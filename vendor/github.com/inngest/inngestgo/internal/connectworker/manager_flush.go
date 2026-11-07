@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 func (h *connectHandler) flushBufferedMessages(reason string) {
 	// Flushes are manager-owned because they need the current auth context.

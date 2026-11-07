@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 import (
 	"context"
@@ -59,7 +59,7 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 
 	// Send connect message
 	{
-		data, err := proto.Marshal(&connectproto.WorkerConnectRequestData{
+		req := &connectproto.WorkerConnectRequestData{
 			ConnectionId:         startResponse.ConnectionId,
 			InstanceId:           h.instanceId(),
 			MaxWorkerConcurrency: h.maxWorkerConcurrency(),
@@ -80,7 +80,14 @@ func (h *connectHandler) performConnectHandshake(ctx context.Context, connection
 			SdkVersion:  h.opts.SDKVersion,
 			SdkLanguage: h.opts.SDKLanguage,
 			StartedAt:   timestamppb.New(startTime),
-		})
+		}
+		if h.opts.PrepareConnect != nil {
+			if err := h.opts.PrepareConnect(req); err != nil {
+				return nil, newReconnectErr(fmt.Errorf("could not prepare connect message: %w", err))
+			}
+		}
+
+		data, err := proto.Marshal(req)
 		if err != nil {
 			return nil, fmt.Errorf("could not serialize sdk connect message: %w", err)
 		}
