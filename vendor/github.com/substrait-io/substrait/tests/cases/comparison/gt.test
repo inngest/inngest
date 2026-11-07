@@ -1,0 +1,21 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+gt(1::i8, 2::i8) = false::bool
+gt(200::i16, 199::i16) = true::bool
+gt(200::i16, 200::i16) = false::bool
+gt(2000000000::i32, 1000000000::i32) = true::bool
+gt(-922337203685775808::i64, -922337203685775807::i64) = false::bool
+gt(7.25::fp32, 2.50::fp32) = true::bool
+gt(-922337203685775808::dec<38, 0>, -922337203685775807::dec<38, 0>) = false::bool
+gt(7.25::dec<38, 2>, 2.50::dec<38, 2>) = true::bool
+gt(-1.5e+308::fp64, -inf::fp64) = true::bool
+gt(inf::fp64, 1.5e+308::fp64) = true::bool
+
+# null_input: Examples with null as input
+gt(null::i16?, 100::i16) = null::bool?
+gt(2::i16, null::i16?) = null::bool?
+gt(null::i16?, null::i16?) = null::bool?
+gt(2::dec<38, 2>, null::dec?<38, 2>) = null::bool?
+gt(null::dec?<38, 2>, null::dec?<38, 2>) = null::bool?

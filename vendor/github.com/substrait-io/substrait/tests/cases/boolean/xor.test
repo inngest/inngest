@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_boolean.yaml'
+
+# basic: Basic examples without any special cases
+xor(true::bool, false::bool) = true::bool
+xor(true::bool, true::bool) = false::bool
+xor(false::bool, false::bool) = false::bool
+xor(false::bool, true::bool) = true::bool
+
+# null_input: Examples with null as input
+xor(true::bool, null::bool?) = null::bool?
+xor(null::bool?, true::bool) = null::bool?
+xor(false::bool, null::bool?) = null::bool?
+xor(null::bool?, false::bool) = null::bool?

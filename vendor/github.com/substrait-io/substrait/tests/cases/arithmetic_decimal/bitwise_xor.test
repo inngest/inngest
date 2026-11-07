@@ -1,0 +1,22 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+bitwise_xor(0::dec<1, 0>, 1::dec<1, 0>) = 1::dec<1, 0>
+bitwise_xor(127::dec<3, 0>, 127::dec<3, 0>) = 0::dec<3, 0>
+bitwise_xor(-127::dec<3, 0>, -10::dec<2, 0>) = 119::dec<3, 0>
+bitwise_xor(31766::dec<5, 0>, 900::dec<3, 0>) = 32658::dec<5, 0>
+bitwise_xor(-31766::dec<5, 0>, 900::dec<3, 0>) = -32658::dec<5, 0>
+bitwise_xor(2147483647::dec<10, 0>, 123456789::dec<9, 0>) = 2024026858::dec<10, 0>
+bitwise_xor(-2147483647::dec<10, 0>, 123456789::dec<9, 0>) = -2024026860::dec<10, 0>
+bitwise_xor(9223372036854775807::dec<19, 0>, 127::dec<3, 0>) = 9223372036854775680::dec<19, 0>
+bitwise_xor(-9223372036854775807::dec<19, 0>, 127::dec<3, 0>) = -9223372036854775682::dec<19, 0>
+
+# max_values: test with max values
+bitwise_xor(99999999999999999999999999999999999999::dec<38, 0>, 99999999999999999999999999999999999999::dec<38, 0>) = 0::dec<38, 0>
+bitwise_xor(99999999999999999999999999999999999999::dec<38, 0>, 00000000000000000000000000000000000000::dec<38, 0>) = 99999999999999999999999999999999999999::dec<38, 0>
+bitwise_xor(-99999999999999999999999999999999999999::dec<38, 0>, -99999999999999999999999999999999999999::dec<38, 0>) = 0::dec<38, 0>
+
+# null_values: test with null values
+bitwise_xor(null::dec?<1, 0>, 127::dec<3, 0>) = null::dec?<3, 0>
+bitwise_xor(null::dec?<1, 0>, null::dec?<1, 0>) = null::dec?<1, 0>

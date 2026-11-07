@@ -1,0 +1,22 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+sum((0, -1, 2, 20)::i8) = 21::i64?
+sum((2000000, -3217908, 629000, -100000, 0, 987654)::i32) = 298746::i64?
+sum((2.5, 0, 5.0, -2.5, -7.5)::fp32) = -2.5::fp64?
+sum((2.5000007152557373046875, 7.0000007152557373046875, 0, 7.0000007152557373046875)::fp64) = 16.500002145767212::fp64?
+
+# overflow: Examples demonstrating overflow behavior
+sum((9223372036854775806, 1, 1, 1, 1, 10000000000)::i64) [overflow:ERROR] = <!ERROR>
+
+# floating_exception: Examples demonstrating exceptional floating point cases
+sum((1.5e+308, 1.5e+308, 1.5e+308)::fp64) = inf::fp64?
+sum((-1.5e+308, -1.5e+308, -1.5e+308)::fp64) = -inf::fp64?
+sum((2.500000715, inf, 2.500000715)::fp64) = inf::fp64?
+sum((2.5000007, -inf, 2.5000007, 10.0)::fp64) = -inf::fp64?
+
+# null_handling: Examples with null as input or output
+sum((Null, Null, Null)::i16) = Null::i64?
+sum(()::i16) = Null::i64?
+sum((200000, Null, 629000, -10000, 0, 987621)::i32) = 1806621::i64?

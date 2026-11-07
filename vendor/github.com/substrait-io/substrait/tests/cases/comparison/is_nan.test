@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+is_nan(0.0::fp32) = false::bool
+is_nan(0.55::fp32) = false::bool
+is_nan(1000.000000000001::fp64) = false::bool
+is_nan(-inf::fp64) = false::bool
+is_nan(inf::fp64) = false::bool
+is_nan(null::fp64?) = null::bool?
+is_nan(nan::fp64) = true::bool
