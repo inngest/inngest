@@ -53,8 +53,8 @@ var (
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, queued_at
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // scheduled_at, started_at, ended_at
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
-		duckdbdriver.QuackColumnVarchar,                                                          // status
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
+		duckdbdriver.QuackColumnVarchar,                                                                   // status
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, inputs, output
 		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
 		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
 		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
@@ -69,13 +69,13 @@ var (
 		duckdbdriver.QuackColumnVarchar,                                          // name
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, output, input
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, internal_id, received_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // source, source_id, event_id, event_name
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnVarchar, // event_data, event_v, event_ts, event_meta
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
@@ -90,7 +90,7 @@ var (
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 )
@@ -303,13 +303,7 @@ func nullableTime(t *time.Time) any {
 	return *t
 }
 
-// nullableJSON substitutes SQL NULL for an empty JSON-column value --
-// jsonText (sample.go) returns "" for a sampled column that was itself SQL
-// NULL, and an empty string is not valid JSON, so writing it verbatim into
-// a JSON-typed column (output/input) fails at commit time ("Malformed
-// JSON... input length is 0") rather than faithfully reproducing "this
-// span/run had no output/input".
-// nonEmptyJSON supplies "{}" for a NOT NULL VARIANT column with no value.
+// nonEmptyJSON supplies "{}" for a NOT NULL JSON column with no value.
 func nonEmptyJSON(s string) string {
 	if s == "" {
 		return `{}`
@@ -317,6 +311,12 @@ func nonEmptyJSON(s string) string {
 	return s
 }
 
+// nullableJSON substitutes SQL NULL for an empty JSON-column value --
+// jsonText (sample.go) returns "" for a sampled column that was itself SQL
+// NULL, and an empty string is not valid JSON, so writing it verbatim into
+// a JSON text column (output/input) would leave readers an unparseable
+// value rather than faithfully reproducing "this span/run had no
+// output/input".
 func nullableJSON(s string) any {
 	if s == "" {
 		return nil

@@ -134,14 +134,13 @@ func TestBatcherHandlesOptionalSpanColumnsInABatch(t *testing.T) {
 		return count == 2
 	}, 2*time.Second, 50*time.Millisecond)
 
-	// "output" is a JSON column, so the driver decodes it straight into a Go
-	// map rather than handing back the raw string that was inserted (see
-	// pkg/db/duckdb/rows.go) — scan into `any` rather than sql.NullString.
+	// "output" is JSON text, stored as inserted -- scan into `any` rather
+	// than sql.NullString so a NULL reads back as nil.
 	var output any
 	require.NoError(t, db.QueryRowContext(context.Background(),
 		"SELECT output FROM inngest.run_trace_spans WHERE span_id = 'span-with-output';",
 	).Scan(&output))
-	require.Equal(t, map[string]any{"data": "my-output"}, output,
+	require.Equal(t, `{"data":"my-output"}`, output,
 		"span-with-output row's output should not have been dropped")
 
 	require.NoError(t, db.QueryRowContext(context.Background(),
