@@ -61,12 +61,21 @@ func ulidColumn(v any, col string) (ulid.ULID, error) {
 	return id, nil
 }
 
-// asMap requires the column's already-decoded JSON value to be an object,
-// or SQL/JSON null — used for columns like events.event_data. Both a SQL
-// NULL and a stored JSON "null" decode to a Go nil and mean "no data", so
+// asMap decodes a JSON column's value, which must be an object or
+// SQL/JSON null — used for columns like events.event_data. The lake stores
+// JSON as text (VARCHAR), so v is usually that text; an already-decoded
+// value (a JSON-typed expression's, which the driver unmarshals itself) is
+// taken as is. Both a SQL NULL and a stored JSON "null" mean "no data", so
 // they map to an empty object; any other non-object shape is real
 // corruption worth surfacing.
 func asMap(v any, col string) (map[string]any, error) {
+	if s, ok := v.(string); ok {
+		var decoded any
+		if err := json.Unmarshal([]byte(s), &decoded); err != nil {
+			return nil, fmt.Errorf("duckdbquery: decoding column %q: %w", col, err)
+		}
+		v = decoded
+	}
 	if v == nil {
 		return map[string]any{}, nil
 	}
@@ -77,12 +86,33 @@ func asMap(v any, col string) (map[string]any, error) {
 	return m, nil
 }
 
-// asJSON re-marshals a JSON column's already-decoded Go value back into raw
-// bytes, so callers can treat it like a TEXT/BLOB column from any other
-// backend. Returns nil, nil for a SQL NULL column.
+// asRawMap is asMap keeping each value's own JSON text, so it round-trips
+// exactly (numbers included).
+func asRawMap(v any, col string) (map[string]json.RawMessage, error) {
+	b, err := asJSON(v, col)
+	if err != nil || b == nil {
+		return map[string]json.RawMessage{}, err
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("duckdbquery: expected object for column %q: %w", col, err)
+	}
+	if m == nil { // JSON null
+		m = map[string]json.RawMessage{}
+	}
+	return m, nil
+}
+
+// asJSON returns a JSON column's raw bytes, so callers can treat it like a
+// TEXT/BLOB column from any other backend: the stored text as is, or an
+// already-decoded value (a JSON-typed expression's) re-marshaled. Returns
+// nil, nil for a SQL NULL column.
 func asJSON(v any, col string) ([]byte, error) {
-	if v == nil {
+	switch x := v.(type) {
+	case nil:
 		return nil, nil
+	case string:
+		return []byte(x), nil
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

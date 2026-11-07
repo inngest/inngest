@@ -69,20 +69,16 @@ func encodeLiteral(v driver.Value) (string, error) {
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'", nil
 	case json.RawMessage:
 		// Cast through ::JSON rather than encoded as an ordinary VARCHAR
-		// literal (the plain string case above): this matters for any
-		// VARIANT-typed column (migrations/000001_baseline.sql: attributes,
-		// inputs, output, values, input, event_data, event_meta).
-		// DuckDB's implicit VARCHAR->VARIANT assignment cast does NOT parse
-		// a plain string's content — it wraps the whole string as a single
-		// VARCHAR-typed variant leaf instead of the structured value
-		// callers expect (confirmed against a real binary:
-		// `'{"a":1}'::VARCHAR::VARIANT` reports variant_typeof "VARCHAR",
-		// not "OBJECT(a)"; going through JSON first,
-		// `'{"a":1}'::JSON::VARIANT`, does parse it). A caller with
-		// already-marshaled JSON bytes for one of these columns should pass
-		// them as json.RawMessage instead of string precisely to opt into
-		// this cast — see conn.go's CheckNamedValue for why that requires
-		// its own case there too, not just here.
+		// literal (the plain string case above), so the value is typed (and
+		// validated) as JSON: a JSON-text column stores it as is, and a
+		// VARIANT/STRUCT column parses it (DuckDB's implicit
+		// VARCHAR->VARIANT cast instead wraps the whole string as one
+		// VARCHAR leaf: `'{"a":1}'::VARCHAR::VARIANT` reports
+		// variant_typeof "VARCHAR", not "OBJECT(a)"). A caller with
+		// already-marshaled JSON bytes should pass them as json.RawMessage
+		// instead of string precisely to opt into this cast — see conn.go's
+		// CheckNamedValue for why that requires its own case there too, not
+		// just here.
 		return "'" + strings.ReplaceAll(string(val), "'", "''") + "'::JSON", nil
 	case []byte:
 		var sb strings.Builder

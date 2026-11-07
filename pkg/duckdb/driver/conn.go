@@ -182,7 +182,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 		// silently discarding the json.RawMessage type, and with it
 		// encodeLiteral's ::JSON cast, before this value ever reaches
 		// interpolate (encodeLiteral's own []byte case encodes as a BLOB
-		// literal instead, not what a VARIANT column needs — see
+		// literal instead, not what a JSON column needs — see
 		// encodeLiteral's json.RawMessage case). Returning nil instead
 		// tells database/sql to accept nv.Value exactly as given.
 		return nil
