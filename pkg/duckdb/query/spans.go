@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -47,7 +46,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		   WHERE s.run_id = ?
 		   QUALIFY m.kind IS NULL OR ROW_NUMBER() OVER (
 		     PARTITION BY m.span_id, m.is_user, m.kind
-		     ORDER BY m.created_at DESC, CAST(m.values AS VARCHAR) DESC NULLS LAST
+		     ORDER BY m.created_at DESC, m.values DESC NULLS LAST
 		   ) = 1
 		 )
 		 SELECT
@@ -255,7 +254,9 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		return nil, "", err
 	}
 
-	attrs, _ := rawAttributes.(map[string]any)
+	// Lenient, as for any other backend: a malformed attributes value reads
+	// as no attributes rather than failing the whole trace.
+	attrs, _ := asMap(rawAttributes, "attributes")
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
@@ -362,24 +363,16 @@ func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
 			return nil, err
 		}
 
-		values, err := asMap(entry["values"], "metadata.values")
+		values, err := asRawMap(entry["values"], "metadata.values")
 		if err != nil {
 			return nil, err
-		}
-		mv := make(metadata.Values, len(values))
-		for k, v := range values {
-			b, err := json.Marshal(v)
-			if err != nil {
-				return nil, fmt.Errorf("duckdbquery: re-marshaling metadata.values[%q]: %w", k, err)
-			}
-			mv[k] = b
 		}
 
 		out = append(out, &cqrs.SpanMetadata{
 			Scope:     scope,
 			Kind:      metadata.Kind(kind),
 			IsUser:    isUser,
-			Values:    mv,
+			Values:    metadata.Values(values),
 			UpdatedAt: updatedAt,
 		})
 	}

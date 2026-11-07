@@ -345,6 +345,34 @@ func TestGetSpanOutputUnwrapsDataEnvelope(t *testing.T) {
 	require.JSONEq(t, `{"input":true}`, string(out.Input))
 }
 
+// TestGetSpanOutputKeepsStoredJSON checks a span's input comes back as the
+// exact text written (key order, big ints), since the lake stores JSON as
+// text (output goes through cqrs' data envelope unwrap, so only its value is
+// checked).
+func TestGetSpanOutputKeepsStoredJSON(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC()
+	input := `{"z":1,"a":{"n":18446744073709551615,"f":1.50}}`
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.run_trace_spans
+		 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, input)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step', ?, ?, 'trace-1', 'span-1', '{}', ?, ?);`,
+		uuid.New().String(), uuid.New().String(), runID.String(), now, uuid.New().String(), "test-app", uuid.New().String(), "test-fn",
+		now, now, json.RawMessage(`{"data":{"b":2,"a":[1,{"x":null}]}}`), json.RawMessage(input),
+	)
+	require.NoError(t, err)
+
+	out, err := m.GetSpanOutput(ctx, cqrs.SpanIdentifier{RunID: runID.String(), SpanID: "span-1"})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"b":2,"a":[1,{"x":null}]}`, string(out.Data))
+	require.Equal(t, input, string(out.Input))
+}
+
 func TestGetSpanOutputRequiresRunIDAndSpanID(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()

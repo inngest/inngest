@@ -45,23 +45,14 @@ func (m *Manager) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[uli
 		args[i+1] = id.String()
 	}
 
-	// attributes is VARIANT, not JSON — DuckDB's ->> operator only extracts
-	// from JSON, and silently falls back to stringifying the VARIANT with
-	// its own single-quoted struct syntax first (verified against a real
-	// binary: `{'key': value}`, not `{"key":"value"}`) rather than
-	// erroring, so every extraction re-parses that as JSON and fails with a
-	// "Malformed JSON at byte 1" error. VARIANT's own dot-access syntax
-	// (attributes."key", a quoted identifier — the key's dots make it one
-	// field name, not a further nested path) reads the field natively
-	// instead, no JSON round-trip at all; the trailing ::VARCHAR unwraps it
-	// from a VARIANT-typed result to a plain string, matching what ->>
-	// itself always returned — see pkg/duckdb/tracing/tracing.go's
-	// materializeRuns for the same fix on the write side.
-	hashedIDExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferHashedID.Key())
-	userlandIDExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferUserlandID.Key())
-	fnSlugExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferFnSlug.Key())
-	statusExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferStatus.Key())
-	eventIDExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferEventID.Key())
+	// attributes is JSON text; each key is read with ->> and a quoted
+	// JSONPath key ($."key"), since the key's dots make it one field name,
+	// not a nested path.
+	hashedIDExpr := attrText(meta.Attrs.DeferHashedID.Key())
+	userlandIDExpr := attrText(meta.Attrs.DeferUserlandID.Key())
+	fnSlugExpr := attrText(meta.Attrs.DeferFnSlug.Key())
+	statusExpr := attrText(meta.Attrs.DeferStatus.Key())
+	eventIDExpr := attrText(meta.Attrs.DeferEventID.Key())
 
 	// hashed_id IS NOT NULL excludes any row that isn't ours; every defer
 	// span sets it unconditionally.
@@ -293,4 +284,12 @@ func (m *Manager) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (m
 		return nil, fmt.Errorf("duckdbquery: reading run-queued span rows: %w", err)
 	}
 	return out, nil
+}
+
+// attrText is the SQL reading span attribute key (a constant meta.Attrs
+// key, never user input) as text: attributes->>'$."key"', the key quoted as
+// one JSONPath field since it has dots in it.
+func attrText(key string) string {
+	path := `$."` + strings.ReplaceAll(key, `"`, `\"`) + `"`
+	return "attributes->>'" + strings.ReplaceAll(path, "'", "''") + "'"
 }

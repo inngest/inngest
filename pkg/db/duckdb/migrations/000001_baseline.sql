@@ -7,8 +7,8 @@
 -- whole-value reads). They're VARCHAR rather than JSON so an Iceberg lake
 -- (which rejects duckdb's JSON type, and duckdb doesn't keep the alias on a
 -- string column) can share the same column types. Everything above the
--- tables reads them as JSON: the 000002_insights_views.sql macros cast them
--- back (free, JSON is an alias of VARCHAR).
+-- tables reads them as JSON: the raw_*/insights_* macros cast them back
+-- (free, JSON is an alias of VARCHAR).
 CREATE TABLE IF NOT EXISTS inngest.runs (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -224,6 +224,13 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- inngest.run_trace_spans as is: spans need no collapse, each row is its own
 -- emission.
 --
+-- The lake stores JSON payloads as JSON text in VARCHAR columns (see the top
+-- of this file). Every macro returns them as JSON (dot access, ->>, JSON
+-- results for Insights), but ::JSON is a validating parse per row, so it's
+-- only applied to a whole value a macro returns or embeds, in its final
+-- projection (after any QUALIFY): the macros' own filters and key
+-- extractions (->>, which parses either way) read the text directly.
+--
 -- A lake whose runs are already one row per run (duckdb.ModeFlatLake: it only
 -- holds exported final rows, and a federated read's delta is each run's
 -- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
@@ -232,21 +239,21 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- spanning lines.
 -- +goose ENVSUB ON
 CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
-SELECT * FROM query_table(p_runs)
+SELECT * REPLACE (attributes::JSON AS attributes, inputs::JSON AS inputs, output::JSON AS output) FROM query_table(p_runs)
 ${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC, CASE WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2 WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1 ELSE 0 END DESC, status DESC) = 1};
 -- +goose ENVSUB OFF
 
 CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
-SELECT * FROM query_table(p_spans);
+SELECT * REPLACE (attributes::JSON AS attributes, output::JSON AS output, input::JSON AS input) FROM query_table(p_spans);
 
 -- raw_events is inngest.events as is: an event is never re-written.
 CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE
-SELECT * FROM query_table(p_events);
+SELECT * REPLACE (event_data::JSON AS event_data, event_meta::JSON AS event_meta) FROM query_table(p_events);
 
 -- raw_run_metadata is inngest.run_metadata as is: one row per emission
 -- (inngest.run_metadata_rollup collapses them).
 CREATE MACRO inngest.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT * FROM query_table(p_metadata);
+SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 
 -- +goose Down
 DROP MACRO IF EXISTS inngest.raw_run_metadata;
