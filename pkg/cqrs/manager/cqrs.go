@@ -1203,6 +1203,14 @@ func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error
 	return domainToCQRS(app, domainApp), nil
 }
 
+func (w wrapper) GetAppsByIDs(ctx context.Context, ids []uuid.UUID) ([]*cqrs.App, error) {
+	apps, err := w.q.GetAppsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return domainToCQRSList(apps, domainApp), nil
+}
+
 func (w wrapper) GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url, forceHTTPS)
@@ -1354,6 +1362,14 @@ func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) 
 	}
 
 	return domainToCQRS(fn, domainFunction), nil
+}
+
+func (w wrapper) GetFunctionsByInternalUUIDs(ctx context.Context, fnIDs []uuid.UUID) ([]*cqrs.Function, error) {
+	fns, err := w.q.GetFunctionsByIDs(ctx, fnIDs)
+	if err != nil {
+		return nil, err
+	}
+	return domainToCQRSList(fns, domainFunction), nil
 }
 
 func (w wrapper) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {

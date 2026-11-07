@@ -84,6 +84,9 @@ SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;
 -- name: GetAppByID :one
 SELECT * FROM apps WHERE id = ? LIMIT 1;
 
+-- name: GetAppsByIDs :many
+SELECT * FROM apps WHERE id IN (sqlc.slice('ids'));
+
 -- name: GetAppByURL :one
 SELECT * FROM apps WHERE url = ? AND archived_at IS NULL LIMIT 1;
 
@@ -155,6 +158,9 @@ LIMIT CASE WHEN @limit_rows > 0 THEN @limit_rows ELSE -1 END;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
+
+-- name: GetFunctionsByIDs :many
+SELECT * FROM functions WHERE id IN (sqlc.slice('ids'));
 
 -- name: GetFunctionBySlug :one
 SELECT * FROM functions WHERE slug = ? AND archived_at IS NULL;
