@@ -174,19 +174,34 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 		opts.SpanID = spanID.String()
 	}
 
-	resp, err := do(ctx, traceCtx, forwarder, opts)
+	resp, instanceID, err := do(ctx, traceCtx, forwarder, opts)
 	if err != nil {
-		return nil, err
+		return withInstanceID(nil, instanceID), err
 	}
 
-	return httpdriver.HandleHttpResponse(ctx, r, resp)
+	dr, err := httpdriver.HandleHttpResponse(ctx, r, resp)
+	return withInstanceID(dr, instanceID), err
 }
 
-func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grpc.ProxyOpts) (*httpdriver.Response, error) {
+// withInstanceID sets the connect worker instance on the driver response.  The executor reads it
+// to tag the step spans with the worker.  It creates a response when dr is nil and the instance
+// is known, and the executor fills in the step and the error the same way as for a nil response.
+func withInstanceID(dr *state.DriverResponse, instanceID string) *state.DriverResponse {
+	if instanceID == "" {
+		return dr
+	}
+	if dr == nil {
+		dr = &state.DriverResponse{}
+	}
+	dr.InstanceID = instanceID
+	return dr
+}
+
+func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grpc.ProxyOpts) (*httpdriver.Response, string, error) {
 	span := trace.SpanFromContext(traceCtx)
 
 	pre := time.Now()
-	resp, err := forwarder.Proxy(ctx, traceCtx, opts)
+	resp, instanceID, err := forwarder.Proxy(ctx, traceCtx, opts)
 	dur := time.Since(pre)
 
 	var sysErr *syscode.Error
@@ -201,7 +216,7 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 	}
 
 	if resp == nil && err != nil {
-		return nil, err
+		return nil, instanceID, err
 	}
 
 	// TODO Should be handled above, verify this
@@ -269,5 +284,5 @@ func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grp
 		Sdk:            resp.SdkVersion,
 		Header:         http.Header{}, // not supported by connect
 		SysErr:         sysErr,
-	}, err
+	}, instanceID, err
 }

@@ -109,6 +109,10 @@ type DriverResponse struct {
 	// SDK represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
 	SDK string `json:"sdk,omitempty"`
+	// InstanceID is the connect worker instance that the request was sent to.
+	// it is empty for HTTP requests and for connect requests that no worker
+	// received.
+	InstanceID string `json:"instanceID,omitempty"`
 
 	// final indicates whether the error has been marked as final.  This occurs
 	// when the response errors and the executor detects that this is the final

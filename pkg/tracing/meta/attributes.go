@@ -158,6 +158,9 @@ var Attrs = struct {
 	ResponseOutputSize attr[*int]
 	ResponseSteps      attr[*ResponseOps]
 
+	// Connect attributes
+	ConnectInstanceID attr[*string]
+
 	IsCheckpoint attr[*bool]
 
 	// Userland attributes
@@ -192,6 +195,7 @@ var Attrs = struct {
 	AppName:                            StringAttr("app.name"),
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
+	ConnectInstanceID:                  StringAttr("connect.instance_id"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
 	DeferEventID:                       ULIDAttr("defer.event_id"),

@@ -99,6 +99,7 @@ type ExtractedValues struct {
 	ResponseStatusCode *int
 	ResponseOutputSize *int
 	ResponseSteps *ResponseOps
+	ConnectInstanceID *string
 	IsCheckpoint *bool
 	IsUserland *bool
 	UserlandSpanID *string
@@ -203,6 +204,7 @@ var AttrsByKey = map[string]Serializer{
 	Attrs.ResponseStatusCode.Key(): Attrs.ResponseStatusCode,
 	Attrs.ResponseOutputSize.Key(): Attrs.ResponseOutputSize,
 	Attrs.ResponseSteps.Key(): Attrs.ResponseSteps,
+	Attrs.ConnectInstanceID.Key(): Attrs.ConnectInstanceID,
 	Attrs.IsCheckpoint.Key(): Attrs.IsCheckpoint,
 	Attrs.IsUserland.Key(): Attrs.IsUserland,
 	Attrs.UserlandSpanID.Key(): Attrs.UserlandSpanID,

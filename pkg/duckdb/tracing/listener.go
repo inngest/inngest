@@ -969,6 +969,10 @@ func (l *listener) OnStepFinished(ctx context.Context, md sv2.Metadata, item que
 			steps[i] = meta.ResponseOp{Op: s.Op, ID: s.ID, Name: s.Name}
 		}
 		meta.AddAttr(attrs, meta.Attrs.ResponseSteps, &steps)
+
+		if resp.InstanceID != "" {
+			meta.AddAttr(attrs, meta.Attrs.ConnectInstanceID, &resp.InstanceID)
+		}
 	}
 
 	mdPtr := safeMetadata(md)

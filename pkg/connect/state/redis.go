@@ -998,15 +998,22 @@ func (r *redisConnectionStateManager) AssignRequestToWorker(ctx context.Context,
 		return err
 	}
 
-	// If no limit (capacity == 0), don't track leases, don't track information about the worker
+	requestTTL := consts.ConnectWorkerRequestToWorkerMappingTTL
+	requestWorkerKey := r.requestWorkerKey(envID, requestID)
+
+	// a worker without a capacity limit has no sorted set.  it still gets the
+	// request-to-worker key, so GetAssignedWorkerID can name the worker that
+	// ran the request.
 	if capacity <= 0 {
+		err := r.client.Do(ctx, r.client.B().Set().Key(requestWorkerKey).Value(instanceID).Ex(requestTTL).Build()).Error()
+		if err != nil {
+			return fmt.Errorf("failed to set request worker mapping: %w", err)
+		}
 		return nil
 	}
 
 	// Use Lua script to atomically check capacity and add to sorted set
 	setTTL := consts.ConnectWorkerCapacityManagerTTL
-	requestTTL := consts.ConnectWorkerRequestToWorkerMappingTTL
-	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 	now := r.c.Now()
 	expirationTime := now.Add(requestTTL).Unix()
 
@@ -1045,12 +1052,20 @@ func (r *redisConnectionStateManager) DeleteRequestFromWorker(ctx context.Contex
 	workerRequestsKey := r.workerRequestsKey(envID, instanceID)
 	requestWorkerKey := r.requestWorkerKey(envID, requestID)
 
-	// check instance capacity - if the capacity is 0/infinite, we don't need to delete the lease
 	capacity, err := r.GetWorkerTotalCapacity(ctx, envID, instanceID)
 	if err != nil {
 		return err
 	}
+
+	// a worker without a capacity limit only has the request-to-worker key.
+	// the key is deleted only when it names this instance, so a stale cleanup
+	// does not erase the mapping of the worker that now runs the request.
 	if capacity <= 0 {
+		keys := []string{requestWorkerKey}
+		args := []string{instanceID}
+		if err := scripts["delete_request_worker"].Exec(ctx, r.client, keys, args).Error(); err != nil {
+			return fmt.Errorf("failed to delete request worker mapping: %w", err)
+		}
 		return nil
 	}
 
