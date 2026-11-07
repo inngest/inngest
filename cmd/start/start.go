@@ -132,6 +132,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		EnableDuckDB:            localconfig.GetBoolValue(cmd, "duckdb", false),
 		EnableDuckDBReads:       localconfig.GetBoolValue(cmd, "duckdb-reads", false),
 		Persist:                 true,
+		Poll:                    true,
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
 		PostgresConnMaxIdleTime: localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5),
 		PostgresConnMaxLifetime: localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30),
