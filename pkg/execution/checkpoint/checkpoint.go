@@ -269,6 +269,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
 					MaxAttempts: &max,
+					InstanceID:  input.InstanceID,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
@@ -315,6 +316,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 					Identifier:  input.Metadata.ID,
 					Attempt:     runCtx.AttemptCount(),
 					MaxAttempts: &max,
+					InstanceID:  input.InstanceID,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
@@ -575,6 +577,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 					Identifier: md.ID,
 					Attempt:    0,
 					// XXX: MaxAttempts isn't stored here, as we don't have that info at this time.,
+					InstanceID: input.InstanceID,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
@@ -618,6 +621,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 					Identifier: md.ID,
 					Attempt:    0,
+					InstanceID: input.InstanceID,
 				}),
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
