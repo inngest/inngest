@@ -54,7 +54,7 @@ func TestExecuteFederated(t *testing.T) {
 	_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.runs
 		(account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug,
 		 status, attributes, inputs, output, bucket_at)
-		VALUES (?::UUID, ?::UUID, 'run-lake', ?, ?, ?, ?, ?::UUID, 'app', ?::UUID, 'fn', 'Completed', '{}'::JSON::VARIANT, '[]'::JSON::VARIANT, NULL, ?)`,
+		VALUES (?::UUID, ?::UUID, 'run-lake', ?, ?, ?, ?, ?::UUID, 'app', ?::UUID, 'fn', 'Completed', '{}', '[]', NULL, ?)`,
 		account.String(), env.String(), queued, queued, queued, queued, app.String(), fn.String(), w.Add(-time.Second))
 	require.NoError(t, err)
 	delta := map[federate.Table][]map[string]any{federate.TableRuns: {{
@@ -97,8 +97,8 @@ func TestExecuteFederated(t *testing.T) {
 		// emission in the delta; run-delta's only emission is in the delta.
 		_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.run_metadata
 			(account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at, bucket_at)
-			VALUES (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'cost', true, '{"usd":1}'::JSON::VARIANT, ?, ?),
-			       (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'region', true, '{"name":"us"}'::JSON::VARIANT, ?, ?)`,
+			VALUES (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'cost', true, '{"usd":1}', ?, ?),
+			       (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'region', true, '{"name":"us"}', ?, ?)`,
 			account.String(), env.String(), queued, queued, w.Add(-time.Second),
 			account.String(), env.String(), queued, queued, w.Add(-time.Second))
 		require.NoError(t, err)

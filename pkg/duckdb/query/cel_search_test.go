@@ -169,7 +169,7 @@ func TestGetTraceRunsCELPagesPastNonMatchingCandidates(t *testing.T) {
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status)
 		 SELECT ?, ?, printf('run-%04d', i), ?::TIMESTAMPTZ + to_milliseconds(i // 2), ?::TIMESTAMPTZ, ?, 'test-app', ?, 'test-fn', '{}',
-		        json_array(json_object('name', 'x', 'data', json_object('a', i % 100)))::VARIANT, ?
+		        json_array(json_object('name', 'x', 'data', json_object('a', i % 100)))::VARCHAR, ?
 		 FROM range(?) t(i);`,
 		accountID.String(), envID.String(), base, base, uuid.New().String(), uuid.New().String(),
 		enums.StepStatusCompleted.String(), total,

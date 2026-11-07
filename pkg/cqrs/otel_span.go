@@ -91,11 +91,18 @@ func UnwrapSpanOutputEnvelope(so *SpanOutput, output, input []byte) (done bool) 
 	if isWaitForEventOutput(m) {
 		return true
 	}
-	if errData, ok := m["error"]; ok {
+	// Take the envelope's data/error as their stored bytes rather than
+	// re-marshaling the decoded value, so key order and number text (IE
+	// 1.10, ints past 2^53) come back as the SDK sent them.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(output, &raw); err != nil {
+		return false
+	}
+	if _, ok := m["error"]; ok {
 		so.IsError = true
-		so.Data, _ = json.Marshal(errData)
-	} else if successData, ok := m["data"]; ok {
-		so.Data, _ = json.Marshal(successData)
+		so.Data = raw["error"]
+	} else if _, ok := m["data"]; ok {
+		so.Data = raw["data"]
 	}
 	return false
 }
