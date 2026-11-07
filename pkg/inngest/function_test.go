@@ -123,6 +123,97 @@ func TestValidate(t *testing.T) {
 	})
 }
 
+func TestValidateDurations(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func(f *Function)
+		wantErr string
+	}{
+		{name: "no durations", mutate: func(f *Function) {}},
+		{
+			name: "valid timeouts",
+			mutate: func(f *Function) {
+				f.Timeouts = &Timeouts{Start: new("1d"), Finish: new("1h30m")}
+			},
+		},
+		{
+			name: "empty timeouts are treated as unset",
+			mutate: func(f *Function) {
+				f.Timeouts = &Timeouts{Start: new(""), Finish: new("")}
+			},
+		},
+		{
+			name: "unparseable start timeout",
+			mutate: func(f *Function) {
+				f.Timeouts = &Timeouts{Start: new("1 hour")}
+			},
+			wantErr: "The start timeout of '1 hour' is invalid",
+		},
+		{
+			name: "unparseable finish timeout",
+			mutate: func(f *Function) {
+				f.Timeouts = &Timeouts{Finish: new("soon")}
+			},
+			wantErr: "The finish timeout of 'soon' is invalid",
+		},
+		{
+			name: "negative finish timeout",
+			mutate: func(f *Function) {
+				f.Timeouts = &Timeouts{Finish: new("-5s")}
+			},
+			wantErr: "The finish timeout of '-5s' must not be negative",
+		},
+		{
+			name: "valid cancellation duration timeout",
+			mutate: func(f *Function) {
+				f.Cancel = []Cancel{{Event: "stop", Timeout: new("1h")}}
+			},
+		},
+		{
+			name: "valid cancellation timestamp timeout",
+			mutate: func(f *Function) {
+				f.Cancel = []Cancel{{Event: "stop", Timeout: new("2030-10-12T07:20:50.52Z")}}
+			},
+		},
+		{
+			name: "unparseable cancellation timeout",
+			mutate: func(f *Function) {
+				f.Cancel = []Cancel{{Event: "stop", Timeout: new("soon")}}
+			},
+			wantErr: "Cancellation timeout is invalid",
+		},
+		{
+			name: "valid debounce timeout",
+			mutate: func(f *Function) {
+				f.Debounce = &Debounce{Period: "10s", Timeout: new("1m")}
+			},
+		},
+		{
+			name: "unparseable debounce timeout",
+			mutate: func(f *Function) {
+				f.Debounce = &Debounce{Period: "10s", Timeout: new("soon")}
+			},
+			wantErr: "The debounce timeout of 'soon' is invalid",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := Function{
+				Name:     "hi",
+				Triggers: []Trigger{{EventTrigger: &EventTrigger{Event: "go"}}},
+				Steps:    []Step{{ID: "step", Name: "Function body", URI: "http://example.com"}},
+			}
+			tc.mutate(&f)
+
+			err := f.Validate(context.Background())
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
 func TestRunPriorityFactor(t *testing.T) {
 	ctx := context.Background()
 	f := Function{}
