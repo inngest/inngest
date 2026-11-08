@@ -38,6 +38,30 @@ type Query {
   runTrigger(runID: String!): RunTraceTrigger!
   runTrace(runID: String!): RunTraceSpan!
 
+  insights(sql: String!): InsightsQueryResult!
+
+  # Sessions pagination matches /v2/sessions: first is 1-100 (default
+  # 20), after is the previous page's pageInfo.endCursor.
+  sessionKeys(
+    search: String
+    first: Int! = 20
+    after: String
+  ): SessionKeysConnection!
+  sessions(
+    sessionKey: String!
+    sessionIdSearch: String
+    timeRange: TimeRangeInput
+    first: Int! = 20
+    after: String
+  ): SessionGroupsConnection!
+  sessionRuns(
+    sessionKey: String!
+    sessionId: String!
+    timeRange: TimeRangeInput
+    first: Int! = 20
+    after: String
+  ): SessionRunsConnection!
+
   workerConnections(
     first: Int! = 100
     after: String
@@ -75,6 +99,11 @@ input FunctionRunQuery {
 
 input FunctionRunsQuery {
   workspaceId: ID! = "local"
+}
+
+input TimeRangeInput {
+  from: Time!
+  until: Time
 }
 
 input StreamQuery {

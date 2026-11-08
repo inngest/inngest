@@ -1,3 +1,9 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuPanelClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { useState } from 'react';
 import { Listbox } from '@headlessui/react';
 import {
@@ -7,6 +13,7 @@ import {
 } from '@inngest/components/Tooltip/Tooltip';
 import {
   RiCloudLine,
+  RiCheckLine,
   RiErrorWarningLine,
   RiExpandUpDownLine,
 } from '@remixicon/react';
@@ -31,6 +38,7 @@ export default function EnvSelectMenu({
   onSelect,
   className,
 }: EnvSelectMenuProps) {
+  const keyboardNavigation = useMenuInputModality();
   const [{ data: envs = [], error }] = useEnvironments();
   const [selection, setSelection] = useState<Environment | null>(null);
 
@@ -90,15 +98,26 @@ export default function EnvSelectMenu({
             </Listbox.Button>
 
             <Listbox.Options
-              className="bg-canvasBase border-subtle absolute left-0.5 top-9
-              z-50 max-h-96 w-[250px] divide-none overflow-y-auto rounded border shadow focus:outline-none"
+              data-keyboard-navigation={keyboardNavigation}
+              className={cn(
+                menuPanelClassName,
+                'dropdown-focus absolute left-0.5 top-9 z-50 max-h-96 w-[250px] overflow-y-auto',
+              )}
             >
               {defaultEnvironment !== null && (
-                <EnvItem env={defaultEnvironment} key={defaultEnvironment.id} />
+                <EnvItem
+                  env={defaultEnvironment}
+                  key={defaultEnvironment.id}
+                  isSelected={selection?.id === defaultEnvironment.id}
+                />
               )}
               {testEnvironments.length > 0 &&
                 testEnvironments.map((env) => (
-                  <EnvItem key={env.id} env={env} />
+                  <EnvItem
+                    key={env.id}
+                    env={env}
+                    isSelected={selection?.id === env.id}
+                  />
                 ))}
             </Listbox.Options>
           </div>
@@ -121,13 +140,27 @@ const SelectedDisplay = ({ env }: { env: Environment | null }) => (
   </span>
 );
 
-const EnvItem = ({ env }: { env: Environment }) => (
+const EnvItem = ({
+  env,
+  isSelected,
+}: {
+  env: Environment;
+  isSelected: boolean;
+}) => (
   <Listbox.Option
     key={'lo-' + env.id}
     value={env}
-    className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+    className={cn(headlessMenuItemClassName, isSelected && 'bg-canvasSubtle')}
   >
-    <span className="bg-primary-moderate block h-1.5 w-1.5 shrink-0 rounded-full" />
-    <span className="truncate">{env.name}</span>
+    <>
+      <span className="bg-primary-moderate block h-1.5 w-1.5 shrink-0 rounded-full" />
+      <span className="min-w-0 flex-1 truncate">{env.name}</span>
+      {isSelected && (
+        <RiCheckLine
+          className="text-success h-4 w-4 shrink-0"
+          aria-hidden="true"
+        />
+      )}
+    </>
   </Listbox.Option>
 );

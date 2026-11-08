@@ -1,0 +1,14 @@
+INPUT
+event.id == "abc"
+
+EVENT SQL
+(COALESCE((x::JSON->>?), '') = ?)
+
+EVENT ARGS
+[$.id abc]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

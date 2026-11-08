@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
@@ -71,6 +72,7 @@ func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
 type ShardedClient struct {
 	fnRunState *FunctionRunStateClient
 	batch      *BatchClient
+	batchNext  *BatchClient
 }
 
 type IsShardedWithRunIdFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
@@ -88,6 +90,9 @@ type ShardedClientOpts struct {
 
 	FunctionRunStateClient rueidis.Client
 	BatchClient            rueidis.Client
+	// BatchNextClient is optional. It is the next batch store during a
+	// batching migration, and nil when no migration is in progress.
+	BatchNextClient rueidis.Client
 
 	StateDefaultKey string
 	QueueDefaultKey string
@@ -96,10 +101,14 @@ type ShardedClientOpts struct {
 }
 
 func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
-	return &ShardedClient{
+	sc := &ShardedClient{
 		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
 		batch:      NewBatchClient(opts.BatchClient, opts.QueueDefaultKey),
 	}
+	if opts.BatchNextClient != nil {
+		sc.batchNext = NewBatchClient(opts.BatchNextClient, opts.QueueDefaultKey)
+	}
+	return sc
 }
 
 func (s *ShardedClient) FunctionRunState() *FunctionRunStateClient {
@@ -110,12 +119,40 @@ func (s *ShardedClient) Batch() *BatchClient {
 	return s.batch
 }
 
-type PauseClient struct {
-	kg          PauseKeyGenerator
-	unshardedRc rueidis.Client
+// BatchNext returns the next batch store during a batching migration, or nil
+// when no migration is in progress.
+func (s *ShardedClient) BatchNext() *BatchClient {
+	return s.batchNext
 }
 
-func (p *PauseClient) KeyGenerator() PauseKeyGenerator {
+type PauseClient struct {
+	kg              PauseKeyGenerator
+	unshardedRc     rueidis.Client
+	stateDefaultKey string
+	workspaceScoped bool
+}
+
+// KeyPrefix is the hash tag shared by a workspace's pause records and indexes.
+func (p *PauseClient) KeyPrefix(workspaceID uuid.UUID) string {
+	if p.workspaceScoped {
+		return fmt.Sprintf("%s:%s", p.stateDefaultKey, workspaceID)
+	}
+	return p.stateDefaultKey
+}
+
+// BlockKeyPrefix preserves the historical block metadata prefix unless
+// workspace-scoped keys are explicitly enabled.
+func (p *PauseClient) BlockKeyPrefix(workspaceID uuid.UUID) string {
+	if !p.workspaceScoped {
+		return "estate"
+	}
+	return p.KeyPrefix(workspaceID)
+}
+
+func (p *PauseClient) KeyGenerator(workspaceID uuid.UUID) PauseKeyGenerator {
+	if p.workspaceScoped {
+		return pauseKeyGenerator{stateDefaultKey: p.KeyPrefix(workspaceID)}
+	}
 	return p.kg
 }
 
@@ -125,8 +162,9 @@ func (p *PauseClient) Client() rueidis.Client {
 
 func NewPauseClient(r rueidis.Client, stateDefaultKey string) *PauseClient {
 	return &PauseClient{
-		kg:          pauseKeyGenerator{stateDefaultKey: stateDefaultKey},
-		unshardedRc: r,
+		kg:              pauseKeyGenerator{stateDefaultKey: stateDefaultKey},
+		unshardedRc:     r,
+		stateDefaultKey: stateDefaultKey,
 	}
 }
 
@@ -225,12 +263,25 @@ func (u *UnshardedClient) Global() *GlobalClient {
 	return u.global
 }
 
-func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
-	return &UnshardedClient{
+type UnshardedClientOpt func(*UnshardedClient)
+
+// WithWorkspaceScopedPauseKeys opts a new pause store into workspace hash tags.
+// It does not migrate existing keys. Keep legacy readers on the default layout.
+// Other users of the unsharded client retain their existing key layout.
+func WithWorkspaceScopedPauseKeys() UnshardedClientOpt {
+	return func(u *UnshardedClient) { u.pauses.workspaceScoped = true }
+}
+
+func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string, opts ...UnshardedClientOpt) *UnshardedClient {
+	u := &UnshardedClient{
 		pauses:        NewPauseClient(r, stateDefaultKey),
 		queue:         NewQueueClient(r, queueDefaultKey),
 		debounce:      NewDebounceClient(r, queueDefaultKey),
 		global:        NewGlobalClient(r, stateDefaultKey),
 		unshardedConn: r,
 	}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }

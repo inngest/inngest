@@ -29,10 +29,11 @@ const (
 	ErrorAccessDenied = "access_denied"
 
 	// 409 Conflict errors
-	ErrorResourceAlreadyExists = "resource_already_exists"
-	ErrorIdempotencyConflict   = "idempotency_conflict"
-	ErrorRunAlreadyCancelled   = "run_already_cancelled"
-	ErrorRunAlreadyEnded       = "run_already_ended"
+	ErrorResourceAlreadyExists  = "resource_already_exists"
+	ErrorIdempotencyConflict    = "idempotency_conflict"
+	ErrorRunAlreadyCancelled    = "run_already_cancelled"
+	ErrorRunAlreadyEnded        = "run_already_ended"
+	ErrorFunctionPauseScheduled = "function_pause_scheduled"
 
 	// 429 Too Many Requests errors
 	ErrorRateLimited = "rate_limited"

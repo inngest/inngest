@@ -30,7 +30,6 @@ export function EnvKeysDropdownButton({ env }: Props) {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem
-          className="text-basis text-sm"
           onSelect={() =>
             navigate({ to: pathCreator.keys({ envSlug: env.slug }) })
           }
@@ -38,7 +37,6 @@ export function EnvKeysDropdownButton({ env }: Props) {
           Manage event keys
         </DropdownMenuItem>
         <DropdownMenuItem
-          className="text-basis text-sm"
           onSelect={() =>
             navigate({ to: pathCreator.signingKeys({ envSlug: env.slug }) })
           }

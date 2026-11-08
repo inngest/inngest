@@ -2,11 +2,40 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
+
+// SingletonMigrationKey discovers only a lock still owned by the item's run.
+func (q *queue) SingletonMigrationKey(ctx context.Context, item osqueue.QueueItem) (string, error) {
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.KeyGenerator()
+	runID := item.Data.Identifier.RunID.String()
+	key, err := client.Do(ctx, client.B().Get().Key(kg.SingletonRunKey(runID)).Build()).ToString()
+	if rueidis.IsRedisNil(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	prefix := strings.TrimSuffix(kg.SingletonKey(nil), "-")
+	logicalKey, ok := strings.CutPrefix(key, prefix)
+	if !ok || logicalKey == "" {
+		return "", fmt.Errorf("invalid singleton run mapping")
+	}
+	holder, err := client.Do(ctx, client.B().Get().Key(key).Build()).ToString()
+	if rueidis.IsRedisNil(err) || (err == nil && holder != runID) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return logicalKey, nil
+}
 
 const getAndDeleteLua = `
 local v = redis.call('get', KEYS[1])

@@ -14,12 +14,66 @@ import (
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gocloud.dev/blob/memblob"
 )
+
+func TestBlockMetadataCustomPrefix(t *testing.T) {
+	for _, scoped := range []bool{false, true} {
+		name := "legacy"
+		if scoped {
+			name = "workspace"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			var opts []redis_state.UnshardedClientOpt
+			if scoped {
+				opts = append(opts, redis_state.WithWorkspaceScopedPauseKeys())
+			}
+			client := redis_state.NewUnshardedClient(rc, "custom", "queue", opts...)
+			leaser := NewRedisBlockLeaser(rc, "test", time.Minute)
+			store, err := NewBlockstore(BlockstoreOpts{
+				PauseClient: client.Pauses(), Bufferer: StateBufferer(redis_state.NewPauseStore(client)),
+				Leaser: leaser, CompactionLeaser: leaser,
+			})
+			require.NoError(t, err)
+			ctx := context.Background()
+			index := Index{WorkspaceID: uuid.New(), EventName: "test/compatibility"}
+			id := ulid.Make()
+			deleted := uuid.New().String()
+			prefix := "estate"
+			if scoped {
+				prefix = "custom:" + index.WorkspaceID.String()
+			}
+			// Seed the persisted layout independently of the current key generator.
+			suffix := fmt.Sprintf("%s:%s", index.WorkspaceID, util.XXHash(index.EventName))
+			_, err = r.ZAdd("{"+prefix+"}:blk:idx:"+suffix, 2000, id.String())
+			require.NoError(t, err)
+			r.HSet("{"+prefix+"}:blk:md:"+suffix, id.String(), `{"tr":[1000,2000],"len":2}`)
+			_, err = r.SAdd("{"+prefix+"}:blk:dels:"+suffix+":"+id.String(), deleted)
+			require.NoError(t, err)
+
+			ids, err := store.BlocksSince(ctx, index, time.Time{})
+			require.NoError(t, err)
+			require.Equal(t, []ulid.ULID{id}, ids)
+			metadata, err := store.GetBlockMetadata(ctx, index)
+			require.NoError(t, err)
+			require.Contains(t, metadata, id.String())
+			require.Equal(t, 2, metadata[id.String()].Len)
+			deletedIDs, count, err := store.GetBlockDeletedIDs(ctx, index, id)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, count)
+			require.Equal(t, []string{deleted}, deletedIDs)
+		})
+	}
+}
 
 func TestBlockID(t *testing.T) {
 	// Create a block with a deterministic pause
@@ -328,7 +382,7 @@ func (m *mockBufferer) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, w
 	return state.ErrPauseNotFound
 }
 
-func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var ids []uuid.UUID
@@ -340,7 +394,7 @@ func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]u
 	return ids, nil
 }
 
-func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
 	return nil
 }
 
@@ -495,7 +549,7 @@ func (m *mockBuffererSameTimestamp) DeletePauseByID(ctx context.Context, pauseID
 	return state.ErrPauseNotFound
 }
 
-func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var ids []uuid.UUID
@@ -507,7 +561,7 @@ func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ul
 	return ids, nil
 }
 
-func (m *mockBuffererSameTimestamp) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+func (m *mockBuffererSameTimestamp) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
 	return nil
 }
 
@@ -773,7 +827,7 @@ func TestBlockstoreDelete(t *testing.T) {
 		var foundCount int
 		var foundBlocks []ulid.ULID
 		for _, blockID := range blocks {
-			deleteKey := blockDeleteKey(index, blockID)
+			deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 			exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(testPause.ID.String()).Build()).AsBool()
 			require.NoError(t, err)
 			if exists {
@@ -947,7 +1001,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 	var foundCount int
 	var foundBlocks []ulid.ULID
 	for _, blockID := range blocks {
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(boundaryPause.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
 		if exists {
@@ -1064,7 +1118,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 
 	var foundCount int
 	for _, blockID := range blocks {
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pauseWithoutTime.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
 		if exists {
@@ -1282,7 +1336,7 @@ func TestCompaction(t *testing.T) {
 	require.Len(t, blocks, 1)
 
 	blockID := blocks[0]
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 
 	// Delete one pause - below compaction threshold of 2
 	err = store.Delete(ctx, index, *pause1)
@@ -1314,7 +1368,7 @@ func TestCompaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, block.Pauses, 3)
 
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
 		assert.NoError(t, err)
 		assert.False(t, exists)
@@ -1326,13 +1380,13 @@ func TestCompaction(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond)
 
 	// Verify that block index score was updated to the new latest timestamp (even though the blockID is stable)
-	indexKey := blockIndexKey(index)
+	indexKey := store.(*blockstore).blockIndexKey(index)
 	score, err := rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
 	require.NoError(t, err)
 	require.Equal(t, float64(pause4.CreatedAt.UnixMilli()), score)
 
 	// Verify updated metadata reflects the new block composition with boundaries from pause2 to pause4
-	metadataKey := blockMetadataKey(index)
+	metadataKey := store.(*blockstore).blockMetadataKey(index)
 	exists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -1370,7 +1424,7 @@ func TestCompaction(t *testing.T) {
 		assert.False(t, metadataExists)
 
 		// Delete tracking should be cleaned up
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
 		assert.NoError(t, err)
 		assert.False(t, deleteExists)
@@ -1479,7 +1533,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	require.Len(t, block.Pauses, 4, "block should still have all original pauses when compaction fails")
 
 	// Verify delete tracking still exists since compaction failed
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleteCount, "delete tracking should remain when compaction fails")
@@ -1864,7 +1918,7 @@ func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
 	assert.Len(t, pauseIdxs, 1)
 
 	remainingKey := pauseIdxs[0]
-	expectedKey := pauseClient.KeyGenerator().PauseBlockIndex(ctx, pause3.ID)
+	expectedKey := pauseClient.KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, pause3.ID)
 	assert.Equal(t, expectedKey, remainingKey, "Remaining pause-block key should be for pause3")
 }
 
@@ -1964,9 +2018,30 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 		assert.Equal(t, int64(0), bufLen, "Expected buffer to be empty after flush goroutine completes")
 	}, 5*time.Second, 100*time.Millisecond)
 
-	// First, delete from blocks only
+	// Delete existing blocks through a manager with reading and flushing disabled.
+	mgr := NewManager(redisAdapter{rsm: pauseStore}, store)
+	blockIDs, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blockIDs, 1)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockIDs[0])
+	// A wrong-type key lets the locator read succeed but fails the deletion marker write.
+	require.NoError(t, r.Set(deleteKey, "not a set"))
+	require.ErrorContains(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID), "WRONGTYPE")
+	r.Del(deleteKey)
+	require.NoError(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID))
+	require.NoError(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID))
+
+	reader := NewManager(redisAdapter{rsm: pauseStore}, store,
+		WithBlockStoreEnabled(func(context.Context, uuid.UUID) bool { return true }))
+	var remaining []uuid.UUID
+	require.NoError(t, reader.LoadEvaluablesSince(ctx, workspaceID, eventName, time.Time{}, func(_ context.Context, e expr.Evaluable) error {
+		remaining = append(remaining, e.GetID())
+		return nil
+	}))
+	require.ElementsMatch(t, []uuid.UUID{pauses[1].ID, pauses[2].ID}, remaining)
+
 	for _, pause := range pauses {
-		err = store.DeleteByID(ctx, pause.ID, workspaceID)
+		err = mgr.DeletePauseByID(ctx, pause.ID, workspaceID)
 		require.NoError(t, err)
 	}
 
@@ -2524,7 +2599,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	require.Len(t, blocks, 1)
 
 	blockID := blocks[0]
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 
 	// Delete 2 pauses, leaving only pause3 - this will trigger phantom compaction
 	err = store.Delete(ctx, index, *pause1)
@@ -2545,7 +2620,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	require.Equal(t, int64(1), deleteCount, "should have 1 delete (phantom)")
 
 	// Verify metadata shows Len=2
-	metadataKey := blockMetadataKey(index)
+	metadataKey := store.(*blockstore).blockMetadataKey(index)
 	metadataBytes, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field(blockID.String()).Build()).AsBytes()
 	require.NoError(t, err)
 
@@ -2671,7 +2746,7 @@ func TestPauseIteratorSkipsCompactionPhantoms(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, block.Pauses, 2)
 
-	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(blockDeleteKey(index, blocks[0])).Build()).AsInt64()
+	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(store.(*blockstore).blockDeleteKey(index, blocks[0])).Build()).AsInt64()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), deleteCount)
 

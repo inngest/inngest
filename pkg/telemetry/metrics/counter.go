@@ -403,6 +403,15 @@ func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64
 	})
 }
 
+func IncrConnectGatewayGRPCClientEvictedCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_evicted_total",
+		Description: "Total number of gRPC clients to connect gateways removed after a transport failure",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectRouterGRPCMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -1062,6 +1071,15 @@ func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrConnectProxyForwardFailedAfterResponseCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.forward_failed_after_response_total",
+		Description: "Total number of failed forwards whose response had already arrived, so the request was not re-routed",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPISemaphoreCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -1108,6 +1126,26 @@ func IncrMetadataLegacySplitsTotal(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "metadata_legacy_splits_total",
 		Description: "Total number of legacy multi key score/warning metadata writes split into per name kinds",
+		Tags:        opts.Tags,
+	})
+}
+
+// IncrInsightsQueryCounter records one duckdbInsightsQuery GQL call, tagged
+// by status ("ok", "parse_error", "validation_error", "execution_error") --
+// the only per-query observability this resolver has today, so this and the
+// two insights histograms (HistogramInsightsQueryDuration/RowCount) are
+// meant to answer "is this new query surface being abused/regressing" from
+// one place rather than requiring a log dive.
+func IncrInsightsQueryCounter(ctx context.Context, status string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "insights_query_total",
+		Description: "Total number of insights queries executed, tagged by outcome status",
 		Tags:        opts.Tags,
 	})
 }

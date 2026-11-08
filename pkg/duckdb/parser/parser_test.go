@@ -1,0 +1,160 @@
+// pkg/duckdb/parser/parser_test.go
+package parser
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/sebdah/goldie/v2"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParser(t *testing.T) {
+	files, err := filepath.Glob("testdata/queries/*.sql")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "no fixtures discovered; check the glob")
+
+	g := goldie.New(t,
+		goldie.WithFixtureDir("testdata/queries/parser"),
+		goldie.WithNameSuffix(".sql.out"),
+		goldie.WithDiffEngine(goldie.ColoredDiff),
+	)
+
+	for _, f := range files {
+		f := f
+		name := strings.TrimSuffix(filepath.Base(f), ".sql")
+		t.Run(name, func(t *testing.T) {
+			src, err := os.ReadFile(f)
+			require.NoError(t, err)
+
+			var out strings.Builder
+			for _, stmt := range strings.Split(string(src), ";\n\n") {
+				stmt = strings.TrimSpace(stmt)
+				if stmt == "" {
+					continue
+				}
+				out.WriteString("-- " + stmt + "\n")
+				parsed, err := ParseString(stmt)
+				if err != nil {
+					out.WriteString("ERROR: " + err.Error() + "\n\n")
+					continue
+				}
+				out.WriteString(Dump(parsed))
+				out.WriteString("\n")
+			}
+			g.Assert(t, name, []byte(out.String()))
+		})
+	}
+}
+
+func TestParseStringRecoversPanicAsError(t *testing.T) {
+	// DESCRIBE as a standalone statement stays out of scope permanently
+	// (see Task 11's plan entry) — the adapter panics internally;
+	// ParseString must turn that into a plain error, never let it cross
+	// out. (This example has been swapped three times now, from GROUP BY
+	// to JOIN to WITH to PIVOT, as each gained real support in a later
+	// task — this one shouldn't need to move again.)
+	_, err := ParseString("DESCRIBE t")
+	require.Error(t, err)
+}
+
+func TestParseStringReportsUnsupportedConstructsAsParseErrors(t *testing.T) {
+	// An unsupported construct comes back as a positioned *ParseError, not
+	// a recovered panic message.
+	for _, c := range []struct {
+		sql, msg string
+		col      int
+	}{
+		{"DESCRIBE t", "DESCRIBE/TABLE as a standalone statement is not supported", 1},
+		{"SELECT * REPLACE (a + 1 AS a) FROM t", "* REPLACE (...) is not supported", 10},
+		{"SELECT * RENAME (a AS b) FROM t", "* RENAME (...) is not supported", 10},
+		{"SELECT * FROM t TABLESAMPLE 10%", "TABLESAMPLE is not supported", 17},
+		{"SELECT a OPERATOR(+) b FROM t", "OPERATOR(...) is not supported", 10},
+		{"SELECT TRY(a) FROM t", "TRY(...) is not supported", 8},
+	} {
+		_, err := ParseString(c.sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr, c.sql)
+		require.Equal(t, c.msg, perr.Message, c.sql)
+		require.Equal(t, 1, perr.Pos.Line, c.sql)
+		require.Equal(t, c.col, perr.Pos.Column, c.sql)
+	}
+}
+
+func TestParseStringRejectsOversizedInput(t *testing.T) {
+	// Padding stays within the limit and parses normally.
+	atLimit := "SELECT 1" + strings.Repeat(" ", MaxSQLBytes-len("SELECT 1"))
+	_, err := ParseString(atLimit)
+	require.NoError(t, err)
+
+	_, err = ParseString(atLimit + " ")
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Contains(t, perr.Message, "exceeding the 65536-byte limit")
+}
+
+func TestParseStringRejectsOversizedParse(t *testing.T) {
+	// A dense input well under MaxSQLBytes still exceeds the memo/node
+	// budget, and fails cleanly instead of allocating without bound.
+	sql := "SELECT a" + strings.Repeat(", a", 20<<10)
+	require.Less(t, len(sql), MaxSQLBytes)
+	_, err := ParseString(sql)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Equal(t, "query is too large or complex to parse", perr.Message)
+
+	// So is an IN list just under MaxSQLBytes.
+	var in strings.Builder
+	in.WriteString("SELECT * FROM t WHERE x IN (100000")
+	for i := 100001; in.Len() < MaxSQLBytes-16; i++ {
+		fmt.Fprintf(&in, ", %d", i)
+	}
+	in.WriteString(")")
+	_, err = ParseString(in.String())
+	require.NoError(t, err)
+
+	// A realistic large query is well within it.
+	_, err = ParseString("SELECT a" + strings.Repeat(", coalesce(t.b, 'x') + 1 AS c", 200) + " FROM t")
+	require.NoError(t, err)
+
+	// The pooled session that hit the limit is reusable afterwards.
+	_, err = ParseString("SELECT a FROM t")
+	require.NoError(t, err)
+}
+
+func TestParseStringRejectsDeepNesting(t *testing.T) {
+	nestedParens := func(depth int) string {
+		return "SELECT " + strings.Repeat("(", depth) + "1" + strings.Repeat(")", depth)
+	}
+	nestedSubqueries := func(depth int) string {
+		return strings.Repeat("SELECT * FROM (", depth) + "SELECT 1" + strings.Repeat(") AS s", depth)
+	}
+
+	// Realistic nesting is unaffected.
+	_, err := ParseString(nestedParens(100))
+	require.NoError(t, err)
+	_, err = ParseString(nestedSubqueries(100))
+	require.NoError(t, err)
+
+	// 20k levels fits in MaxSQLBytes but, unguarded, overflows the
+	// goroutine stack — a fatal, unrecoverable crash rather than a panic.
+	for _, sql := range []string{nestedParens(20000), nestedSubqueries(3000)} {
+		require.Less(t, len(sql), MaxSQLBytes)
+		_, err = ParseString(sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr)
+		require.Equal(t, "query is nested too deeply", perr.Message)
+	}
+
+	// The pooled session that hit the limit is reusable afterwards.
+	_, err = ParseString("SELECT a FROM t")
+	require.NoError(t, err)
+}
+
+func TestParseStringRejectsMalformedSQL(t *testing.T) {
+	_, err := ParseString("SELEC * FROM")
+	require.Error(t, err)
+}

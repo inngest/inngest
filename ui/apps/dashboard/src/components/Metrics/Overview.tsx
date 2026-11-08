@@ -60,29 +60,6 @@ const GetFunctionStatusMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      completed: scopedMetrics(
-        filter: {
-          name: "function_run_ended_total"
-          scope: $scope
-          groupBy: "status"
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          tagName
-          tagValue
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
       completedByFunction: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
@@ -134,7 +111,6 @@ export const MetricsOverview = ({
   selectedApps = [],
   selectedFns = [],
   autoRefresh = false,
-  entities, // dynamic based on scope
   functions,
   scope,
 }: MetricsFilters) => {
@@ -179,7 +155,6 @@ export const MetricsOverview = ({
             <FunctionStatus totals={data?.workspace.totals} />
             <FailedFunctions
               workspace={data?.workspace}
-              entities={entities}
               functions={functions}
             />
           </div>

@@ -1,0 +1,1 @@
+SELECT run_id FROM runs, unnest(range(10000)) u

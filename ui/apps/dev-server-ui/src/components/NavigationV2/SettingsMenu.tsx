@@ -1,8 +1,15 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  menuItemClassName,
+  menuPanelClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 import { RiSettings3Line } from '@remixicon/react';
 
 export const SettingsMenu = () => {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <div className="relative flex">
@@ -12,11 +19,20 @@ export const SettingsMenu = () => {
         >
           <RiSettings3Line className="h-[18px] w-[18px]" />
         </Listbox.Button>
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute right-0 top-full z-50 mt-2 w-[220px] rounded border ring-0 focus:outline-none">
+        <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute right-0 top-full z-50 mt-2 w-[220px]',
+          )}
+        >
           <Listbox.Option
             disabled
             value="themeMode"
-            className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
+            className={cn(
+              menuItemClassName,
+              'text-muted min-h-10 justify-between',
+            )}
           >
             <div>Theme</div>
             <ModeSwitch />

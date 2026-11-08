@@ -405,5 +405,91 @@
         ]
       }
     }
+  },
+  "/apps/{appId}/functions/pause": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": true,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions/resume": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": false,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
   }
 }

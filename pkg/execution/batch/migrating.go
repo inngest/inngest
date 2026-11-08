@@ -3,170 +3,187 @@ package batch
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
-// MigrationMode controls how a migratingBatchManager routes operations between
-// the current and next BatchManager instances during a cluster migration.
-type MigrationMode int
+// WriteToNextFunc reports whether an account's new batch appends go to the next
+// cluster. That cluster is the account's primary, and reads check it first. It
+// is called on every operation so it can change at runtime (e.g. via feature
+// flag).
+type WriteToNextFunc func(ctx context.Context, accountID uuid.UUID) bool
 
-const (
-	// MigrationModeCurrentOnly routes all reads and writes to the current cluster.
-	// This is the default mode used before migration starts.
-	MigrationModeCurrentOnly MigrationMode = iota
-
-	// MigrationModeDualRead writes to the current cluster but reads from both,
-	// checking the next cluster first. This allows instances that have already
-	// switched to writing to the next cluster to have their data found.
-	MigrationModeDualRead
-
-	// MigrationModeWriteToNext writes to the next cluster and reads from both,
-	// checking the next cluster first. Old batches on the current cluster remain
-	// readable until they are processed.
-	MigrationModeWriteToNext
-)
-
-// MigrationModeFunc returns the current migration mode. It is called on every
-// operation so the mode can change at runtime (e.g. via feature flag).
-type MigrationModeFunc func(ctx context.Context) MigrationMode
-
-// NewMigratingBatchManager creates a BatchManager that delegates to two underlying
-// managers based on a runtime migration mode.
+// NewMigratingBatchManager creates a BatchManager that migrates batching state
+// from current to next.
+// - Each append goes to exactly one cluster, the account's
+// primary, chosen by writeToNext.
+// - Reads (RetrieveItems, StartExecution) check the primary first and fall
+// back to the other cluster only when the batch is not there, so batches drain
+// from whichever cluster created them.
+// - DeleteKeys runs on the primary, and on the other cluster only when the
+// primary did not hold the batch.
+// - The debug APIs (GetBatchInfo, DeleteBatch, RunBatch) act on both clusters
+// and return one result per cluster, current first.
 //
-// If next is nil or mode is nil, current is returned directly with zero overhead.
-func NewMigratingBatchManager(current, next BatchManager, mode MigrationModeFunc) BatchManager {
-	if next == nil || mode == nil {
-		return current
+// current is required. If next is nil, current is returned directly with zero
+// overhead. If writeToNext is nil, every append goes to current.
+func NewMigratingBatchManager(current, next BatchManager, writeToNext WriteToNextFunc) (BatchManager, error) {
+	l := logger.StdlibLogger(context.Background())
+	if current == nil {
+		return nil, fmt.Errorf("current batch manager is required")
+	}
+	if next == nil {
+		l.Info("next batch manager is nil, batch migration is off; delegating all operations to current")
+		return current, nil
 	}
 
+	l.Info("next batch manager is set, batch migration is on; appends go to each account's primary and reads fall back to the other cluster")
 	return &migratingBatchManager{
-		current: current,
-		next:    next,
-		mode:    mode,
-	}
+		current:     current,
+		next:        next,
+		writeToNext: writeToNext,
+	}, nil
 }
 
 type migratingBatchManager struct {
-	current BatchManager
-	next    BatchManager
-	mode    MigrationModeFunc
+	current     BatchManager
+	next        BatchManager
+	writeToNext WriteToNextFunc
 }
 
-// writeManager returns the manager that should receive writes for the current mode.
-func (m *migratingBatchManager) writeManager(ctx context.Context) BatchManager {
-	if m.mode(ctx) == MigrationModeWriteToNext {
-		return m.next
+// writeManager returns the account's primary cluster, which receives its appends
+// and is read first, and the fallback cluster that reads check when the
+// primary doesn't have the batch.
+func (m *migratingBatchManager) writeManager(ctx context.Context, accountID uuid.UUID) (primary, fallback BatchManager) {
+	if m.writeToNext != nil && m.writeToNext(ctx, accountID) {
+		return m.next, m.current
 	}
-	return m.current
-}
-
-// isDualRead returns true when reads should check both clusters.
-func (m *migratingBatchManager) isDualRead(ctx context.Context) bool {
-	mode := m.mode(ctx)
-	return mode == MigrationModeDualRead || mode == MigrationModeWriteToNext
+	return m.current, m.next
 }
 
 func (m *migratingBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error) {
-	return m.writeManager(ctx).Append(ctx, bi, fn)
+	primary, _ := m.writeManager(ctx, bi.AccountID)
+	return primary.Append(ctx, bi, fn)
 }
 
+// BulkAppend routes on the first item's account. The append buffer groups items
+// by function, so every item in a call belongs to the same account.
 func (m *migratingBatchManager) BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (*BulkAppendResult, error) {
-	return m.writeManager(ctx).BulkAppend(ctx, items, fn)
+	if len(items) == 0 {
+		return m.current.BulkAppend(ctx, items, fn)
+	}
+	primary, _ := m.writeManager(ctx, items[0].AccountID)
+	return primary.BulkAppend(ctx, items, fn)
 }
 
-func (m *migratingBatchManager) StartExecution(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
-	if !m.isDualRead(ctx) {
-		return m.current.StartExecution(ctx, functionID, batchID, batchPointer)
+// StartExecution checks the fallback cluster only when the primary reports the
+// batch absent. Errors are returned as-is so the job retries: treating one as
+// absent would let the caller delete a batch that may still exist.
+func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
+	primary, fallback := m.writeManager(ctx, accountID)
+	result, err := primary.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
+	if err != nil || result != enums.BatchStatusAbsent.String() {
+		return result, err
 	}
-
-	result, err := m.next.StartExecution(ctx, functionID, batchID, batchPointer)
-	if err == nil && result != enums.BatchStatusAbsent.String() {
-		return result, nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next StartExecution failed, falling back to current")
-	}
-	return m.current.StartExecution(ctx, functionID, batchID, batchPointer)
+	logger.StdlibLogger(ctx).Debug("batch absent in primary cluster, falling back for StartExecution",
+		"account_id", accountID,
+		"function_id", functionID,
+		"batch_id", batchID,
+		"primary", primary.Name(),
+	)
+	recordFallback(ctx, "start_execution")
+	return fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
 }
 
-func (m *migratingBatchManager) RetrieveItems(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
-	if !m.isDualRead(ctx) {
-		return m.current.RetrieveItems(ctx, functionID, batchID)
+// RetrieveItems checks the fallback cluster only when the primary returns no items.
+// Errors are returned as-is so the job retries: an empty batch is skipped, so
+// treating an error as a miss would silently drop the batch.
+func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
+	primary, fallback := m.writeManager(ctx, accountID)
+	items, err := primary.RetrieveItems(ctx, accountID, functionID, batchID)
+	if err != nil || len(items) > 0 {
+		return items, err
 	}
-
-	items, err := m.next.RetrieveItems(ctx, functionID, batchID)
-	if err == nil && len(items) > 0 {
-		return items, nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next RetrieveItems failed, falling back to current")
-	}
-	return m.current.RetrieveItems(ctx, functionID, batchID)
+	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for RetrieveItems",
+		"account_id", accountID,
+		"function_id", functionID,
+		"batch_id", batchID,
+		"primary", primary.Name(),
+	)
+	recordFallback(ctx, "retrieve_items")
+	return fallback.RetrieveItems(ctx, accountID, functionID, batchID)
 }
 
+// recordFallback counts a read that missed the primary store and is retried
+// on the fallback store.
+func recordFallback(ctx context.Context, op string) {
+	metrics.IncrBatchMigrationFallbackCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"op": op},
+	})
+}
+
+// ScheduleExecution doesn't touch either store; it only enqueues the
+// schedule-batch job, which finds the batch in whichever cluster holds it.
 func (m *migratingBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
-	return m.writeManager(ctx).ScheduleExecution(ctx, opts)
+	primary, _ := m.writeManager(ctx, opts.AccountID)
+	return primary.ScheduleExecution(ctx, opts)
 }
 
-func (m *migratingBatchManager) DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error {
-	if !m.isDualRead(ctx) {
-		return m.current.DeleteKeys(ctx, functionID, batchID)
+// DeleteKeys deletes from the account's primary cluster, and from the other
+// cluster only when the primary did not hold the batch. Batch IDs are unique
+// ULIDs, so a batch found in the primary cannot also exist in the other
+// cluster. A primary error is returned without falling back: whether the batch
+// was there is unknown, so the caller retries.
+func (m *migratingBatchManager) DeleteKeys(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) (bool, error) {
+	primary, fallback := m.writeManager(ctx, accountID)
+	existed, err := primary.DeleteKeys(ctx, accountID, functionID, batchID)
+	if err != nil || existed {
+		return existed, err
 	}
-
-	// Delete is idempotent, so call both clusters.
-	errNext := m.next.DeleteKeys(ctx, functionID, batchID)
-	errCurrent := m.current.DeleteKeys(ctx, functionID, batchID)
-	return errors.Join(errNext, errCurrent)
+	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for DeleteKeys",
+		"account_id", accountID,
+		"function_id", functionID,
+		"batch_id", batchID,
+		"primary", primary.Name(),
+	)
+	recordFallback(ctx, "delete_keys")
+	return fallback.DeleteKeys(ctx, accountID, functionID, batchID)
 }
 
-func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
-	if !m.isDualRead(ctx) {
-		return m.current.GetBatchInfo(ctx, functionID, batchKey)
-	}
-
-	info, err := m.next.GetBatchInfo(ctx, functionID, batchKey)
-	if err == nil && info != nil && info.BatchID != "" {
-		return info, nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next GetBatchInfo failed, falling back to current")
-	}
-	return m.current.GetBatchInfo(ctx, functionID, batchKey)
+// GetBatchInfo returns the current batch in each cluster, current first. Both
+// clusters can hold an open batch for the same function during a migration,
+// so the debug APIs report and act on every cluster instead of picking one.
+func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error) {
+	infoCurrent, errCurrent := m.current.GetBatchInfo(ctx, functionID, batchKey)
+	infoNext, errNext := m.next.GetBatchInfo(ctx, functionID, batchKey)
+	return append(infoCurrent, infoNext...), errors.Join(errCurrent, errNext)
 }
 
-func (m *migratingBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error) {
-	if !m.isDualRead(ctx) {
-		return m.current.DeleteBatch(ctx, functionID, batchKey)
-	}
-
-	result, err := m.next.DeleteBatch(ctx, functionID, batchKey)
-	if err == nil && result != nil && result.Deleted {
-		return result, nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next DeleteBatch failed, falling back to current")
-	}
-	return m.current.DeleteBatch(ctx, functionID, batchKey)
+// DeleteBatch deletes the current batch in each cluster and returns one result
+// per cluster, current first.
+func (m *migratingBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) ([]DeleteBatchResult, error) {
+	resCurrent, errCurrent := m.current.DeleteBatch(ctx, functionID, batchKey)
+	resNext, errNext := m.next.DeleteBatch(ctx, functionID, batchKey)
+	return append(resCurrent, resNext...), errors.Join(errCurrent, errNext)
 }
 
-func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error) {
-	if !m.isDualRead(ctx) {
-		return m.current.RunBatch(ctx, opts)
-	}
+// RunBatch schedules the current batch in each cluster and returns one result
+// per cluster, current first.
+func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]RunBatchResult, error) {
+	resCurrent, errCurrent := m.current.RunBatch(ctx, opts)
+	resNext, errNext := m.next.RunBatch(ctx, opts)
+	return append(resCurrent, resNext...), errors.Join(errCurrent, errNext)
+}
 
-	result, err := m.next.RunBatch(ctx, opts)
-	if err == nil && result != nil && result.Scheduled {
-		return result, nil
-	}
-	if err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "migrating batch: next RunBatch failed, falling back to current")
-	}
-	return m.current.RunBatch(ctx, opts)
+func (m *migratingBatchManager) Name() string {
+	return "migrating"
 }
 
 func (m *migratingBatchManager) Close() error {

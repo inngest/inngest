@@ -1,0 +1,3 @@
+{
+  "error": "insights: UNNEST in a FROM clause takes exactly one argument (at 1:21)"
+}

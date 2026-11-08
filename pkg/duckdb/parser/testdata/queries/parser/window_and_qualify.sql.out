@@ -1,0 +1,30 @@
+-- SELECT row_number() OVER win FROM t WINDOW win AS (PARTITION BY a ORDER BY b)
+SelectStatement
+  SelectItem()
+    FunctionExpr(row_number,distinct=false)
+      WindowSpec(win)
+  FromClause
+    BaseTableRef(t,alias=)
+  WindowDef(win)
+    WindowSpec()
+      Ident(a)
+      OrderByClause
+        OrderByItem(desc=false,nulls=false/false)
+          Ident(b)
+
+-- SELECT a, row_number() OVER (ORDER BY a) AS rn FROM t QUALIFY rn = 1;
+SelectStatement
+  SelectItem()
+    Ident(a)
+  SelectItem(rn)
+    FunctionExpr(row_number,distinct=false)
+      WindowSpec()
+        OrderByClause
+          OrderByItem(desc=false,nulls=false/false)
+            Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(=)
+    Ident(rn)
+    Literal(1,1)
+

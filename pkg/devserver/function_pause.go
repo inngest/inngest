@@ -10,32 +10,72 @@ import (
 )
 
 type functionPauses struct {
+	mu        sync.RWMutex
+	functions map[uuid.UUID]*functionPause
+}
+
+type functionPause struct {
 	mu       sync.RWMutex
-	pausedAt map[uuid.UUID]time.Time
+	pausedAt time.Time
+}
+
+func (p *functionPauses) state(id uuid.UUID) *functionPause {
+	p.mu.RLock()
+	state := p.functions[id]
+	p.mu.RUnlock()
+	if state != nil {
+		return state
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.functions == nil {
+		p.functions = make(map[uuid.UUID]*functionPause)
+	}
+	if state, ok := p.functions[id]; ok {
+		return state
+	}
+	// Keep the entry so concurrent callers always use the same lock.
+	state = &functionPause{}
+	p.functions[id] = state
+	return state
 }
 
 func (p *functionPauses) pause(id uuid.UUID) time.Time {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if at, ok := p.pausedAt[id]; ok {
-		return at
+	state := p.state(id)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.pausedAt.IsZero() {
+		state.pausedAt = time.Now()
 	}
-	at := time.Now()
-	p.pausedAt[id] = at
-	return at
+	return state.pausedAt
 }
 
 func (p *functionPauses) get(id uuid.UUID) time.Time {
-	p.mu.RLock()
-	at := p.pausedAt[id]
-	p.mu.RUnlock()
-	return at
+	state := p.state(id)
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.pausedAt
 }
 
 func (p *functionPauses) unpause(id uuid.UUID) {
-	p.mu.Lock()
-	delete(p.pausedAt, id)
-	p.mu.Unlock()
+	state := p.state(id)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.pausedAt = time.Time{}
+}
+
+func (p *functionPauses) resume(id uuid.UUID, wake func() error) error {
+	state := p.state(id)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	// Readers must not see the wake before the pause is cleared.
+	if err := wake(); err != nil {
+		return err
+	}
+	state.pausedAt = time.Time{}
+	return nil
 }
 
 func (p *functionPauses) partitionPaused(_ context.Context, id uuid.UUID) queue.PartitionPausedInfo {

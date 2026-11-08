@@ -1,0 +1,173 @@
+-- SELECT * FROM a JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(INNER,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a LEFT JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(LEFT,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a LEFT OUTER JOIN b USING (id)
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(LEFT OUTER,using=[id])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+
+-- SELECT * FROM a RIGHT JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(RIGHT,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a FULL OUTER JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(FULL OUTER,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a CROSS JOIN b
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(CROSS,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+
+-- SELECT * FROM a NATURAL JOIN b
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(NATURAL,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+
+-- SELECT * FROM a SEMI JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(SEMI,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a ANTI JOIN b ON a.id = b.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(ANTI,using=[])
+      BaseTableRef(a,alias=)
+      BaseTableRef(b,alias=)
+      BinaryExpr(=)
+        Ident(a.id)
+        Ident(b.id)
+
+-- SELECT * FROM a JOIN b ON a.id = b.id JOIN c ON b.id = c.id
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    JoinRef(INNER,using=[])
+      JoinRef(INNER,using=[])
+        BaseTableRef(a,alias=)
+        BaseTableRef(b,alias=)
+        BinaryExpr(=)
+          Ident(a.id)
+          Ident(b.id)
+      BaseTableRef(c,alias=)
+      BinaryExpr(=)
+        Ident(b.id)
+        Ident(c.id)
+
+-- SELECT * FROM (SELECT id FROM t) sub
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableSubqueryRef(alias=sub)
+      SelectStatement
+        SelectItem()
+          Ident(id)
+        FromClause
+          BaseTableRef(t,alias=)
+
+-- SELECT * FROM a, LATERAL (SELECT * FROM b WHERE b.id = a.id) sub
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    BaseTableRef(a,alias=)
+    TableSubqueryRef(alias=sub)
+      SelectStatement
+        SelectItem()
+          StarExpr(,exclude=[])
+        FromClause
+          BaseTableRef(b,alias=)
+        BinaryExpr(=)
+          Ident(b.id)
+          Ident(a.id)
+
+-- SELECT * FROM range(10) t
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableFunctionRef(range,alias=t)
+      Literal(1,10)
+
+-- SELECT * FROM (a JOIN b ON a.id = b.id) x
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    ParensTableRef(alias=x)
+      JoinRef(INNER,using=[])
+        BaseTableRef(a,alias=)
+        BaseTableRef(b,alias=)
+        BinaryExpr(=)
+          Ident(a.id)
+          Ident(b.id)
+
+-- SELECT * FROM a, b;
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    BaseTableRef(a,alias=)
+    BaseTableRef(b,alias=)
+

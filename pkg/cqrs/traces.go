@@ -354,8 +354,12 @@ type SpanLink struct {
 }
 
 type SpanMetadata struct {
-	Scope     metadata.Scope  `json:"scope"`
+	Scope metadata.Scope `json:"scope"`
+	// Kind is the full kind (e.g. "userland.foo") on the cqrs read path, but
+	// stripped of its userland/inngest prefix (e.g. "foo") when read from
+	// DuckDB's inngest.run_metadata. IsUser tells the two apart either way.
 	Kind      metadata.Kind   `json:"kind"`
+	IsUser    bool            `json:"is_user"`
 	Values    metadata.Values `json:"values"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }
@@ -386,6 +390,8 @@ type TraceRun struct {
 	CronSchedule            *string         `json:"cron_schedule,omitempty"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
+
+	SkipReason *enums.SkipReason `json:"skip_reason,omitempty"`
 
 	AppName      string `json:"app_name,omitempty"`
 	FunctionSlug string `json:"function_slug,omitempty"`
@@ -457,6 +463,8 @@ type GetTraceRunOpt struct {
 	Cursor        string
 	Items         uint
 	IncludeOutput bool
+	// IncludeSkipped exposes skipped runs for replay selection; ordinary run lists omit them.
+	IncludeSkipped bool
 	// Whether the run list should use the tracing preview stores
 	Preview bool
 }
@@ -613,4 +621,7 @@ type TraceCursor struct {
 	Field string `json:"f"`
 	// Value represents the value used for this cursor
 	Value int64 `json:"v"`
+	// NanosecondRemainder preserves sub-microsecond precision for span timestamps.
+	// Older cursors omit this field and retain their original precision.
+	NanosecondRemainder int64 `json:"ns,omitempty"`
 }

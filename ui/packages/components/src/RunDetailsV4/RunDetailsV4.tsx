@@ -8,7 +8,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
-import { useGetRun } from '../SharedContext/useGetRun';
+import { useGetRun, type GetRunData } from '../SharedContext/useGetRun';
 import { useGetRunLinkage } from '../SharedContext/useGetRunLinkage';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { StatusCell } from '../Table/Cell';
@@ -38,6 +38,7 @@ type Props = {
   pollInterval?: number;
   runID: string;
   orgName?: string;
+  renderRunAction?: (run: GetRunData, standalone: boolean) => React.ReactNode;
   // Hides run actions (rerun/cancel/invoke) for read-only views.
   readOnly?: boolean;
 };
@@ -119,6 +120,7 @@ export const RunDetailsV4 = ({
   initialRunData,
   orgName,
   readOnly,
+  renderRunAction,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -301,6 +303,9 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               isDurableEndpoint={runData?.isDurableEndpoint}
               readOnly={readOnly}
+              additionalAction={
+                !readOnly && runData?.id === runID ? renderRunAction?.(runData, standalone) : null
+              }
             />
             {showError && (
               <ErrorCard

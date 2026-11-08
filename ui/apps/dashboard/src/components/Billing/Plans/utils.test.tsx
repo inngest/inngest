@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   displayPlanName,
+  executionUsageDescription,
   isActive,
   pickSelfServePlans,
   processPlan,
@@ -303,5 +304,49 @@ describe('Business plan display', () => {
   it('matches a Growth current plan to the Business card', () => {
     expect(isActive({ name: 'Growth' }, { name: 'Business' })).toBe(true);
     expect(isActive({ name: 'Pro' }, { name: 'Business' })).toBe(false);
+  });
+});
+
+describe('execution usage description', () => {
+  it.each([
+    ['Pro', 1_000_000, 50, '1,000,000'],
+    ['Business', 10_000_000, 25, '10,000,000'],
+    ['Growth', 1_000_000, 50, '1,000,000'],
+    ['Pro', 4_999_999, 50, '4,999,999'],
+    ['Pro', 5_000_000, 25, '5,000,000'],
+    ['Pro', 14_999_999, 25, '14,999,999'],
+    ['Pro', 15_000_000, 20, '15,000,000'],
+    ['Pro', 49_999_999, 20, '49,999,999'],
+    ['Pro', 50_000_000, 15, '50,000,000'],
+  ])(
+    'uses the allowance for %s with %i included',
+    (name, limit, price, formattedLimit) => {
+      expect(
+        executionUsageDescription({ name, slug: 'paid-plan' }, limit),
+      ).toBe(
+        `Usage beyond ${formattedLimit} is billed at $${price} per 1,000,000 at the start of the next billing cycle.`,
+      );
+    },
+  );
+
+  it.each([
+    ['Enterprise', 1_000_000],
+    ['Enterprise - Annual', 10_000_000],
+    ['enterprise custom', 50_000_000],
+    ['Enterprise', null],
+    ['Pro', null],
+  ])('keeps the existing copy for %s with limit %s', (name, limit) => {
+    expect(executionUsageDescription({ name, slug: 'plan' }, limit)).toBe(
+      'Additional usage billed at the start of the next billing cycle.',
+    );
+  });
+
+  it('keeps the free Hobby execution limit copy', () => {
+    expect(
+      executionUsageDescription(
+        { name: 'Hobby', slug: 'hobby-free-2025-08-08' },
+        50_000,
+      ),
+    ).toBe('The maximum number of executions per month');
   });
 });

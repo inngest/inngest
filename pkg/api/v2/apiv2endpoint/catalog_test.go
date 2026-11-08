@@ -42,11 +42,69 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, http.MethodPost, byMethod["PauseFunction"].HTTPMethod)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", byMethod["PauseFunction"].Path)
 	require.Empty(t, byMethod["PauseFunction"].Body)
+	require.Equal(t, "runs:write:bulk_cancel", byMethod["CreateCancellation"].AuthzPermission)
+	require.Equal(t, "create-cancellation", byMethod["CreateCancellation"].CommandName)
+	require.Equal(t, "create_cancellation", byMethod["CreateCancellation"].ToolName)
+	require.Equal(t, http.MethodPost, byMethod["CreateCancellation"].HTTPMethod)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/cancellations", byMethod["CreateCancellation"].Path)
+	require.Equal(t, "*", byMethod["CreateCancellation"].Body)
+	require.Equal(t, []string{"app_id", "function_id"}, byMethod["CreateCancellation"].PathParams)
+	require.Equal(t, "functions:write:resume", byMethod["ResumeFunction"].AuthzPermission)
+	require.Equal(t, "resume-function", byMethod["ResumeFunction"].CommandName)
+	require.Equal(t, "resume_function", byMethod["ResumeFunction"].ToolName)
+	require.Equal(t, http.MethodPost, byMethod["ResumeFunction"].HTTPMethod)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/resume", byMethod["ResumeFunction"].Path)
+	require.Empty(t, byMethod["ResumeFunction"].Body)
 	require.Equal(t, "runs:read:list", byMethod["ListRuns"].AuthzPermission)
+	require.Equal(t, "runs:write:replay", byMethod["CreateReplay"].AuthzPermission)
+	require.Equal(t, "create-replay", byMethod["CreateReplay"].CommandName)
+	require.Equal(t, "create_replay", byMethod["CreateReplay"].ToolName)
+	require.Equal(t, http.MethodPost, byMethod["CreateReplay"].HTTPMethod)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/replays", byMethod["CreateReplay"].Path)
+	require.Equal(t, "*", byMethod["CreateReplay"].Body)
 	require.Equal(t, "sandboxes:write:exec", byMethod["ExecSandbox"].AuthzPermission)
 	require.Equal(t, "send-event", byMethod["SendEvent"].CommandName)
 	require.Equal(t, "send_event", byMethod["SendEvent"].ToolName)
 	require.Equal(t, http.MethodPost, byMethod["SendEvent"].HTTPMethod)
 	require.Equal(t, "/events", byMethod["SendEvent"].Path)
 	require.Equal(t, "events:write:send", byMethod["SendEvent"].AuthzPermission)
+}
+
+func TestEventReadCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, command, tool, path, permission string }{
+		{"ListEvents", "list-events", "list_events", "/events", "events:read:list"},
+		{"GetEvent", "get-event", "get_event", "/events/{event_id}", "events:read:get"},
+	} {
+		endpoint := byMethod[tc.method]
+		require.Equal(t, tc.command, endpoint.CommandName)
+		require.Equal(t, tc.tool, endpoint.ToolName)
+		require.Equal(t, http.MethodGet, endpoint.HTTPMethod)
+		require.Equal(t, tc.path, endpoint.Path)
+		require.Equal(t, tc.permission, endpoint.AuthzPermission)
+		require.Equal(t, []string{"payload"}, FieldEnum(endpoint.Input.Fields().ByName("include")))
+	}
+}
+
+func TestFunctionsPauseResumeCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, action string }{
+		{"PauseFunctions", "pause"},
+		{"ResumeFunctions", "resume"},
+	} {
+		endpoint := byMethod[tc.method]
+		require.Equal(t, "functions:write:"+tc.action, endpoint.AuthzPermission)
+		require.Equal(t, tc.action+"-functions", endpoint.CommandName)
+		require.Equal(t, tc.action+"_functions", endpoint.ToolName)
+		require.Equal(t, http.MethodPost, endpoint.HTTPMethod)
+		require.Equal(t, "/apps/{app_id}/functions/"+tc.action, endpoint.Path)
+		require.Equal(t, "*", endpoint.Body)
+		require.True(t, IsRequired(endpoint.Input.Fields().ByName("function_ids")))
+	}
 }

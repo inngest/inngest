@@ -274,6 +274,28 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
+func TestEventReadHelp(t *testing.T) {
+	for _, name := range []string{"list-events", "get-event"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			require.NoError(t, cmd.Run(t.Context(), []string{"api", name, "--help"}))
+			require.Contains(t, out.String(), "Payloads can contain personal data and be large, so request them only when needed.")
+			require.Contains(t, out.String(), "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+			require.Contains(t, out.String(), "Events can be up to 5 MiB in Cloud (less on lower plans).")
+			if name == "list-events" {
+				require.Contains(t, out.String(), "With include=payload the maximum and default are 5")
+				require.Contains(t, out.String(), "up to 20 names, with up to 256 characters each and no backslashes or control characters")
+				require.Contains(t, out.String(), "ID of the last returned event from the previous response.")
+				require.Contains(t, out.String(), "Defaults to one hour before until, or one hour before the current time if until is omitted.")
+			} else {
+				require.Contains(t, out.String(), "Internal inngest/ events are not returned.")
+			}
+		})
+	}
+}
+
 func TestDeprecatedEndpointFlagsAreHidden(t *testing.T) {
 	var trace endpoint
 	for _, ep := range discoverEndpoints() {
@@ -401,26 +423,33 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
 }
 
-func TestCommandPausesFunction(t *testing.T) {
-	var method, path, body string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		method, path = r.Method, r.URL.Path
-		data, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		body = string(data)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"id":"fn","isPaused":true}}`))
-	}))
-	defer srv.Close()
-	cmd := Command()
-	var out bytes.Buffer
-	cmd.Writer = &out
-	err := cmd.Run(t.Context(), []string{"api", "pause-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, method)
-	require.Equal(t, "/api/v2/apps/app/functions/fn/pause", path)
-	require.Empty(t, body)
-	require.JSONEq(t, `{"data":{"id":"fn","isPaused":true}}`, out.String())
+func TestCommandPausesAndResumesFunction(t *testing.T) {
+	for _, action := range []struct{ name, response string }{
+		{"pause", `{"data":{"id":"fn","isPaused":true}}`},
+		{"resume", `{"data":{"id":"fn","isPaused":false}}`},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			var method, path, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(action.response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/fn/"+action.name, path)
+			require.Empty(t, body)
+			require.JSONEq(t, action.response, out.String())
+		})
+	}
 }
 
 func TestWriteSandboxFileSendsRawBodyAndQueryParameters(t *testing.T) {
@@ -542,6 +571,88 @@ func TestCommandSendsEvent(t *testing.T) {
 		"ts":   float64(1786032000000),
 	}, gotBody)
 	require.Contains(t, out.String(), `"eventId": "01K1QQ3VQ8R3M8QX4D51J8G7XH"`)
+}
+
+func TestCommandBuildsReplayBody(t *testing.T) {
+	var gotMethod, gotPath, gotQuery string
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotQuery = r.Method, r.URL.Path, r.URL.RawQuery
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"550e8400-e29b-41d4-a716-446655440000","createdAt":"2026-01-03T00:00:00Z"}}`))
+	}))
+	defer srv.Close()
+
+	var out bytes.Buffer
+	cmd := Command()
+	cmd.Writer = &out
+	err := cmd.Run(t.Context(), []string{
+		"api", "--api-host", srv.URL, "create-replay",
+		"--app-id", "my-app",
+		"--name", "Replay orders",
+		"--function-id", "orders-created",
+		"--statuses", "FAILED", "--statuses", "CANCELLED",
+		"--from", "2026-01-01T00:00:00.123Z",
+		"--until", "2026-01-02T00:00:00Z",
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, gotMethod)
+	require.Equal(t, "/api/v2/apps/my-app/functions/orders-created/replays", gotPath)
+	require.Empty(t, gotQuery)
+	require.Equal(t, map[string]any{
+		"name":     "Replay orders",
+		"statuses": []any{"FAILED", "CANCELLED"},
+		"from":     "2026-01-01T00:00:00.123Z", "until": "2026-01-02T00:00:00Z",
+	}, gotBody)
+	require.Contains(t, out.String(), `"id": "550e8400-e29b-41d4-a716-446655440000"`)
+}
+
+func TestCommandReplayRequiresFields(t *testing.T) {
+	fields := []struct {
+		flag, jsonName, value string
+	}{
+		{"app-id", "appId", "my-app"},
+		{"name", "name", "Replay orders"},
+		{"function-id", "functionId", "orders-created"},
+		{"from", "from", "2026-01-01T00:00:00Z"},
+		{"until", "until", "2026-01-02T00:00:00Z"},
+		{"statuses", "statuses", "FAILED"},
+	}
+	for _, missing := range fields {
+		for _, input := range []string{"flags", "body"} {
+			t.Run(missing.flag+"/"+input, func(t *testing.T) {
+				args := []string{"api", "--api-host", "http://localhost:1", "create-replay"}
+				body := map[string]any{}
+				for _, field := range fields {
+					if field.flag == missing.flag {
+						continue
+					}
+					if input == "flags" || field.flag == "app-id" || field.flag == "function-id" {
+						args = append(args, "--"+field.flag, field.value)
+					}
+					body[field.jsonName] = field.value
+					if field.jsonName == "statuses" {
+						body[field.jsonName] = []string{field.value}
+					}
+				}
+				if input == "body" {
+					encoded, err := json.Marshal(body)
+					require.NoError(t, err)
+					args = append(args, "--body", string(encoded))
+				}
+				cmd := Command()
+				cmd.Writer = &bytes.Buffer{}
+				err := cmd.Run(t.Context(), args)
+				if missing.flag == "app-id" || missing.flag == "function-id" {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or positional argument <%s>", missing.flag, missing.flag))
+				} else {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or body field %q", missing.flag, missing.jsonName))
+				}
+			})
+		}
+	}
 }
 
 func TestCommandBuildsRerunFromStepBody(t *testing.T) {
@@ -1197,4 +1308,187 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 			require.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestCommandCreatesCancellation(t *testing.T) {
+	for _, input := range []string{"flags", "positionals", "body"} {
+		t.Run(input, func(t *testing.T) {
+			var method, path, query, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path, query = r.Method, r.URL.Path, r.URL.RawQuery
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000"}}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := []string{"api", "create-cancellation", "--api-host", srv.URL}
+			if input != "positionals" {
+				args = append(args, "--app-id", "app", "--function-id", "fn")
+			}
+			if input == "body" {
+				args = append(args, "--body", `{"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`)
+			} else {
+				args = append(args, "--from", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z", "--if", "event.data.cancel == true", "--name", "cleanup")
+			}
+			if input == "positionals" {
+				args = append(args, "app", "fn")
+			}
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/fn/cancellations", path)
+			require.Empty(t, query)
+			require.JSONEq(t, `{"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`, body)
+			require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000"}}`, out.String())
+		})
+	}
+}
+
+func TestCommandCancellationRequiresFields(t *testing.T) {
+	fields := []struct {
+		flag, jsonName, value string
+	}{
+		{"app-id", "appId", "app"},
+		{"function-id", "functionId", "fn"},
+		{"from", "from", "2026-01-01T00:00:00Z"},
+		{"until", "until", "2026-01-01T01:00:00Z"},
+	}
+	for _, missing := range fields {
+		for _, input := range []string{"flags", "body"} {
+			t.Run(missing.flag+"/"+input, func(t *testing.T) {
+				args := []string{"api", "--api-host", "http://localhost:1", "create-cancellation"}
+				body := map[string]any{}
+				for _, field := range fields {
+					if field.flag == missing.flag {
+						continue
+					}
+					if input == "flags" || field.flag == "app-id" || field.flag == "function-id" {
+						args = append(args, "--"+field.flag, field.value)
+					} else {
+						body[field.jsonName] = field.value
+					}
+				}
+				if input == "body" {
+					encoded, err := json.Marshal(body)
+					require.NoError(t, err)
+					args = append(args, "--body", string(encoded))
+				}
+				cmd := Command()
+				cmd.Writer = &bytes.Buffer{}
+				err := cmd.Run(t.Context(), args)
+				if missing.flag == "app-id" || missing.flag == "function-id" {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or positional argument <%s>", missing.flag, missing.flag))
+				} else {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or body field %q", missing.flag, missing.jsonName))
+				}
+			})
+		}
+	}
+}
+
+func TestCommandReadsEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name, path string
+		args       []string
+		query      url.Values
+	}{
+		{"list-events", "/api/v2/events", []string{"--name", "order/placed", "--name", "order/paid", "--include", "payload", "--limit", "5", "--cursor", "01J00000000000000000000000", "--from", "2026-10-27T11:00:00Z", "--until", "2026-10-27T12:00:00Z"}, url.Values{"name": {"order/placed", "order/paid"}, "include": {"payload"}, "limit": {"5"}, "cursor": {"01J00000000000000000000000"}, "from": {"2026-10-27T11:00:00Z"}, "until": {"2026-10-27T12:00:00Z"}}},
+		{"get-event", "/api/v2/events/01J00000000000000000000000", []string{"01J00000000000000000000000", "--include", "payload"}, url.Values{"include": {"payload"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				require.Equal(t, http.MethodGet, r.Method)
+				require.Equal(t, tc.path, r.URL.Path)
+				require.Equal(t, tc.query, r.URL.Query())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := append([]string{"api", tc.name, "--api-host", srv.URL}, tc.args...)
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, 1, calls)
+			require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`, out.String())
+		})
+	}
+}
+
+func TestListEventsAcceptsLargePayloadPage(t *testing.T) {
+	senderID := strings.Repeat("s", 1024*1024)
+	payload := `{"name":"large","id":"` + senderID + `","data":{"value":"` + strings.Repeat("x", 4*1024*1024-1024) + `"}}`
+	require.Less(t, len(payload), 5*1024*1024)
+	event := `{"id":"01J00000000000000000000000","name":"large","idempotencyKey":"` + senderID + `","payload":` + payload + `}`
+	body := `{"data":[` + strings.TrimSuffix(strings.Repeat(event+",", 5), ",") + `],"page":{"hasMore":false,"limit":5}}`
+	require.Greater(t, len(body), maxResponseBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v2/events", r.URL.Path)
+		require.Equal(t, "payload", r.URL.Query().Get("include"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	cmd := Command()
+	var out bytes.Buffer
+	cmd.Writer = &out
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "list-events", "--api-host", srv.URL, "--include", "payload", "--raw"}))
+	require.Equal(t, body+"\n", out.String())
+}
+
+func TestCommandPausesAndResumesFunctions(t *testing.T) {
+	for _, action := range []struct{ name, response string }{
+		{"pause", `{"data":[{"functionId":"echo","function":{"id":"echo","isPaused":true}},{"functionId":"missing","error":{"code":"not_found","message":"Function not found"}}]}`},
+		{"resume", `{"data":[{"functionId":"echo","function":{"id":"echo","isPaused":false}},{"functionId":"missing","error":{"code":"not_found","message":"Function not found"}}]}`},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			var method, path, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(action.response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-functions", "--api-host", srv.URL, "--app-id", "app", "--function-ids", "echo", "--function-ids", "missing"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/"+action.name, path)
+			require.JSONEq(t, `{"functionIds":["echo","missing"]}`, body)
+			require.JSONEq(t, action.response, out.String())
+		})
+	}
+}
+
+func TestSubmitFeedbackCommand(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	var gotBody map[string]any
+	var gotPath, gotAgent, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotAgent, gotAuth = r.URL.Path, r.UserAgent(), r.Header.Get("Authorization")
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"accepted":true}}`))
+	}))
+	t.Cleanup(srv.Close)
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "--api-host", srv.URL, "--api-key", "test-key",
+		"submit-feedback", "--feedback", "More examples please", "--operation", "get_run", "--email", "dev@example.com"}))
+	require.Equal(t, "/api/v2/feedback", gotPath)
+	require.Equal(t, "Bearer test-key", gotAuth)
+	require.True(t, strings.HasPrefix(gotAgent, "inngest-cli/"))
+	require.Equal(t, map[string]any{"feedback": "More examples please", "operation": "get_run", "email": "dev@example.com"}, gotBody)
 }

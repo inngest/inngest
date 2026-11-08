@@ -13,6 +13,7 @@ import (
 var _ AppProvider = (*mockAppProvider)(nil)
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
 var _ RunProvider = (*mockRunProvider)(nil)
+var _ ReplayProvider = (*mockReplayProvider)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
 var _ RateLimitProvider = (*mockRateLimitProvider)(nil)
 
@@ -78,6 +79,16 @@ func (m *mockRunProvider) Rerun(ctx context.Context, runID ulid.ULID, opts Rerun
 
 func (m *mockRunProvider) Cancel(ctx context.Context, runID ulid.ULID) error {
 	return m.Called(ctx, runID).Error(0)
+}
+
+type mockReplayProvider struct {
+	mock.Mock
+}
+
+func (m *mockReplayProvider) CreateReplay(ctx context.Context, opts CreateReplayOpts) (ReplayResult, error) {
+	args := m.Called(ctx, opts)
+	result, _ := args.Get(0).(ReplayResult)
+	return result, args.Error(1)
 }
 
 type mockFunctionTraceReader struct {

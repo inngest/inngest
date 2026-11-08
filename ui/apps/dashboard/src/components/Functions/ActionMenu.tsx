@@ -1,3 +1,4 @@
+import { menuDangerItemClassName } from '@inngest/components/DropdownMenu/menuStyles';
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
@@ -86,7 +87,10 @@ export const ActionsMenu = ({
             Replay
           </DropdownMenuItem>
         </OptionalTooltip>
-        <DropdownMenuItem onSelect={showCancel} className="text-error">
+        <DropdownMenuItem
+          onSelect={showCancel}
+          className={menuDangerItemClassName}
+        >
           <RiCloseCircleLine className="h-4 w-4" />
           Bulk Cancel
         </DropdownMenuItem>

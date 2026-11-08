@@ -1,0 +1,1 @@
+SELECT run_id FROM runs EXCEPT (SELECT run_id FROM runs EXCEPT SELECT run_id FROM extended_trace_spans)

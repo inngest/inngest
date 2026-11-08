@@ -94,9 +94,6 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
-	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
-	// The default is to always enforce the limits.
-	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 	// SyncLifecycleListeners are notified synchronously (see
@@ -122,9 +119,6 @@ func New(o Opts) Checkpointer {
 	}
 	if o.BackoffFunc == nil {
 		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
-	}
-	if o.EnforceStepSizeLimits == nil {
-		o.EnforceStepSizeLimits = func(ctx context.Context, accountID uuid.UUID) bool { return true }
 	}
 
 	return checkpointer{o}
@@ -226,10 +220,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		}
 	}
 
-	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
-
 	if !complete {
-		if enforceStepSizeLimits && input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
+		if input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
 			return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 		}
 	}
@@ -248,7 +240,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+			if len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
@@ -546,9 +538,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		}
 	}
 
-	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
-
-	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
+	if md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
 		return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 	}
 
@@ -565,7 +555,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+			if len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 

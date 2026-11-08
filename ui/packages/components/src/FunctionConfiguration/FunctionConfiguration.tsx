@@ -398,6 +398,7 @@ export function FunctionConfiguration({
         {'keyQueuesEnabled' in inngestFunction && inngestFunction.keyQueuesEnabled && (
           <KeyQueuesConfiguration />
         )}
+        {'isDraining' in inngestFunction && inngestFunction.isDraining && <DrainingConfiguration />}
       </ConfigurationCategory>
     </div>
   );
@@ -412,12 +413,32 @@ function KeyQueuesConfiguration() {
       <div className="text-basis flex items-center gap-2 text-sm">
         Key queues
         <Info
-          text={<span className="whitespace-pre-line">Key queues enable fairer scheduling across concurrency keys.</span>}
+          text={
+            <span className="whitespace-pre-line">
+              Key queues enable fairer scheduling across concurrency keys.
+            </span>
+          }
           widthClassName="max-w-60"
           iconElement={<RiInformationLine className="text-muted h-[18px] w-[18px]" />}
         />
       </div>
       <Pill>Enabled</Pill>
+    </div>
+  );
+}
+
+function DrainingConfiguration() {
+  return (
+    <div className="border-subtle flex h-8 items-center justify-between gap-2 rounded border-[0.5px] px-2">
+      <div className="text-basis flex items-center gap-2 text-sm">
+        Draining
+        <Info
+          text="New runs are skipped while existing runs continue to execute."
+          widthClassName="max-w-60"
+          iconElement={<RiInformationLine className="text-muted h-[18px] w-[18px]" />}
+        />
+      </div>
+      <Pill kind="warning">Enabled</Pill>
     </div>
   );
 }

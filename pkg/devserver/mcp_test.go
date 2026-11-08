@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	ossv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2operations"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -42,6 +44,11 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {
 		names = append(names, tool.Name)
+		if tool.Name == "pause_functions" || tool.Name == "resume_functions" {
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+			require.ElementsMatch(t, []any{"appId", "functionIds"}, tool.InputSchema["required"])
+		}
 		if _, ok := generated[tool.Name]; ok {
 			require.IsType(t, []any{}, tool.InputSchema["required"], tool.Name)
 			properties := tool.InputSchema["properties"].(map[string]any)
@@ -54,7 +61,15 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	}
 	require.Contains(t, names, "list_functions")
 	require.Contains(t, names, "invoke_function")
+	require.Contains(t, names, "create_replay")
 	require.Contains(t, names, "pause_function")
+	require.Contains(t, names, "create_cancellation")
+	require.Contains(t, names, "resume_function")
+	require.Contains(t, names, "pause_functions")
+	require.Contains(t, names, "resume_functions")
+	require.Contains(t, names, "list_events")
+	require.Contains(t, names, "get_event")
+	require.Contains(t, names, "submit_feedback")
 	for method := range unsupportedDevServerMCPMethods {
 		// The dev server keeps its older send_event tool for eventIdSeed support.
 		if method == "SendEvent" {
@@ -148,11 +163,29 @@ func TestMCPOperations(t *testing.T) {
 	require.Equal(t, "GetFunctionRun", getRun.ID)
 	require.Equal(t, "GET", getRun.HTTP.Method)
 	require.Equal(t, "get-function-run", getRun.CLI.Command)
+	cancellation := operations["create_cancellation"]
+	require.Equal(t, "CreateCancellation", cancellation.ID)
+	require.Equal(t, "POST", cancellation.HTTP.Method)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/cancellations", cancellation.HTTP.Path)
+	require.Equal(t, "create-cancellation", cancellation.CLI.Command)
 	pause := operations["pause_function"]
 	require.Equal(t, "PauseFunction", pause.ID)
 	require.Equal(t, "POST", pause.HTTP.Method)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", pause.HTTP.Path)
 	require.Equal(t, "pause-function", pause.CLI.Command)
+	resume := operations["resume_function"]
+	require.Equal(t, "ResumeFunction", resume.ID)
+	require.Equal(t, "POST", resume.HTTP.Method)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/resume", resume.HTTP.Path)
+	require.Equal(t, "resume-function", resume.CLI.Command)
+
+	for _, action := range []struct{ method, name string }{{"PauseFunctions", "pause"}, {"ResumeFunctions", "resume"}} {
+		op := operations[action.name+"_functions"]
+		require.Equal(t, action.method, op.ID)
+		require.Equal(t, "POST", op.HTTP.Method)
+		require.Equal(t, "/apps/{app_id}/functions/"+action.name, op.HTTP.Path)
+		require.Equal(t, action.name+"-functions", op.CLI.Command)
+	}
 
 	grepDocs := operations["grep_docs"]
 	require.Equal(t, "mcp.grep_docs", grepDocs.ID)
@@ -216,10 +249,11 @@ func TestMCPNotImplementedIsToolError(t *testing.T) {
 }
 
 type listedMCPTool struct {
-	Name        string         `json:"name"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"inputSchema"`
+	Name        string              `json:"name"`
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	InputSchema map[string]any      `json:"inputSchema"`
+	Annotations mcp.ToolAnnotations `json:"annotations"`
 }
 
 func listMCPTools(t *testing.T, handler http.Handler) []listedMCPTool {
@@ -273,4 +307,54 @@ func listMCPTools(t *testing.T, handler http.Handler) []listedMCPTool {
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	return response.Result.Tools
+}
+
+func TestMCPEventReadCalls(t *testing.T) {
+	calls := []string{}
+	handler := NewMCPHandler(nil, nil, 0, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "payload", r.URL.Query().Get("include"))
+		calls = append(calls, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000","name":"order/placed","payload":{"name":"order/placed","data":{"ok":true}}}}`))
+	}))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "event-test", Version: "1"}, nil)
+	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: srv.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	defer session.Close()
+	for _, tc := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"list_events", map[string]any{"include": []string{"payload"}, "name": []string{"order/placed"}}},
+		{"get_event", map[string]any{"include": []string{"payload"}, "eventId": "01J00000000000000000000000"}},
+	} {
+		result, err := session.CallTool(t.Context(), &mcp.CallToolParams{Name: tc.name, Arguments: tc.args})
+		require.NoError(t, err)
+		require.False(t, result.IsError)
+		data := result.StructuredContent.(map[string]any)["data"].(map[string]any)
+		require.Equal(t, "01J00000000000000000000000", data["id"])
+		require.Equal(t, true, data["payload"].(map[string]any)["data"].(map[string]any)["ok"])
+	}
+	require.Equal(t, []string{"/api/v2/events", "/api/v2/events/01J00000000000000000000000"}, calls)
+}
+
+func TestMCPFeedbackPointsToCloud(t *testing.T) {
+	handler, err := ossv2.NewHTTPHandler(t.Context(), ossv2.ServiceOptions{}, ossv2.HTTPHandlerOptions{}, apiv2base.NewBase())
+	require.NoError(t, err)
+	srv := httptest.NewServer(NewMCPHandler(nil, nil, 0, handler))
+	defer srv.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "feedback-test", Version: "1"}, nil)
+	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: srv.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	defer session.Close()
+	result, err := session.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "submit_feedback", Arguments: map[string]any{"feedback": "More examples"},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.Contains(t, result.Content[0].(*mcp.TextContent).Text, "Inngest Cloud")
+	require.Contains(t, result.Content[0].(*mcp.TextContent).Text, "inngest api --prod submit-feedback --feedback")
 }

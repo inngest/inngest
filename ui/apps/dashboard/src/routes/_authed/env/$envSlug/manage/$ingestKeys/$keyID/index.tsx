@@ -1,3 +1,4 @@
+import { menuDangerItemClassName } from '@inngest/components/DropdownMenu/menuStyles';
 import { graphql } from '@/gql';
 import { EnvironmentType } from '@/gql/graphql';
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -137,7 +138,7 @@ function KeyComponent() {
                   )}
                   <DropdownMenuItem
                     onSelect={() => setIsDeleteKeyModalVisible(true)}
-                    className="text-error"
+                    className={menuDangerItemClassName}
                   >
                     <RiDeleteBinLine className="h-4 w-4" />
                     Delete

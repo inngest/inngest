@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
+import EntityFilter from '../Filter/EntityFilter';
 import { Select, SelectGroup, SelectWithSearch, type Option } from './Select';
 
 const meta = {
@@ -143,3 +144,38 @@ export const GroupOfSelects: Story = {
     </SelectGroup>
   ),
 };
+
+function SingleSelection() {
+  const [selected, setSelected] = useState<Option>(options[0]!);
+  return (
+    <Select label="Time field" value={selected} onChange={setSelected} size="small">
+      <Select.Button size="small">{selected.name}</Select.Button>
+      <Select.Options>
+        {options.map((option) => (
+          <Select.Option key={option.id} option={option}>
+            {option.name}
+          </Select.Option>
+        ))}
+        <Select.Option option={{ id: 'disabled', name: 'Unavailable', disabled: true }}>
+          Unavailable
+        </Select.Option>
+      </Select.Options>
+    </Select>
+  );
+}
+
+export const SingleSelectionAndDisabled: Story = { render: () => <SingleSelection /> };
+
+function SearchAndApply() {
+  const [selection, setSelection] = useState<string[]>([]);
+  return (
+    <EntityFilter
+      type="app"
+      entities={options}
+      selectedEntities={selection}
+      onFilterChange={setSelection}
+    />
+  );
+}
+
+export const SearchWithApplyAndReset: Story = { render: () => <SearchAndApply /> };

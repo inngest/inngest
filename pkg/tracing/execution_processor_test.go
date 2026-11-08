@@ -4,10 +4,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestAddQueueTimestampAttrs(t *testing.T) {
@@ -89,5 +93,107 @@ func TestAddQueueTimestampAttrs(t *testing.T) {
 		require.True(t, hasScheduledAt)
 		assert.Equal(t, now, *queuedAt)
 		assert.Equal(t, now, *scheduledAt)
+	})
+}
+
+func TestExecutionProcessorStepStartWhenQueued(t *testing.T) {
+	queuedAt := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+	sdkStartedAt := queuedAt.Add(30 * time.Second)
+	sdkEndedAt := sdkStartedAt.Add(time.Second)
+
+	// emitStep creates an executor.step span the way the executor does, while
+	// executing a queue item of the given kind, and returns the exported
+	// span's typed attributes.
+	emitStep := func(t *testing.T, queueKind string, op enums.Opcode, opts CreateSpanOptions) (*meta.ExtractedValues, time.Time) {
+		t.Helper()
+
+		exp := tracetest.NewInMemoryExporter()
+
+		tp := NewOtelTracerProvider(exp, time.Millisecond)
+
+		ctx := WithExecutionContext(t.Context(), ExecutionContext{QueueKind: queueKind})
+
+		stepID := "step-id"
+
+		attrs := meta.NewAttrSet(
+			meta.Attr(meta.Attrs.StepID, &stepID),
+			meta.Attr(meta.Attrs.StepOp, &op),
+		)
+
+		opts.Attributes = attrs.Merge(opts.Attributes)
+
+		opts.Parent = RunSpanRefFromMetadata(&statev2.Metadata{ID: statev2.ID{RunID: ulid.Make()}})
+
+		_, err := tp.CreateSpan(ctx, meta.SpanNameStep, &opts)
+		require.NoError(t, err)
+
+		spans := exp.GetSpans()
+		require.Len(t, spans, 1)
+
+		raw := map[string]any{}
+		for _, kv := range spans[0].Attributes {
+			raw[string(kv.Key)] = kv.Value.AsInterface()
+		}
+
+		ev, err := meta.ExtractTypedValues(t.Context(), raw)
+		require.NoError(t, err)
+
+		return ev, spans[0].StartTime
+	}
+
+	t.Run("failed step run while resuming a sleep keeps its SDK start", func(t *testing.T) {
+		timing := meta.NewAttrSet()
+		AddTimingAttrs(timing, queuedAt, queuedAt, sdkStartedAt, sdkEndedAt)
+
+		ev, _ := emitStep(t, queue.KindSleep, enums.OpcodeStepFailed, CreateSpanOptions{
+			Attributes: timing,
+			StartTime:  queuedAt,
+			EndTime:    sdkEndedAt,
+		})
+
+		require.NotNil(t, ev.StartedAt)
+		assert.Equal(t, sdkStartedAt.UnixMilli(), ev.StartedAt.UnixMilli())
+	})
+
+	t.Run("step run while resuming a sleep keeps its SDK start", func(t *testing.T) {
+		timing := meta.NewAttrSet()
+		AddTimingAttrs(timing, queuedAt, queuedAt, sdkStartedAt, sdkEndedAt)
+
+		ev, _ := emitStep(t, queue.KindSleep, enums.OpcodeStepRun, CreateSpanOptions{
+			Attributes: timing,
+			StartTime:  queuedAt,
+			EndTime:    sdkEndedAt,
+		})
+
+		require.NotNil(t, ev.StartedAt)
+		assert.Equal(t, sdkStartedAt.UnixMilli(), ev.StartedAt.UnixMilli())
+	})
+
+	t.Run("sleep's own span starts when queued", func(t *testing.T) {
+		ev, spanStart := emitStep(t, queue.KindSleep, enums.OpcodeSleep, CreateSpanOptions{})
+
+		require.NotNil(t, ev.StartedAt)
+		assert.Equal(t, spanStart.UnixMilli(), ev.StartedAt.UnixMilli())
+	})
+
+	t.Run("waitForEvent starts when queued", func(t *testing.T) {
+		ev, spanStart := emitStep(t, queue.KindEdge, enums.OpcodeWaitForEvent, CreateSpanOptions{})
+
+		require.NotNil(t, ev.StartedAt)
+		assert.Equal(t, spanStart.UnixMilli(), ev.StartedAt.UnixMilli())
+	})
+
+	t.Run("step run outside a sleep keeps its SDK start", func(t *testing.T) {
+		timing := meta.NewAttrSet()
+		AddTimingAttrs(timing, queuedAt, queuedAt, sdkStartedAt, sdkEndedAt)
+
+		ev, _ := emitStep(t, queue.KindEdge, enums.OpcodeStepRun, CreateSpanOptions{
+			Attributes: timing,
+			StartTime:  queuedAt,
+			EndTime:    sdkEndedAt,
+		})
+
+		require.NotNil(t, ev.StartedAt)
+		assert.Equal(t, sdkStartedAt.UnixMilli(), ev.StartedAt.UnixMilli())
 	})
 }

@@ -35,25 +35,80 @@ func TestRequest(t *testing.T) {
 	require.False(t, Tool(endpoint).Annotations.IdempotentHint)
 }
 
-func TestPauseFunctionRequest(t *testing.T) {
-	endpoint := endpointByMethod(t, "PauseFunction")
-	req, err := Request(t.Context(), endpoint, map[string]any{
-		"appId": "my app", "functionId": "hello/world",
-	}, Options{})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, req.Method)
-	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/pause", req.URL.EscapedPath())
-	body, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-	require.Empty(t, body)
-	require.Empty(t, req.URL.RawQuery)
-	schema := InputSchema(endpoint)
-	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
-	require.Len(t, schema["properties"], 3)
+func TestFunctionPauseResumeRequest(t *testing.T) {
+	for _, action := range []struct{ method, name string }{{"PauseFunction", "pause"}, {"ResumeFunction", "resume"}} {
+		t.Run(action.name, func(t *testing.T) {
+			endpoint := endpointByMethod(t, action.method)
+			req, err := Request(t.Context(), endpoint, map[string]any{
+				"appId": "my app", "functionId": "hello/world",
+			}, Options{})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/"+action.name, req.URL.EscapedPath())
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.Empty(t, body)
+			require.Empty(t, req.URL.RawQuery)
+			schema := InputSchema(endpoint)
+			require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
+			require.Len(t, schema["properties"], 3)
+			tool := Tool(endpoint)
+			require.Equal(t, action.name+"_function", tool.Name)
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+		})
+	}
+}
+
+func TestReplayTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "CreateReplay")
 	tool := Tool(endpoint)
-	require.Equal(t, "pause_function", tool.Name)
-	require.True(t, tool.Annotations.IdempotentHint)
+	require.Equal(t, "create_replay", tool.Name)
 	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.True(t, *tool.Annotations.DestructiveHint)
+	schema := tool.InputSchema.(map[string]any)
+	require.ElementsMatch(t, []string{"appId", "name", "functionId", "from", "until", "statuses"}, schema["required"])
+	properties := schema["properties"].(map[string]any)
+	functionID := properties["functionId"].(map[string]any)
+	require.Equal(t, "string", functionID["type"])
+	statuses := properties["statuses"].(map[string]any)
+	require.Equal(t, "array", statuses["type"])
+	require.Equal(t, []string{"ALL", "COMPLETED", "FAILED", "CANCELLED", "SKIPPED_PAUSED"}, statuses["items"].(map[string]any)["enum"])
+	for _, field := range []string{"from", "until"} {
+		timestamp := properties[field].(map[string]any)
+		require.Equal(t, "string", timestamp["type"])
+		require.Equal(t, "date-time", timestamp["format"])
+	}
+
+	var gotMethod, gotPath, gotQuery, gotEnv string
+	var gotBody map[string]any
+	result, err := call(t.Context(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{
+			"env":"branch-a","appId":"my-app","name":"Replay orders","functionId":"orders-created",
+			"statuses":["FAILED","SKIPPED_PAUSED"],"from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z"
+		}`)},
+	}, endpoint, Options{
+		BasePath: "/v2", EnvHeader: "X-Inngest-Env",
+		Execute: func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+			gotMethod, gotPath, gotQuery = req.Method, req.URL.Path, req.URL.RawQuery
+			gotEnv = req.Header.Get("X-Inngest-Env")
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&gotBody))
+			return ToolResult(map[string]any{"id": "replay-id"}, "created replay"), nil
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, map[string]any{"id": "replay-id"}, result.StructuredContent)
+	require.Equal(t, http.MethodPost, gotMethod)
+	require.Equal(t, "/v2/apps/my-app/functions/orders-created/replays", gotPath)
+	require.Empty(t, gotQuery)
+	require.Equal(t, "branch-a", gotEnv)
+	require.Equal(t, map[string]any{
+		"name":     "Replay orders",
+		"statuses": []any{"FAILED", "SKIPPED_PAUSED"},
+		"from":     "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z",
+	}, gotBody)
 }
 
 func TestSendEventRequest(t *testing.T) {
@@ -197,4 +252,139 @@ func endpointByMethod(t *testing.T, method string) apiv2endpoint.Endpoint {
 	}
 	t.Fatalf("endpoint %s not found", method)
 	return apiv2endpoint.Endpoint{}
+}
+
+func TestCancellationTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "CreateCancellation")
+	tool := Tool(endpoint)
+	require.Equal(t, "create_cancellation", tool.Name)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.True(t, *tool.Annotations.DestructiveHint)
+	schema := tool.InputSchema.(map[string]any)
+	require.ElementsMatch(t, []string{"appId", "functionId", "from", "until"}, schema["required"])
+	properties := schema["properties"].(map[string]any)
+	for _, field := range []string{"appId", "functionId", "from", "until"} {
+		require.Equal(t, "string", properties[field].(map[string]any)["type"])
+	}
+	for _, field := range []string{"from", "until"} {
+		require.Equal(t, "date-time", properties[field].(map[string]any)["format"])
+	}
+
+	var method, path, query, env string
+	var body map[string]any
+	result, err := call(t.Context(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{
+			"env":"branch-a","appId":"my app","functionId":"hello/world",
+			"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"
+		}`)},
+	}, endpoint, Options{
+		BasePath:  "/v2",
+		EnvHeader: "X-Inngest-Env",
+		Execute: func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+			method, path, query = req.Method, req.URL.EscapedPath(), req.URL.RawQuery
+			env = req.Header.Get("X-Inngest-Env")
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			return ToolResult(map[string]any{"id": "cancellation-id"}, "created cancellation"), nil
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, map[string]any{"id": "cancellation-id"}, result.StructuredContent)
+	require.Equal(t, http.MethodPost, method)
+	require.Equal(t, "/v2/apps/my%20app/functions/hello%2Fworld/cancellations", path)
+	require.Empty(t, query)
+	require.Equal(t, "branch-a", env)
+	require.Equal(t, map[string]any{
+		"from":  "2026-01-01T00:00:00Z",
+		"until": "2026-01-01T01:00:00Z",
+		"if":    "event.data.cancel == true",
+		"name":  "cleanup",
+	}, body)
+}
+
+func TestEventReadTools(t *testing.T) {
+	for _, tc := range []struct {
+		method, name, path string
+		args               map[string]any
+	}{
+		{"ListEvents", "list_events", "/api/v2/events", map[string]any{"name": []any{"order/placed", "order/paid"}, "include": []any{"payload"}, "limit": 5, "from": "2026-10-27T11:00:00Z", "until": "2026-10-27T12:00:00Z", "cursor": "01J00000000000000000000000"}},
+		{"GetEvent", "get_event", "/api/v2/events/01J00000000000000000000000", map[string]any{"eventId": "01J00000000000000000000000", "include": []any{"payload"}}},
+	} {
+		endpoint := endpointByMethod(t, tc.method)
+		tool := Tool(endpoint)
+		require.Equal(t, tc.name, tool.Name)
+		require.True(t, tool.Annotations.ReadOnlyHint)
+		require.True(t, tool.Annotations.IdempotentHint)
+		require.False(t, *tool.Annotations.DestructiveHint)
+		schema := InputSchema(endpoint)
+		include := schema["properties"].(map[string]any)["include"].(map[string]any)
+		require.Equal(t, []string{"payload"}, include["items"].(map[string]any)["enum"])
+		require.Contains(t, include["description"], "Payloads can contain personal data and be large, so request them only when needed.")
+		require.Contains(t, include["description"], "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+		properties := schema["properties"].(map[string]any)
+		if tc.method == "ListEvents" {
+			require.Contains(t, properties["limit"].(map[string]any)["description"], "With include=payload the maximum and default are 5")
+			require.Contains(t, properties["limit"].(map[string]any)["description"], "Events can be up to 5 MiB in Cloud (less on lower plans).")
+			require.Contains(t, properties["name"].(map[string]any)["description"], "up to 20 names, with up to 256 characters each and no backslashes or control characters")
+			require.Contains(t, properties["cursor"].(map[string]any)["description"], "ID of the last returned event from the previous response.")
+			require.Contains(t, properties["from"].(map[string]any)["description"], "Defaults to one hour before until, or one hour before the current time if until is omitted.")
+		} else {
+			require.Contains(t, include["description"], "Events can be up to 5 MiB in Cloud (less on lower plans).")
+			require.Contains(t, tool.Description, "Internal inngest/ events are not returned.")
+		}
+		req, err := Request(t.Context(), endpoint, tc.args, Options{})
+		require.NoError(t, err)
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, tc.path, req.URL.Path)
+		require.Equal(t, []string{"payload"}, req.URL.Query()["include"])
+		if tc.method == "ListEvents" {
+			require.Equal(t, []string{"order/placed", "order/paid"}, req.URL.Query()["name"])
+			require.Equal(t, "5", req.URL.Query().Get("limit"))
+			require.Equal(t, "2026-10-27T11:00:00Z", req.URL.Query().Get("from"))
+			require.Equal(t, "2026-10-27T12:00:00Z", req.URL.Query().Get("until"))
+			require.Equal(t, "01J00000000000000000000000", req.URL.Query().Get("cursor"))
+		}
+	}
+}
+
+func TestFunctionsPauseResumeRequest(t *testing.T) {
+	for _, action := range []struct{ method, name string }{{"PauseFunctions", "pause"}, {"ResumeFunctions", "resume"}} {
+		t.Run(action.name, func(t *testing.T) {
+			endpoint := endpointByMethod(t, action.method)
+			req, err := Request(t.Context(), endpoint, map[string]any{
+				"appId": "my app", "functionIds": []string{"echo", "hello/world"},
+			}, Options{})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "/api/v2/apps/my%20app/functions/"+action.name, req.URL.EscapedPath())
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.JSONEq(t, `{"functionIds":["echo","hello/world"]}`, string(body))
+			require.Empty(t, req.URL.RawQuery)
+			require.ElementsMatch(t, []string{"appId", "functionIds"}, InputSchema(endpoint)["required"])
+			tool := Tool(endpoint)
+			require.Equal(t, action.name+"_functions", tool.Name)
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+		})
+	}
+}
+
+func TestFeedbackTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "SubmitFeedback")
+	tool := Tool(endpoint)
+	require.Equal(t, "submit_feedback", tool.Name)
+	require.Equal(t, "feedback:write:create", endpoint.AuthzPermission)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.Contains(t, tool.Description, "user has asked to share")
+	require.ElementsMatch(t, []string{"feedback"}, InputSchema(endpoint)["required"])
+	req, err := Request(t.Context(), endpoint, map[string]any{"feedback": "More examples", "operation": "get_run"}, Options{BasePath: "/v2"})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "/v2/feedback", req.URL.Path)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+	require.Equal(t, map[string]any{"feedback": "More examples", "operation": "get_run"}, body)
 }

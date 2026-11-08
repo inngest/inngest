@@ -82,6 +82,12 @@ type devserver struct {
 
 	Data cqrs.Manager
 
+	// DuckDB is the dual-write DuckDB connection (see setupDualWrite in
+	// devserver.go) -- nil unless --duckdb dual-write started
+	// successfully. Used by devapi.Info to report the "duckdb-insights"
+	// feature flag.
+	DuckDB *sql.DB
+
 	stepLimitOverrides      map[string]int
 	stateSizeLimitOverrides map[string]int
 
@@ -343,7 +349,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		urls := map[string]struct{}{}
 		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil); err == nil {
 			for _, app := range apps {
-				if app.Method == enums.AppMethodConnect.String() || app.Method == enums.AppMethodAPI.String() {
+				if app.Method == enums.AppMethodConnect.String() || app.Method == enums.AppMethodAPI.String() || app.Method == enums.AppMethodInngestServe.String() {
 					continue
 				}
 

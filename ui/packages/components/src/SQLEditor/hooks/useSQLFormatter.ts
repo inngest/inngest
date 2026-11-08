@@ -3,7 +3,9 @@ import { useMonaco } from '@monaco-editor/react';
 import type { languages } from 'monaco-editor';
 import { clickhouse, formatDialect } from 'sql-formatter';
 
-export function useSQLFormatter() {
+export type SQLFormatterDialect = typeof clickhouse;
+
+export function useSQLFormatter(dialect: SQLFormatterDialect = clickhouse) {
   const monaco = useMonaco();
 
   useEffect(() => {
@@ -16,7 +18,7 @@ export function useSQLFormatter() {
 
         try {
           const formatted = formatDialect(text, {
-            dialect: clickhouse,
+            dialect,
             tabWidth: 2,
             linesBetweenQueries: 2,
           });
@@ -39,5 +41,5 @@ export function useSQLFormatter() {
     return () => {
       disposable.dispose();
     };
-  }, [monaco]);
+  }, [monaco, dialect]);
 }

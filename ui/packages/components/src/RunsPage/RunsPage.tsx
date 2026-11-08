@@ -50,6 +50,9 @@ import type { Run, ViewScope } from './types';
 
 type Props = {
   data: Run[];
+  initialExpandedRunID?: string;
+  toolbarActions?: React.ReactNode;
+  renderRunAction?: React.ComponentProps<typeof RunDetailsV4>['renderRunAction'];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
@@ -87,6 +90,7 @@ export function RunsPage({
   defaultVisibleColumns,
   getTrigger,
   data,
+  initialExpandedRunID,
   features,
   hasMore,
   isLoadingInitial,
@@ -104,6 +108,8 @@ export function RunsPage({
   progressiveSearch,
   infiniteScrollTrigger,
   searchLimit,
+  toolbarActions,
+  renderRunAction,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -271,11 +277,12 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
+            renderRunAction={renderRunAction}
           />
         </div>
       );
     },
-    [getTrigger, pollInterval]
+    [getTrigger, pollInterval, renderRunAction]
   );
 
   const options = useMemo(() => {
@@ -388,6 +395,7 @@ export function RunsPage({
                 onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
+            {toolbarActions}
           </div>
           <div className="flex items-center gap-2">
             {progressiveSearch ? (
@@ -464,6 +472,7 @@ export function RunsPage({
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
+          initialExpandedRunID={initialExpandedRunID}
           isLoading={isLoadingInitial}
           error={error}
           onRefresh={onRefresh}

@@ -1,0 +1,3 @@
+{
+  "error": "insights: unknown table \"bogus_alias\" (at 1:8)"
+}

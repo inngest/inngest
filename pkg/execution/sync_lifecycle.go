@@ -128,6 +128,18 @@ type SyncLifecycleListener interface {
 		now time.Time,
 	)
 
+	// OnFunctionSkipped is called synchronously when a function run is
+	// skipped (paused, draining, singleton, backlog size limit, etc). A
+	// skipped run never reaches OnFunctionScheduled, so this is the only hook
+	// it fires. now is the caller's own "this just happened" timestamp -- see
+	// OnFunctionFinished.
+	OnFunctionSkipped(
+		ctx context.Context,
+		md statev2.Metadata,
+		s SkipState,
+		now time.Time,
+	)
+
 	// OnStepScheduled is called synchronously when a new step is scheduled.
 	// now is the caller's own "this just happened" timestamp — see
 	// OnFunctionFinished.
@@ -433,6 +445,9 @@ func (NoopSyncLifecycleListener) OnFunctionFinished(context.Context, statev2.Met
 }
 
 func (NoopSyncLifecycleListener) OnFunctionCancelled(context.Context, statev2.Metadata, CancelRequest, []json.RawMessage, time.Time) {
+}
+
+func (NoopSyncLifecycleListener) OnFunctionSkipped(context.Context, statev2.Metadata, SkipState, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnStepScheduled(context.Context, statev2.Metadata, queue.Item, *string, time.Time) {

@@ -16,13 +16,33 @@ message BatchInfoRequest {
 // BatchInfoResponse contains information about the current batch.
 message BatchInfoResponse {
   // batch_id is the current batch ULID if one exists.
-  string batch_id = 1;
+  // Deprecated: no longer populated; use stores, which has the batch in each batch store.
+  string batch_id = 1 [deprecated = true];
   // item_count is the number of events currently in the batch.
-  int32 item_count = 2;
+  // Deprecated: no longer populated; use stores, which has the batch in each batch store.
+  int32 item_count = 2 [deprecated = true];
   // items contains the batch items with event data.
-  repeated BatchEventItem items = 3;
+  // Deprecated: no longer populated; use stores, which has the batch in each batch store.
+  repeated BatchEventItem items = 3 [deprecated = true];
   // status is the current batch status (pending, started, etc.).
-  string status = 4;
+  // Deprecated: no longer populated; use stores, which has the batch in each batch store.
+  string status = 4 [deprecated = true];
+  // stores has the current batch in each batch store.
+  repeated BatchInfo stores = 5;
+}
+
+// BatchInfo describes the current batch in one batch store.
+message BatchInfo {
+  // store is the name of the batch store.
+  string store = 1;
+  // batch_id is the current batch ULID in this store, if one exists.
+  string batch_id = 2;
+  // item_count is the number of events in the batch.
+  int32 item_count = 3;
+  // items contains the batch items with event data.
+  repeated BatchEventItem items = 4;
+  // status is the batch status (pending, started, etc.).
+  string status = 5;
 }
 
 // BatchEventItem represents a single event in a batch.
@@ -48,11 +68,28 @@ message DeleteBatchRequest {
 // DeleteBatchResponse contains information about the deleted batch.
 message DeleteBatchResponse {
   // deleted indicates whether a batch was found and deleted.
-  bool deleted = 1;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  bool deleted = 1 [deprecated = true];
   // batch_id is the ULID of the deleted batch, if one was deleted.
-  string batch_id = 2;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  string batch_id = 2 [deprecated = true];
   // item_count is the number of events that were in the deleted batch.
-  int32 item_count = 3;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  int32 item_count = 3 [deprecated = true];
+  // stores has the result for each batch store.
+  repeated DeleteBatchResult stores = 4;
+}
+
+// DeleteBatchResult describes the batch deleted from one batch store.
+message DeleteBatchResult {
+  // store is the name of the batch store.
+  string store = 1;
+  // deleted indicates whether a batch was found and deleted in this store.
+  bool deleted = 2;
+  // batch_id is the ULID of the deleted batch, if one was deleted.
+  string batch_id = 3;
+  // item_count is the number of events that were in the deleted batch.
+  int32 item_count = 4;
 }
 
 // RunBatchRequest is used to trigger immediate execution of a batch.
@@ -66,9 +103,26 @@ message RunBatchRequest {
 // RunBatchResponse contains information about the scheduled batch execution.
 message RunBatchResponse {
   // scheduled indicates whether a batch was found and scheduled.
-  bool scheduled = 1;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  bool scheduled = 1 [deprecated = true];
   // batch_id is the ULID of the batch that was scheduled.
-  string batch_id = 2;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  string batch_id = 2 [deprecated = true];
   // item_count is the number of events in the batch.
-  int32 item_count = 3;
+  // Deprecated: no longer populated; use stores, which has the result for each batch store.
+  int32 item_count = 3 [deprecated = true];
+  // stores has the result for each batch store.
+  repeated RunBatchResult stores = 4;
+}
+
+// RunBatchResult describes the batch scheduled in one batch store.
+message RunBatchResult {
+  // store is the name of the batch store.
+  string store = 1;
+  // scheduled indicates whether a batch was found and scheduled in this store.
+  bool scheduled = 2;
+  // batch_id is the ULID of the scheduled batch.
+  string batch_id = 3;
+  // item_count is the number of events in the batch.
+  int32 item_count = 4;
 }

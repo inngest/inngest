@@ -1,0 +1,1 @@
+WITH x AS (SELECT run_id FROM x) SELECT * FROM x

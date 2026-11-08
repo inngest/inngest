@@ -1,0 +1,1 @@
+SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE EXISTS (SELECT 1 FROM extended_trace_spans WHERE extended_trace_spans.run_id = runs.run_id))

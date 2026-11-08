@@ -1,3 +1,4 @@
+import { menuDangerItemClassName } from '@inngest/components/DropdownMenu/menuStyles';
 import type { ReactElement } from 'react';
 import {
   DropdownMenu,
@@ -48,17 +49,13 @@ export function QueryActionsMenu({
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {editorRef && (
-          <DropdownMenuItem
-            className="text-basis px-4 outline-none"
-            onSelect={handleFormatSQL}
-          >
+          <DropdownMenuItem onSelect={handleFormatSQL}>
             <RiAlignLeft className="size-4" />
             <span>Format SQL</span>
           </DropdownMenuItem>
         )}
         {isActualQueryAndUnshared(query) && (
           <DropdownMenuItem
-            className="text-basis px-4 outline-none"
             onSelect={() => {
               if (query === undefined || isQuerySnapshot(query)) return;
               shareQuery(query.id);
@@ -70,7 +67,7 @@ export function QueryActionsMenu({
         )}
         {query !== undefined && (
           <DropdownMenuItem
-            className="text-error px-4 outline-none"
+            className={menuDangerItemClassName}
             onSelect={() => {
               onSelectDelete(query);
             }}

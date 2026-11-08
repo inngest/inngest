@@ -1420,13 +1420,13 @@ type replyFailingExecutor struct {
 	replyReceived chan *connect.ReplyRequest
 }
 
-func startReplyFailingExecutor(t *testing.T) *replyFailingExecutor {
+func startReplyFailingExecutor(t *testing.T, opts ...grpc.ServerOption) *replyFailingExecutor {
 	t.Helper()
 
 	executor := &replyFailingExecutor{
 		replyReceived: make(chan *connect.ReplyRequest, 1),
 	}
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(opts...)
 	connect.RegisterConnectExecutorServer(grpcServer, executor)
 
 	lis, err := net.Listen("tcp", "127.0.0.1:0")

@@ -583,7 +583,9 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 		PassthroughJobId:       true,
 		ForceQueueShardName:    "queue-a",
 		NormalizeFromBacklogID: "backlog-a",
+		SingletonMigrationKey:  "singleton-a",
 		IdempotencyPeriod:      &idempotencyPeriod,
+		CallerLease:            &CallerLease{Shards: []string{"shard-a", "shard-b"}, LeaseID: ulid.Make(), AtLimit: true},
 	}
 
 	msg := EnqueueOptionsToProto(original)
@@ -591,6 +593,22 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 
 	require.Equal(t, original, roundTripped)
 	require.Equal(t, EnqueueOpts{}, EnqueueOptionsFromProto(nil))
+}
+
+// TestEnqueueOptionsCallerLeaseValidation: a caller lease the queue cannot
+// use is dropped, so the enqueue proceeds normally.
+func TestEnqueueOptionsCallerLeaseValidation(t *testing.T) {
+	for name, msg := range map[string]*pb.CallerLease{
+		"no shards":   {LeaseId: ulid.Make().String()},
+		"bad lease":   {Shards: []string{"shard-a"}, LeaseId: "not-a-ulid"},
+		"empty lease": {Shards: []string{"shard-a"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			opts := EnqueueOptionsFromProto(&pb.EnqueueOptions{PassthroughJobId: true, CallerLease: msg})
+			require.Nil(t, opts.CallerLease)
+			require.True(t, opts.PassthroughJobId)
+		})
+	}
 }
 
 // TestQueueItemFromProtoInvalidIDs guards against malformed proxy payloads
@@ -1155,7 +1173,9 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"PassthroughJobId",
 			"ForceQueueShardName",
 			"NormalizeFromBacklogID",
+			"SingletonMigrationKey",
 			"IdempotencyPeriod",
+			"CallerLease",
 		},
 	})
 }

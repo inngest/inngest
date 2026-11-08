@@ -30,7 +30,9 @@ export const MetricsActionMenu = () => {
         <DropdownMenuContent align="end">
           <DropdownMenuItem className="hover:bg-canvasBase">
             <div className="flex flex-col">
-              <div className="text-basis text-sm">Auto Refresh</div>
+              <div className="text-basis text-[13px] leading-5">
+                Auto Refresh
+              </div>
               <div className="text-basis text-xs">
                 Refreshes data every {AUTO_REFRESH_INTERVAL} seconds
               </div>

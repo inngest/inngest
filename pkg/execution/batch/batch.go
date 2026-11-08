@@ -40,6 +40,7 @@ func HashBatchKey(batchKey string) string {
 //
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
+	Name() string
 	// Append appends items to a batch.  This may buffer in-memory for functions with
 	// the same ID prior to appending.
 	//
@@ -70,19 +71,22 @@ type BatchManager interface {
 	//     an error.
 	BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (*BulkAppendResult, error)
 
-	RetrieveItems(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
-	StartExecution(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
+	RetrieveItems(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
+	StartExecution(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 
-	DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error
-	// GetBatchInfo retrieves information about the current batch for a function and batch key.
-	// This is used for debugging and introspection.
-	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error)
-	// DeleteBatch deletes the current batch for a function and batch key.
-	// Returns information about the deleted batch.
-	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error)
-	// RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
-	RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error)
+	// DeleteKeys deletes a batch's keys and reports whether the batch's event
+	// list existed.
+	DeleteKeys(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) (bool, error)
+	// GetBatchInfo retrieves information about the current batch for a function and batch key,
+	// with one entry per batch store. This is used for debugging and introspection.
+	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error)
+	// DeleteBatch deletes the current batch for a function and batch key in every batch store.
+	// Returns one result per batch store.
+	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) ([]DeleteBatchResult, error)
+	// RunBatch schedules immediate execution of the current batch in every batch store by
+	// creating a timeout job that runs in one second. Returns one result per batch store.
+	RunBatch(ctx context.Context, opts RunBatchOpts) ([]RunBatchResult, error)
 	// Close gracefully shuts down the batch manager, flushing any pending buffers.
 	Close() error
 }
@@ -98,6 +102,8 @@ type BatchMetricRecorder interface {
 
 // BatchInfo contains information about a batch for debugging purposes.
 type BatchInfo struct {
+	// Store is the name of the batch store the batch lives in.
+	Store string
 	// BatchID is the current batch ULID if one exists.
 	BatchID string
 	// Items contains the batch items.
@@ -108,6 +114,8 @@ type BatchInfo struct {
 
 // DeleteBatchResult contains information about a deleted batch.
 type DeleteBatchResult struct {
+	// Store is the name of the batch store the batch was deleted from.
+	Store string
 	// Deleted indicates whether a batch was found and deleted.
 	Deleted bool
 	// BatchID is the ULID of the deleted batch, if one was deleted.
@@ -127,6 +135,8 @@ type RunBatchOpts struct {
 
 // RunBatchResult contains information about a scheduled batch execution.
 type RunBatchResult struct {
+	// Store is the name of the batch store the batch lives in.
+	Store string
 	// Scheduled indicates whether a batch was found and scheduled.
 	Scheduled bool
 	// BatchID is the ULID of the batch that was scheduled.

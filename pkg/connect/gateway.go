@@ -1332,11 +1332,15 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 	{
 		// Send a best-effort gRPC message to fast-track the response,
 		// this should be reliable enough but we still combine it with a reliable store like the buffer above.
-		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
+		// Bound notification latency so an unreachable executor cannot delay the
+		// worker ACK indefinitely after its response has already been buffered.
+		notifyCtx, notifyCancel := context.WithTimeout(ctx, time.Second)
+		defer notifyCancel()
+		grpcClient, err := c.svc.getOrCreateGRPCClient(notifyCtx, c.conn.EnvID, data.RequestId)
 
 		switch {
 		case err == nil:
-			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+			result, err := grpcClient.Reply(notifyCtx, &connectpb.ReplyRequest{Data: data})
 			if err != nil {
 				tags := c.svc.metricsTags()
 				tags["reason"] = "reply_error"

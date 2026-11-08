@@ -6,6 +6,7 @@ import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
 import "api/v2/image.proto";
+import "api/v2/deploy.proto";
 import "third_party/google/api/annotations.proto";
 import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
@@ -34,6 +35,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
     }
   }
   tags: { name: "Account"      description: "Manage your account" }
+  tags: { name: "Feedback"     description: "Submit product feedback" }
   tags: { name: "Environments" description: "Create and manage environments" }
   tags: { name: "Keys"         description: "Manage event and signing keys" }
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
@@ -44,6 +46,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
   tags: { name: "Builds"       description: "Build images for sandboxes and compute" }
+  tags: { name: "Deploys"      description: "Deploy apps to compute" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
@@ -1071,6 +1074,51 @@ service V2 {
     };
   }
 
+  rpc CreateReplay(CreateReplayRequest) returns (CreateReplayResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/replays"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:replay"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create replay"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Creates an asynchronous replay for matching runs of one function. Cloud bounds have millisecond precision: from rounds down; until includes the end of its millisecond. Dev server bounds are inclusive at stored timestamp precision. Dev server replays run in memory and are lost on restart. Requests are not idempotent: retrying creates another replay. In Inngest Cloud, replays are listed on the function's Replays page in the dashboard. Scheduling is best effort and does not preserve event order."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Replay successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateReplayResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc Rerun(RerunRequest) returns (RerunResponse) {
     option (google.api.http) = {
       post: "/runs/{run_id}/rerun"
@@ -1204,6 +1252,53 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Cancel an unfinished build"
       tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
+  rpc CreateDeploy(CreateDeployRequest) returns (CreateDeployResponse) {
+    option (google.api.http) = { post: "/deploys/{name}" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a deploy"
+      description: "Provide config from the selected apps entry in inngest.toml with exactly one of serve or connect. Memory defaults to 2048 MiB, CPU to 1 vCPU, and connect replicas to 1. Serve path defaults to /api/inngest and an omitted port is discovered from the image's exposed ports at launch. Omitted serve_config settings use node defaults. Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact. Runtime ENV, ENTRYPOINT, and CMD come from the image. Requires image-build access."
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CommitDeploy(CommitDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { post: "/deploys/{name}/{deploy_id}/commit" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit an upload and start the deploy"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetDeploy(GetDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { get: "/deploys/{deploy_id}" };
+    option (authz) = { require_authz: true permission: "images:read:get" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a deploy"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListDeploys(ListDeploysRequest) returns (ListDeploysResponse) {
+    option (google.api.http) = { get: "/deploys" };
+    option (authz) = { require_authz: true permission: "images:read:list" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List recent workspace deploys"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CancelDeploy(CancelDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { post: "/deploys/{deploy_id}/cancel" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:cancel" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel an unfinished deploy"
+      tags: "Deploys" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
@@ -1792,6 +1887,117 @@ service V2 {
     };
   }
 
+  rpc CreateCancellation(CreateCancellationRequest) returns (CreateCancellationResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/cancellations"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:bulk_cancel"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a cancellation"
+      description: "Cancels a function's runs queued between from and until, inclusive, with millisecond precision. until may be up to now plus five seconds. There is no cap on range width; a from far in the past includes all queued runs through until. Includes runs that have never started, even when the function is paused. Running runs stop before their next step; sleeping or waiting runs are cancelled when they next resume. A step already executing may finish. The optional if expression filters the triggering event. Returns 201 when created; cancellation happens asynchronously. Not idempotent: each request creates another cancellation."
+      tags: "Runs"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Cancellation created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateCancellationResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid cancellation request"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Permission denied"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Function not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unable to create cancellation"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Cancellation creation is not implemented"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc PauseFunction(PauseFunctionRequest) returns (PauseFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/pause"
@@ -1802,7 +2008,75 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Pause a function"
-      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. In the dev server, the pause applies right away and lasts until resumed or restarted. No bulk pause; call once per function."
+      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. Use PauseFunctions to pause up to 500 functions in one request."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ResumeFunction(ResumeFunctionRequest) returns (ResumeFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/resume"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:resume"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume a function"
+      description: "Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false. The dev server still wakes the queue so retries can recover a failed wake. Send no request body. In Cloud, the response reflects the requested state; the resume can take up to a minute to apply. A future scheduled pause returns 409 and is left unchanged. New runs skipped while paused are not recreated. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, resume clears the pause after waking the queue; a failed wake leaves the pause in place. Queued runs can then start. Use ResumeFunctions to resume up to 500 functions in one request."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc PauseFunctions(PauseFunctionsRequest) returns (PauseFunctionsResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/pause"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:pause"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause functions"
+      description: "Pauses functions in one app. Idempotent. Accepts up to 500 unique IDs, at most 256 bytes each, in a body of at most 256 KiB of JSON. Split larger sets into multiple requests. Cloud limits bulk calls to a lower rate (about 1 per 5 seconds on most plans), so quick retries can get a 429. Returns one result per ID in request order; failures do not stop the rest. An unknown app returns 200 with not_found for every ID, so check each result. The path app ID is used; any appId in the body is ignored. Running work may continue. In Cloud, pauses can take up to a minute to apply, new runs are skipped, and unfinished runs are cancelled after 7 days paused. In the dev server, pauses apply immediately, new runs stay queued, and pauses last until resumed or restarted. Wait for each pause or resume request to finish before sending the opposite action; confirm with GetFunction after the cache refreshes and retry if needed."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ResumeFunctions(ResumeFunctionsRequest) returns (ResumeFunctionsResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/resume"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:resume"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume functions"
+      description: "Resumes functions in one app. Idempotent. Accepts up to 500 unique IDs, at most 256 bytes each, in a body of at most 256 KiB of JSON. Split larger sets into multiple requests. Cloud limits bulk calls to a lower rate (about 1 per 5 seconds on most plans), so quick retries can get a 429. Returns one result per ID in request order; failures do not stop the rest. An unknown app returns 200 with not_found for every ID, so check each result. The path app ID is used; any appId in the body is ignored. In Cloud, the response reflects the requested state; resumes can take up to a minute to apply. Future scheduled pauses return per-function errors and stay unchanged. Skipped runs are not recreated. In the dev server, each queue is woken before its pause is cleared; a failed wake leaves that function paused. Retries wake queues again. Wait for each pause or resume request to finish before sending the opposite action; confirm with GetFunction after the cache refreshes and retry if needed."
       tags: "Functions"
       tags: "Beta"
       security: {
@@ -1833,6 +2107,36 @@ service V2 {
           value: {}
         }
       }
+    };
+  }
+
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse) {
+    option (google.api.http) = { get: "/events" };
+    option (authz) = {
+      require_authz: true
+      permission: "events:read:list"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List events"
+      description: "Lists events in descending internal-ID order, excluding internal inngest/ events. Time filters use received time; client-seeded IDs can differ from received-time order. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
+      tags: "Events"
+      tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse) {
+    option (google.api.http) = { get: "/events/{event_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "events:read:get"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get an event"
+      description: "Gets an event by its internal ID. Internal inngest/ events are not returned. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
+      tags: "Events"
+      tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
 
@@ -2522,6 +2826,20 @@ service V2 {
       }
     };
   }
+
+  rpc SubmitFeedback(SubmitFeedbackRequest) returns (SubmitFeedbackResponse) {
+    option (google.api.http) = { post: "/feedback", body: "*" };
+    option (authz) = {
+      require_authz: true
+      permission: "feedback:write:create"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit product feedback"
+      tags: "Feedback"
+      description: "Sends user-requested product feedback to Inngest support. Cloud only. Submit only feedback the user has asked to share; do not include credentials, secrets, or run payloads. Creates a support ticket, so retries may create duplicates. Requires feedback:write:create. No environment selection is required."
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
 }
 
 message HealthRequest {
@@ -2846,6 +3164,9 @@ message TraceSpanMetadata {
   string kind = 2;
   map<string, string> values = 3;
   google.protobuf.Timestamp updated_at = 4;
+  // Whether kind is user-defined. kind may be returned without its
+  // userland/inngest prefix, so this tells a user kind from an internal one.
+  bool is_user = 5;
 }
 
 message TraceSpan {
@@ -2914,6 +3235,7 @@ enum AppMethod {
   APP_METHOD_SERVE = 1;
   APP_METHOD_CONNECT = 2;
   APP_METHOD_API = 3;
+  APP_METHOD_INNGEST_SERVE = 4;
 }
 
 message App {
@@ -3626,6 +3948,29 @@ message QueryInsightsData {
       description: "Any non-fatal diagnostics related to the insights query execution"
     }
   ];
+  InsightsQueryInfo info = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Which tables the query read and whether its result was capped by the default row limit"
+    }
+  ];
+}
+
+message InsightsQueryInfo {
+  optional string primary_table = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The table the query's outermost FROM reads, if there is exactly one"
+    }
+  ];
+  repeated string tables = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Every table the query reads"
+    }
+  ];
+  bool limited = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether the server applied the default row limit or reduced an explicit LIMIT to the maximum"
+    }
+  ];
 }
 
 message InsightsOutputColumn {
@@ -3639,6 +3984,47 @@ message InsightsOutputColumn {
       description: "Data type of the column (e.g., 'string', 'number', 'boolean')"
     }
   ];
+  repeated InsightsPathHint path_hints = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "What kind of ID each JSON path into this column's values holds (an empty path is the column's own value), e.g. runs.inputs' [*].id path holds event IDs. Empty when the column isn't traceable to a known table column."
+    }
+  ];
+}
+
+message InsightsPathHint {
+  repeated InsightsPathSegment path = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Path into the column's value; empty for the column's own value"
+    }
+  ];
+  InsightsColumnHint hint = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "What the value at path holds"
+    }
+  ];
+}
+
+message InsightsPathSegment {
+  optional string key = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Object key, unset when wildcard is true"
+    }
+  ];
+  bool wildcard = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Every element of an array"
+    }
+  ];
+}
+
+enum InsightsColumnHint {
+  INSIGHTS_COLUMN_HINT_UNSPECIFIED = 0;
+  INSIGHTS_COLUMN_HINT_APP_ID = 1;
+  INSIGHTS_COLUMN_HINT_FUNCTION_ID = 2;
+  INSIGHTS_COLUMN_HINT_RUN_ID = 3;
+  INSIGHTS_COLUMN_HINT_EVENT_ID = 4;
+  // A session reference: a {key, id} object, not a bare ID string.
+  INSIGHTS_COLUMN_HINT_SESSION = 5;
 }
 
 enum InsightsOutputColumnType {
@@ -3653,7 +4039,7 @@ enum InsightsOutputColumnType {
 message InsightsRow {
   repeated google.protobuf.Value values = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)"
+      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)."
     }
   ];
 }
@@ -4181,4 +4567,332 @@ message PauseFunctionRequest {
 message PauseFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message ResumeFunctionRequest {
+  // App ID.
+  string app_id = 1;
+  // Function ID.
+  string function_id = 2;
+}
+
+message ResumeFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message PauseFunctionsRequest {
+  string app_id = 1;
+  repeated string function_ids = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Function IDs in the app. 1 to 500 unique strings, at most 256 bytes each. Send IDs as plain strings, not URL-encoded."
+      example: "[\"send-welcome-email\", \"sync-user\"]"
+      min_items: 1
+      max_items: 500
+    }
+  ];
+}
+
+message PauseFunctionsResponse {
+  repeated FunctionPauseResult data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ResumeFunctionsRequest {
+  string app_id = 1;
+  repeated string function_ids = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Function IDs in the app. 1 to 500 unique strings, at most 256 bytes each. Send IDs as plain strings, not URL-encoded."
+      example: "[\"send-welcome-email\", \"sync-user\"]"
+      min_items: 1
+      max_items: 500
+    }
+  ];
+}
+
+message ResumeFunctionsResponse {
+  repeated FunctionPauseResult data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message FunctionPauseResult {
+  string function_id = 1;
+  oneof result {
+    Function function = 2;
+    Error error = 3;
+  }
+}
+
+message ListEventsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages."
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 5; otherwise the default is 40. Zero uses the default. Events can be up to 5 MiB in Cloud (less on lower plans)."
+      default: "40"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive received-time lower bound. Defaults to one hour before until, or one hour before the current time if until is omitted. Must not be after until. The effective window is returned in metadata.timeRange."
+    }
+  ];
+  optional google.protobuf.Timestamp until = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive received-time upper bound. Defaults to the current time. When from is omitted, it defaults to one hour before this bound. The effective window is returned in metadata.timeRange."
+    }
+  ];
+  repeated string name = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Exact event names to include. Repeat to match any of up to 20 names, with up to 256 characters each and no backslashes or control characters."
+    }
+  ];
+  repeated string include = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads."
+      enum: "payload"
+    }
+  ];
+}
+
+message GetEventRequest {
+  string event_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ULID, also used by GetEventRuns."
+    }
+  ];
+  repeated string include = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Events can be up to 5 MiB in Cloud (less on lower plans)."
+      enum: "payload"
+    }
+  ];
+}
+
+message ListEventsResponse {
+  repeated Event data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message GetEventResponse {
+  Event data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Event {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ULID, also used by GetEventRuns."
+    }
+  ];
+  string name = 2;
+  google.protobuf.Timestamp received_at = 3;
+  google.protobuf.Timestamp occurred_at = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event timestamp supplied by the sender. Omitted when the stored timestamp is zero."
+    }
+  ];
+  EventSource source = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event source, when available. Usually absent in the dev server."
+    }
+  ];
+  string idempotency_key = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sender-supplied event ID used for idempotency."
+    }
+  ];
+  optional string version = 7;
+  google.protobuf.Struct payload = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Stored event JSON (name, data, user, ts, id, v). Present only with include=payload. Payloads can contain personal data and be large, so request them only when needed. Numbers in payloads are JSON float64, so integers above 2^53 may lose precision."
+    }
+  ];
+}
+
+message EventSource {
+  optional string id = 1;
+  optional string name = 2;
+}
+
+message CreateReplayRequest {
+  string app_id = 6 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
+  ];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters"
+      example: "\"Replay cancelled orders\""
+    }
+  ];
+  string function_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range"
+    }
+  ];
+  google.protobuf.Timestamp until = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400."
+    }
+  ];
+  repeated string statuses = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
+}
+
+message CreateReplayResponse {
+  Replay data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Replay {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay ID"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+  google.protobuf.Timestamp created_at = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Time the replay was created"
+    }
+  ];
+  string name = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters. Echoes the request after trimming surrounding whitespace."
+    }
+  ];
+  string function_id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range. Echoes the request timestamp normalized to UTC."
+    }
+  ];
+  google.protobuf.Timestamp until = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400. Echoes the request timestamp normalized to UTC and clamped when necessary."
+    }
+  ];
+  repeated string statuses = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400. Echoes the normalized request with surrounding whitespace trimmed, values uppercased, and duplicates removed."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
+}
+
+message CreateCancellationRequest {
+  string app_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
+  ];
+  string function_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)." }
+  ];
+  google.protobuf.Timestamp from = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Inclusive lower bound on run queued time, with millisecond precision. No limit on range width." }
+  ];
+  google.protobuf.Timestamp until = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Inclusive upper bound on run queued time, with millisecond precision. May be up to now plus five seconds." }
+  ];
+  optional string if = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "CEL expression over event, the triggering event. Maximum 1024 characters; macros and non-logical functions are restricted." }
+  ];
+  optional string name = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Optional name, trimmed of surrounding whitespace. Must contain 1 to 255 characters when provided." }
+  ];
+}
+
+message CreateCancellationResponse {
+  Cancellation data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Cancellation {
+  string id = 1;
+  string app_id = 2;
+  string function_id = 3;
+  optional string name = 4;
+  google.protobuf.Timestamp from = 5;
+  google.protobuf.Timestamp until = 6;
+  optional string if = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message SubmitFeedbackRequest {
+  string feedback = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Feedback to share with Inngest support, up to 10000 characters. Do not include secrets or sensitive run data."
+    }
+  ];
+  optional string operation = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional API operation, CLI command, or MCP tool this feedback concerns, up to 200 characters."
+    }
+  ];
+  optional string email = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional reply-to email, up to 254 characters. Treated as unverified contact information, not as the submitter identity."
+    }
+  ];
+  optional string name = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional contact name, up to 200 characters. Treated as caller-supplied contact information."
+    }
+  ];
+}
+
+message SubmitFeedbackResponse {
+  FeedbackData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message FeedbackData {
+  bool accepted = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "True only after the support ticket was created."
+    }
+  ];
 }

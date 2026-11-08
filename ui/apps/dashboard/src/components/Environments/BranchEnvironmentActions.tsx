@@ -46,7 +46,6 @@ export function BranchEnvironmentActions({
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem
-              className="text-basis text-sm"
               onSelect={() =>
                 navigate({
                   to: pathCreator.keys({ envSlug: branchParent.slug }),
@@ -56,7 +55,6 @@ export function BranchEnvironmentActions({
               Manage event keys
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-basis text-sm"
               onSelect={() =>
                 navigate({
                   to: pathCreator.signingKeys({ envSlug: branchParent.slug }),

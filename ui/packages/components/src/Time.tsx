@@ -3,7 +3,8 @@ import { RiFileCopyLine, RiTimeLine, RiUserSmileLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { cn } from './utils/classNames';
-import { format, formatInTimeZone, isValidDate, relativeTime, toMaybeDate } from './utils/date';
+import { isValidDate, relativeTime, toMaybeDate } from './utils/date';
+import { formatLocalTime, formatUTCTime } from './utils/time';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -17,14 +18,6 @@ type Props = {
   value: Date | string;
   copyable?: boolean;
 };
-
-function formatDate(date: Date) {
-  return format(date, 'dd MMM yyyy, hh:mm:ss a');
-}
-
-function formatUTCDate(date: Date) {
-  return formatInTimeZone(date, 'UTC', 'dd MMM yyyy, HH:mm:ss');
-}
 
 export function Time({ className, format, value, copyable = true }: Props) {
   const copyToClipboard = (text: string) => {
@@ -40,8 +33,8 @@ export function Time({ className, format, value, copyable = true }: Props) {
 
   const dateString = format === 'relative' ? relativeTime(date) : date.toLocaleString();
 
-  const utcTimeString = formatUTCDate(date);
-  const localTimeString = formatDate(date);
+  const utcTimeString = formatUTCTime(date);
+  const localTimeString = formatLocalTime(date);
 
   return (
     <Tooltip>

@@ -13,6 +13,7 @@ import (
 )
 
 type ValidationPolicy struct {
+	RequireBoolean      bool
 	DisallowMacros      bool
 	DisallowNonLogicFns bool
 	AllowDateTimeFns    bool
@@ -67,6 +68,9 @@ func Validate(_ context.Context, policy *ValidationPolicy, expression string) er
 	}
 
 	if policy != nil {
+		if policy.RequireBoolean && !ast.OutputType().IsExactType(cel.BoolType) && !ast.OutputType().IsExactType(cel.DynType) {
+			return newValidationErr(fmt.Errorf("expression must return a boolean"))
+		}
 		if err = validateAST(policy, expr.GetExpr()); err != nil {
 			return newValidationErr(err)
 		}

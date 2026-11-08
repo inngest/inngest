@@ -1,0 +1,489 @@
+package quack
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"runtime"
+	"sync/atomic"
+	"time"
+
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/logger"
+)
+
+// clientVersion and clientPlatform are sent in the ConnectionRequest
+// handshake for server-side diagnostics only; the server doesn't gate on them.
+const clientVersion = "inngest-duckdb-quack-client 0.0.1"
+
+func clientPlatform() string { return runtime.GOOS + "/" + runtime.GOARCH }
+
+// supportedVersion is the only quack protocol version this client
+// speaks. A mismatch fails loudly rather than risk silently misparsing a
+// newer server's responses, since DuckDB's wire format may still change
+// before it stabilizes.
+const supportedVersion = 3
+
+// heartbeatTimeoutSeconds is sent as every ConnectionRequest's
+// heartbeat_timeout (required as of protocol version 3; omitting it defaults
+// to 0, which the server rejects as out of range). This client has no
+// keepalive of its own and a session may sit idle indefinitely between exec
+// calls, so it requests the server's maximum.
+const heartbeatTimeoutSeconds = 9223372036854775
+
+// newHTTPClient has no Timeout of its own: every request already goes
+// out via http.NewRequestWithContext(ctx, ...) in send(), so the caller's own
+// context is the sole timeout authority. A fixed client-level Timeout would
+// double-constrain that — and did, in practice: a 30s cap here killed a
+// ducklake_merge_adjacent_files compaction call on a large (1M-row,
+// 200-partition) lake with "context deadline exceeded" well before the
+// caller's own context did, even though compaction is expected to take
+// longer as data volume grows.
+func newHTTPClient() *http.Client {
+	return &http.Client{}
+}
+
+// cancelRequestTimeout bounds the DisconnectMessage watchForCancel sends
+// once a caller's ctx ends mid-statement, under a fresh, short-lived context
+// detached from that (already-done) ctx, since it needs to go out regardless
+// of why the caller gave up.
+const cancelRequestTimeout = 5 * time.Second
+
+// abandonedStatementTimeout bounds the CancelRequest watchForCancel sends
+// before that DisconnectMessage. The server only answers it once the
+// statement is done (verified against v2.0.0: ~1ms for an interruptible
+// statement, but ~8.7s for a constant-folded levenshtein that ignores the
+// interrupt), so it's how long an abandoned statement is tracked (see
+// WithAbandonedCounter). It's a backstop for a statement that never
+// finishes, not an expected wait.
+const abandonedStatementTimeout = 2 * time.Minute
+
+// Session implements sqlExecer (see conn.go) over DuckDB's quack wire
+// protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
+// server-assigned connection id for its lifetime; process.go recovers from a
+// lost session by discarding it and re-handshaking against a fresh subprocess.
+type Session struct {
+	httpClient   *http.Client
+	endpoint     string
+	connectionID string
+	// abandoned is set once a statement's ctx ends mid-flight -- see
+	// watchForCancel.
+	abandoned atomic.Bool
+	// abandonedCounter, if set, counts this session's abandoned statements
+	// the server may still be running -- see WithAbandonedCounter.
+	abandonedCounter *atomic.Int64
+}
+
+// Option configures a Session.
+type Option func(*Session)
+
+// WithAbandonedCounter has a session add 1 to n for each statement it
+// abandons (see watchForCancel), from when it's abandoned until the server
+// is done with it (or abandonedStatementTimeout passes), so an owner sharing
+// n across sessions can tell how much abandoned work is still running
+// server-side.
+func WithAbandonedCounter(n *atomic.Int64) Option {
+	return func(s *Session) { s.abandonedCounter = n }
+}
+
+// NewSession performs the ConnectionRequest handshake against listenURL
+// (as reported by `CALL quack_serve(...)`) and returns a session ready for exec.
+func NewSession(ctx context.Context, listenURL, token string, opts ...Option) (*Session, error) {
+	s := &Session{
+		httpClient: newHTTPClient(),
+		endpoint:   listenURL + "/quack",
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	req := connectionRequest{
+		AuthString:               token,
+		ClientDuckDBVersion:      clientVersion,
+		ClientPlatform:           clientPlatform(),
+		MinSupportedQuackVersion: supportedVersion,
+		MaxSupportedQuackVersion: supportedVersion,
+		HeartbeatTimeoutSeconds:  heartbeatTimeoutSeconds,
+	}
+	hdr, r, err := s.send(ctx, req.encode())
+	if err != nil {
+		return nil, fmt.Errorf("duckdb: quack handshake: %w", err)
+	}
+	if hdr.Type == msgErrorResponse {
+		resp, derr := decodeErrorResponseBody(r)
+		if derr != nil {
+			return nil, fmt.Errorf("duckdb: quack handshake: server returned an error this client could not parse: %w", derr)
+		}
+		return nil, fmt.Errorf("duckdb: quack handshake rejected: %s", resp.Error())
+	}
+	if hdr.Type != msgConnectionResponse {
+		return nil, fmt.Errorf("duckdb: quack handshake: unexpected response message type %d", hdr.Type)
+	}
+	resp, err := decodeConnectionResponseBody(r)
+	if err != nil {
+		return nil, fmt.Errorf("duckdb: quack handshake: %w", err)
+	}
+	if resp.Version != supportedVersion {
+		return nil, fmt.Errorf("duckdb: quack server negotiated protocol version %d, but this client only supports version %d", resp.Version, supportedVersion)
+	}
+
+	s.connectionID = hdr.ConnectionID
+	logger.StdlibLogger(ctx).Debug("duckdb: quack connection opened",
+		"transport", "quack", "phase", "connect", "connection_id", s.connectionID, "endpoint", s.endpoint)
+	return s, nil
+}
+
+// Exec implements sqlExecer as query without the type-name conversion, for
+// ExecContext callers (DDL/INSERT/health checks) that don't need column types.
+func (s *Session) Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error) {
+	cols, _, rows, err = s.Query(ctx, sqlText)
+	return cols, rows, err
+}
+
+// Query implements sqlExecer. A statement DuckDB itself rejected (bad SQL, a
+// missing table, a constraint violation) comes back wrapped in
+// result.ErrStatementFailed, matching jsonlines.Session.Query so process.Query's
+// restart-vs-surface classification works identically across transports. Any
+// other error (HTTP failure, malformed response) is left unwrapped, which
+// process.Query treats as a dead subprocess warranting a restart.
+//
+// A result too large for one inline PrepareResponse (needsMoreFetch) is
+// paged in via a FetchRequest/FetchResponse loop, keyed off the
+// PrepareResponse's result_uuid, until a response comes back with zero
+// chunks — see decodeFetchResponseBody for why that's the wire format's
+// only "done" signal.
+//
+// cols and types both come from the PrepareResponse's metadata, populated
+// even for zero-row results; unlike the jsonlines transport in rows.go,
+// quack never needs a separate DESCRIBE statement to get types.
+//
+// A caller whose ctx ends mid-statement doesn't just stop waiting: a
+// watchForCancel func (armed immediately below) fires a real
+// CancelRequest for this statement's queryID, which the server turns into
+// an actual DuckDB Connection::Interrupt() — see encodeCancelRequest's
+// doc comment for the wire format and quack_server.cpp's CANCEL_REQUEST
+// handler (verified against the real extension: this is what actually
+// stops the abandoned statement from continuing to burn CPU server-side,
+// which simply not waiting for the response never did on its own). It also
+// marks the session Abandoned, so its owner never runs another statement
+// on it.
+func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error) {
+	queryID := randomHugeint()
+	stopCancelWatch := s.watchForCancel(ctx, queryID)
+	defer stopCancelWatch()
+
+	// Protocol-level log lines and transport errors carry correlation IDs
+	// (connection, query, result, batch) and the phase, never SQL or row
+	// data. Statement errors are left as DuckDB reported them, since those
+	// are shown to users (Insights) as-is.
+	l := logger.StdlibLogger(ctx).With("transport", "quack", "connection_id", s.connectionID, "query_id", queryID.String())
+	phaseErr := func(phase string, err error) error {
+		return fmt.Errorf("duckdb: quack %s (connection_id=%s query_id=%s): %w", phase, s.connectionID, queryID, err)
+	}
+	start := time.Now()
+
+	// budget is the caller's result.WithMaxBytes limit, spent across the
+	// prepare response and every fetch response; 0 means unlimited.
+	budget := newResultBudget(ctx)
+
+	hdr, r, err := s.sendLimited(ctx, encodePrepareRequest(s.connectionID, sqlText, queryID), budget)
+	if err != nil {
+		if budget.exceeded(err) {
+			return nil, nil, nil, err
+		}
+		return nil, nil, nil, phaseErr("prepare", err)
+	}
+
+	if hdr.Type == msgErrorResponse {
+		return nil, nil, nil, decodeStatementError(r)
+	}
+	if hdr.Type != msgPrepareResponse {
+		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("unexpected response message type %d", hdr.Type))
+	}
+
+	cols, logicalTypes, rows, needsMoreFetch, resultUUID, err := decodePrepareResponseBody(r)
+	if err != nil {
+		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("decoding prepare response: %w", err))
+	}
+	l.Debug("duckdb: quack prepare complete",
+		"phase", "prepare", "rows", len(rows), "needs_more_fetch", needsMoreFetch,
+		"result_uuid", resultUUID.String(), "duration", time.Since(start))
+
+	// nextBatchIndex starts at 1, not 0: confirmed by reading the real quack
+	// extension binary's disassembly (no source is vendored in this repo) —
+	// the server deserializes batch_index as a plain optional int with no
+	// separate "was it present" flag surviving past deserialization, so a
+	// present-but-zero value and an absent value both collapse to the same
+	// in-memory 0, and the validation that produces "FETCH_REQUEST is
+	// missing its batch index" treats stored-zero as "missing" regardless
+	// of which case it actually was. 0 is therefore never a usable request
+	// value, confirmed empirically (still fails with a constant or
+	// incrementing-from-0 index; succeeds starting from 1). Advances to
+	// whatever batchIndex the previous FetchResponse says it just
+	// delivered, plus one — trusting the server's own count rather than
+	// assuming this loop's iteration number always matches it.
+	// Function-local and never shared across goroutines: each query() call
+	// (even concurrent ones on different pooled sessions, see
+	// driver.Options.QuackConns) runs its own independent fetch loop, so this
+	// needs no synchronization.
+	nextBatchIndex := uint64(1)
+	fetchCols := result.NewColumns(cols)
+	for needsMoreFetch {
+		fetchPhase := fmt.Sprintf("fetch (result_uuid=%s batch_index=%d)", resultUUID, nextBatchIndex)
+		hdr, r, err := s.sendLimited(ctx, encodeFetchRequest(s.connectionID, resultUUID, nextBatchIndex), budget)
+		if err != nil {
+			if budget.exceeded(err) {
+				return nil, nil, nil, err
+			}
+			return nil, nil, nil, phaseErr(fetchPhase, err)
+		}
+		if hdr.Type == msgErrorResponse {
+			return nil, nil, nil, decodeStatementError(r)
+		}
+		if hdr.Type != msgFetchResponse {
+			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("unexpected response message type %d", hdr.Type))
+		}
+
+		fetchedRows, chunkCount, batchIndex, ferr := decodeFetchResponseBody(r, fetchCols)
+		if ferr != nil {
+			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("decoding fetch response: %w", ferr))
+		}
+		l.Debug("duckdb: quack fetch complete",
+			"phase", "fetch", "result_uuid", resultUUID.String(), "batch_index", batchIndex,
+			"rows", len(fetchedRows), "chunks", chunkCount)
+		rows = append(rows, fetchedRows...)
+		needsMoreFetch = chunkCount > 0
+		nextBatchIndex = batchIndex + 1
+	}
+
+	types = make([]string, len(logicalTypes))
+	for i, lt := range logicalTypes {
+		types[i] = lt.typeName()
+	}
+	return cols, types, rows, nil
+}
+
+// watchForCancel arranges for the session to abandon queryID's statement as
+// soon as ctx ends, and returns a stop func the caller must defer
+// immediately (before ctx can end) to retire that arrangement once query()'s
+// own request(s) are done, success or any other error.
+//
+// Abandoning marks the session Abandoned, so its owner discards it rather
+// than running another statement on this server connection, and then (in
+// the background, never blocking Query's return) sends a CancelRequest for
+// queryID followed by a DisconnectMessage for the connection. Reusing the
+// connection after a cancel isn't safe either way:
+//
+//   - The server's query_uuid check doesn't make a late cancel safe:
+//     quack_server.cpp reads the active query_uuid under the statement lock,
+//     releases it, and only then calls Connection::Interrupt(), which
+//     interrupts whatever is running on the connection by then. So a cancel
+//     racing the next statement's PREPARE can fail it w/ "INTERRUPT Error".
+//   - Some statements don't react to Interrupt() (or the CancelRequest
+//     itself blocks server-side) at all. `SELECT len(string_split(repeat('a,',
+//     300000000), ','))` keeps running for ~50s after its cancel, which
+//     only gets a response once it finishes. The next PREPARE on that
+//     connection queues behind it, and the late interrupt then fails it w/
+//     "Interrupted!".
+//
+// A fresh connection doesn't queue behind the abandoned statement (other
+// connections stay responsive while it runs) and a late interrupt can't
+// reach it. DisconnectMessage returns promptly even mid-statement, but it
+// doesn't stop the statement either, it just frees the server's connection
+// entry so abandoned connections don't pile up.
+//
+// context.AfterFunc makes "was ctx done before stop" deterministic: once
+// ctx.Err() is non-nil, stop always reports the func as started, so a
+// statement Query gave up on is never silently left running on a session
+// still marked reusable. The same goes for abandonedCounter: whichever of
+// the func and stop sees the abandonment first counts it, before Query
+// returns, and the func (which always runs to completion once started)
+// uncounts it.
+func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop func()) {
+	var counted atomic.Bool
+	abandon := func() {
+		s.abandoned.Store(true)
+		if s.abandonedCounter != nil && counted.CompareAndSwap(false, true) {
+			s.abandonedCounter.Add(1)
+		}
+	}
+	stopAfter := context.AfterFunc(ctx, func() {
+		abandon()
+		s.cancelAndDisconnect(context.WithoutCancel(ctx), queryID)
+		if s.abandonedCounter != nil {
+			s.abandonedCounter.Add(-1)
+		}
+	})
+	return func() {
+		if !stopAfter() {
+			abandon()
+		}
+	}
+}
+
+// cancelAndDisconnect sends a CancelRequest for queryID and waits (up to
+// abandonedStatementTimeout) for the server to answer it, which it does once
+// the statement is done, then sends a DisconnectMessage for s's connection
+// under cancelRequestTimeout. Results are logged, not returned: Query's
+// caller already gets ctx's own error back regardless of whether the server
+// managed to actually interrupt anything.
+func (s *Session) cancelAndDisconnect(ctx context.Context, queryID hugeint) {
+	l := logger.StdlibLogger(ctx).With(
+		"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
+
+	cancelCtx, cancel := context.WithTimeout(context.Background(), abandonedStatementTimeout)
+	hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
+	cancel()
+	switch {
+	case err != nil:
+		l.Warn("duckdb: quack: failed to send cancel request for an abandoned query (or it's still running)", "error", err)
+	case hdr.Type == msgErrorResponse:
+		resp, _ := decodeErrorResponseBody(r)
+		l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", resp.Error())
+	}
+
+	disconnectCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
+	defer cancel()
+	if _, _, err := s.send(disconnectCtx, encodeDisconnectMessage(s.connectionID)); err != nil {
+		l.Warn("duckdb: quack: failed to disconnect an abandoned connection", "error", err)
+	}
+}
+
+// closeTimeout bounds Close's DisconnectMessage. The server answers it
+// promptly even mid-statement, so this only matters for an unreachable one.
+const closeTimeout = 2 * time.Second
+
+// Close sends a DisconnectMessage for s's connection (best effort, under
+// closeTimeout), so the server drops its connection entry instead of keeping
+// it until the subprocess exits. It's a no-op for an abandoned session,
+// whose watchForCancel already disconnects it once its statement is done.
+// HTTP sockets aren't s's own to close: every session shares
+// http.DefaultTransport's keep-alive pool (see newHTTPClient), which caps
+// idle sockets per host itself. s must not be used afterwards.
+func (s *Session) Close(ctx context.Context) error {
+	if s.Abandoned() {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+	defer cancel()
+	hdr, r, err := s.send(ctx, encodeDisconnectMessage(s.connectionID))
+	if err != nil {
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s): %w", s.connectionID, err)
+	}
+	if hdr.Type == msgErrorResponse {
+		resp, _ := decodeErrorResponseBody(r)
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s) rejected: %s", s.connectionID, resp.Error())
+	}
+	return nil
+}
+
+// Abandoned reports whether a statement on s was given up on mid-flight
+// (its ctx ended before the server answered). An abandoned session must not
+// run another statement: see watchForCancel. Owners discard it and
+// handshake a new one.
+func (s *Session) Abandoned() bool { return s.abandoned.Load() }
+
+// ErrDatabaseInvalidated marks an ErrorResponse w/ must_invalidate set: the
+// server's database is gone, so unlike result.ErrStatementFailed the
+// subprocess is not healthy and the caller should respawn it rather than
+// retry against it.
+var ErrDatabaseInvalidated = errors.New("duckdb: quack server invalidated its database")
+
+// decodeStatementError decodes an ErrorResponse body into an error
+// wrapped in result.ErrStatementFailed: the server responded, it just rejected the
+// statement — not a transport or subprocess failure. The exception is
+// must_invalidate, which wraps ErrDatabaseInvalidated instead.
+func decodeStatementError(r *reader) error {
+	resp, derr := decodeErrorResponseBody(r)
+	if derr != nil {
+		return fmt.Errorf("duckdb: quack: server returned an error this client could not parse: %w", derr)
+	}
+	if resp.MustInvalidate {
+		return fmt.Errorf("%w: %s", ErrDatabaseInvalidated, resp.Error())
+	}
+	return fmt.Errorf("%w: %s", result.ErrStatementFailed, resp.Error())
+}
+
+// send POSTs one quack message and returns the decoded response header, with
+// r positioned at the start of the response body object (see
+// decodeMessageHeader).
+func (s *Session) send(ctx context.Context, payload []byte) (messageHeader, *reader, error) {
+	return s.sendLimited(ctx, payload, nil)
+}
+
+// resultBudget tracks how many response-body bytes one Query may still read
+// under its caller's result.WithMaxBytes limit. A nil *resultBudget is
+// unlimited.
+type resultBudget struct {
+	max, remaining int64
+	err            error
+}
+
+func newResultBudget(ctx context.Context) *resultBudget {
+	max := result.MaxBytes(ctx)
+	if max <= 0 {
+		return nil
+	}
+	return &resultBudget{max: max, remaining: max}
+}
+
+// exceeded reports whether err is this budget running out.
+func (b *resultBudget) exceeded(err error) bool {
+	return b != nil && b.err != nil && err == b.err
+}
+
+// sendLimited is send, reading at most budget's remaining bytes of the
+// response body: past that, it stops reading (never buffering the rest) and
+// fails with result.TooLargeError.
+func (s *Session) sendLimited(ctx context.Context, payload []byte, budget *resultBudget) (messageHeader, *reader, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: building request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/duckdb")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: request to %s failed: %w", s.endpoint, err)
+	}
+	defer resp.Body.Close()
+
+	var body []byte
+	if budget == nil {
+		body, err = io.ReadAll(resp.Body)
+	} else {
+		body, err = io.ReadAll(io.LimitReader(resp.Body, budget.remaining+1))
+	}
+	if err != nil {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: reading response body: %w", err)
+	}
+	if budget != nil {
+		if int64(len(body)) > budget.remaining {
+			budget.err = result.TooLargeError(budget.max)
+			return messageHeader{}, nil, budget.err
+		}
+		budget.remaining -= int64(len(body))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: HTTP %d from %s: %s", resp.StatusCode, s.endpoint, body)
+	}
+
+	r := newReader(body)
+	hdr, err := decodeMessageHeader(r)
+	if err != nil {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: decoding response header: %w", err)
+	}
+	// The server currently leaves connection_id empty on every response
+	// after the handshake, so only a present-but-different ID is rejected:
+	// that would mean this response belongs to some other session.
+	if s.connectionID != "" && hdr.ConnectionID != "" && hdr.ConnectionID != s.connectionID {
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: response for connection %s received on connection %s", hdr.ConnectionID, s.connectionID)
+	}
+	return hdr, r, nil
+}
+
+// ConnectionID is the server-assigned connection id, for correlating logs.
+func (s *Session) ConnectionID() string { return s.connectionID }

@@ -15,6 +15,7 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -22,6 +23,62 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestSlowClientCreationDoesNotBlockOtherPeers(t *testing.T) {
+	ctx, _, dialer, _, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	started := make(chan struct{})
+	clients := NewGRPCClientManager(connectpb.NewConnectGatewayClient,
+		WithDialer[connectpb.ConnectGatewayClient](func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+			if target == "slow" {
+				opts = append(opts, grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+					close(started)
+					<-ctx.Done()
+					return ctx.Err()
+				}))
+			}
+			return dialer(target, opts...)
+		}))
+	t.Cleanup(func() {
+		for _, key := range clients.GetClientKeys() {
+			clients.RemoveClient(key)
+		}
+	})
+	cached, err := clients.GetOrCreateClient(ctx, "cached", "cached")
+	require.NoError(t, err)
+	slowCtx, cancelSlow := context.WithCancel(ctx)
+	defer cancelSlow()
+	slowDone := make(chan error, 1)
+	go func() {
+		_, err := clients.GetOrCreateClient(slowCtx, "slow", "slow")
+		slowDone <- err
+	}()
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("slow peer did not start pinging")
+	}
+	healthyDone := make(chan struct{})
+	go func() {
+		client, err := clients.GetOrCreateClient(ctx, "cached", "cached")
+		assert.NoError(t, err)
+		assert.Same(t, cached, client)
+		_, err = clients.GetOrCreateClient(ctx, "new", "new")
+		assert.NoError(t, err)
+		close(healthyDone)
+	}()
+	select {
+	case <-healthyDone:
+	case <-time.After(time.Second):
+		cancelSlow()
+		<-healthyDone
+		t.Fatal("slow peer blocked healthy peers")
+	}
+	cancelSlow()
+	require.ErrorIs(t, <-slowDone, context.Canceled)
+}
 
 func TestExecutorGRPCMessageSize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -113,31 +170,168 @@ func newGatewayGRPCManagerWithDialer(ctx context.Context, stateManager state.Gat
 
 type mockConnectGatewayServer struct {
 	connectpb.UnimplementedConnectGatewayServer
+	mu           sync.Mutex
 	pingCount    int
 	forwardCount int
+	forwardErr   error
+	forwardDelay time.Duration
 }
 
 func (m *mockConnectGatewayServer) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pingCount++
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }
 
 func (m *mockConnectGatewayServer) Forward(ctx context.Context, req *connectpb.ForwardRequest) (*connectpb.ForwardResponse, error) {
+	m.mu.Lock()
 	m.forwardCount++
+	delay, forwardErr := m.forwardDelay, m.forwardErr
+	m.mu.Unlock()
+
+	if delay > 0 {
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if forwardErr != nil {
+		return nil, forwardErr
+	}
 	return &connectpb.ForwardResponse{Success: true}, nil
 }
 
 func (m *mockConnectGatewayServer) getPingCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.pingCount
 }
 
 func (m *mockConnectGatewayServer) getForwardCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.forwardCount
 }
 
 func (m *mockConnectGatewayServer) reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pingCount = 0
 	m.forwardCount = 0
+	m.forwardErr = nil
+	m.forwardDelay = 0
+}
+
+func TestForwardRemovesClientOnTransportFailure(t *testing.T) {
+	ctx, mockServer, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	gatewayID := ulid.MustNew(ulid.Now(), rand.Reader)
+	err := gatewayManager.UpsertGateway(ctx, &state.Gateway{
+		Id:                gatewayID,
+		Status:            state.GatewayStatusActive,
+		IPAddress:         net.ParseIP("127.0.0.1"),
+		Hostname:          "test-gateway",
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		forwardErr     error
+		forwardDelay   time.Duration
+		forwardTimeout time.Duration
+		callerTimeout  time.Duration
+		expectCode     codes.Code
+		expectRemoved  bool
+	}{
+		{name: "success keeps client", expectCode: codes.OK},
+		{name: "unavailable removes client", forwardErr: status.Error(codes.Unavailable, "connection timed out"), expectCode: codes.Unavailable, expectRemoved: true},
+		{name: "deadline exceeded removes client", forwardErr: status.Error(codes.DeadlineExceeded, "deadline exceeded"), expectCode: codes.DeadlineExceeded, expectRemoved: true},
+		{name: "other errors keep client", forwardErr: status.Error(codes.Internal, "boom"), expectCode: codes.Internal},
+		{name: "forward timeout removes client", forwardDelay: 5 * time.Second, forwardTimeout: 100 * time.Millisecond, expectCode: codes.DeadlineExceeded, expectRemoved: true},
+		{name: "caller cancellation keeps client", forwardDelay: 5 * time.Second, callerTimeout: 100 * time.Millisecond, expectCode: codes.DeadlineExceeded},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockServer.reset()
+			mockServer.mu.Lock()
+			mockServer.forwardErr = tt.forwardErr
+			mockServer.forwardDelay = tt.forwardDelay
+			mockServer.mu.Unlock()
+
+			mgr := newGatewayGRPCManager(ctx, gatewayManager, WithGatewayDialer(bufDialer), WithGatewayForwardTimeout(tt.forwardTimeout)).(*gatewayGRPCManager)
+			require.NoError(t, mgr.ConnectToGateways(ctx))
+			t.Cleanup(func() { mgr.grpcClientManager.RemoveClient(gatewayID.String()) })
+
+			callCtx := ctx
+			if tt.callerTimeout > 0 {
+				var cancel context.CancelFunc
+				callCtx, cancel = context.WithTimeout(ctx, tt.callerTimeout)
+				defer cancel()
+			}
+
+			evicted := counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total")
+			err := mgr.Forward(callCtx, gatewayID, ulid.MustNew(ulid.Now(), nil), &connectpb.GatewayExecutorRequestData{
+				RequestId: uuid.New().String(),
+			})
+			require.Equal(t, tt.expectCode, status.Code(err))
+
+			_, err = mgr.grpcClientManager.GetClient(ctx, gatewayID.String())
+			if tt.expectRemoved {
+				require.ErrorIs(t, err, ErrGatewayNotFound)
+				require.Equal(t, evicted+1, counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total"))
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, evicted, counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total"))
+			}
+		})
+	}
+}
+
+func TestRemoveClientIfCurrent(t *testing.T) {
+	ctx, _, bufDialer, _, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	tests := []struct {
+		name          string
+		removeStale   bool
+		expectRemoved bool
+	}{
+		{name: "stale client keeps replacement", removeStale: true},
+		{name: "current client is removed", expectRemoved: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clients := NewGRPCClientManager(connectpb.NewConnectGatewayClient, WithDialer[connectpb.ConnectGatewayClient](bufDialer))
+			t.Cleanup(func() { clients.RemoveClient("gateway") })
+
+			stale, err := clients.GetOrCreateClient(ctx, "gateway", "bufnet")
+			require.NoError(t, err)
+
+			clients.RemoveClient("gateway")
+			fresh, err := clients.GetOrCreateClient(ctx, "gateway", "bufnet")
+			require.NoError(t, err)
+
+			target := fresh
+			if tt.removeStale {
+				target = stale
+			}
+			clients.RemoveClientIfCurrent("gateway", target)
+
+			current, err := clients.GetClient(ctx, "gateway")
+			if tt.expectRemoved {
+				require.ErrorIs(t, err, ErrGatewayNotFound)
+			} else {
+				require.NoError(t, err)
+				require.Same(t, fresh, current)
+			}
+		})
+	}
 }
 
 func TestConnectToGateways(t *testing.T) {

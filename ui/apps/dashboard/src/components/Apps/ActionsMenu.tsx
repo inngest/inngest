@@ -1,8 +1,10 @@
+import { menuDangerItemClassName } from '@inngest/components/DropdownMenu/menuStyles';
 import { Button } from '@inngest/components/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
@@ -63,22 +65,25 @@ export const ActionsMenu = ({
           </DropdownMenuItem>
         </OptionalTooltip>
         {(!isArchived || showUnarchive) && (
-          <OptionalTooltip
-            tooltip={
-              disableArchive
-                ? 'Parent app is archived. Archive action not available.'
-                : undefined
-            }
-          >
-            <DropdownMenuItem
-              disabled={disableArchive}
-              onSelect={showArchive}
-              className="text-error"
+          <>
+            <DropdownMenuSeparator />
+            <OptionalTooltip
+              tooltip={
+                disableArchive
+                  ? 'Parent app is archived. Archive action not available.'
+                  : undefined
+              }
             >
-              <RiArchive2Line className="h-4 w-4" />
-              {isArchived ? 'Unarchive app' : 'Archive app'}
-            </DropdownMenuItem>
-          </OptionalTooltip>
+              <DropdownMenuItem
+                disabled={disableArchive}
+                onSelect={showArchive}
+                className={menuDangerItemClassName}
+              >
+                <RiArchive2Line className="h-4 w-4" />
+                {isArchived ? 'Unarchive app' : 'Archive app'}
+              </DropdownMenuItem>
+            </OptionalTooltip>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

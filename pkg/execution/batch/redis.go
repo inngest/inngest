@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -26,6 +28,8 @@ import (
 const (
 	defaultBatchSizeLimit         = 10 * 1024 * 1024 // 10MiB
 	defaultEventIdempotenceSetTTL = 1800             // 30 minutes
+	// defaultStoreName names the batch store in debug results when no name is set.
+	defaultStoreName = "default"
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -45,6 +49,13 @@ func WithRedisBatchIdempotenceSetTTL(ttl int64) RedisBatchManagerOpt {
 func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.log = l
+	}
+}
+
+// WithStoreName names the batch store in per-store debug results.
+func WithStoreName(name string) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.storeName = name
 	}
 }
 
@@ -109,6 +120,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer, opts ...
 		sizeLimit:         defaultBatchSizeLimit,
 		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
 		log:               logger.StdlibLogger(context.Background()),
+		storeName:         defaultStoreName,
 	}
 
 	// add default buffer
@@ -116,6 +128,12 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer, opts ...
 
 	for _, apply := range opts {
 		apply(manager)
+	}
+
+	// Options can rename the store or replace the buffer, so name the buffer
+	// after all of them have been applied.
+	if manager.buffer != nil {
+		manager.buffer.storeName = manager.storeName
 	}
 
 	return manager
@@ -137,6 +155,9 @@ type redisBatchManager struct {
 	buffer *appendBuffer
 
 	metricRecorder BatchMetricRecorder
+
+	// storeName names this batch store in per-store debug results.
+	storeName string
 
 	// splitBatchPartitionByFunction, when non-nil and returning true for a
 	// given accountID, causes ScheduleExecution to enqueue the batch-scheduling
@@ -203,7 +224,9 @@ func (b *redisBatchManager) batchPointer(ctx context.Context, fn inngest.Functio
 //     No-op
 //
 // When buffering is enabled, this method blocks until the batch is committed to Redis.
-func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.Function) (*BatchAppendResult, error) {
+func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.Function) (_ *BatchAppendResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "append", start, err) }(time.Now())
+
 	// If buffering is enabled, delegate to buffer
 	if b.buffer != nil {
 		return b.buffer.append(ctx, bi, fn, b)
@@ -272,7 +295,9 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 }
 
 // RetrieveItems retrieve the data associated with the specified batch.
-func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
+func (b *redisBatchManager) RetrieveItems(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID) (_ []BatchItem, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "retrieve_items", start, err) }(time.Now())
+
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		b.b.Client(),
@@ -303,7 +328,9 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 
 // StartExecution sets the status to `started`
 // If it has already started, don't do anything
-func (b *redisBatchManager) StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
+func (b *redisBatchManager) StartExecution(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (_ string, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "start_execution", start, err) }(time.Now())
+
 	keys := []string{
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 		batchPointer,
@@ -353,6 +380,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	if b.splitBatchPartitionByFunction != nil && b.splitBatchPartitionByFunction(ctx, opts.AccountID) {
 		queueName = fmt.Sprintf("%s:%s", queue.KindScheduleBatch, opts.FunctionID)
 	}
+	start := time.Now()
 	err := b.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
@@ -371,6 +399,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
+	b.recordCall(ctx, "schedule_execution", start, err)
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID, "function_id", opts.FunctionID)
 		return nil
@@ -382,8 +411,11 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	return nil
 }
 
-// DeleteKeys drops keys related to the provided batchID.
-func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error {
+// DeleteKeys drops keys related to the provided batchID and reports whether
+// the batch's event list existed.
+func (b *redisBatchManager) DeleteKeys(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID) (_ bool, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "delete_keys", start, err) }(time.Now())
+
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
@@ -396,7 +428,7 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		[]string{},
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
+		return false, fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}
 	if batchExisted > 0 && b.metricRecorder != nil {
 		createdAt := time.UnixMilli(int64(batchID.Time()))
@@ -407,34 +439,37 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		b.metricRecorder.RecordDelete(ctx, residencyDuration)
 	}
 
-	return nil
+	return batchExisted > 0, nil
 }
 
 // DeleteBatch deletes the current batch for a function and batch key.
-func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error) {
+func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (_ []DeleteBatchResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "delete_batch", start, err) }(time.Now())
+
 	// First get the batch info to know what we're deleting
-	info, err := b.GetBatchInfo(ctx, functionID, batchKey)
+	info, err := b.getBatchInfo(ctx, functionID, batchKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch info: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to get batch info: %w", b.storeName, err)
 	}
 
 	if info.BatchID == "" {
 		// No active batch to delete
-		return &DeleteBatchResult{
+		return []DeleteBatchResult{{
+			Store:     b.storeName,
 			Deleted:   false,
 			BatchID:   "",
 			ItemCount: 0,
-		}, nil
+		}}, nil
 	}
 
 	batchID, err := ulid.Parse(info.BatchID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid batch ID: %w", err)
+		return nil, fmt.Errorf("batch store %s: invalid batch ID: %w", b.storeName, err)
 	}
 
 	// Delete the batch keys
-	if err := b.DeleteKeys(ctx, functionID, batchID); err != nil {
-		return nil, fmt.Errorf("failed to delete batch keys: %w", err)
+	if _, err := b.DeleteKeys(ctx, consts.DevServerAccountID, functionID, batchID); err != nil {
+		return nil, fmt.Errorf("batch store %s: failed to delete batch keys: %w", b.storeName, err)
 	}
 
 	// Delete the batch pointer
@@ -449,36 +484,44 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 	if err := b.b.Client().Do(ctx, func(c rueidis.Client) rueidis.Completed {
 		return c.B().Del().Key(batchPointerKey).Build()
 	}).Error(); err != nil {
-		return nil, fmt.Errorf("failed to delete batch pointer: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to delete batch pointer: %w", b.storeName, err)
 	}
 
-	return &DeleteBatchResult{
+	return []DeleteBatchResult{{
+		Store:     b.storeName,
 		Deleted:   true,
 		BatchID:   info.BatchID,
 		ItemCount: len(info.Items),
-	}, nil
+	}}, nil
 }
 
 // RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
-func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error) {
+func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (_ []RunBatchResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "run_batch", start, err) }(time.Now())
+
 	// Get the batch info first
-	info, err := b.GetBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
+	info, err := b.getBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch info: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to get batch info: %w", b.storeName, err)
 	}
 
-	if info.BatchID == "" {
+	// A pointer batch without items has no metadata, so its schedule job would
+	// find it absent and complete without moving the pointer. That job ID would
+	// then block the batch's own timeout job once events arrive, so only
+	// schedule batches that hold items.
+	if info.BatchID == "" || len(info.Items) == 0 {
 		// No active batch to run
-		return &RunBatchResult{
+		return []RunBatchResult{{
+			Store:     b.storeName,
 			Scheduled: false,
 			BatchID:   "",
 			ItemCount: 0,
-		}, nil
+		}}, nil
 	}
 
 	batchID, err := ulid.Parse(info.BatchID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid batch ID: %w", err)
+		return nil, fmt.Errorf("batch store %s: invalid batch ID: %w", b.storeName, err)
 	}
 
 	// Determine the batch pointer key
@@ -511,14 +554,15 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 	}
 
 	if err := b.ScheduleExecution(ctx, scheduleOpts); err != nil {
-		return nil, fmt.Errorf("failed to schedule batch execution: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to schedule batch execution: %w", b.storeName, err)
 	}
 
-	return &RunBatchResult{
+	return []RunBatchResult{{
+		Store:     b.storeName,
 		Scheduled: true,
 		BatchID:   info.BatchID,
 		ItemCount: len(info.Items),
-	}, nil
+	}}, nil
 }
 
 // BulkAppendResult represents the result of a bulk append operation.
@@ -535,15 +579,22 @@ type BulkAppendResult struct {
 
 // BulkAppend appends multiple items to a batch atomically. If the batch becomes full,
 // overflow events are placed into a new batch.
-func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (*BulkAppendResult, error) {
+func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (_ *BulkAppendResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "bulk_append", start, err) }(time.Now())
+
 	if len(items) == 0 {
 		return nil, fmt.Errorf("no items to append")
 	}
 	metricTags := b.accountScopedMetricTags(ctx, items[0].AccountID, items[0].WorkspaceID)
-	return b.bulkAppend(ctx, items, fn, metricTags)
+	return b.bulkAppend(ctx, items, nil, fn, metricTags)
 }
 
-func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, metricTags map[string]any) (*BulkAppendResult, error) {
+// bulkAppend is the shared write path for BulkAppend and buffered flushes. It
+// is recorded as bulk_append_internal so store writes from both are counted.
+// Buffered flushes supply encoded items to reuse their measured bytes.
+func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, encoded [][]byte, fn inngest.Function, metricTags map[string]any) (_ *BulkAppendResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "bulk_append_internal", start, err) }(time.Now())
+
 	config := fn.EventBatch
 	if config == nil {
 		return nil, fmt.Errorf("no batch config found for function: %s", fn.Slug)
@@ -578,8 +629,12 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 	}
 
 	// Add event pairs: eventID1, event1, eventID2, event2, ...
-	for _, item := range items {
-		baseArgs = append(baseArgs, item.EventID.String(), item)
+	for i, item := range items {
+		if encoded != nil {
+			baseArgs = append(baseArgs, item.EventID.String(), encoded[i])
+		} else {
+			baseArgs = append(baseArgs, item.EventID.String(), item)
+		}
 	}
 
 	args, err := redis_state.StrSlice(baseArgs)
@@ -607,6 +662,11 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 	return result, nil
 }
 
+// Name returns the batch store name set by WithStoreName.
+func (b *redisBatchManager) Name() string {
+	return b.storeName
+}
+
 // Close gracefully shuts down the batch manager, flushing any pending buffers.
 func (b *redisBatchManager) Close() error {
 	if b.buffer != nil {
@@ -616,7 +676,18 @@ func (b *redisBatchManager) Close() error {
 }
 
 // GetBatchInfo retrieves information about the current batch for a function and batch key.
-func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
+func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (_ []BatchInfo, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "get_batch_info", start, err) }(time.Now())
+
+	info, err := b.getBatchInfo(ctx, functionID, batchKey)
+	if err != nil {
+		return nil, fmt.Errorf("batch store %s: %w", b.storeName, err)
+	}
+	info.Store = b.storeName
+	return []BatchInfo{*info}, nil
+}
+
+func (b *redisBatchManager) getBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
 	// Determine the batch pointer key based on the batch key
 	// When batchKey is "default" or empty, use BatchPointer (no key suffix)
 	// This matches the behavior of Append when fn.EventBatch.Key is nil
@@ -651,7 +722,7 @@ func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UU
 	}
 
 	// Retrieve the batch items
-	items, err := b.RetrieveItems(ctx, functionID, batchID)
+	items, err := b.RetrieveItems(ctx, consts.DevServerAccountID, functionID, batchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve batch items: %w", err)
 	}
@@ -674,4 +745,19 @@ func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UU
 		Items:   items,
 		Status:  status,
 	}, nil
+}
+
+// recordCall counts one batch manager API call against this store and records
+// how long it took.
+func (b *redisBatchManager) recordCall(ctx context.Context, op string, start time.Time, err error) {
+	status := "ok"
+	switch {
+	case errors.Is(err, queue.ErrQueueItemExists):
+		status = "already_exists"
+	case err != nil:
+		status = "error"
+	}
+	tags := map[string]any{"op": op, "backend": b.storeName, "status": status}
+	metrics.IncrBatchManagerCallsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
+	metrics.HistogramBatchManagerCallDuration(ctx, time.Since(start), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
 }

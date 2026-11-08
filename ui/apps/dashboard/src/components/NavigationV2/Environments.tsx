@@ -1,3 +1,10 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuLabelClassName,
+  menuPanelClassName,
+  menuSeparatorClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
 import { useEffect, useState } from 'react';
 
 import { Listbox } from '@headlessui/react';
@@ -10,6 +17,7 @@ import {
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiCloudFill,
+  RiCheckLine,
   RiCloudLine,
   RiErrorWarningLine,
   RiExpandUpDownLine,
@@ -128,6 +136,7 @@ export default function EnvironmentSelectMenu({
   activeEnv,
   collapsed,
 }: EnvironmentSelectMenuProps) {
+  const keyboardNavigation = useMenuInputModality();
   const navigate = useNavigate();
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
   const [selected, setSelected] = useState<ListboxValue>(null);
@@ -206,18 +215,31 @@ export default function EnvironmentSelectMenu({
             </Listbox.Button>
           </OptionalTooltip>
 
-          <Listbox.Options className="bg-canvasBase border-subtle absolute top-10 z-50 max-h-[calc(100vh-8rem)] w-[250px] divide-none overflow-y-auto rounded border shadow focus:outline-none">
+          <Listbox.Options
+            data-keyboard-navigation={keyboardNavigation}
+            className={cn(
+              menuPanelClassName,
+              'dropdown-focus absolute top-10 z-50 max-h-[calc(100vh-8rem)] w-[250px] overflow-y-auto',
+            )}
+          >
             {defaultEnvironment !== null && (
-              <EnvironmentItem environment={defaultEnvironment} />
+              <EnvironmentItem
+                environment={defaultEnvironment}
+                isSelected={selectedEnv?.id === defaultEnvironment.id}
+              />
             )}
 
             {testEnvironments.length > 0 &&
               testEnvironments.map((env) => (
-                <EnvironmentItem key={env.id} environment={env} />
+                <EnvironmentItem
+                  key={env.id}
+                  environment={env}
+                  isSelected={selectedEnv?.id === env.id}
+                />
               ))}
 
             <div>
-              <div className="bg-canvasBase text-disabled border-subtle flex h-[18px] cursor-not-allowed items-center gap-3 border-t px-3 py-4 text-xs font-normal">
+              <div className={cn(menuLabelClassName, menuSeparatorClassName)}>
                 Branch Environments
               </div>
               {mostRecentlyCreatedBranchEnvironments.length > 0 ? (
@@ -225,6 +247,7 @@ export default function EnvironmentSelectMenu({
                   <EnvironmentItem
                     key={env.id}
                     environment={env}
+                    isSelected={selectedEnv?.id === env.id}
                     variant="compact"
                   />
                 ))
@@ -232,9 +255,9 @@ export default function EnvironmentSelectMenu({
                 <Listbox.Option
                   key="sync-branch"
                   value="sync_branch"
-                  className="bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal"
+                  className={cn(headlessMenuItemClassName)}
                 >
-                  <RiLoopLeftLine className="h-3 w-3" />
+                  <RiLoopLeftLine className="text-muted h-4 w-4" />
                   Sync a branch
                 </Listbox.Option>
               )}
@@ -244,9 +267,9 @@ export default function EnvironmentSelectMenu({
               <Listbox.Option
                 key="view-all"
                 value="view_all"
-                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
+                className={cn(headlessMenuItemClassName, 'whitespace-nowrap')}
               >
-                <RiCloudFill className="h-3 w-3" />
+                <RiCloudFill className="text-muted h-4 w-4" />
                 View All Environments
               </Listbox.Option>
             </div>
@@ -261,10 +284,12 @@ function EnvironmentItem({
   environment,
   name,
   variant = 'normal',
+  isSelected = false,
 }: {
   environment: Environment;
   name?: string;
   variant?: 'compact' | 'normal';
+  isSelected?: boolean;
 }) {
   let statusColorClass: string;
   if (environment.isArchived) {
@@ -278,17 +303,28 @@ function EnvironmentItem({
       key={environment.id}
       value={environment}
       className={cn(
-        'bg-canvasBase hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 px-3 text-[13px] font-normal',
-        variant === 'compact' && 'py-2',
+        headlessMenuItemClassName,
+        variant === 'compact' && 'py-1.5',
+        isSelected && 'bg-canvasSubtle',
       )}
     >
-      <span
-        className={cn(
-          'block h-1.5 w-1.5 shrink-0 rounded-full',
-          statusColorClass,
+      <>
+        <span
+          className={cn(
+            'block h-1.5 w-1.5 shrink-0 rounded-full',
+            statusColorClass,
+          )}
+        />
+        <span className="min-w-0 flex-1 truncate">
+          {name || environment.name}
+        </span>
+        {isSelected && (
+          <RiCheckLine
+            className="text-success h-4 w-4 shrink-0"
+            aria-hidden="true"
+          />
         )}
-      />
-      <span className="truncate">{name || environment.name}</span>
+      </>
     </Listbox.Option>
   );
 }

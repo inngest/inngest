@@ -1,3 +1,11 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuItemClassName,
+  menuPanelClassName,
+  menuSeparatorClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import {
   RiArrowLeftRightLine,
@@ -21,6 +29,7 @@ type Props = React.PropsWithChildren<{
 }>;
 
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
+  const keyboardNavigation = useMenuInputModality();
   const navigate = useNavigate();
 
   return (
@@ -29,20 +38,29 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
         {children}
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-4 z-50 ml-8 w-[199px] rounded border ring-0 focus:outline-none">
+        <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute -right-48 bottom-4 z-50 ml-8 w-[199px]',
+          )}
+        >
           <Listbox.Option
             disabled
             value="themeMode"
-            className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
+            className={cn(
+              menuItemClassName,
+              'text-muted min-h-10 justify-between',
+            )}
           >
             <div>Theme</div>
             <ModeSwitch />
           </Listbox.Option>
 
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="userProfile"
             onClick={() =>
               navigate({ to: '/settings/user/profile' as FileRouteTypes['to'] })
@@ -54,7 +72,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </div>
           </Listbox.Option>
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="org"
             onClick={() =>
               navigate({ to: '/settings/organization' as FileRouteTypes['to'] })
@@ -67,7 +85,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           </Listbox.Option>
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="members"
             onClick={() =>
               navigate({
@@ -82,7 +100,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           </Listbox.Option>
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="apiKeys"
             onClick={() =>
               navigate({ to: '/settings/api-keys' as FileRouteTypes['to'] })
@@ -95,7 +113,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           </Listbox.Option>
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="billing"
             onClick={() => navigate({ to: pathCreator.billing() })}
           >
@@ -106,7 +124,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
           </Listbox.Option>
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="switchOrg"
             onClick={() =>
               navigate({ to: '/organization-list' as FileRouteTypes['to'] })
@@ -118,10 +136,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </div>
           </Listbox.Option>
 
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="switchAccount"
             onClick={() =>
               navigate({ to: '/sign-in/choose' as FileRouteTypes['to'] })
@@ -132,9 +150,9 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               <div>Switch Account</div>
             </div>
           </Listbox.Option>
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="signOut"
           >
             <SignOutButton isMarketplace={isMarketplace} />

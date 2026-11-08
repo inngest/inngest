@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@inngest/components/Popover';
 
+import { menuPanelClassName } from '../DropdownMenu/menuStyles';
+import { cn } from '../utils/classNames';
 import { Pill } from './Pill';
 
 type FunctionsCellContentProps = {
@@ -51,7 +53,7 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
           </button>
         </PopoverTrigger>
 
-        <PopoverContent sideOffset={5} className="border-subtle p-3" side="right">
+        <PopoverContent sideOffset={5} className={cn(menuPanelClassName, 'p-3')} side="right">
           <div className="flex flex-col gap-2">{hiddenPills}</div>
         </PopoverContent>
       </Popover>

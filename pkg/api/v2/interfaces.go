@@ -87,9 +87,15 @@ type EventPublisher interface {
 
 type EventSender func(context.Context, *event.Event) (string, error)
 
+type EventProvider interface {
+	GetEvent(ctx context.Context, id ulid.ULID) (*cqrs.Event, error)
+	GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error)
+}
+
 type FunctionPauser interface {
-	// idempotent. may apply async; PausedAt is when the pause applies
+	// idempotent pause and resume; may apply asynchronously
 	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+	ResumeFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
 }
 
 type GetRunOpts struct {
@@ -173,6 +179,27 @@ type GetRunsResult struct {
 	HasMore bool
 }
 
+type CreateReplayOpts struct {
+	AppID      string
+	Name       string
+	FunctionID string
+	From       time.Time
+	Until      time.Time
+	Statuses   []enums.ReplayRunStatus
+}
+
+type ReplayResult struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+type ReplayProvider interface {
+	// CreateReplay starts a replay for one function in the authenticated environment.
+	// Cloud uses the existing function replay worker. Local work is asynchronous,
+	// in memory, and lost on restart. Retrying creation creates another replay.
+	CreateReplay(ctx context.Context, opts CreateReplayOpts) (ReplayResult, error)
+}
+
 type RunProvider interface {
 	GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
@@ -223,4 +250,13 @@ type ScoreProvider interface {
 	// missing runs or steps may not surface in queries. Implementations return
 	// ErrScoresNotEnabled when the account cannot submit scores.
 	CreateScores(ctx context.Context, params CreateScoresParams) error
+}
+
+type CreateCancellationOpts struct {
+	From, Until time.Time
+	If, Name    *string
+}
+
+type CancellationCreator interface {
+	CreateCancellation(context.Context, inngest.DeployedFunction, CreateCancellationOpts) (*cqrs.Cancellation, error)
 }

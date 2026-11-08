@@ -18,6 +18,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/driver/schemes"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -473,7 +474,9 @@ func (f Function) Validate(ctx context.Context) error {
 		case "http", "https", "ws", "wss":
 			continue
 		default:
-			err = multierror.Append(err, fmt.Errorf("Non-supported step schema: %s", uri.Scheme))
+			if !schemes.Registered(uri.Scheme) {
+				err = multierror.Append(err, fmt.Errorf("Non-supported step schema: %s", uri.Scheme))
+			}
 		}
 	}
 

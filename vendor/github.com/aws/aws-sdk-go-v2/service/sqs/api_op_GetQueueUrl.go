@@ -4,21 +4,22 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Returns the URL of an existing Amazon SQS queue.
+// The GetQueueUrl API returns the URL of an existing Amazon SQS queue. This is
+// useful when you know the queue's name but need to retrieve its URL for further
+// operations.
 //
-// To access a queue that belongs to another AWS account, use the
+// To access a queue owned by another Amazon Web Services account, use the
 // QueueOwnerAWSAccountId parameter to specify the account ID of the queue's owner.
-// The queue's owner must grant you permission to access the queue. For more
-// information about shared queue access, see AddPermissionor see [Allow Developers to Write Messages to a Shared Queue] in the Amazon SQS Developer
-// Guide.
+// Note that the queue owner must grant you the necessary permissions to access the
+// queue. For more information about accessing shared queues, see the AddPermissionAPI or [Allow developers to write messages to a shared queue] in
+// the Amazon SQS Developer Guide.
 //
-// [Allow Developers to Write Messages to a Shared Queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue
+// [Allow developers to write messages to a shared queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-writing-an-sqs-policy.html#write-messages-to-shared-queue
 func (c *Client) GetQueueUrl(ctx context.Context, params *GetQueueUrlInput, optFns ...func(*Options)) (*GetQueueUrlOutput, error) {
 	if params == nil {
 		params = &GetQueueUrlInput{}
@@ -34,20 +35,38 @@ func (c *Client) GetQueueUrl(ctx context.Context, params *GetQueueUrlInput, optF
 	return out, nil
 }
 
+// Retrieves the URL of an existing queue based on its name and, optionally, the
+// Amazon Web Services account ID.
 type GetQueueUrlInput struct {
 
-	// The name of the queue whose URL must be fetched. Maximum 80 characters. Valid
-	// values: alphanumeric characters, hyphens ( - ), and underscores ( _ ).
-	//
-	// Queue URLs and names are case-sensitive.
+	// (Required) The name of the queue for which you want to fetch the URL. The name
+	// can be up to 80 characters long and can include alphanumeric characters, hyphens
+	// (-), and underscores (_). Queue URLs and names are case-sensitive.
 	//
 	// This member is required.
 	QueueName *string
 
-	// The Amazon Web Services account ID of the account that created the queue.
+	// (Optional) The Amazon Web Services account ID of the account that created the
+	// queue. This is only required when you are attempting to access a queue owned by
+	// another Amazon Web Services account.
 	QueueOwnerAWSAccountId *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *GetQueueUrlInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetQueueUrlRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetQueueUrlInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueName != nil {
+		s.WriteString(schemas.GetQueueUrlRequest_QueueName, *v.QueueName)
+	}
+	if v.QueueOwnerAWSAccountId != nil {
+		s.WriteString(schemas.GetQueueUrlRequest_QueueOwnerAWSAccountId, *v.QueueOwnerAWSAccountId)
+	}
 }
 
 // For more information, see [Interpreting Responses] in the Amazon SQS Developer Guide.
@@ -64,74 +83,48 @@ type GetQueueUrlOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetQueueUrlOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetQueueUrlResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetQueueUrlOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.GetQueueUrlResult_QueueUrl, *v.QueueUrl)
+	}
+}
+func (v *GetQueueUrlOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetQueueUrlResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetQueueUrlResult_QueueUrl:
+			v.QueueUrl = new(string)
+			return d.ReadString(schemas.GetQueueUrlResult_QueueUrl, v.QueueUrl)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetQueueUrl, schemas.GetQueueUrlRequest, schemas.GetQueueUrlResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpGetQueueUrl{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetQueueUrl, schemas.GetQueueUrlRequest, schemas.GetQueueUrlResult), output: &GetQueueUrlOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpGetQueueUrl{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetQueueUrl"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetQueueUrlValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetQueueUrl(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -146,13 +139,8 @@ func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, opt
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opGetQueueUrl(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetQueueUrl",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

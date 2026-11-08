@@ -1,0 +1,349 @@
+package driver
+
+import (
+	"context"
+	"os/exec"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
+	"github.com/stretchr/testify/require"
+)
+
+func TestStartProcessWithQuackTransport(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	_, isQuack := p.sess.(*quack.Session)
+	require.True(t, isQuack, "process should have swapped its active session to the quack transport once bootstrapped")
+
+	require.NoError(t, p.healthCheck(t.Context()))
+
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
+	require.NoError(t, err)
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
+	require.NoError(t, err)
+
+	_, rows, err := p.Exec(t.Context(), "SELECT id, name FROM t;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, int64(1), rows[0].Get("id"))
+	require.Equal(t, "a", rows[0].Get("name"))
+}
+
+func TestQuackTransportSurvivesRestart(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	require.NoError(t, err)
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1);")
+	require.NoError(t, err)
+
+	pidBefore := p.cmd.Process.Pid
+	require.NoError(t, p.cmd.Process.Kill())
+	_, _ = p.cmd.Process.Wait()
+
+	// :memory: state (including the CREATE TABLE above) does not survive a
+	// real crash — same as the jsonlines path — so the pre-crash table is
+	// gone. What this proves is that the restart's fresh spawn+bootstrap
+	// stands up a *new* quack listener and the process keeps working over
+	// it, rather than hanging or falling back to some other transport.
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	require.NoError(t, err, "restart must re-bootstrap the quack transport, not just the jsonlines control channel")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1);")
+	require.NoError(t, err)
+	_, rows, err := p.Exec(t.Context(), "SELECT count(*) AS c FROM t;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, int64(1), rows[0].Get("c"))
+
+	p.mu.Lock()
+	disabled := p.disabled
+	pidAfter := p.cmd.Process.Pid
+	_, stillQuack := p.sess.(*quack.Session)
+	p.mu.Unlock()
+	require.False(t, disabled)
+	require.NotEqual(t, pidBefore, pidAfter)
+	require.True(t, stillQuack, "the restarted process must still be using the quack transport, not have fallen back to jsonlines")
+}
+
+// TestQuackCancelledQueryDoesNotRestartSubprocess pins the fix for a real
+// bug: cancelling a caller's ctx mid-query over quack used to be
+// indistinguishable, from process.exec/query's point of view, from the
+// subprocess having crashed -- runWithRestartLocked treated both the same
+// way and paid for a full respawn every time, disrupting every other
+// caller sharing this same connection (e.g. dual-write's own writes,
+// serialized through the identical mutex) even though nothing was
+// actually wrong with the subprocess. Unlike jsonlines (whose single
+// shared stdin/stdout stream really is left desynced by an abandoned
+// statement -- see TestSessionExecCancelMidStatementDesyncsAndProcessResyncs),
+// quack's HTTP transport is a self-contained request per statement: an
+// aborted request doesn't corrupt anything for the next one, verified
+// empirically against the real quack extension (a fresh query on the same
+// connection succeeds in ~1ms after an abort). So a cancelled quack query
+// must now surface its ctx error without ever touching the subprocess.
+//
+// It also asserts the query is genuinely interrupted server-side, not just
+// abandoned: quack.Session.Query's watchForCancel sends a real CancelRequest
+// (encodeQuackCancelRequest), which quack_server.cpp turns into a DuckDB
+// Connection::Interrupt() -- confirmed here by watching the subprocess's own
+// CPU time via ps plateau almost immediately after cancel, rather than
+// continuing to climb for the ~8s the query would otherwise take to finish
+// on its own.
+func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	_, _, err = p.Exec(t.Context(), "SET threads=1;")
+	require.NoError(t, err)
+
+	pidBefore := p.cmd.Process.Pid
+
+	// A genuinely slow, single-threaded query -- confirmed empirically to
+	// take several seconds -- so cancelling it below lands mid-flight
+	// rather than racing a query that already finished.
+	slowSQL := "SELECT count(*) FROM (SELECT md5(a::VARCHAR || b::VARCHAR) FROM range(50000000) a, range(2000) b);"
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		_, _, _, err := p.Query(ctx, slowSQL)
+		done <- err
+	}()
+
+	time.Sleep(1500 * time.Millisecond)
+	cpuAtCancel := processCPUSeconds(t, pidBefore)
+	cancel()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(10 * time.Second):
+		t.Fatal("cancelled query never returned")
+	}
+
+	p.mu.Lock()
+	pidAfter := p.cmd.Process.Pid
+	disabled := p.disabled
+	p.mu.Unlock()
+	require.Equal(t, pidBefore, pidAfter, "a cancelled query must not respawn the subprocess")
+	require.False(t, disabled)
+
+	// The connection (and process.exec's mutex-guarded path a write like
+	// dual-write's would use) must still be immediately usable -- not
+	// blocked behind the abandoned query.
+	_, rows, err := p.Exec(t.Context(), "SELECT 1 AS ok;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	// Give the CancelRequest watchForCancel fired a moment to reach the
+	// server and for Interrupt() to actually take effect, then confirm CPU
+	// usage plateaued rather than continuing to accumulate at ~1
+	// core-second per wall-second (which single-threaded execution of
+	// slowSQL would otherwise do for several more seconds).
+	time.Sleep(2 * time.Second)
+	delta := processCPUSeconds(t, pidAfter) - cpuAtCancel
+	require.Less(t, delta, 1.5,
+		"subprocess CPU time kept climbing after cancel -- the query does not appear to have been interrupted server-side (delta=%.2fs)", delta)
+}
+
+// processCPUSeconds shells out to ps to read pid's accumulated CPU time (the
+// TIME column, HH:MM:SS or MM:SS) -- a crude but real signal of whether it's
+// still actively burning CPU.
+func processCPUSeconds(t *testing.T, pid int) float64 {
+	t.Helper()
+	out, err := exec.Command("ps", "-o", "time=", "-p", strconv.Itoa(pid)).Output()
+	require.NoError(t, err)
+	parts := strings.Split(strings.TrimSpace(string(out)), ":")
+	var secs, mult float64 = 0, 1
+	for i := len(parts) - 1; i >= 0; i-- {
+		v, _ := strconv.ParseFloat(parts[i], 64)
+		secs += v * mult
+		mult *= 60
+	}
+	return secs
+}
+
+// TestQuackAbandonedStatementDoesNotBlockNextStatement pins that a statement
+// which ignores its CancelRequest doesn't poison the connection it ran on.
+// A constant-folded levenshtein runs inside the server's PREPARE handler,
+// which neither reacts to Interrupt() nor answers the CancelRequest until
+// it finishes (~9s here). Reusing that quack connection used to queue the
+// next statement behind it, and then fail it w/ the late "Interrupted!".
+// Both the primary connection (process) and a pooled one must instead move
+// to a fresh quack connection.
+func TestQuackAbandonedStatementDoesNotBlockNextStatement(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	pooled, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+
+	const stuckSQL = "SELECT levenshtein(repeat('a', 80000), repeat('b', 80000)) AS d;"
+	for name, execer := range map[string]sqlExecer{"primary": p, "pooled": pooled} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+			defer cancel()
+			start := time.Now()
+			_, _, _, err := execer.Query(ctx, stuckSQL)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			require.Less(t, time.Since(start), 2*time.Second, "an abandoned statement must not block its caller on the cancel")
+
+			start = time.Now()
+			_, _, rows, err := execer.Query(t.Context(), "SELECT 1 AS ok;")
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+			require.Less(t, time.Since(start), 2*time.Second, "the next statement must not queue behind the abandoned one")
+		})
+	}
+
+	p.mu.Lock()
+	disabled := p.disabled
+	p.mu.Unlock()
+	require.False(t, disabled)
+}
+
+// TestQuackAbandonedAppendIsReplacedBeforeNextAppend pins that a connection
+// whose appender Flush was cancelled mid-statement hands the next appender
+// (and the next plain statement) a fresh session. The appender drives the
+// session directly, outside pooledQuackConn.attempt, so a pooled conn used
+// to keep the abandoned session and its next currentSession returned a nil
+// session w/ a nil error. The CHECK constraint constant-folds the same slow
+// levenshtein as TestQuackAbandonedStatementDoesNotBlockNextStatement so the
+// INSERT is still in flight when ctx ends.
+func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE memory.main.slow_append_t (id VARCHAR CHECK (levenshtein(repeat('a', 80000), repeat('b', 80000)) >= 0));")
+	require.NoError(t, err)
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE memory.main.append_t (id VARCHAR);")
+	require.NoError(t, err)
+
+	pooled, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+
+	for name, execer := range map[string]sqlExecer{"primary": p, "pooled": pooled} {
+		t.Run(name, func(t *testing.T) {
+			driverConn := &conn{sess: execer}
+
+			slow, err := NewQuackAppenderFromConn(t.Context(), driverConn, "memory", "main", "slow_append_t", []QuackColumnKind{QuackColumnVarchar})
+			require.NoError(t, err)
+			require.NoError(t, slow.AppendRow("x"))
+			ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+			defer cancel()
+			start := time.Now()
+			require.ErrorIs(t, slow.Flush(ctx), context.DeadlineExceeded)
+			require.Less(t, time.Since(start), 2*time.Second, "an abandoned append must not block its caller on the cancel")
+			require.True(t, slow.session.Abandoned())
+
+			start = time.Now()
+			appender, err := NewQuackAppenderFromConn(t.Context(), driverConn, "memory", "main", "append_t", []QuackColumnKind{QuackColumnVarchar})
+			require.NoError(t, err)
+			require.NotNil(t, appender.session)
+			require.False(t, appender.session.Abandoned())
+			require.NoError(t, appender.AppendRow(name))
+			require.NoError(t, appender.Close(t.Context()))
+
+			_, _, rows, err := execer.Query(t.Context(), "SELECT id FROM memory.main.append_t WHERE id = '"+name+"';")
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+			require.Less(t, time.Since(start), 2*time.Second, "the next append must not queue behind the abandoned one")
+		})
+	}
+}
+
+// TestQuackAbandonedStatementsAreCapped pins Options.MaxAbandonedStatements:
+// once that many abandoned statements are still running server-side, a gated
+// (OpenShared) connection refuses to handshake a new session w/
+// ErrTooManyAbandoned, until the server is done w/ them. Sessions that don't
+// need a new handshake, the primary connection, and ungated pooled
+// connections (dual-write's) are unaffected. The constant-folded levenshtein
+// ignores its interrupt (~2s here), like
+// TestQuackAbandonedStatementDoesNotBlockNextStatement's.
+func TestQuackAbandonedStatementsAreCapped(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr, withMaxAbandoned(1))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	gated, err := p.openGatedQuackConn(t.Context())
+	require.NoError(t, err)
+	otherGated, err := p.openGatedQuackConn(t.Context())
+	require.NoError(t, err)
+	ungated, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+
+	const stuckSQL = "SELECT levenshtein(repeat('a', 40000), repeat('b', 40000)) AS d;"
+	abandon := func(execer sqlExecer) {
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		_, _, _, err := execer.Query(ctx, stuckSQL)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
+
+	abandon(gated)
+	require.EqualValues(t, 1, p.abandoned.Load(), "an abandoned statement is counted before Query returns")
+
+	start := time.Now()
+	_, _, _, err = gated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.ErrorIs(t, err, ErrTooManyAbandoned)
+	require.Less(t, time.Since(start), time.Second, "a capped connection must fail fast, not queue")
+	_, err = p.openGatedQuackConn(t.Context())
+	require.ErrorIs(t, err, ErrTooManyAbandoned)
+
+	for name, execer := range map[string]sqlExecer{"healthy gated": otherGated, "primary": p, "ungated": ungated} {
+		_, _, rows, err := execer.Query(t.Context(), "SELECT 1 AS ok;")
+		require.NoError(t, err, name)
+		require.Len(t, rows, 1, name)
+	}
+	abandon(ungated)
+	_, _, _, err = ungated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.NoError(t, err, "an ungated connection re-handshakes past the cap")
+	require.EqualValues(t, 2, p.abandoned.Load())
+
+	// Both levenshteins ignore their interrupt, so they're only uncounted
+	// once the server finishes them.
+	require.Eventually(t, func() bool { return p.abandoned.Load() == 0 }, 30*time.Second, 50*time.Millisecond)
+	_, _, rows, err := gated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	p.mu.Lock()
+	disabled := p.disabled
+	p.mu.Unlock()
+	require.False(t, disabled)
+}

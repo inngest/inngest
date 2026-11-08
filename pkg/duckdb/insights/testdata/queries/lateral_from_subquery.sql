@@ -1,0 +1,1 @@
+SELECT run_id FROM runs, LATERAL (SELECT id FROM events WHERE events.id = runs.run_id) AS sub

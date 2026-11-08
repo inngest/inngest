@@ -1,0 +1,1 @@
+SELECT [x.key FOR x IN sessions] AS keys, [x FOR x IN event_ids IF x != ''] AS ids FROM runs

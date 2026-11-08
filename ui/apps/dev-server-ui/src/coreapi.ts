@@ -396,6 +396,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     metadata {
       scope
       kind
+      isUser
       values
       updatedAt
     }
@@ -728,6 +729,51 @@ export const GET_EVENT_RUNS = gql`
           skipReason
           skipExistingRunID
         }
+      }
+    }
+  }
+`;
+
+// Local onboarding observes existing run state; invocation still uses InvokeFunction.
+export const QUICKSTART_RUNS = gql`query QuickstartRuns($functionIDs: [UUID!]!, $from: Time!, $status: [FunctionRunStatus!]) {
+  runs(first: 20, filter: { functionIDs: $functionIDs, from: $from, status: $status, timeField: QUEUED_AT },
+    orderBy: [{ field: QUEUED_AT, direction: DESC }]) {
+    edges { node { id appID status queuedAt endedAt function { id name slug } } }
+    pageInfo { hasNextPage }
+  }
+}`;
+export const EXECUTE_INSIGHTS_QUERY = gql`
+  query ExecuteInsightsQuery($sql: String!) {
+    insights(sql: $sql) {
+      columns {
+        name
+        type
+        pathHints {
+          path {
+            key
+            wildcard
+          }
+          hint
+        }
+      }
+      rows
+      info {
+        primaryTable
+        tables
+        limited
+      }
+      diagnostics {
+        start {
+          line
+          column
+        }
+        end {
+          line
+          column
+        }
+        severity
+        code
+        message
       }
     }
   }

@@ -5,48 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
-	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-var sendEventHTTPMethod, sendEventHTTPPath = sendEventRoute()
-
-func sendEventRoute() (string, string) {
-	for _, endpoint := range apiv2endpoint.Discover() {
-		if endpoint.MethodName == "SendEvent" {
-			return endpoint.HTTPMethod, endpoint.Path
-		}
-	}
-	panic("SendEvent API route not found")
-}
-
-// SendEventBodyLimitMiddleware rejects large event bodies before they are read.
-func SendEventBodyLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		limited := apiv2base.MaxRequestBodyBytesMiddleware(maxBytes)(next)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			path := r.URL.Path
-			if after, ok := strings.CutPrefix(path, "/api/v2"); ok {
-				path = after
-			} else if after, ok := strings.CutPrefix(path, "/v2"); ok {
-				path = after
-			}
-			if r.Method == sendEventHTTPMethod && path == sendEventHTTPPath {
-				limited.ServeHTTP(w, r)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
 
 func (s *Service) SendEvent(ctx context.Context, req *apiv2.SendEventRequest) (*apiv2.SendEventResponse, error) {
 	receivedAt := time.Now()

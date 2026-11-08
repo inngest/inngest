@@ -2,6 +2,7 @@ import { forwardRef } from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 
 import { cn } from '../utils/classNames';
+import { menuItemClassName, menuPanelClassName, menuSeparatorClassName } from './menuStyles';
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 
@@ -33,10 +34,7 @@ export const DropdownMenuContent = forwardRef<
         align={props.align ?? 'start'}
         collisionPadding={8}
         sideOffset={props.sideOffset ?? 8}
-        className={cn(
-          'shadow-primary bg-canvasBase border-muted z-50 min-w-40 rounded-md border p-0.5 outline-none [&>*:not(:last-child)]:mb-0.5',
-          props.className
-        )}
+        className={cn(menuPanelClassName, 'z-50 min-w-40', props.className)}
       >
         {children}
       </DropdownMenuPrimitive.Content>
@@ -55,11 +53,8 @@ export const DropdownMenuItem = forwardRef<
       {...props}
       ref={forwardedRef}
       className={cn(
-        // Radix moves DOM focus onto the hovered item (roving focus), so the
-        // browser's default ring would show on hover. Suppress it and express
-        // the active row through data-highlighted, which covers both pointer
-        // and keyboard navigation.
-        'text-muted hover:bg-canvasSubtle data-[highlighted]:bg-canvasSubtle flex cursor-pointer select-none flex-row items-center gap-2 rounded-md p-2 text-[0.8125rem] outline-none',
+        menuItemClassName,
+        'hover:bg-canvasSubtle data-[highlighted]:bg-canvasSubtle data-[disabled]:text-disabled cursor-pointer data-[disabled]:cursor-not-allowed data-[disabled]:hover:bg-transparent',
         props.className
       )}
     >
@@ -76,9 +71,7 @@ export const DropdownMenuSeparator = forwardRef<
     <DropdownMenuPrimitive.Separator
       {...props}
       ref={forwardedRef}
-      // The negative inline margin cancels the content's p-0.5 so the rule
-      // spans the full width of the panel.
-      className={cn('border-subtle -mx-0.5 my-1 border-t', props.className)}
+      className={cn(menuSeparatorClassName, props.className)}
     />
   );
 });

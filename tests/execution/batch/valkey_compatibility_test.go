@@ -87,7 +87,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchFull, res.Status)
 
-				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.BatchID))
+				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(res.BatchID))
 				require.NoError(t, err)
 				require.Len(t, items, 3)
 				require.Equal(t, first.EventID, items[0].EventID)
@@ -119,7 +119,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.Equal(t, 5, res.Committed)
 				require.Equal(t, 2, res.OverflowCount)
 
-				overflow, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.NextBatchID))
+				overflow, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(res.NextBatchID))
 				require.NoError(t, err)
 				require.Len(t, overflow, 2)
 
@@ -135,15 +135,15 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				batchID := ulid.MustParse(res.BatchID)
 
-				status, err := bm.StartExecution(ctx, fn.ID, batchID, res.BatchPointerKey)
+				status, err := bm.StartExecution(ctx, uuid.Nil, fn.ID, batchID, res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusReady.String(), status)
 
-				status, err = bm.StartExecution(ctx, fn.ID, batchID, res.BatchPointerKey)
+				status, err = bm.StartExecution(ctx, uuid.Nil, fn.ID, batchID, res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusStarted.String(), status)
 
-				status, err = bm.StartExecution(ctx, fn.ID, ulid.Make(), res.BatchPointerKey)
+				status, err = bm.StartExecution(ctx, uuid.Nil, fn.ID, ulid.Make(), res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusAbsent.String(), status)
 			})
@@ -157,21 +157,27 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				_, err = bm.Append(ctx, newItem(fn, map[string]any{"tenant": "b"}), fn)
 				require.NoError(t, err)
 
-				info, err := bm.GetBatchInfo(ctx, fn.ID, "a")
+				infos, err := bm.GetBatchInfo(ctx, fn.ID, "a")
 				require.NoError(t, err)
+				require.Len(t, infos, 1)
+				info := infos[0]
 				require.Len(t, info.Items, 1)
 				require.Equal(t, enums.BatchStatusPending.String(), info.Status)
 
-				deleted, err := bm.DeleteBatch(ctx, fn.ID, "a")
+				results, err := bm.DeleteBatch(ctx, fn.ID, "a")
 				require.NoError(t, err)
+				require.Len(t, results, 1)
+				deleted := results[0]
 				require.True(t, deleted.Deleted)
 
-				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(info.BatchID))
+				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(info.BatchID))
 				require.NoError(t, err)
 				require.Empty(t, items)
 
-				info, err = bm.GetBatchInfo(ctx, fn.ID, "b")
+				infos, err = bm.GetBatchInfo(ctx, fn.ID, "b")
 				require.NoError(t, err)
+				require.Len(t, infos, 1)
+				info = infos[0]
 				require.Len(t, info.Items, 1)
 			})
 		})

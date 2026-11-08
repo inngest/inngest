@@ -1,6 +1,7 @@
 import { RunDetailsV4 } from '@inngest/components/RunDetailsV4';
 import { cn } from '@inngest/components/utils/classNames';
 
+import { renderRunAIDebug } from './RunAIDebug';
 import { useGetTrigger } from './useGetTrigger';
 
 type Props = {
@@ -17,6 +18,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
     <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
       <RunDetailsV4
         standalone={standalone}
+        renderRunAction={renderRunAIDebug}
         getTrigger={getTrigger}
         runID={runID}
         pollInterval={DEFAULT_POLL_INTERVAL}

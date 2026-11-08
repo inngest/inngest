@@ -2037,16 +2037,23 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
+	skip := execution.SkipState{
+		Reason: reason,
+		Events: evts,
+	}
+	if len(req.Events) > 0 {
+		skip.CronSchedule = req.Events[0].GetEvent().CronSchedule()
+	}
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
-				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-					Reason:       reason,
-					Events:       evts,
-				})
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, skip)
 			})
 	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionSkipped", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionSkipped(ctx, metadata, skip, syncNow)
+	})
 	return nil, nil, SkippedError{Reason: reason}
 }
 
@@ -2754,8 +2761,7 @@ func correlationID(event event.Event) *string {
 }
 
 func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
-	// If no cancellation checker was provided, assume run should not be cancelled
-	if e.cancellationChecker == nil {
+	if e.cancellationChecker == nil || len(evts) == 0 {
 		return false, nil
 	}
 
@@ -3182,8 +3188,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
-	if iter.Error() != context.Canceled {
-		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	if err := iter.Error(); err != nil && err != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
 
 	return res, goerr
@@ -3395,14 +3401,12 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	var (
 		evtID = evt.GetInternalID()
-		wsID  = evt.GetWorkspaceID()
 		l     = e.log.With("event_id", evtID.String())
 
 		eventName string
 	)
 
-	// find the pause with correlationID
-	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
+	pause, err := e.invokePause(ctx, evt, correlationID)
 	if err != nil {
 		return err
 	}
@@ -6045,7 +6049,7 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
 	if enableInstrumentation {
@@ -6129,7 +6133,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
-		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+		if _, err := e.batcher.DeleteKeys(ctx, payload.AccountID, payload.FunctionID, payload.BatchID); err != nil {
 			return err
 		}
 	}
@@ -6534,6 +6538,12 @@ func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext
 	item := runCtx.LifecycleItem()
 	queuedAt = item.EnqueuedAt
 	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
+
+	// A sleep item is enqueued when the sleep begins, but steps run while
+	// resuming it can only be queued once the sleep has ended.
+	if item.Kind == queue.KindSleep {
+		queuedAt = scheduledAt
+	}
 
 	if gen != nil {
 		startedAt = gen.Timing.Start()

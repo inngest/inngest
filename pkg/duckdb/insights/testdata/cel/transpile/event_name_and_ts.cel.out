@@ -1,0 +1,14 @@
+INPUT
+event.name == "test/hello" && event.ts > 1727291508963
+
+EVENT SQL
+((COALESCE((x::JSON->>?), '') = ?) AND (COALESCE(TRY_CAST((x::JSON->>?) AS DOUBLE), 0) > ?))
+
+EVENT ARGS
+[$.name test/hello $.ts 1727291508963]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

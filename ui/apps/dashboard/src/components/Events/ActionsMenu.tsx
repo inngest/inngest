@@ -1,3 +1,9 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuPanelClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { RiArchive2Line, RiMore2Line } from '@remixicon/react';
@@ -7,6 +13,7 @@ export type EventActions = {
 };
 
 export const ActionsMenu = ({ archive }: EventActions) => {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <Listbox.Button as="div">
@@ -18,9 +25,15 @@ export const ActionsMenu = ({ archive }: EventActions) => {
         />
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase absolute right-1 top-5 z-50 w-[170px] gap-y-0.5 rounded border shadow">
+        <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute right-1 top-5 z-50 w-[170px]',
+          )}
+        >
           <Listbox.Option
-            className="flex h-8 cursor-pointer items-center text-[13px]"
+            className={cn(headlessMenuItemClassName, 'p-0')}
             value="eventsActions"
           >
             <Button
@@ -30,7 +43,7 @@ export const ActionsMenu = ({ archive }: EventActions) => {
               icon={<RiArchive2Line className="h-4 w-4" />}
               iconSide="left"
               label={'Archive event'}
-              className="m-0 w-full justify-start"
+              className="m-0 w-full justify-start rounded px-2 text-[13px] leading-5 [&>span:first-child]:pr-2"
               onClick={archive}
             />
           </Listbox.Option>
