@@ -669,8 +669,10 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 	// for batched functions.
 	freshEvents := []event.Event{}
 	for n, runEvt := range inputEvents {
-		if runEvt.Name == event.FnFailedName || runEvt.Name == event.FnFinishedName {
-			// Don't recursively trigger internal finish handlers.
+		if runEvt.Name == event.FnFailedName || runEvt.Name == event.FnFinishedName || runEvt.Name == event.FnCancelledName {
+			// Don't recursively trigger internal finish handlers. A cancelled
+			// function.cancelled handler must not emit another function.cancelled,
+			// or bulk cancellations loop through every subscribed function.
 			continue
 		}
 
