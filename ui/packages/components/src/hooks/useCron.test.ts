@@ -73,6 +73,16 @@ describe('getHumanReadableCron', (t) => {
     assert.equal(getHumanReadableCron('TZ=America/Los_Angeles 0 12 * * *'), 'At 12:00 PM');
   });
 
+  it.each([
+    'CRON_TZ=Asia/Tokyo',
+    'TZ=Etc/GMT+5',
+    'TZ=Etc/GMT-3',
+    'TZ=CST6CDT',
+    'TZ=America/Port-au-Prince',
+  ])('can describe a schedule with %s', (prefix) => {
+    assert.equal(getHumanReadableCron(`${prefix} 0 12 * * *`), 'At 12:00 PM');
+  });
+
   it('should ignore seconds', () => {
     // backend validation should prevent us from ever needing this, but documenting that cronstrue currently allows it without error
     assert.equal(getHumanReadableCron('* * * * * *'), 'Every second');
@@ -105,6 +115,18 @@ describe('useCron - nextRun - robfig/cron test cases', (t) => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  test.each([
+    ['CRON_TZ=Asia/Tokyo', '2026-11-08T03:00:00.000Z'],
+    ['TZ=Etc/GMT+5', '2026-11-08T17:00:00.000Z'],
+    ['TZ=Etc/GMT-3', '2026-11-08T09:00:00.000Z'],
+    ['TZ=CST6CDT', '2026-11-08T18:00:00.000Z'],
+    ['TZ=America/Port-au-Prince', '2026-11-08T17:00:00.000Z'],
+  ])('calculates the next run for %s', (prefix, expected) => {
+    vi.setSystemTime(new Date('2026-11-08T00:00:00Z'));
+    const { result } = renderHook(() => useCron(`${prefix} 0 12 * * *`));
+    assert.equal(result.current.nextRun?.toISOString(), expected);
   });
 
   // Helper function to parse test dates. The complexity here comes from wanting to touch the test
@@ -146,7 +168,7 @@ describe('useCron - nextRun - robfig/cron test cases', (t) => {
 
   // copied from https://github.com/robfig/cron/blob/bc59245fe10efaed9d51b56900192527ed733435/spec_test.go#L79C1-L185C97
   // - {} replaced with [] because instead of Go structs we will use 3 element arrays
-  // - CRON_TZ tests are omitted since they are redundant with TZ
+  // - CRON_TZ variants are covered separately above
   // - upstream tests were using seconds in the expression and the second parser. croner technically supports seconds
   //   but since our app currently doesn't, I removed all the seconds from the cron expressions and changed expected times to :00
   // - croner handles ? very differently from robfig/cron. Replace all ? with *
