@@ -39,6 +39,9 @@ import (
 type inboxMessageValue struct {
 	Data  map[string]any `json:"data"`
 	Inbox string         `json:"inngest/inbox"`
+	// InternalID is the event's internal id, kept for messages of the singleton
+	// inbox so that handing one to the next run keeps the event as it arrived.
+	InternalID string `json:"internal_id,omitempty"`
 }
 
 // An arrival that does not fit in the run's step or state size bounds saves
@@ -343,12 +346,30 @@ func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx exe
 		return err
 	}
 
+	// A close that is handled again finds its result saved; only the first
+	// hands the unread messages of a singleton inbox on.
+	firstClose := false
+	if opts.Inbox == singletonInboxID() {
+		saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{gen.ID})
+		if err != nil {
+			return err
+		}
+		_, done := saved[gen.ID]
+		firstClose = !done
+	}
+
 	wake, hasPendingSteps, err := e.smv2.CloseInbox(ctx, md.ID, sv2.InboxClose{
 		StepID: gen.ID,
 		Inbox:  opts.Inbox,
 	})
 	if err != nil {
 		return err
+	}
+
+	if firstClose {
+		if err := e.handBackSingletonInbox(ctx, md, opts.Taken); err != nil {
+			return err
+		}
 	}
 
 	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
@@ -711,6 +732,60 @@ type inboxArrival struct {
 	// src are the pauses of the sources the event matched. They are drawn on
 	// the message's tick, and not saved with the message.
 	src []string
+}
+
+// singletonInbox is the id of the inbox a function with singleton mode queue
+// reads. A run opens it with `step.subscribe("singleton", ...)`.
+const singletonInbox = "singleton"
+
+// queueSingletonEvent takes an event that met a held singleton lock (mode
+// queue). It is saved as a message of the holder's singleton inbox; if that
+// inbox is closed or the run is gone, it is parked in the lock's mailbox, which
+// the release of the lock hands back for scheduling. It returns false only when
+// the lock was free, in which case the caller schedules the event normally.
+func (e *executor) queueSingletonEvent(ctx context.Context, req execution.ScheduleRequest, key string, holder *ulid.ULID) (bool, error) {
+	evt := req.Events[0]
+	scope := queue.Scope{AccountID: req.AccountID, EnvID: req.WorkspaceID, FunctionID: req.Function.ID}
+
+	if holder != nil {
+		id := sv2.ID{RunID: *holder, FunctionID: req.Function.ID, Tenant: sv2.Tenant{AccountID: req.AccountID, EnvID: req.WorkspaceID}}
+		sum := sha1.Sum([]byte(singletonInbox))
+		inbox := hex.EncodeToString(sum[:])
+		value, err := json.Marshal(inboxMessageValue{Data: evt.GetEvent().Map(), Inbox: inbox, InternalID: evt.GetInternalID().String()})
+		if err != nil {
+			return false, err
+		}
+		stepID := inboxMessageStepID(inbox, evt.GetInternalID())
+
+		wake, err := e.smv2.SaveInboxMessage(ctx, id, sv2.InboxMessage{
+			StepID:       stepID,
+			Inbox:        inbox,
+			Value:        value,
+			MaxSteps:     e.inboxMaxSteps(id),
+			MaxStateSize: e.inboxMaxStateSize(id),
+		})
+		switch {
+		case err == nil:
+			e.tickInboxArrival(ctx, &inboxArrival{id: id, inbox: inbox}, stepID)
+			if wake != nil {
+				return true, e.wakeInboxRead(ctx, id, *wake)
+			}
+			return true, nil
+		case errors.Is(err, state.ErrDuplicateResponse):
+			return true, nil
+		case errors.Is(err, state.ErrRunNotFound), errors.Is(err, sv2.ErrInboxClosed):
+			// Park below.
+		default:
+			return false, err
+		}
+	}
+
+	entry, err := json.Marshal(map[string]any{"f": req.Function.ID, "e": evt})
+	if err != nil {
+		return false, err
+	}
+
+	return e.singletonMgr.Park(ctx, scope, key, string(entry))
 }
 
 type inboxArrivalsKey struct{}

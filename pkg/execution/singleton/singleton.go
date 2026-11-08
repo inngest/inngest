@@ -20,6 +20,12 @@ var (
 
 type Singleton interface {
 	HandleSingleton(ctx context.Context, scope queue.Scope, key string, c inngest.Singleton) (*ulid.ULID, error)
+	// Park holds an entry in the key's mailbox while its lock is held. It
+	// reports false when the lock is free, so the caller schedules normally.
+	Park(ctx context.Context, scope queue.Scope, key string, entry string) (bool, error)
+	// ParkFirst puts entries at the head of the mailbox, in order, ahead of
+	// everything parked so far.
+	ParkFirst(ctx context.Context, scope queue.Scope, key string, entries []string) (bool, error)
 }
 
 func New(ctx context.Context, shards queue.ShardRegistry) Singleton {
@@ -36,6 +42,28 @@ func (s *store) HandleSingleton(ctx context.Context, scope queue.Scope, key stri
 	}
 
 	return singleton(ctx, s.shards, scope, key, cfg)
+}
+
+func (s *store) Park(ctx context.Context, scope queue.Scope, key string, entry string) (bool, error) {
+	if err := scope.Validate(); err != nil {
+		return false, err
+	}
+	shard, err := s.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return false, err
+	}
+	return shard.SingletonPark(ctx, scope, key, entry)
+}
+
+func (s *store) ParkFirst(ctx context.Context, scope queue.Scope, key string, entries []string) (bool, error) {
+	if err := scope.Validate(); err != nil {
+		return false, err
+	}
+	shard, err := s.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return false, err
+	}
+	return shard.SingletonParkFirst(ctx, scope, key, entries)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -75,7 +103,7 @@ func singleton(ctx context.Context, shards queue.ShardRegistry, scope queue.Scop
 		return nil, err
 	}
 	switch s.Mode {
-	case enums.SingletonModeSkip:
+	case enums.SingletonModeSkip, enums.SingletonModeQueue:
 		return shard.SingletonGetRunID(ctx, scope, key)
 	case enums.SingletonModeCancel:
 		return shard.SingletonReleaseRunID(ctx, scope, key)

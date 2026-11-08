@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _SingletonModeName = "skipcancel"
+const _SingletonModeName = "skipcancelqueue"
 
-var _SingletonModeIndex = [...]uint8{0, 4, 10}
+var _SingletonModeIndex = [...]uint8{0, 4, 10, 15}
 
-const _SingletonModeLowerName = "skipcancel"
+const _SingletonModeLowerName = "skipcancelqueue"
 
 func (i SingletonMode) String() string {
 	if i < 0 || i >= SingletonMode(len(_SingletonModeIndex)-1) {
@@ -29,20 +29,24 @@ func _SingletonModeNoOp() {
 	var x [1]struct{}
 	_ = x[SingletonModeSkip-(0)]
 	_ = x[SingletonModeCancel-(1)]
+	_ = x[SingletonModeQueue-(2)]
 }
 
-var _SingletonModeValues = []SingletonMode{SingletonModeSkip, SingletonModeCancel}
+var _SingletonModeValues = []SingletonMode{SingletonModeSkip, SingletonModeCancel, SingletonModeQueue}
 
 var _SingletonModeNameToValueMap = map[string]SingletonMode{
-	_SingletonModeName[0:4]:       SingletonModeSkip,
-	_SingletonModeLowerName[0:4]:  SingletonModeSkip,
-	_SingletonModeName[4:10]:      SingletonModeCancel,
-	_SingletonModeLowerName[4:10]: SingletonModeCancel,
+	_SingletonModeName[0:4]:        SingletonModeSkip,
+	_SingletonModeLowerName[0:4]:   SingletonModeSkip,
+	_SingletonModeName[4:10]:       SingletonModeCancel,
+	_SingletonModeLowerName[4:10]:  SingletonModeCancel,
+	_SingletonModeName[10:15]:      SingletonModeQueue,
+	_SingletonModeLowerName[10:15]: SingletonModeQueue,
 }
 
 var _SingletonModeNames = []string{
 	_SingletonModeName[0:4],
 	_SingletonModeName[4:10],
+	_SingletonModeName[10:15],
 }
 
 // SingletonModeString retrieves an enum value from the enum constants string name.

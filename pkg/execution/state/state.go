@@ -62,9 +62,17 @@ var (
 // cleanup since the run is still ongoing.
 type DeleteOpts struct {
 	IsMigration bool
+	// ReleaseIdempotency removes the run's idempotency key instead of leaving
+	// a tombstone, for state that was created but never ran, so the same event
+	// can be scheduled again (singleton mode queue hands such events on).
+	ReleaseIdempotency bool
 }
 
 type DeleteOption func(*DeleteOpts)
+
+func WithReleaseIdempotency() DeleteOption {
+	return func(o *DeleteOpts) { o.ReleaseIdempotency = true }
+}
 
 func WithIsMigration() DeleteOption {
 	return func(o *DeleteOpts) { o.IsMigration = true }

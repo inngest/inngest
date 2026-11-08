@@ -257,6 +257,14 @@ func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, scope 
 	return nil, nil
 }
 
+func (m *mockShardForIterator) SingletonParkFirst(ctx context.Context, scope Scope, key string, entries []string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockShardForIterator) SingletonPark(ctx context.Context, scope Scope, key string, entry string) (bool, error) {
+	return false, nil
+}
+
 func (m *mockShardForIterator) DebounceCreate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	return nil, nil
 }

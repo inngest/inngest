@@ -169,6 +169,13 @@ type SingletonOperations interface {
 	// SingletonReleaseRunID atomically gets and deletes the singleton lock
 	// for key, returning the released run ID or nil if no lock was held.
 	SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error)
+	// SingletonPark appends entry to the key's mailbox if the lock is still
+	// held and reports whether it did. The mailbox is handed to the
+	// SingletonHandoff option when the holder's last queue item is dequeued.
+	SingletonPark(ctx context.Context, scope Scope, key string, entry string) (bool, error)
+	// SingletonParkFirst puts entries at the head of the key's mailbox, in the
+	// order given, ahead of everything parked so far, if the lock is still held.
+	SingletonParkFirst(ctx context.Context, scope Scope, key string, entries []string) (bool, error)
 }
 
 // DebounceUpdateStatus describes the outcome of DebounceUpdate.

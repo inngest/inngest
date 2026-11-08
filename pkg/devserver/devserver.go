@@ -395,7 +395,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("could not create constraint API: %w", err)
 	}
 
+	// Set once the runner exists; it schedules events parked by singleton mode queue.
+	var singletonHandoff func(ctx context.Context, entries []string)
+
 	queueOpts := []queue.QueueOpt{
+		queue.WithSingletonHandoff(func(ctx context.Context, entries []string) {
+			if singletonHandoff != nil {
+				go singletonHandoff(ctx, entries)
+			}
+		}),
 		queue.WithRunMode(runMode),
 		queue.WithIdempotencyTTL(time.Hour),
 		queue.WithNumWorkers(int32(opts.QueueWorkers)),
@@ -706,6 +714,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithLogger(l),
 		runner.WithSyncLifecycleListeners(syncListeners...),
 	)
+
+	if h, ok := runner.(interface {
+		SingletonHandoff(context.Context, []string)
+	}); ok {
+		singletonHandoff = h.SingletonHandoff
+	}
 
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)

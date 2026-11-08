@@ -169,6 +169,10 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
+	// A run of singleton mode queue hands the events it left unread to the next
+	// run. This is before Delete, which removes the messages.
+	e.closeSingletonInbox(ctx, &opts.Metadata)
+
 	finalizationClaim := e.claimFinalization(ctx, opts.Metadata)
 
 	// Delete the function state in every case.

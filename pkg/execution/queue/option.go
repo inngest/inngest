@@ -393,6 +393,12 @@ func WithLogger(l logger.Logger) QueueOpt {
 	}
 }
 
+func WithSingletonHandoff(f func(ctx context.Context, entries []string)) QueueOpt {
+	return func(q *QueueOptions) {
+		q.SingletonHandoff = f
+	}
+}
+
 func WithBackoffFunc(f backoff.BackoffFunc) QueueOpt {
 	return func(q *QueueOptions) {
 		q.backoffFunc = f
@@ -503,6 +509,9 @@ type QueueOptions struct {
 	// IdempotencyTTLFunc returns an time.Duration representing how long job IDs
 	// remain idempotent.
 	IdempotencyTTLFunc func(context.Context, QueueItem) time.Duration
+	// SingletonHandoff receives the mailbox entries of a singleton lock that
+	// was released by the dequeue of its holder's last item.
+	SingletonHandoff func(ctx context.Context, entries []string)
 	// pollTick is the interval between each scan for jobs.
 	pollTick                 time.Duration
 	shadowPollTick           time.Duration

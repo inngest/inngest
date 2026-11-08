@@ -173,6 +173,14 @@ func (r *recordingSingletonManager) HandleSingleton(context.Context, queue.Scope
 	return nil, nil
 }
 
+func (r *recordingSingletonManager) ParkFirst(context.Context, queue.Scope, string, []string) (bool, error) {
+	return false, nil
+}
+
+func (r *recordingSingletonManager) Park(context.Context, queue.Scope, string, string) (bool, error) {
+	return false, nil
+}
+
 func TestScheduleAccountExecutionCapInvokes(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

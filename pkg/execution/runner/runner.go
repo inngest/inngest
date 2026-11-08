@@ -205,6 +205,41 @@ func (s *svc) Run(ctx context.Context) error {
 	return nil
 }
 
+// SingletonHandoff schedules, in order, the events that singleton mode queue
+// parked while a run held the lock. The first starts a run and takes the lock;
+// the others find it held and join that run's singleton inbox.
+func (s *svc) SingletonHandoff(ctx context.Context, entries []string) {
+	s.log.Info("singleton handoff", "events", len(entries))
+	fns, err := s.data.Functions(ctx)
+	if err != nil {
+		s.log.Error("singleton handoff: error loading functions", "error", err)
+		return
+	}
+	for _, raw := range entries {
+		var entry struct {
+			F uuid.UUID       `json:"f"`
+			E json.RawMessage `json:"e"`
+		}
+		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+			s.log.Error("singleton handoff: bad entry", "error", err)
+			continue
+		}
+		tracked, err := event.NewBaseTrackedEventFromString(string(entry.E))
+		if err != nil {
+			s.log.Error("singleton handoff: bad event", "error", err)
+			continue
+		}
+		for _, fn := range fns {
+			if fn.ID != entry.F {
+				continue
+			}
+			if err := s.initialize(ctx, fn, tracked); err != nil {
+				s.log.Error("singleton handoff: error scheduling", "error", err, "function", fn.Name)
+			}
+		}
+	}
+}
+
 func (s *svc) Stop(ctx context.Context) error {
 	if s.batcher != nil {
 		return s.batcher.Close()

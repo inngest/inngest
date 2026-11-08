@@ -66,6 +66,55 @@ func (q *queue) SingletonReleaseRunID(ctx context.Context, scope osqueue.Scope, 
 	return parseRunIDFromRedisValue(val, err)
 }
 
+// The mailbox of a lock is a list next to it. Parking and the release in
+// dequeue.lua are both atomic on the one Redis, so an entry is either seen by
+// the release or refused here because the lock is already gone.
+const singletonParkLua = `
+if redis.call('exists', KEYS[1]) == 0 then
+  return 0
+end
+redis.call('rpush', KEYS[1] .. ':mailbox', ARGV[1])
+return 1
+`
+
+var singletonParkScript = rueidis.NewLuaScript(singletonParkLua)
+
+// SingletonPark implements queue.ShardOperations.
+func (q *queue) SingletonPark(ctx context.Context, scope osqueue.Scope, key string, entry string) (bool, error) {
+	client := q.RedisClient.Client()
+	redisKey := q.RedisClient.KeyGenerator().SingletonKey(&osqueue.Singleton{Key: key})
+
+	n, err := singletonParkScript.Exec(ctx, client, []string{redisKey}, []string{entry}).AsInt64()
+	return n == 1, err
+}
+
+// Entries go to the head of the mailbox in the order given: pushed last to
+// first, so the first entry ends up first. They are older than anything parked
+// after the run's inbox closed, so they belong ahead of it.
+const singletonParkFirstLua = `
+if redis.call('exists', KEYS[1]) == 0 then
+  return 0
+end
+for i = #ARGV, 1, -1 do
+  redis.call('lpush', KEYS[1] .. ':mailbox', ARGV[i])
+end
+return 1
+`
+
+var singletonParkFirstScript = rueidis.NewLuaScript(singletonParkFirstLua)
+
+// SingletonParkFirst implements queue.ShardOperations.
+func (q *queue) SingletonParkFirst(ctx context.Context, scope osqueue.Scope, key string, entries []string) (bool, error) {
+	if len(entries) == 0 {
+		return true, nil
+	}
+	client := q.RedisClient.Client()
+	redisKey := q.RedisClient.KeyGenerator().SingletonKey(&osqueue.Singleton{Key: key})
+
+	n, err := singletonParkFirstScript.Exec(ctx, client, []string{redisKey}, entries).AsInt64()
+	return n == 1, err
+}
+
 func parseRunIDFromRedisValue(val string, err error) (*ulid.ULID, error) {
 	if err != nil {
 		if rueidis.IsRedisNil(err) {

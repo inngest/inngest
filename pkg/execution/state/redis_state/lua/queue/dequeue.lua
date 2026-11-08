@@ -136,6 +136,15 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
 
      if singletonRunID == runID then
         redis.call("DEL", singletonKey)
+
+        -- Events parked by singleton mode queue go to the caller to schedule.
+        local mailbox = singletonKey .. ":mailbox"
+        local parked = redis.call("LRANGE", mailbox, 0, -1)
+        if #parked > 0 then
+          redis.call("DEL", mailbox)
+          table.insert(parked, 1, 2)
+          return parked
+        end
     end
   end
 end

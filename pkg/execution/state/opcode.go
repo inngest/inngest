@@ -336,6 +336,9 @@ func (g GeneratorOpcode) SubscribeReadOpts() (*SubscribeReadOpts, error) {
 type SubscribeCloseOpts struct {
 	// Inbox is the id of the op that opened the inbox.
 	Inbox string `json:"inbox"`
+	// Taken is how many messages of the inbox the run read. For the singleton
+	// inbox of mode queue, the messages after them go to the next run.
+	Taken int `json:"taken,omitempty"`
 }
 
 func (g GeneratorOpcode) SubscribeCloseOpts() (*SubscribeCloseOpts, error) {

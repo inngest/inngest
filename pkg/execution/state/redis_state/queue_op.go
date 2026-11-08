@@ -114,13 +114,30 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		return err
 	}
 
-	status, err := scripts["queue/dequeue"].Exec(
+	msg, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		q.RedisClient.unshardedRc,
 		keys,
 		args,
-	).AsInt64()
+	).ToMessage()
 	if err != nil {
+		return fmt.Errorf("error dequeueing item: %w", err)
+	}
+	var status int64
+	if msg.IsArray() {
+		// Status 2: the singleton lock was released with events parked in its
+		// mailbox, which follow the status.
+		parked, _ := msg.ToArray()
+		entries := make([]string, 0, len(parked))
+		for _, p := range parked[1:] {
+			if s, serr := p.ToString(); serr == nil {
+				entries = append(entries, s)
+			}
+		}
+		if q.SingletonHandoff != nil {
+			q.SingletonHandoff(context.WithoutCancel(ctx), entries)
+		}
+	} else if status, err = msg.AsInt64(); err != nil {
 		return fmt.Errorf("error dequeueing item: %w", err)
 	}
 	switch status {

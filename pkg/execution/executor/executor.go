@@ -1545,6 +1545,16 @@ func (e *executor) schedule(
 					})
 
 				default:
+					if req.Function.Singleton.Mode == enums.SingletonModeQueue {
+						taken, qerr := e.queueSingletonEvent(ctx, req, singletonKey, singletonRunID)
+						if qerr != nil {
+							return nil, nil, qerr
+						}
+						if !taken {
+							// The lock was released meanwhile: schedule normally.
+							break
+						}
+					}
 					// Mark as singleton skip - will be handled after span creation
 					skipReason = enums.SkipReasonSingleton
 					singletonSkipRunID = singletonRunID
@@ -1940,9 +1950,33 @@ func (e *executor) schedule(
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case errors.Is(err, queue.ErrQueueItemSingletonExists):
-		deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
+		var deleteOpts []sv2.DeleteOption
+		if singletonConfig != nil && req.Function.Singleton.Mode == enums.SingletonModeQueue {
+			// The event is delivered to the winner or parked, and starts a run
+			// later: its idempotency key must not stay as a tombstone.
+			deleteOpts = append(deleteOpts, state.WithReleaseIdempotency())
+		}
+		deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID), deleteOpts...)
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
+		}
+		if singletonConfig != nil && req.Function.Singleton.Mode == enums.SingletonModeQueue {
+			// Lost the race for the lock after the early check: deliver to the winner.
+			holder, herr := e.singletonMgr.HandleSingleton(ctx, queue.Scope{
+				AccountID:  req.AccountID,
+				EnvID:      req.WorkspaceID,
+				FunctionID: req.Function.ID,
+			}, singletonConfig.Key, *req.Function.Singleton)
+			if herr != nil {
+				return nil, nil, herr
+			}
+			taken, qerr := e.queueSingletonEvent(ctx, req, singletonConfig.Key, holder)
+			if qerr != nil {
+				return nil, nil, qerr
+			}
+			if !taken {
+				return nil, nil, fmt.Errorf("singleton lock released while queueing the event")
+			}
 		}
 		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 

@@ -1450,7 +1450,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier, opts ...state.Delet
 	o := state.ApplyDeleteOpts(opts)
 	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
-	if err := m.shardedMgr.delete(ctx, callCtx, i); err != nil {
+	if err := m.shardedMgr.delete(ctx, callCtx, i, o.ReleaseIdempotency); err != nil {
 		return err
 	}
 	if o.IsMigration || m.pauseDeleter == nil {
@@ -1459,7 +1459,7 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier, opts ...state.Delet
 	return m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
 }
 
-func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
+func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier, releaseIdempotency bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "delete"), redis_telemetry.ScopeFnRunState)
 	callCtx = redis_telemetry.WithScope(redis_telemetry.WithOpName(callCtx, "delete"), redis_telemetry.ScopeFnRunState)
 
@@ -1476,6 +1476,9 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	}
 
 	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		if releaseIdempotency {
+			return client.B().Del().Key(key).Build()
+		}
 		// update the idempotency key to the tombstone prefix to indicate this run is done
 		// so scheduling retries can detect and stop.
 		val := fmt.Sprintf("%s%s", string(consts.FunctionIdempotencyTombstone), i.RunID)
