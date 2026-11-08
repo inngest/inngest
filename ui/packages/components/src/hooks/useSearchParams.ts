@@ -103,7 +103,7 @@ export const useBooleanSearchParam = (
   const rawValue = (search as Record<string, unknown>)?.[name];
   let value = undefined;
   if (rawValue !== undefined) {
-    value = rawValue === 'true';
+    value = rawValue === true || rawValue === 'true';
   }
 
   return [value, upsert, remove];
