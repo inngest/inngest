@@ -1526,7 +1526,7 @@ func TestUpdateWebhookCommand(t *testing.T) {
 			args = append(args, id)
 			require.NoError(t, cmd.Run(t.Context(), args))
 			require.Equal(t, http.MethodPost, method)
-			require.Equal(t, "/api/v2/env/webhooks/"+id, path)
+			require.Equal(t, "/api/v2/webhooks/"+id, path)
 			require.Equal(t, "production", env)
 			require.JSONEq(t, tc.body, body)
 			require.JSONEq(t, response, out.String())

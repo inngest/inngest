@@ -889,7 +889,7 @@ service V2 {
 
   rpc UpdateWebhook(UpdateWebhookRequest) returns (UpdateWebhookResponse) {
     option (google.api.http) = {
-      post: "/env/webhooks/{id}",
+      post: "/webhooks/{id}",
       body: "*"
     };
     option (authz) = {

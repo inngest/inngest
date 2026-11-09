@@ -260,6 +260,8 @@ func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Han
 			"CreateReplay":    64 << 10,
 			"PauseFunctions":  256 << 10,
 			"ResumeFunctions": 256 << 10,
+			"CreateWebhook":   16 << 10,
+			"UpdateWebhook":   16 << 10,
 		}
 		handlers := map[route]http.Handler{}
 		paths := chi.NewRouter()

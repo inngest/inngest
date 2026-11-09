@@ -538,7 +538,7 @@
       }
     }
   },
-  "/env/webhooks/{id}": {
+  "/webhooks/{id}": {
     "post": {
       "200": {
         "data": {

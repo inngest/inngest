@@ -290,6 +290,9 @@ func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookReq
 	if req.Transform != nil && *req.Transform == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Transform function cannot be empty")
 	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_UpdateWebhook_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and the webhook was not updated.")
+	}
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
 

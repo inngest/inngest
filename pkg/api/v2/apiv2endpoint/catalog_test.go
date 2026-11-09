@@ -139,7 +139,7 @@ func TestUpdateWebhookCatalog(t *testing.T) {
 	require.Equal(t, "update-webhook", endpoint.CommandName)
 	require.Equal(t, "update_webhook", endpoint.ToolName)
 	require.Equal(t, http.MethodPost, endpoint.HTTPMethod)
-	require.Equal(t, "/env/webhooks/{id}", endpoint.Path)
+	require.Equal(t, "/webhooks/{id}", endpoint.Path)
 	require.Equal(t, "*", endpoint.Body)
 	require.Equal(t, []string{"id"}, endpoint.PathParams)
 }

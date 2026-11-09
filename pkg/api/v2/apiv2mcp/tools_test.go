@@ -394,7 +394,7 @@ func TestUpdateWebhookTool(t *testing.T) {
 	tool := Tool(endpoint)
 	require.Equal(t, "update_webhook", tool.Name)
 	require.False(t, tool.Annotations.ReadOnlyHint)
-	require.False(t, tool.Annotations.IdempotentHint)
+	require.True(t, tool.Annotations.IdempotentHint)
 	require.True(t, *tool.Annotations.DestructiveHint)
 	require.Equal(t, []string{"id"}, InputSchema(endpoint)["required"])
 
@@ -414,7 +414,7 @@ func TestUpdateWebhookTool(t *testing.T) {
 			req, err := Request(t.Context(), endpoint, tc.fields, Options{BasePath: "/v2", EnvHeader: "X-Inngest-Env"})
 			require.NoError(t, err)
 			require.Equal(t, http.MethodPost, req.Method)
-			require.Equal(t, "/v2/env/webhooks/11111111-1111-1111-1111-111111111111", req.URL.Path)
+			require.Equal(t, "/v2/webhooks/11111111-1111-1111-1111-111111111111", req.URL.Path)
 			require.Equal(t, "production", req.Header.Get("X-Inngest-Env"))
 			body, err := io.ReadAll(req.Body)
 			require.NoError(t, err)
