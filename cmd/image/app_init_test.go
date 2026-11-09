@@ -55,6 +55,25 @@ dockerfile = "./Dockerfile"
 			},
 		},
 		{
+			name:    "numbers with leading zeros",
+			dir:     "web",
+			answers: "\nserve\n08080\n\n\n",
+			want: `[apps.web]
+serve = { port = 8080, path = "/api/inngest" }
+dockerfile = "./Dockerfile"
+`,
+		},
+		{
+			name:    "subcommand as app name is asked again",
+			dir:     "web",
+			answers: "example-config\nworker\nconnect\n007\n\n",
+			want: `[apps.worker]
+connect = { replicas = 7 }
+dockerfile = "./Dockerfile"
+`,
+			asked: []string{`and not "default", "example-config", "help" or "h"`},
+		},
+		{
 			name:    "directory name that is not an app name",
 			dir:     "default",
 			answers: "\nconnect\n\n\n",

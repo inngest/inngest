@@ -47,8 +47,8 @@ func writeAppsFile(stdin io.Reader, stdout io.Writer) error {
 
 	q := questions{in: bufio.NewScanner(stdin), out: stdout}
 	name := q.ask("App name", defaultAppName(filepath.Base(wd)), func(v string) error {
-		if !namePattern.MatchString(v) || v == "default" {
-			return errors.New(`use 1 to 63 lowercase letters, digits, '.', '_' or '-', and not "default"`)
+		if !validAppName(v) {
+			return errors.New("use " + appNameRules)
 		}
 		return nil
 	})
@@ -58,9 +58,10 @@ func writeAppsFile(stdin io.Reader, stdout io.Writer) error {
 		}
 		return nil
 	})
+	// TOML integers have no leading zeros, which uintBetween accepts.
 	var port, path, replicas string
 	if mode == "serve" {
-		port = q.ask("Port the app listens on", "8080", uintBetween(1, 65535))
+		port = strings.TrimLeft(q.ask("Port the app listens on", "8080", uintBetween(1, 65535)), "0")
 		path = q.ask("Path of the Inngest endpoint", "/api/inngest", func(v string) error {
 			if !strings.HasPrefix(v, "/") || strings.ContainsAny(v, "?#") {
 				return errors.New("use an absolute path such as /api/inngest, without a query or fragment")
@@ -68,7 +69,7 @@ func writeAppsFile(stdin io.Reader, stdout io.Writer) error {
 			return nil
 		})
 	} else {
-		replicas = q.ask("Number of workers", "1", uintBetween(1, math.MaxUint32))
+		replicas = strings.TrimLeft(q.ask("Number of workers", "1", uintBetween(1, math.MaxUint32)), "0")
 	}
 	dockerfile := q.ask("Dockerfile", defaultDockerfile, nil)
 	if q.err != nil {
@@ -171,7 +172,7 @@ func defaultAppName(dir string) string {
 	if len(name) > 63 {
 		name = name[:63]
 	}
-	if !namePattern.MatchString(name) || name == "default" {
+	if !validAppName(name) {
 		return "my-app"
 	}
 	return name

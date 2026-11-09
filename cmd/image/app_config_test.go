@@ -211,6 +211,18 @@ serve = {}`,
 			err: "[apps.default]: the app name must be",
 		},
 		{
+			name: "subcommand as app name",
+			toml: `[apps.example-config]
+serve = {}`,
+			err: "[apps.example-config]: the app name must be",
+		},
+		{
+			name: "help as app name",
+			toml: `[apps.h]
+serve = {}`,
+			err: "[apps.h]: the app name must be",
+		},
+		{
 			name: "invalid toml",
 			toml: `[apps.web`,
 			err:  "invalid inngest.toml",

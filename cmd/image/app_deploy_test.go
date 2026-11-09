@@ -29,7 +29,8 @@ func TestDeployApp(t *testing.T) {
 		toml string
 		// args follow `inngest deploy`.
 		args []string
-		// wantDocker is the docker build args after --platform and --load.
+		// wantDocker is the docker build args after --platform and --load,
+		// with the local tag as <ref>.
 		wantDocker []string
 		// wantCreate is the CreateDeploy body.
 		wantCreate string
@@ -47,7 +48,7 @@ func TestDeployApp(t *testing.T) {
 serve = { port = 8080, path = "/api/inngest" }
 serve_config = { idle = "15s" }
 dockerfile = "./cmd/all-in-one/Dockerfile"`,
-			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./cmd/all-in-one/Dockerfile", "."},
+			wantDocker: []string{"-t", "<ref>", "-f", "./cmd/all-in-one/Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `",
 				"config":{"serve":{"port":8080,"path":"/api/inngest"},"serveConfig":{"idle":"15s"}}}`,
 			deploy: `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
@@ -61,7 +62,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 		{
 			name:       "connect",
 			toml:       "[apps.inngest]\nconnect = { replicas = 2 }",
-			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{"replicas":2}}}`,
 			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
 			output:     []string{"Deploy d1 is ready.  Artifact digest abc"},
@@ -70,7 +71,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			name:       "app by name with docker build args",
 			toml:       "[apps.web]\nserve = {}\n[apps.inngest]\nconnect = {}",
 			args:       []string{"inngest", "--", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
-			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", ".", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", ".", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
 			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
 		},
@@ -78,14 +79,14 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			name:       "only app with docker build args",
 			toml:       "[apps.inngest]\nconnect = {}",
 			args:       []string{"--", "--build-arg", "VERSION=1"},
-			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", ".", "--build-arg", "VERSION=1"},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", ".", "--build-arg", "VERSION=1"},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
 			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
 		},
 		{
 			name:         "spec over the plan limit",
 			toml:         "[apps.inngest]\nconnect = {}\nspec = { cpu = 2, memory = 4096 }",
-			wantDocker:   []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
+			wantDocker:   []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
 			wantCreate:   `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"spec":{"cpu":2,"memory":4096},"connect":{}}}`,
 			createStatus: http.StatusForbidden,
 			createBody:   machineSize,
@@ -94,7 +95,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 		{
 			name:       "failed deploy",
 			toml:       "[apps.inngest]\nserve = {}",
-			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"serve":{}}}`,
 			deploy:     `{"data":{"id":"d1","status":"failed","error":"Image build failed or timed out"}}`,
 			err:        "deploy d1 failed: Image build failed or timed out",
@@ -152,7 +153,14 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 
 			args, readErr := os.ReadFile(filepath.Join(dockerDir, "args"))
 			require.NoError(t, readErr)
-			require.Equal(t, append([]string{"build", "--platform", "linux/amd64", "--load"}, tc.wantDocker...), strings.Fields(string(args)))
+			gotDocker := strings.Fields(string(args))
+			// a tag per run keeps concurrent deploys of an app apart.
+			require.Regexp(t, `^inngest-deploy:inngest-[0-9a-f]{16}$`, gotDocker[5])
+			saved, readErr := os.ReadFile(filepath.Join(dockerDir, "saved"))
+			require.NoError(t, readErr)
+			require.Equal(t, gotDocker[5], string(saved))
+			gotDocker[5] = "<ref>"
+			require.Equal(t, append([]string{"build", "--platform", "linux/amd64", "--load"}, tc.wantDocker...), gotDocker)
 
 			if tc.err != "" {
 				require.EqualError(t, err, tc.err)

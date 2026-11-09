@@ -100,8 +100,8 @@ func (a *app) validate(name string) error {
 	if a == nil {
 		return errors.New("app is empty")
 	}
-	if !namePattern.MatchString(name) || name == "default" {
-		return errors.New(`the app name must be 1 to 63 lowercase letters, digits, '.', '_' or '-', and not "default"`)
+	if !validAppName(name) {
+		return errors.New("the app name must be " + appNameRules)
 	}
 	if (a.Connect == nil) == (a.Serve == nil) {
 		return errors.New("set exactly one of connect or serve")
@@ -139,6 +139,18 @@ func (a *app) validate(name string) error {
 		}
 	}
 	return nil
+}
+
+const appNameRules = `1 to 63 lowercase letters, digits, '.', '_' or '-', and not "default", "example-config", "help" or "h"`
+
+// validAppName reports whether name follows appNameRules.  `inngest deploy
+// <name>` runs the subcommand instead of deploying an app with its name.
+func validAppName(name string) bool {
+	switch name {
+	case "default", "example-config", "help", "h":
+		return false
+	}
+	return namePattern.MatchString(name)
 }
 
 func (a *app) dockerfile() string {

@@ -2,6 +2,8 @@ package imagecmd
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -104,14 +106,18 @@ Create it with one of:
 // deployApp builds the app's image with the extra docker build args, uploads
 // it, and waits until Inngest has built and published the app.
 func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *client, name string, a *app, dockerArgs []string) error {
-	// the local tag has a prefix so that it does not replace a local image
-	// with the app's name.
-	ref := "inngest-deploy/" + name + ":" + deployTag
+	// the local tag is new on every run, so that concurrent deploys of an app
+	// do not upload each other's image.  the app name is in the tag, where
+	// every app name is valid.
+	suffix := make([]byte, 8)
+	_, _ = rand.Read(suffix)
+	ref := "inngest-deploy:" + name + "-" + hex.EncodeToString(suffix)
 
 	fmt.Fprintf(stdout, "Building app %s from %s...\n\n", name, a.dockerfile())
 	if err := dc.Build(ctx, platform, append([]string{"-t", ref, "-f", a.dockerfile(), "."}, dockerArgs...)); err != nil {
 		return err
 	}
+	defer func() { _ = dc.Remove(ctx, ref) }()
 	image, err := dc.Inspect(ctx, ref)
 	if err != nil {
 		return err
