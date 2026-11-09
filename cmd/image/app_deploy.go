@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/cmd/image/internal/docker"
@@ -23,7 +24,7 @@ func DeployCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "deploy",
 		Usage:     "Build an app from inngest.toml and deploy it to Inngest compute",
-		UsageText: "inngest deploy [app]",
+		UsageText: "inngest deploy [app] [-- docker build args]",
 		Description: `Reads inngest.toml in the current directory, builds the app's Dockerfile
 for linux/amd64 with docker, uploads the image, and waits for Inngest to
 deploy it.  The current directory is the docker build context.  Without
@@ -31,6 +32,9 @@ inngest.toml, it asks a few questions in a terminal and writes the file.
 
 app is the name of an [apps.<name>] section.  It can be omitted when the
 file has one app.  Run ` + "`inngest deploy example-config`" + ` for a commented example.
+
+Arguments after -- go to docker build, as in ` + "`inngest image build`" + `, such as
+` + "`inngest deploy web -- --build-arg VERSION=1`" + `.
 
 Log in with ` + "`inngest login`" + ` first.  INNGEST_ENV selects the environment.`,
 		Commands: []*cli.Command{
@@ -49,8 +53,12 @@ Log in with ` + "`inngest login`" + ` first.  INNGEST_ENV selects the environmen
 }
 
 func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
-	if cmd.NArg() > 1 {
-		return errors.New("expected at most one app name; usage: inngest deploy [app]")
+	// the first argument is the app name unless it is a docker build flag.
+	// the rest go to docker build, as in `inngest image build`.
+	args := cmd.Args().Slice()
+	var appName string
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		appName, args = args[0], args[1:]
 	}
 
 	stdin, stdout, stderr := stdio(cmd)
@@ -69,7 +77,7 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	name, a, err := selectApp(apps, cmd.Args().First())
+	name, a, err := selectApp(apps, appName)
 	if err != nil {
 		return err
 	}
@@ -85,7 +93,7 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	return deployApp(ctx, stdout, dc, api, name, a)
+	return deployApp(ctx, stdout, dc, api, name, a, args)
 }
 
 var errNoAppsFile = errors.New(appsFile + ` not found in the current directory.  inngest deploy reads the apps to deploy from it.
@@ -93,15 +101,15 @@ Create it with one of:
   inngest deploy example-config > ` + appsFile + `   then edit the file
   inngest deploy                                 in a terminal, which asks a few questions and writes the file`)
 
-// deployApp builds the app's image, uploads it, and waits until Inngest has
-// built and published the app.
-func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *client, name string, a *app) error {
+// deployApp builds the app's image with the extra docker build args, uploads
+// it, and waits until Inngest has built and published the app.
+func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *client, name string, a *app, dockerArgs []string) error {
 	// the local tag has a prefix so that it does not replace a local image
 	// with the app's name.
 	ref := "inngest-deploy/" + name + ":" + deployTag
 
 	fmt.Fprintf(stdout, "Building app %s from %s...\n\n", name, a.dockerfile())
-	if err := dc.Build(ctx, platform, []string{"-t", ref, "-f", a.dockerfile(), "."}); err != nil {
+	if err := dc.Build(ctx, platform, append([]string{"-t", ref, "-f", a.dockerfile(), "."}, dockerArgs...)); err != nil {
 		return err
 	}
 	image, err := dc.Inspect(ctx, ref)

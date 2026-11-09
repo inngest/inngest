@@ -10,12 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/inngest/inngest/cmd/image/internal/docker"
+	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
 
+// TestDeployApp runs `inngest deploy` with fake docker against a fake API,
+// logged in through the saved login that `inngest login` writes.
 func TestDeployApp(t *testing.T) {
 	// the SHA256 of "image bytes", which fake docker saves.
 	const digest = "de7030234493a8bea844dbe1d8676e68a2c1a4b014c721f0425a22b6df66faec"
@@ -24,6 +27,10 @@ func TestDeployApp(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		toml string
+		// args follow `inngest deploy`.
+		args []string
+		// wantDocker is the docker build args after --platform and --load.
+		wantDocker []string
 		// wantCreate is the CreateDeploy body.
 		wantCreate string
 		// createStatus and createBody replace the CreateDeploy response.
@@ -40,6 +47,7 @@ func TestDeployApp(t *testing.T) {
 serve = { port = 8080, path = "/api/inngest" }
 serve_config = { idle = "15s" }
 dockerfile = "./cmd/all-in-one/Dockerfile"`,
+			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./cmd/all-in-one/Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `",
 				"config":{"serve":{"port":8080,"path":"/api/inngest"},"serveConfig":{"idle":"15s"}}}`,
 			deploy: `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
@@ -53,13 +61,31 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 		{
 			name:       "connect",
 			toml:       "[apps.inngest]\nconnect = { replicas = 2 }",
+			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{"replicas":2}}}`,
 			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
 			output:     []string{"Deploy d1 is ready.  Artifact digest abc"},
 		},
 		{
+			name:       "app by name with docker build args",
+			toml:       "[apps.web]\nserve = {}\n[apps.inngest]\nconnect = {}",
+			args:       []string{"inngest", "--", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
+			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", ".", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
+			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
+			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+		},
+		{
+			name:       "only app with docker build args",
+			toml:       "[apps.inngest]\nconnect = {}",
+			args:       []string{"--", "--build-arg", "VERSION=1"},
+			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", ".", "--build-arg", "VERSION=1"},
+			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
+			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+		},
+		{
 			name:         "spec over the plan limit",
 			toml:         "[apps.inngest]\nconnect = {}\nspec = { cpu = 2, memory = 4096 }",
+			wantDocker:   []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
 			wantCreate:   `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"spec":{"cpu":2,"memory":4096},"connect":{}}}`,
 			createStatus: http.StatusForbidden,
 			createBody:   machineSize,
@@ -68,19 +94,19 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 		{
 			name:       "failed deploy",
 			toml:       "[apps.inngest]\nserve = {}",
+			wantDocker: []string{"-t", "inngest-deploy/inngest:latest", "-f", "./Dockerfile", "."},
 			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"serve":{}}}`,
 			deploy:     `{"data":{"id":"d1","status":"failed","error":"Image build failed or timed out"}}`,
 			err:        "deploy d1 failed: Image build failed or timed out",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := fakeDocker(t)
-			apps, err := parseApps(strings.NewReader(tc.toml))
-			require.NoError(t, err)
+			dockerDir := fakeDocker(t)
 
 			var uploaded, committed []byte
 			mux := http.NewServeMux()
 			mux.HandleFunc("POST /v2/deploys/inngest", func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
 				body, _ := io.ReadAll(r.Body)
 				require.JSONEq(t, tc.wantCreate, string(body))
 				if tc.createStatus != 0 {
@@ -104,24 +130,29 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			})
 			srv := httptest.NewServer(mux)
 			defer srv.Close()
+			login(t, srv.URL)
 
-			api := &client{
-				baseURL: srv.URL + "/v2",
-				token:   func(context.Context) (string, error) { return "token", nil },
-				http:    srv.Client(),
+			project := t.TempDir()
+			t.Chdir(project)
+			require.NoError(t, os.WriteFile(appsFile, []byte(tc.toml), 0o600))
+			require.NoError(t, os.MkdirAll("cmd/all-in-one", 0o755))
+			for _, dockerfile := range []string{"Dockerfile", "cmd/all-in-one/Dockerfile"} {
+				require.NoError(t, os.WriteFile(dockerfile, []byte("FROM scratch\n"), 0o600))
 			}
-			dc, err := docker.New(nil, io.Discard, io.Discard)
-			require.NoError(t, err)
 
 			var stdout bytes.Buffer
-			err = deployApp(context.Background(), &stdout, dc, api, "inngest", apps["inngest"])
+			root := &cli.Command{
+				Name:      "inngest",
+				Reader:    strings.NewReader(""),
+				Writer:    &stdout,
+				ErrWriter: io.Discard,
+				Commands:  []*cli.Command{DeployCommand()},
+			}
+			err := root.Run(context.Background(), append([]string{"inngest", "deploy"}, tc.args...))
 
-			args, readErr := os.ReadFile(filepath.Join(dir, "args"))
+			args, readErr := os.ReadFile(filepath.Join(dockerDir, "args"))
 			require.NoError(t, readErr)
-			require.Equal(t, []string{
-				"build", "--platform", "linux/amd64", "--load",
-				"-t", "inngest-deploy/inngest:latest", "-f", apps["inngest"].dockerfile(), ".",
-			}, strings.Fields(string(args)))
+			require.Equal(t, append([]string{"build", "--platform", "linux/amd64", "--load"}, tc.wantDocker...), strings.Fields(string(args)))
 
 			if tc.err != "" {
 				require.EqualError(t, err, tc.err)
@@ -136,11 +167,32 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			for _, line := range tc.output {
 				require.Contains(t, stdout.String(), line)
 			}
-			if apps["inngest"].Serve == nil {
+			if !strings.Contains(tc.toml, "serve") {
 				require.NotContains(t, stdout.String(), "sync")
 			}
 		})
 	}
+}
+
+// login saves a login for the API at url, as `inngest login` does.
+func login(t *testing.T, url string) {
+	t.Helper()
+	t.Setenv("INNGEST_API_HOST", url)
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	expiry := time.Now().Add(time.Hour)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:           url,
+		Resource:         cliauth.Resource(url),
+		SessionID:        "session",
+		SessionExpiresAt: expiry,
+	}, cliauth.Credential{
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		TokenType:    "Bearer",
+		Expiry:       expiry,
+	}, true))
 }
 
 func TestDeployWithoutAppsFile(t *testing.T) {
