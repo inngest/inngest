@@ -109,6 +109,7 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		want  []any
 	}{
 		{`data.user.id = 'u1'`, []any{"evt-0"}},
+		{`(data.user).id = 'u1'`, []any{"evt-0"}},
 		{`events.data.user.id <> 'u1'`, []any{"evt-1"}},
 		{`data.user.id IN ('u1', 'u2')`, []any{"evt-0", "evt-1"}},
 		{`data.user.id LIKE 'u%'`, []any{"evt-0", "evt-1"}},

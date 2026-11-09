@@ -105,12 +105,8 @@ func (r *exprRewriter) textIfStringPeer(operands ...*parser.Expr) {
 // extraction.
 func (r *exprRewriter) textAlways(operands ...*parser.Expr) {
 	for _, op := range operands {
-		id, ok := (*op).(*parser.Ident)
-		if !ok {
-			continue
-		}
-		if colParts, path, ok := r.jsonDotAccess(id); ok {
-			*op = jsonTextAccess(colParts, path)
+		if base, path, ok := jsonAccess(*op, r.scope, r.isBound); ok && len(path) > 0 {
+			*op = jsonTextAccess(base, path)
 		}
 	}
 }
@@ -134,34 +130,49 @@ func (r *exprRewriter) selectType(sel *parser.SelectStatement) ColumnType {
 	return col.colType
 }
 
-// jsonDotAccess reports whether id is a dot access into a json column
-// (data.user.id, or table-qualified e.data.user.id), returning the
-// column's own parts (data, or e.data) and the keys past it (user, id).
-// Name resolution matches checkQualifiedIdent (validate.go): a leading
-// table name wins over a same-named column.
-func (r *exprRewriter) jsonDotAccess(id *parser.Ident) (colParts, path []string, ok bool) {
-	if len(id.Parts) < 2 || r.isBound(id.Parts[0]) {
-		return nil, nil, false
-	}
-	if tbl, isTable := r.scope.lookup(id.Parts[0]); isTable {
-		col, found := tbl.column(id.Parts[1])
-		if !found || !col.json || len(id.Parts) < 3 {
+// jsonAccess reports whether e is a JSON value: a json column (data, or
+// table-qualified e.data) or a dot access into one (data.user.id, or the
+// parenthesized (data.user).id, a DotExpr), returning the column reference
+// as base and the keys past it as path (user, id; nil for the column
+// itself). Name resolution matches checkQualifiedIdent (validate.go): a
+// leading table name wins over a same-named column. bound, if non-nil,
+// reports a list-comprehension variable, which shadows any column.
+func jsonAccess(e parser.Expr, scope *tableScope, bound func(string) bool) (base parser.Expr, path []string, ok bool) {
+	switch x := e.(type) {
+	case *parser.Ident:
+		if bound != nil && bound(x.Parts[0]) {
 			return nil, nil, false
 		}
-		return id.Parts[:2], id.Parts[2:], true
-	}
-	col, found := r.scope.uniqueColumn(id.Parts[0])
-	if !found || !col.json {
+		if len(x.Parts) >= 2 {
+			if tbl, isTable := scope.lookup(x.Parts[0]); isTable {
+				col, found := tbl.column(x.Parts[1])
+				if !found || !col.json {
+					return nil, nil, false
+				}
+				return &parser.Ident{Parts: append([]string(nil), x.Parts[:2]...)}, x.Parts[2:], true
+			}
+		}
+		col, found := scope.uniqueColumn(x.Parts[0])
+		if !found || !col.json {
+			return nil, nil, false
+		}
+		return &parser.Ident{Parts: []string{x.Parts[0]}}, x.Parts[1:], true
+	case *parser.DotExpr:
+		base, path, ok := jsonAccess(x.X, scope, bound)
+		if !ok {
+			return nil, nil, false
+		}
+		return base, append(append([]string(nil), path...), x.Field), true
+	default:
 		return nil, nil, false
 	}
-	return id.Parts[:1], id.Parts[1:], true
 }
 
-// jsonTextAccess builds col ->> '$."k1"."k2"', every key quoted so one
+// jsonTextAccess builds base ->> '$."k1"."k2"', every key quoted so one
 // holding a dot, space or other JSONPath syntax is still one key (as
 // DuckDB's own dot access treats it), matching defer.go's
 // (pkg/duckdb/query) ->>'$."key"' quoting.
-func jsonTextAccess(colParts, path []string) parser.Expr {
+func jsonTextAccess(base parser.Expr, path []string) parser.Expr {
 	var sb strings.Builder
 	sb.WriteString("$")
 	for _, key := range path {
@@ -171,24 +182,14 @@ func jsonTextAccess(colParts, path []string) parser.Expr {
 	}
 	return &parser.BinaryExpr{
 		Op:    "->>",
-		Left:  &parser.Ident{Parts: append([]string(nil), colParts...)},
+		Left:  base,
 		Right: &parser.Literal{Kind: parser.LitString, Text: sb.String()},
 	}
 }
 
-// isJSONValue reports whether expr is a reference to a json column, or a
-// dot access into one (still JSON), for a derived table's json flag.
+// isJSONValue reports whether expr is a JSON value (see jsonAccess), for
+// a derived table's json flag.
 func isJSONValue(expr parser.Expr, scope *tableScope) bool {
-	id, ok := expr.(*parser.Ident)
-	if !ok {
-		return false
-	}
-	if len(id.Parts) >= 2 {
-		if tbl, isTable := scope.lookup(id.Parts[0]); isTable {
-			col, found := tbl.column(id.Parts[1])
-			return found && col.json
-		}
-	}
-	col, found := scope.uniqueColumn(id.Parts[0])
-	return found && col.json
+	_, _, ok := jsonAccess(expr, scope, nil)
+	return ok
 }

@@ -55,6 +55,11 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 			want: "SELECT id FROM events WHERE data.a = data.b",
 		},
 		{
+			name: "parenthesized dot access",
+			in:   "SELECT id FROM events WHERE (data.user).id = 'u1' OR (events.data).name LIKE 'a%' OR ((data).user).id IS NULL",
+			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' = 'u1' OR events.data ->> '$."name"' LIKE 'a%' OR data ->> '$."user"."id"' IS NULL`,
+		},
+		{
 			name: "IN list",
 			in:   "SELECT id FROM events WHERE data.user.id NOT IN ('u1', 'u2')",
 			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' NOT IN ('u1', 'u2')`,
