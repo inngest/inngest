@@ -30,6 +30,11 @@ func assertMain(id int) string {
 // process sharing the catalog db would) and checks the server's cached
 // metadata neither fakes a 409 nor hides a real one, and loads stay fresh.
 func TestCacheNeverServesStale(t *testing.T) {
+	t.Run("fast path", func(t *testing.T) { testCacheNeverServesStale(t, true) })
+	t.Run("sql catalog only", func(t *testing.T) { testCacheNeverServesStale(t, false) })
+}
+
+func testCacheNeverServesStale(t *testing.T, fast bool) {
 	dir := t.TempDir()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
 	if err != nil {
@@ -41,7 +46,11 @@ func TestCacheNeverServesStale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	opts := Options{Warehouse: wh}
+	if fast {
+		opts.CatalogDB = testCatalogDB(db, wh)
+	}
+	ts := httptest.NewServer(New(cat, opts))
 	t.Cleanup(ts.Close)
 
 	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {

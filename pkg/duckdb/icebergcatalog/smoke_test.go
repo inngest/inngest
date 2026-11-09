@@ -61,6 +61,7 @@ func TestDuckDBSmoke(t *testing.T) {
 	srv := New(cat, Options{
 		Warehouse: warehouse,
 		Token:     token,
+		CatalogDB: testCatalogDB(db, warehouse),
 		OnRequest: func(method, path string, status int) {
 			mu.Lock()
 			defer mu.Unlock()

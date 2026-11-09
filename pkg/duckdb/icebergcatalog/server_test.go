@@ -31,9 +31,14 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	ts := httptest.NewServer(New(cat, Options{Warehouse: wh, CatalogDB: testCatalogDB(db, wh)}))
 	t.Cleanup(ts.Close)
 	return ts
+}
+
+// testCatalogDB is the CatalogDB for a sqlite catalog the tests create.
+func testCatalogDB(db *sql.DB, wh string) *CatalogDB {
+	return &CatalogDB{DB: db, Dialect: sqlcat.SQLite, Name: "inngest", Properties: iceberg.Properties{"warehouse": wh}}
 }
 
 func do(t *testing.T, ts *httptest.Server, method, path, body string) (int, map[string]any) {
