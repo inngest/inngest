@@ -45,6 +45,12 @@ type knownColumn struct {
 	// be rewritten to the JSONPath wildcard form col ->> '$[*].field' to
 	// actually run — rewriteArrayOfStructAccess (rewrite.go) does that.
 	arrayOfStructs bool
+	// json marks a column whose DuckDB type is JSON proper (JSON text the
+	// macros cast to JSON), as opposed to the other composite types also
+	// bucketed as ColumnTypeJSON (lists, structs). Only a json column's
+	// dot access (data.user.id) is DuckDB's JSON extraction, which
+	// rewriteJSONDotComparison (jsondot.go) relies on.
+	json bool
 	// physical is the physical-table column this logical column is a plain
 	// pass-through of in its table macro's projection (insights_runs'
 	// r.app_name AS app_id is "app_name"), or "" for a computed one. It's
@@ -114,7 +120,7 @@ func rawTables() map[string]logicalTable {
 		for _, c := range t.phys.Columns {
 			tbl.columnOrder = append(tbl.columnOrder, c.Name)
 			// The raw macros return the read type (JSON text as JSON).
-			tbl.columns[c.Name] = knownColumn{colType: DuckDBToColumnType(c.LogicalType()), physical: c.Name}
+			tbl.columns[c.Name] = knownColumn{colType: DuckDBToColumnType(c.LogicalType()), json: c.LogicalType() == schema.TypeJSON.DuckDBType(), physical: c.Name}
 		}
 		out[t.phys.Name] = tbl
 	}
@@ -145,14 +151,14 @@ var logicalTables = map[string]logicalTable{
 			"app_id":       {physical: "app_name", colType: ColumnTypeString, pathHints: rootHint(HintAppID), description: "The app that owns the function this run belongs to."},
 			"function_id":  {physical: "function_slug", colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function that was run."},
 			"status":       {physical: "status", colType: ColumnTypeString, description: "The run's current status: Queued, Running, Completed, Failed, or Cancelled."},
-			"attributes":   {physical: "attributes", colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about the run."},
+			"attributes":   {physical: "attributes", colType: ColumnTypeJSON, json: true, pathHints: spanAttrPathHints, description: "Additional details recorded about the run."},
 			// inputs' elements are full marshaled event.Event objects, not
 			// flattened event data — event.Event's own payload lives under
 			// its "data" field, hence runInputsHints' "data." segment
 			// (distinct from events.data's own eventDataHints, one level
 			// shallower).
-			"inputs": {physical: "inputs", colType: ColumnTypeJSON, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
-			"output": {physical: "output", colType: ColumnTypeJSON, description: "The run's final output, once it completes successfully."},
+			"inputs": {physical: "inputs", colType: ColumnTypeJSON, json: true, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
+			"output": {physical: "output", colType: ColumnTypeJSON, json: true, description: "The run's final output, once it completes successfully."},
 			// event_ids is array-valued (VARCHAR[], so JSON per
 			// DuckDBToColumnType). The hint describes each element, not the
 			// column's own value -- an array of event IDs isn't itself an
@@ -176,8 +182,8 @@ var logicalTables = map[string]logicalTable{
 			// both are a single JSON object per run of kind -> the latest
 			// emission's values for that kind, not the raw per-emission
 			// rows inngest.run_metadata holds.
-			"metadata": {colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded during the run."},
-			"inngest":  {colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
+			"metadata": {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Custom metadata your code recorded during the run."},
+			"inngest":  {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
 		},
 	},
 	"events": {
@@ -193,10 +199,10 @@ var logicalTables = map[string]logicalTable{
 			// ID, so it carries the same HintEventID event_ids (runs) does.
 			"id":          {physical: "event_id", colType: ColumnTypeString, pathHints: rootHint(HintEventID), description: "The unique ID of the event."},
 			"name":        {physical: "event_name", colType: ColumnTypeString, description: "The event's name."},
-			"data":        {physical: "event_data", colType: ColumnTypeJSON, pathHints: eventDataHints, description: "The event's payload."},
+			"data":        {physical: "event_data", colType: ColumnTypeJSON, json: true, pathHints: eventDataHints, description: "The event's payload."},
 			"v":           {physical: "event_v", colType: ColumnTypeString, description: "The event's version, if one was set when it was sent."},
 			"ts":          {physical: "event_ts", colType: ColumnTypeDatetime, description: "The timestamp included with the event when it was sent."},
-			"meta":        {physical: "event_meta", colType: ColumnTypeJSON, pathHints: eventMetaHints, description: "Additional metadata Inngest recorded about the event."},
+			"meta":        {physical: "event_meta", colType: ColumnTypeJSON, json: true, pathHints: eventMetaHints, description: "Additional metadata Inngest recorded about the event."},
 			"received_at": {physical: "received_at", colType: ColumnTypeDatetime, description: "When Inngest received the event."},
 		},
 	},
@@ -225,8 +231,8 @@ var logicalTables = map[string]logicalTable{
 			"step_id":       {colType: ColumnTypeString, description: "The step this metadata belongs to, if any."},
 			"step_index":    {colType: ColumnTypeNumber, description: "The step's position within the run, if this metadata belongs to a step."},
 			"step_attempt":  {colType: ColumnTypeNumber, description: "The attempt number this metadata belongs to, if any."},
-			"inngest":       {colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically."},
-			"metadata":      {colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded."},
+			"inngest":       {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Metadata Inngest recorded automatically."},
+			"metadata":      {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Custom metadata your code recorded."},
 		},
 	},
 	// extended_trace_spans doesn't reuse traceSpanTable: unlike
@@ -253,9 +259,9 @@ var logicalTables = map[string]logicalTable{
 			"name":           {physical: "name", colType: ColumnTypeString, description: "The name given to this trace event."},
 			"start_time":     {physical: "start_time", colType: ColumnTypeDatetime, description: "When this event started."},
 			"end_time":       {physical: "end_time", colType: ColumnTypeDatetime, description: "When this event ended."},
-			"attributes":     {physical: "attributes", colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded with this event."},
-			"metadata":       {colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded during the run."},
-			"inngest":        {colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
+			"attributes":     {physical: "attributes", colType: ColumnTypeJSON, json: true, pathHints: spanAttrPathHints, description: "Additional details recorded with this event."},
+			"metadata":       {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Custom metadata your code recorded during the run."},
+			"inngest":        {colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
 		},
 	},
 	"steps": traceSpanTable("steps", "insights_steps",
@@ -362,9 +368,9 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"name":           {colType: ColumnTypeString, description: "The internal name recorded for this step."},
 		"start_time":     {colType: ColumnTypeDatetime, description: "When this step attempt started."},
 		"end_time":       {colType: ColumnTypeDatetime, description: "When this step attempt ended."},
-		"output":         {colType: ColumnTypeJSON, description: "The step's output, once this attempt completes successfully."},
-		"input":          {colType: ColumnTypeJSON, description: "The input passed to this step attempt."},
-		"attributes":     {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
+		"output":         {colType: ColumnTypeJSON, json: true, description: "The step's output, once this attempt completes successfully."},
+		"input":          {colType: ColumnTypeJSON, json: true, description: "The input passed to this step attempt."},
+		"attributes":     {colType: ColumnTypeJSON, json: true, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
 	}
 	physical := map[string]string{
 		"run_id": "run_id", "run_queued_at": "run_queued_at", "app_id": "app_name", "function_id": "function_slug",
@@ -387,8 +393,8 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 	// 000002_insights_views.sql) LEFT JOIN the metadata rollup, exposing
 	// the same run-scoped metadata/inngest columns insights_runs does.
 	order = append(order, "metadata", "inngest")
-	cols["metadata"] = knownColumn{colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded during the run."}
-	cols["inngest"] = knownColumn{colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."}
+	cols["metadata"] = knownColumn{colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Custom metadata your code recorded during the run."}
+	cols["inngest"] = knownColumn{colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."}
 	return logicalTable{name: name, view: view, description: description, columnOrder: order, columns: cols}
 }
 
