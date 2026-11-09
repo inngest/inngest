@@ -34,6 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
+	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -81,6 +82,13 @@ var (
 	ErrFunctionRateLimited        = fmt.Errorf("function rate-limited")
 	ErrFunctionSkipped            = fmt.Errorf("function skipped")
 	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
+	// ErrLoopEnded means a tick, a wake, or a subscription arrived for a
+	// loop instance that no longer exists.  no run is created.
+	ErrLoopEnded   = fmt.Errorf("loop instance ended")
+	ErrNoLoopStore = fmt.Errorf("loop function scheduled without executor.WithLoopStore")
+	// ErrNoLoopSemaphore means the function was synced before the keyed
+	// semaphore was injected.  no run is created.
+	ErrNoLoopSemaphore = fmt.Errorf("loop function has no keyed semaphore, sync the app again")
 
 	ErrFunctionEnded   = fmt.Errorf("function already ended")
 	ErrNoCorrelationID = fmt.Errorf("no correlation ID found in event when trying to resume invoke parent")
@@ -106,7 +114,7 @@ func ScheduleStatus(err error) string {
 		return "rate_limited"
 	case errors.Is(err, ErrFunctionDebounced):
 		return "debounced"
-	case errors.Is(err, ErrFunctionSkipped):
+	case errors.Is(err, ErrFunctionSkipped), errors.Is(err, ErrLoopEnded):
 		return "skipped"
 	case errors.Is(err, queue.ErrQueueItemExists), errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
 		return "idempotency"
@@ -157,372 +165,6 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	return m, nil
 }
 
-// ExecutorOpt modifies the built-in executor on creation.
-type ExecutorOpt func(m execution.Executor) error
-
-func WithHTTPClient(c exechttp.RequestExecutor) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).httpClient = c
-		return nil
-	}
-}
-
-func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).cancellationChecker = c
-		return nil
-	}
-}
-
-// WithCancellationCheckDeadline bounds how long checkCancellation waits
-// synchronously for the cancellation lookup before proceeding. A zero or
-// negative value keeps the default of 100ms.
-func WithCancellationCheckDeadline(d time.Duration) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).cancellationCheckDeadline = d
-		return nil
-	}
-}
-
-// WithStateManager sets which state manager to use when creating an executor.
-func WithStateManager(sm sv2.RunService) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).smv2 = sm
-		return nil
-	}
-}
-
-// WithQueue sets which state manager to use when creating an executor.
-func WithQueue(q queue.Queue) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).queue = q
-		return nil
-	}
-}
-
-// WithPauseManager sets which pause manager to use when creating an executor.
-func WithPauseManager(pm pauses.Manager) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).pm = pm
-		return nil
-	}
-}
-
-// WithExpressionAggregator sets the expression aggregator singleton to use
-// for matching events using our aggregate evaluator.
-func WithExpressionAggregator(agg expragg.Aggregator) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).exprAggregator = agg
-		return nil
-	}
-}
-
-func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).fl = l
-		return nil
-	}
-}
-
-func WithLogger(l logger.Logger) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).log = l
-		return nil
-	}
-}
-
-func WithFinalizer(f execution.FinalizePublisher) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).SetFinalizer(f)
-		return nil
-	}
-}
-
-func WithInvokeFailHandler(f execution.InvokeFailHandler) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).invokeFailHandler = f
-		return nil
-	}
-}
-
-func WithInvokeEventHandler(f execution.HandleInvokeEvent) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).handleInvokeEvent = f
-		return nil
-	}
-}
-
-func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
-	return func(e execution.Executor) error {
-		for _, item := range l {
-			e.AddLifecycleListener(item)
-		}
-		return nil
-	}
-}
-
-// WithSyncLifecycleListeners registers listeners invoked synchronously
-// (inline, not via a spawned goroutine) alongside the async
-// execution.LifecycleListener dispatch. This is the *only* way to register
-// them on an executor: there is deliberately no AddSyncLifecycleListener
-// counterpart to AddLifecycleListener (see execution.SyncLifecycleListener's
-// doc comment on static, construction-time registration). It asserts to the
-// concrete *executor type, matching the pattern used by options like
-// WithHTTPClient above.
-func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).syncLifecycles = append(e.(*executor).syncLifecycles, l...)
-		return nil
-	}
-}
-
-func WithEventLifecycleListeners(l ...execution.EventLifecycleListener) ExecutorOpt {
-	return func(e execution.Executor) error {
-		for _, item := range l {
-			e.AddEventLifecycleListener(item)
-		}
-		return nil
-	}
-}
-
-func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).steplimit = limit
-		return nil
-	}
-}
-
-func WithStateSizeLimits(limit func(id sv2.ID) int) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).stateSizeLimit = limit
-		return nil
-	}
-}
-
-func WithRateLimiter(rl ratelimit.RateLimiter) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).rateLimiter = rl
-		return nil
-	}
-}
-
-func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).debouncer = d
-		return nil
-	}
-}
-
-func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).singletonMgr = sn
-		return nil
-	}
-}
-
-func WithBatcher(b batch.BatchManager) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).batcher = b
-		return nil
-	}
-}
-
-func WithCapacityManager(cm constraintapi.CapacityManager) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).capacityManager = cm
-		return nil
-	}
-}
-
-// WithSemaphoreManager assigns a semaphore manager to the executor, used to release
-// from semaphores when functions end (for fn concurrency)
-func WithSemaphoreManager(sm constraintapi.SemaphoreManager) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).semaphoreManager = sm
-		return nil
-	}
-}
-
-func WithUseConstraintAPI(uca constraintapi.UseConstraintAPIFn) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).useConstraintAPI = uca
-		return nil
-	}
-}
-
-func WithEnableBatchingInstrumentation(ebi func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).enableBatchingInstrumentation = ebi
-		return nil
-	}
-}
-
-// WithEvaluatorFactory allows customizing of the expression evaluator factory function.
-func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).evalFactory = f
-		return nil
-	}
-}
-
-func WithSigningKeyLoader(f func(ctx context.Context, envID uuid.UUID) ([]byte, error)) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).signingKeyLoader = f
-		return nil
-	}
-}
-
-// WithDriverV1 specifies the drivers available to use when executing steps
-// of a function.
-//
-// When invoking a step in a function, we find the registered driver with the step's URI
-// and use that driver to execute the step.
-func WithDriverV1(drivers ...driver.DriverV1) ExecutorOpt {
-	return func(exec execution.Executor) error {
-		e := exec.(*executor)
-		for _, d := range drivers {
-			if _, ok := e.driverv1[d.Name()]; ok {
-				return ErrRuntimeRegistered
-			}
-			e.driverv1[d.Name()] = d
-
-		}
-		return nil
-	}
-}
-
-func WithDriverV2(drivers ...driver.DriverV2) ExecutorOpt {
-	return func(exec execution.Executor) error {
-		e := exec.(*executor)
-		for _, d := range drivers {
-			if _, ok := e.driverv2[d.Name()]; ok {
-				return ErrRuntimeRegistered
-			}
-			e.driverv2[d.Name()] = d
-
-		}
-		return nil
-	}
-}
-
-// WithShardRegistry wires the executor up to the queue's shard registry.
-// Replaces the old WithAssignedQueueShard + WithShardSelector pair: the
-// registry exposes both the leased primary (Primary) and per-account
-// resolution (Resolve) so the executor doesn't need to track them
-// independently.
-func WithShardRegistry(shards queue.ShardRegistry) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).shards = shards
-		return nil
-	}
-}
-
-func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).traceReader = m
-		return nil
-	}
-}
-
-func WithTracerProvider(t tracing.TracerProvider) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).tracerProvider = t
-		return nil
-	}
-}
-
-// WithRealtimePublisher configures a new publisher in the executor.  This publishes
-// directly to the backing implementaiton.
-func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).rtpub = b
-		return nil
-	}
-}
-
-// WithRealtimeAPIPublisher adds JWT configuration which allows publishing of data to the
-// realtime API, without connecting to the backing realtime service directly.
-func WithRealtimeConfig(config ExecutorRealtimeConfig) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).rtconfig = config
-		return nil
-	}
-}
-
-func WithClock(clock clockwork.Clock) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).clock = clock
-		return nil
-	}
-}
-
-type ExecutorRealtimeConfig struct {
-	Secret     []byte
-	PublishURL string
-}
-
-// AllowStepMetadata is kept only so existing callers (e.g. the monorepo)
-// constructing a WithAllowStepMetadata option still compile.
-//
-// Deprecated: step metadata is now always enabled; this type and
-// WithAllowStepMetadata no longer have any effect and will be removed.
-type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
-
-// WithAllowStepMetadata is a no-op.
-//
-// Deprecated: step metadata is now always enabled; this option no longer has
-// any effect and will be removed. Kept temporarily for compatibility with
-// existing callers in the monorepo.
-func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
-	return func(e execution.Executor) error {
-		return nil
-	}
-}
-
-func WithFunctionBacklogSizeLimit(fbsl BacklogSizeLimitFn) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).functionBacklogSizeLimit = fbsl
-		return nil
-	}
-}
-
-type BacklogSizeLimit struct {
-	Limit   int
-	Enforce bool
-}
-
-type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
-
-type AccountPlanMetricTagResolver func(ctx context.Context, accountID uuid.UUID) string
-
-func WithAccountPlanMetricTagResolver(resolver AccountPlanMetricTagResolver) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).accountPlanMetricTagResolver = resolver
-		return nil
-	}
-}
-
-func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).conditionalTracer = tracer
-		return nil
-	}
-}
-
-type ExecutionCapLimitDecision struct {
-	Exceeded bool
-	Enforce  bool
-}
-
-type ExecutionCapFn func(ctx context.Context, accountId uuid.UUID) ExecutionCapLimitDecision
-
-func WithAccountExecutionCap(capFn ExecutionCapFn) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).accountExecutionCap = capFn
-		return nil
-	}
-}
-
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -531,8 +173,9 @@ type executor struct {
 	// using trees.
 	exprAggregator expragg.Aggregator
 
-	pm   pauses.Manager
-	smv2 sv2.RunService
+	pm    pauses.Manager
+	smv2  sv2.RunService
+	loops loops.Store
 
 	rateLimiter  ratelimit.RateLimiter
 	queue        queue.Queue
@@ -1103,6 +746,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionSkippedIdempotency(ctx, callbackReq, skip)
 		})
+	case errors.Is(err, ErrLoopEnded):
+		// a tick or a wake on an ended instance fires no hook.
 	case errors.Is(err, ErrFunctionDebounced), errors.Is(err, ErrFunctionSkipped), err == nil:
 		// Handled by more specific lifecycle hooks inside schedule.
 	default:
@@ -1150,6 +795,9 @@ func (e *executor) schedule(
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
+	}
+	if req.Function.Loop != nil && e.loops == nil {
+		return nil, nil, ErrNoLoopStore
 	}
 
 	req = cloneScheduleRequest(req)
@@ -1470,6 +1118,21 @@ func (e *executor) schedule(
 		metadata.Config.Semaphores = e.evaluateFnConcurrency(ctx, req.AccountID, req.Function.ID, req.Function.Concurrency.Fn, evtMap)
 	}
 
+	// a loop run names its instance by the key in the first event.  the
+	// keyed semaphore gets the same key, so the semaphore bucket and the
+	// store record agree for a trigger, a tick, a wake, and a subscription
+	// alike.  nothing about the loop is stored on the run.
+	var loopInput loops.Input
+	if req.Function.Loop != nil {
+		loopInput, err = loops.InputFromEvent(ctx, *req.Function.Loop, evtMap)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err = setLoopSemaphoreKey(metadata.Config.Semaphores, req.Function, loopInput.Key); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	//
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
@@ -1592,6 +1255,12 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
+		if req.Function.Loop != nil {
+			if err := e.openLoop(ctx, req, loopInput, runID); err != nil {
+				return nil, nil, err
+			}
+		}
+
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
@@ -2431,6 +2100,46 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			})
 		}()
 
+		// a run that was finalized as cancelled before any request has no
+		// step to report.  the execution span closes here and the queue
+		// drops the item.
+		if resp == nil && errors.Is(err, state.ErrFunctionCancelled) {
+			_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
+				Metadata:   &md,
+				QueueItem:  &item,
+				TargetSpan: instance.execSpan,
+				EndTime:    e.now(),
+				Status:     enums.StepStatusCancelled,
+			})
+			return nil, err
+		}
+
+		// a nil response means the request never reached the SDK.  the
+		// attribute helpers below read the response, so this returns before
+		// them and the queue decides on a retry from the error alone.
+		if resp == nil && err != nil {
+			_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+				Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
+				Metadata:   &md,
+				QueueItem:  &item,
+				TargetSpan: instance.execSpan,
+				EndTime:    e.now(),
+				Status:     enums.StepStatusFailed,
+			})
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepFinished", func(sl execution.SyncLifecycleListener) {
+				sl.OnStepFinished(ctx, md, item, edge, resp, err, instance.reqStart, syncNow)
+			})
+			return nil, err
+		}
+
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		// NOTE: we should make this not emit output if we also emit a step span containing the output.
@@ -2468,19 +2177,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
 		instance.resp = resp
-		if resp == nil && err != nil {
-			for _, e := range e.lifecycles {
-				// OnStepFinished handles step success and step errors/failures.  It is
-				// currently the responsibility of the lifecycle manager to handle the differing
-				// step statuses when a step finishes.
-				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
-			}
-			syncNow := e.now()
-			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepFinished", func(sl execution.SyncLifecycleListener) {
-				sl.OnStepFinished(ctx, md, item, edge, resp, err, instance.reqStart, syncNow)
-			})
-			return nil, err
-		}
 
 		// Extract HTTP timing metadata from httpstat if available.
 		// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
@@ -2570,11 +2266,17 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		sl.OnStepFinished(ctx, i.md, i.item, i.edge, i.resp, nil, i.reqStart, syncNow)
 	})
 
-	if i.resp.Err == nil && i.resp.IsOpResponse() {
-		// Handle generator op responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
+	if i.resp.Err == nil {
+		// a loop response is checked before any opcode is handled.  a bad one
+		// fails the run below, with the message as the run output.
+		serr := validateLoopResponse(i.f, i.resp)
+		if serr == nil && i.resp.IsOpResponse() {
+			// Handle generator op responses then return.
+			serr = e.HandleGeneratorResponse(ctx, i, i.resp)
+		}
+		if serr != nil {
 			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict) || errors.Is(serr, state.ErrTimeoutTooLong)
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict) || errors.Is(serr, state.ErrTimeoutTooLong) || errors.Is(serr, state.ErrLoopInvalid)
 
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
@@ -2883,6 +2585,23 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 		}
 	}
 
+	// a loop run whose return already took effect gets a replay in place
+	// of a request.  no step starts and the SDK is not called.  a tick or
+	// a wake whose instance ended before the run started is cancelled.
+	loop, replay, err := e.loopRequest(ctx, i)
+	if errors.Is(err, ErrLoopEnded) {
+		return nil, e.cancelLoopRun(ctx, i)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if replay != nil {
+		return replay, nil
+	}
+	if loop != nil {
+		ctx = driver.WithLoop(ctx, loop)
+	}
+
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, endpoint.String())
 	}
@@ -2892,6 +2611,9 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	switch d := e.fnDriver(ctx, i.f).(type) {
 	case driver.DriverV2:
+		if loop != nil {
+			return nil, queue.NeverRetryError(fmt.Errorf("loop function %s runs on a sync endpoint, which does not carry loop state", i.f.Slug))
+		}
 		return e.executeDriverV2(ctx, i, d, endpoint.String())
 	case driver.DriverV1:
 		{
@@ -4013,6 +3735,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	if hasLoopReturn(resp.Generator) {
+		return e.handleLoopReturnResponse(ctx, i, resp)
+	}
+
 	nonLazy := nonLazyOpCount(resp.Generator)
 
 	{
@@ -4228,6 +3954,8 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeRunComplete:
 		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
+	case enums.OpcodeLoopReturn:
+		return e.handleGeneratorLoopReturn(ctx, runCtx, gen, edge)
 	case enums.OpcodeSyncRunComplete:
 		// This is an API-based function executed synchronously that had
 		// an async conversion.  The result must always be in the shape of
@@ -4502,14 +4230,46 @@ func (e *executor) enqueueLazyOpFallback(
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
 // has finished
 func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// Save the response to the state store.
-	output, err := gen.Output()
+	ctx, hasPendingSteps, err := e.saveGeneratorStep(ctx, runCtx, gen, edge)
 	if err != nil {
 		return err
 	}
 
+	// Once step output has been saved, we can release the held capacity.
+	// This allows us to continue work in the queue on other items even before
+	// the next step is enqueued and accounting is handled.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+
+	// Update the group ID in context;  we've already saved this step's success and we're now
+	// running the step again, needing a new history group
+	groupID := uuid.New().String()
+
+	// Re-enqueue the exact same edge to run now.
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
+		runCtx.LifecycleItem().ParallelCoalesceKey,
+	)
+}
+
+// saveGeneratorStep saves the output of a finished step and notifies the step
+// finished listeners.  it enqueues nothing.  it returns the context to use
+// for later work and whether steps are still pending.
+func (e *executor) saveGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) (context.Context, bool, error) {
+	// Save the response to the state store.
+	output, err := gen.Output()
+	if err != nil {
+		return ctx, false, err
+	}
+
 	if err := e.validateStateSize(len(output), *runCtx.Metadata()); err != nil {
-		return err
+		return ctx, false, err
 	}
 
 	// Calculate step duration in milliseconds
@@ -4540,7 +4300,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		err = nil
 	}
 	if err != nil {
-		return err
+		return ctx, false, err
 	}
 
 	// Notify sync listeners only once the step's output is durably
@@ -4548,46 +4308,41 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// listener (e.g. dual-write) never records a step as finished when it
 	// never actually committed.
 	e.RunStepRunFinishedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, e.now())
-
-	// Once step output has been saved, we can release the held capacity.
-	// This allows us to continue work in the queue on other items even before
-	// the next step is enqueued and accounting is handled.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
-
-	// Update the group ID in context;  we've already saved this step's success and we're now
-	// running the step again, needing a new history group
-	groupID := uuid.New().String()
-
-	// Re-enqueue the exact same edge to run now.
-	return e.maybeEnqueueDiscoveryStep(
-		state.WithGroupID(ctx, groupID),
-		runCtx,
-		gen,
-		edge,
-		groupID,
-		hasPendingSteps,
-		runCtx.LifecycleItem().ParallelCoalesceKey,
-	)
-
-	// NOTE: Default topics are not yet implemented and are a V2 realtime feature.
-	//
-	// if e.rtpub != nil {
-	// 	e.rtpub.Publish(ctx, realtime.Message{
-	// 		Kind:       streamingtypes.MessageKindStep,
-	// 		Data:       gen.Data,
-	// 		Topic:      gen.UserDefinedName(),
-	// 		EnvID:      i.md.ID.Tenant.EnvID,
-	// 		FnID:       i.md.ID.FunctionID,
-	// 		FnSlug:     i.f.GetSlug(),
-	// 		Channel:    i.md.ID.RunID.String(),
-	// 		CreatedAt:  e.now(),
-	// 		RunID:      i.md.ID.RunID,
-	// 	})
-	// }
+	return ctx, hasPendingSteps, nil
 }
 
+// hasLoopReturn returns whether ops holds a LoopReturn.
+func hasLoopReturn(ops []*state.GeneratorOpcode) bool {
+	for _, op := range ops {
+		if op != nil && op.Op == enums.OpcodeLoopReturn {
+			return true
+		}
+	}
+	return false
+}
+
+// handleLoopReturnResponse handles a response that holds a LoopReturn.  the
+// run ends with the LoopReturn, so no discovery item is enqueued.  every step
+// output is saved first, so a retry after a failed commit memoizes the steps.
+func (e *executor) handleLoopReturnResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	edge, ok := i.LifecycleItem().Payload.(queue.PayloadEdge)
+	if !ok {
+		return fmt.Errorf("unknown queue item type handling generator: %T", i.LifecycleItem().Payload)
+	}
+	var ret *state.GeneratorOpcode
+	for _, op := range resp.Generator {
+		switch {
+		case op == nil:
+		case op.Op == enums.OpcodeLoopReturn:
+			ret = op
+		default:
+			if _, _, err := e.saveGeneratorStep(ctx, i, *op, edge); err != nil {
+				return err
+			}
+		}
+	}
+	return e.handleGeneratorOp(ctx, i, *ret, OpcodeGroup{})
+}
 func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// With the introduction of the StepError opcode, step errors are handled gracefully, and we can
 	// finally distinguish between application level errors (this function) and network errors/other

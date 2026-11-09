@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -749,7 +750,28 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	case errors.Is(err, executor.ErrFunctionDebounced),
 		errors.Is(err, executor.ErrFunctionSkipped),
 		errors.Is(err, executor.ErrFunctionSkippedIdempotency),
+		errors.Is(err, executor.ErrLoopEnded),
 		errors.Is(err, state.ErrIdentifierExists):
+		return nil, nil
+	case errors.Is(err, loops.ErrNoKey):
+		// the event matched other functions too.  one missing key field
+		// must not fail handling for them.
+		l.Warn(
+			"loop key missing from event",
+			"function_id", fn.ID,
+			"event", tracked.GetEvent().Name,
+		)
+		if tracked.GetEvent().IsInvokeEvent() {
+			if err := opts.exec.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
+				OriginalEvent: tracked,
+				Err: map[string]any{
+					"name":    "Error",
+					"message": "invoked loop function received no key",
+				},
+			}); err != nil {
+				l.Error("error handling invoke loop key", "error", err)
+			}
+		}
 		return nil, nil
 	}
 
