@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -29,8 +30,8 @@ const stepPayload = `{"b":1,"a":1.10,"n":12345678901234567890123}`
 
 // TestOutputSplitEndToEnd drives a successful step, a failed step and a
 // failed run through the listener's hooks -> the lake -> the UI/GQL
-// read path, checking output/error are split once at write time and read
-// back as stored.
+// read path and Insights, checking output/error are split once at write
+// time and read back as stored.
 func TestOutputSplitEndToEnd(t *testing.T) {
 	db := openOutputSplitLake(t)
 	md := writeOutputSplitRun(t, db)
@@ -70,6 +71,35 @@ func TestOutputSplitEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, enums.RunStatusFailed, run.Status)
 		require.Equal(t, `{"error":{"name":"Error","message":"fn boom"}}`, string(run.Output))
+	})
+
+	t.Run("insights", func(t *testing.T) {
+		accountID, envID := md.ID.Tenant.AccountID, md.ID.Tenant.EnvID
+		for _, tc := range []struct {
+			sql  string
+			want [][]any
+		}{
+			{
+				`SELECT span_id, error.message AS msg FROM step_attempts WHERE error IS NOT NULL`,
+				[][]any{{stepSpanID(md, "step-fail"), "boom"}},
+			},
+			{
+				`SELECT span_id, output::VARCHAR AS out FROM step_attempts WHERE error IS NULL`,
+				[][]any{{stepSpanID(md, "step-ok"), stepPayload}},
+			},
+			{
+				`SELECT status, error.message AS msg, output FROM runs WHERE error IS NOT NULL`,
+				[][]any{{enums.StepStatusFailed.String(), "fn boom", nil}},
+			},
+		} {
+			t.Run(tc.sql, func(t *testing.T) {
+				tr, err := insights.Transpile(tc.sql, accountID, envID)
+				require.NoError(t, err)
+				res, err := insights.Execute(ctx, db, tr)
+				require.NoError(t, err)
+				require.Equal(t, tc.want, res.Rows)
+			})
+		}
 	})
 }
 

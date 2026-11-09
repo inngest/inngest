@@ -186,7 +186,7 @@
         {
           "name": "scheduled_at",
           "type": "DATETIME",
-          "description": "When the run is scheduled to start, if it was scheduled for later."
+          "description": "When the run is scheduled to start: its queued time, unless it was scheduled for later."
         },
         {
           "name": "started_at",
@@ -239,6 +239,11 @@
           "name": "output",
           "type": "JSON",
           "description": "The run's final output, once it completes successfully."
+        },
+        {
+          "name": "error",
+          "type": "JSON",
+          "description": "The error the run failed with, if it failed."
         },
         {
           "name": "is_deferred",
@@ -329,6 +334,11 @@
           "name": "output",
           "type": "JSON",
           "description": "The step's output, once this attempt completes successfully."
+        },
+        {
+          "name": "error",
+          "type": "JSON",
+          "description": "The error this attempt failed with, if it failed."
         },
         {
           "name": "input",
@@ -443,6 +453,11 @@
           "name": "output",
           "type": "JSON",
           "description": "The step's output, once this attempt completes successfully."
+        },
+        {
+          "name": "error",
+          "type": "JSON",
+          "description": "The error this attempt failed with, if it failed."
         },
         {
           "name": "input",

@@ -75,6 +75,7 @@ SELECT
   r.attributes,
   r.inputs,
   r.output,
+  r.error,
   r.is_deferred,
   r.defer_parent_fn_slug AS defer_parent_function_id,
   r.defer_parent_run_ids,
@@ -159,7 +160,7 @@ WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id AND name = 'sdk.ex
 -- (see 007's flat-span finding), so this view just passes them through
 -- like insights_extended_trace_spans does.
 --
--- step_attempt_rows is its body w/ output/input/attributes still JSON text,
+-- step_attempt_rows is its body w/ output/error/input/attributes still JSON text,
 -- so insights_steps' collapse runs before the JSON casts.
 CREATE MACRO inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT
@@ -174,6 +175,7 @@ SELECT
   rts.start_time as start_time,
   rts.end_time as end_time,
   rts.output as output,
+  rts.error as error,
   rts.input as input,
   rts.attributes,
   rts.attributes->>'$."_inngest.step.userland.id"' AS step_id,
@@ -190,7 +192,7 @@ WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
   AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned');
 
 CREATE MACRO inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT * REPLACE (output::JSON AS output, input::JSON AS input, attributes::JSON AS attributes)
+SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
 FROM inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata);
 
 -- inngest.insights_steps(p_account_id, p_env_id) collapses
@@ -199,7 +201,7 @@ FROM inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_met
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
 -- Logical tables and views table).
 CREATE MACRO inngest.insights_steps(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT * REPLACE (output::JSON AS output, input::JSON AS input, attributes::JSON AS attributes)
+SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
 FROM inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
