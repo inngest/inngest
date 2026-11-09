@@ -3,6 +3,10 @@ package duckdb
 import (
 	"testing"
 
+	"github.com/apache/iceberg-go"
+	"github.com/apache/iceberg-go/catalog"
+	_ "github.com/apache/iceberg-go/catalog/rest"
+
 	"github.com/inngest/inngest/pkg/duckdb/schema"
 
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
@@ -164,6 +168,29 @@ func TestMigrateModeRawRunsCollapse(t *testing.T) {
 				require.NoError(t, db.QueryRowContext(t.Context(), q).Scan(&n))
 				require.Equal(t, tc.want, n, q)
 			}
+		})
+	}
+}
+
+// TestLakeTableProperties checks the Iceberg table properties the migration
+// sets on the lake tables, read back from the catalog.
+func TestLakeTableProperties(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+	opts := testLakeOptions(t, binPath)
+	db, err := driver.Open(t.Context(), opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
+
+	cat, err := catalog.Load(t.Context(), "test", iceberg.Properties{"type": "rest", "uri": opts.Iceberg.URI, "token": opts.Iceberg.Token})
+	require.NoError(t, err)
+	for _, tbl := range []schema.Table{schema.Runs, schema.Spans, schema.Events, schema.RunMetadata} {
+		t.Run(tbl.Name, func(t *testing.T) {
+			lt, err := cat.LoadTable(t.Context(), catalog.ToIdentifier(driver.LakeNamespace, tbl.Name))
+			require.NoError(t, err)
+			props := lt.Properties()
+			require.Equal(t, "zstd", props["write.parquet.compression-codec"])
+			require.Equal(t, "false", props["commit.manifest-merge.enabled"])
 		})
 	}
 }
