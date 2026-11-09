@@ -325,6 +325,28 @@ func TestGenerateAndInsertPropagatesGenerationErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestGenerateAndInsertReturnsWriteErrors drops a table so its writers fail
+// w/ batches still pending, and checks GenerateAndInsert returns that error
+// instead of leaving the generator blocked on work.
+func TestGenerateAndInsertReturnsWriteErrors(t *testing.T) {
+	connector, db := newTestDB(t, 1)
+	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.DuckLakeAlias+".run_trace_spans;")
+	require.NoError(t, err)
+	genCfg := GenerateConfig{RunCount: 50, Window: time.Hour, Now: time.Now().UTC()}
+
+	errc := make(chan error, 1)
+	go func() {
+		_, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), testTemplates(), genCfg, InsertOptions{BatchSize: 2, Parallelism: 1})
+		errc <- err
+	}()
+	select {
+	case err := <-errc:
+		require.ErrorContains(t, err, "run_trace_spans")
+	case <-time.After(30 * time.Second):
+		t.Fatal("GenerateAndInsert hung after a write error")
+	}
+}
+
 // TestGenerateAndInsertWithParallelism proves the interleaved
 // generate+insert path also writes every row exactly once when multiple
 // Appender workers run concurrently.
