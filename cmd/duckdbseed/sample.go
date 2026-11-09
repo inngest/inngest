@@ -29,7 +29,7 @@ func DefaultTemplates() Templates {
 		},
 		Statuses: []string{"Queued", "Running", "Completed", "Completed", "Failed", "Cancelled"},
 		Inputs:   []string{`{"event":{"name":"app/seeded.event","data":{}}}`},
-		Outputs:  []string{`{"data":"ok"}`},
+		Outputs:  []RunOutput{{Output: `"ok"`}},
 		Traces: []TraceTemplate{
 			{
 				TraceID: "seeded-trace",
@@ -38,7 +38,7 @@ func DefaultTemplates() Templates {
 						SpanID:      "seeded-root",
 						Name:        "seeded-function",
 						Attributes:  `{"sys.step.name":"seeded-function"}`,
-						Output:      `{"data":"ok"}`,
+						Output:      `"ok"`,
 						Input:       `{"event":{"name":"app/seeded.event","data":{}}}`,
 						StartOffset: 100 * time.Millisecond,
 						EndOffset:   600 * time.Millisecond,
@@ -48,7 +48,7 @@ func DefaultTemplates() Templates {
 						ParentSpanID: new("seeded-root"),
 						Name:         "seeded-function-step-1",
 						Attributes:   `{"sys.step.name":"seeded-function-step-1"}`,
-						Output:       `{"data":"ok"}`,
+						Output:       `"ok"`,
 						Input:        `{}`,
 						StartOffset:  100 * time.Millisecond,
 						EndOffset:    600 * time.Millisecond,
@@ -135,12 +135,12 @@ func SampleTemplates(ctx context.Context, db *sql.DB, limit int) (Templates, err
 // row at each lifecycle transition), so without this a source with a long
 // history pays for ranking all of it on every seed run just to keep a
 // handful of rows.
-func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, statuses, inputs, outputs []string, err error) {
+func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, statuses, inputs []string, outputs []RunOutput, err error) {
 	query := fmt.Sprintf(`
 	WITH sampled_run_ids AS (
 		SELECT DISTINCT run_id FROM %s.runs LIMIT ?
 	)
-	SELECT account_id, env_id, app_id, app_name, function_id, function_slug, status, inputs, output
+	SELECT account_id, env_id, app_id, app_name, function_id, function_slug, status, inputs, output, error
 	FROM %s.runs
 	WHERE run_id IN (SELECT run_id FROM sampled_run_ids)
 	QUALIFY row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
@@ -157,9 +157,9 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 			rawAccountID, rawEnvID, rawAppID, rawFunctionID any
 			appName, functionSlug                           string
 			status                                          any
-			rawInputs, rawOutput                            any
+			rawInputs, rawOutput, rawError                  any
 		)
-		if err := rows.Scan(&rawAccountID, &rawEnvID, &rawAppID, &appName, &rawFunctionID, &functionSlug, &status, &rawInputs, &rawOutput); err != nil {
+		if err := rows.Scan(&rawAccountID, &rawEnvID, &rawAppID, &appName, &rawFunctionID, &functionSlug, &status, &rawInputs, &rawOutput, &rawError); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("duckdbseed: scanning sampled run: %w", err)
 		}
 
@@ -177,8 +177,8 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 		if v := jsonText(rawInputs); v != "" {
 			inputs = append(inputs, v)
 		}
-		if v := jsonText(rawOutput); v != "" {
-			outputs = append(outputs, v)
+		if out := (RunOutput{Output: jsonText(rawOutput), Error: jsonText(rawError)}); out != (RunOutput{}) {
+			outputs = append(outputs, out)
 		}
 	}
 	return tenants, statuses, inputs, outputs, rows.Err()
@@ -219,7 +219,7 @@ func sampleTraces(ctx context.Context, db *sql.DB, limit int) ([]TraceTemplate, 
 	)
 	SELECT s.run_id, rt.queued_at, rt.started_at, rt.ended_at,
 	       s.trace_id, s.span_id, s.parent_span_id,
-	       s.name, s.attributes, s.output, s.input, s.start_time, s.end_time
+	       s.name, s.attributes, s.output, s.error, s.input, s.start_time, s.end_time
 	FROM %s.run_trace_spans s
 	JOIN run_timing rt ON rt.run_id = s.run_id;`, driver.DuckLakeAlias, driver.DuckLakeAlias, driver.DuckLakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
@@ -242,8 +242,8 @@ func sampleTraces(ctx context.Context, db *sql.DB, limit int) ([]TraceTemplate, 
 		var rawRunID, rawQueuedAt, rawStartedAt, rawEndedAt any
 		var traceID, spanID string
 		var rawParentSpanID any
-		var name, rawAttributes, rawOutput, rawInput, rawStart, rawEnd any
-		if err := rows.Scan(&rawRunID, &rawQueuedAt, &rawStartedAt, &rawEndedAt, &traceID, &spanID, &rawParentSpanID, &name, &rawAttributes, &rawOutput, &rawInput, &rawStart, &rawEnd); err != nil {
+		var name, rawAttributes, rawOutput, rawError, rawInput, rawStart, rawEnd any
+		if err := rows.Scan(&rawRunID, &rawQueuedAt, &rawStartedAt, &rawEndedAt, &traceID, &spanID, &rawParentSpanID, &name, &rawAttributes, &rawOutput, &rawError, &rawInput, &rawStart, &rawEnd); err != nil {
 			return nil, fmt.Errorf("duckdbseed: scanning sampled span: %w", err)
 		}
 
@@ -293,6 +293,7 @@ func sampleTraces(ctx context.Context, db *sql.DB, limit int) ([]TraceTemplate, 
 			Name:         fmt.Sprint(name),
 			Attributes:   jsonText(rawAttributes),
 			Output:       jsonText(rawOutput),
+			Error:        jsonText(rawError),
 			Input:        jsonText(rawInput),
 			StartOffset:  start.Sub(b.queuedAt),
 			EndOffset:    end.Sub(b.queuedAt),
