@@ -79,7 +79,7 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 	ctx := t.Context()
 	accountID, envID := uuid.New(), uuid.New()
 	for i, data := range []string{
-		`{"user":{"id":"u1","name":"Ann"},"n":5,"ok":true,"z":null,"a.b":"dotted"}`,
+		`{"user":{"id":"u1","name":"Ann"},"n":5,"ok":true,"z":null,"a.b":"dotted","tags":["a",1]}`,
 		`{"user":{"id":"u2"},"n":10,"ok":false}`,
 		`{"n":"7"}`,
 	} {
@@ -136,13 +136,20 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		require.Equal(t, [][]any{{"evt-1"}}, res.Rows)
 	})
 
-	t.Run("projection stays JSON", func(t *testing.T) {
-		tr, err := insights.Transpile("SELECT data.user AS u, data.user.id AS uid FROM events WHERE data.user.id = 'u1'", accountID, envID)
+	t.Run("projection stays JSON, decoded", func(t *testing.T) {
+		// Execute decodes a JSON column's values, so a projected dot access
+		// already reaches the caller as the native value (a string unquoted),
+		// w/ the name DuckDB gives it (its last key).
+		tr, err := insights.Transpile("SELECT data.user AS u, data.user.id, data.n, data.ok, data.z, data.missing, data.tags FROM events WHERE data.user.id = 'u1'", accountID, envID)
 		require.NoError(t, err)
 		res, err := insights.Execute(ctx, db, tr)
 		require.NoError(t, err)
-		require.Equal(t, insights.ColumnTypeJSON, res.Columns[0].Type)
-		require.Equal(t, insights.ColumnTypeJSON, res.Columns[1].Type)
-		require.Equal(t, [][]any{{map[string]any{"id": "u1", "name": "Ann"}, "u1"}}, res.Rows)
+		var names []string
+		for _, c := range res.Columns {
+			names = append(names, c.Name)
+			require.Equal(t, insights.ColumnTypeJSON, c.Type, c.Name)
+		}
+		require.Equal(t, []string{"u", "id", "n", "ok", "z", "missing", "tags"}, names)
+		require.Equal(t, [][]any{{map[string]any{"id": "u1", "name": "Ann"}, "u1", float64(5), true, nil, nil, []any{"a", float64(1)}}}, res.Rows)
 	})
 }

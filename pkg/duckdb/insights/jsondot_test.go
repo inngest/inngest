@@ -22,17 +22,17 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 		{
 			name: "string equality",
 			in:   "SELECT id FROM events WHERE data.user.id = 'u1'",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' = 'u1'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') = 'u1'`,
 		},
 		{
 			name: "string on the left",
 			in:   "SELECT id FROM events WHERE 'u1' <> data.user.id",
-			want: `SELECT id FROM events WHERE 'u1' <> data ->> '$."user"."id"'`,
+			want: `SELECT id FROM events WHERE 'u1' <> json_extract_string(data.user.id, '$')`,
 		},
 		{
 			name: "table qualified",
 			in:   "SELECT e.id FROM events e WHERE e.data.user.id = 'u1'",
-			want: `SELECT e.id FROM events AS e WHERE e.data ->> '$."user"."id"' = 'u1'`,
+			want: `SELECT e.id FROM events AS e WHERE json_extract_string(e.data.user.id, '$') = 'u1'`,
 		},
 		{
 			name: "number comparison stays JSON",
@@ -57,52 +57,52 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 		{
 			name: "parenthesized dot access",
 			in:   "SELECT id FROM events WHERE (data.user).id = 'u1' OR (events.data).name LIKE 'a%' OR ((data).user).id IS NULL",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' = 'u1' OR events.data ->> '$."name"' LIKE 'a%' OR data ->> '$."user"."id"' IS NULL`,
+			want: `SELECT id FROM events WHERE json_extract_string((data.user).id, '$') = 'u1' OR json_extract_string((events.data).name, '$') LIKE 'a%' OR json_extract_string((data).user.id, '$') IS NULL`,
 		},
 		{
 			name: "IN list",
 			in:   "SELECT id FROM events WHERE data.user.id NOT IN ('u1', 'u2')",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' NOT IN ('u1', 'u2')`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') NOT IN ('u1', 'u2')`,
 		},
 		{
 			name: "BETWEEN strings",
 			in:   "SELECT id FROM events WHERE data.user.id BETWEEN 'a' AND 'm'",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' BETWEEN 'a' AND 'm'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') BETWEEN 'a' AND 'm'`,
 		},
 		{
 			name: "LIKE and ILIKE",
 			in:   "SELECT id FROM events WHERE data.user.id LIKE 'u%' OR data.name ILIKE '%x%'",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' LIKE 'u%' OR data ->> '$."name"' ILIKE '%x%'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') LIKE 'u%' OR json_extract_string(data.name, '$') ILIKE '%x%'`,
 		},
 		{
 			name: "IS NULL",
 			in:   "SELECT id FROM events WHERE data.user.id IS NULL OR data.a IS NOT NULL OR data.b NOTNULL",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' IS NULL OR data ->> '$."a"' IS NOT NULL OR data ->> '$."b"' IS NOT NULL`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') IS NULL OR json_extract_string(data.a, '$') IS NOT NULL OR json_extract_string(data.b, '$') IS NOT NULL`,
 		},
 		{
 			name: "IS DISTINCT FROM",
 			in:   "SELECT id FROM events WHERE data.user.id IS DISTINCT FROM 'u1'",
-			want: `SELECT id FROM events WHERE data ->> '$."user"."id"' IS DISTINCT FROM 'u1'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.user.id, '$') IS DISTINCT FROM 'u1'`,
 		},
 		{
 			name: "string column peer",
 			in:   "SELECT r.run_id FROM runs r JOIN events e ON e.data.run_id = r.run_id",
-			want: `SELECT r.run_id FROM runs AS r INNER JOIN events AS e ON e.data ->> '$."run_id"' = r.run_id`,
+			want: `SELECT r.run_id FROM runs AS r INNER JOIN events AS e ON json_extract_string(e.data.run_id, '$') = r.run_id`,
 		},
 		{
 			name: "IN string subquery",
 			in:   "SELECT id FROM events WHERE data.run_id IN (SELECT run_id FROM runs)",
-			want: `SELECT id FROM events WHERE data ->> '$."run_id"' IN (SELECT run_id FROM runs)`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.run_id, '$') IN (SELECT run_id FROM runs)`,
 		},
 		{
 			name: "scalar string subquery",
 			in:   "SELECT id FROM events WHERE data.run_id = (SELECT max(run_id) AS m FROM runs)",
-			want: `SELECT id FROM events WHERE data ->> '$."run_id"' = (SELECT max(run_id) AS m FROM runs)`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.run_id, '$') = (SELECT max(run_id) AS m FROM runs)`,
 		},
 		{
 			name: "quantified string subquery",
 			in:   "SELECT id FROM events WHERE data.run_id = ANY (SELECT run_id FROM runs)",
-			want: `SELECT id FROM events WHERE data ->> '$."run_id"' = ANY (SELECT run_id FROM runs)`,
+			want: `SELECT id FROM events WHERE json_extract_string(data.run_id, '$') = ANY (SELECT run_id FROM runs)`,
 		},
 		{
 			name: "list comprehension variable untouched",
@@ -112,37 +112,37 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 		{
 			name: "CASE operand",
 			in:   "SELECT CASE data.kind WHEN 'a' THEN 1 ELSE 0 END AS k FROM events",
-			want: `SELECT CASE data ->> '$."kind"' WHEN 'a' THEN 1 ELSE 0 END AS k FROM events`,
+			want: `SELECT CASE json_extract_string(data.kind, '$') WHEN 'a' THEN 1 ELSE 0 END AS k FROM events`,
 		},
 		{
 			name: "quoted keys",
 			in:   `SELECT id FROM events WHERE data."a.b"."c d"."e""f" = 'x'`,
-			want: `SELECT id FROM events WHERE data ->> '$."a.b"."c d"."e\"f"' = 'x'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data."a.b"."c d"."e""f", '$') = 'x'`,
 		},
 		{
 			name: "key with a single quote",
 			in:   `SELECT id FROM events WHERE data."it's" = 'x'`,
-			want: `SELECT id FROM events WHERE data ->> '$."it''s"' = 'x'`,
+			want: `SELECT id FROM events WHERE json_extract_string(data."it's", '$') = 'x'`,
 		},
 		{
 			name: "every JSON column",
 			in:   "SELECT run_id FROM runs WHERE output.a = 'x' AND attributes.b = 'y' AND inputs.c = 'z' AND metadata.d = 'w'",
-			want: `SELECT run_id FROM runs WHERE output ->> '$."a"' = 'x' AND attributes ->> '$."b"' = 'y' AND inputs ->> '$."c"' = 'z' AND metadata ->> '$."d"' = 'w'`,
+			want: `SELECT run_id FROM runs WHERE json_extract_string(output.a, '$') = 'x' AND json_extract_string(attributes.b, '$') = 'y' AND json_extract_string(inputs.c, '$') = 'z' AND json_extract_string(metadata.d, '$') = 'w'`,
 		},
 		{
 			name: "CTE pass-through keeps JSON",
 			in:   "WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE data.user.id = 'u1'",
-			want: `WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE data ->> '$."user"."id"' = 'u1'`,
+			want: `WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE json_extract_string(data.user.id, '$') = 'u1'`,
 		},
 		{
 			name: "computed JSON base",
 			in:   "SELECT id FROM events WHERE json_extract(data, '$.user').id = 'u1' AND (data -> 'user').id = 'u1' AND (data::JSON).name LIKE 'a%'",
-			want: `SELECT id FROM events WHERE json_extract(data, '$.user') ->> '$."id"' = 'u1' AND (data -> 'user') ->> '$."id"' = 'u1' AND data::JSON ->> '$."name"' LIKE 'a%'`,
+			want: `SELECT id FROM events WHERE json_extract_string(json_extract(data, '$.user').id, '$') = 'u1' AND json_extract_string((data -> 'user').id, '$') = 'u1' AND json_extract_string((data::JSON).name, '$') LIKE 'a%'`,
 		},
 		{
 			name: "CTE computed JSON keeps JSON",
 			in:   "WITH e AS (SELECT json_extract(data, '$.user') AS u, to_json(name) AS n FROM events) SELECT u.id AS uid FROM e WHERE u.id = 'u1' AND n.x = 'y'",
-			want: `WITH e AS (SELECT json_extract(data, '$.user') AS u, to_json(name) AS n FROM events) SELECT u.id AS uid FROM e WHERE u ->> '$."id"' = 'u1' AND n ->> '$."x"' = 'y'`,
+			want: `WITH e AS (SELECT json_extract(data, '$.user') AS u, to_json(name) AS n FROM events) SELECT u.id AS uid FROM e WHERE json_extract_string(u.id, '$') = 'u1' AND json_extract_string(n.x, '$') = 'y'`,
 		},
 		{
 			name: "CTE wildcard extraction is not JSON",
@@ -152,7 +152,7 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 		{
 			name: "subquery",
 			in:   "SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE data.user.id = 'u1')",
-			want: `SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE data ->> '$."user"."id"' = 'u1')`,
+			want: `SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE json_extract_string(data.user.id, '$') = 'u1')`,
 		},
 		{
 			name: "array of structs untouched",

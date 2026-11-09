@@ -8,8 +8,8 @@ import (
 
 // rewriteJSONDotComparison makes a dot access into a JSON column
 // (data.user.id) compare as text wherever it's compared against a string,
-// rewriting it to its ->> extraction (data ->> '$."user"."id"', VARCHAR).
-// Mutates stmt in place.
+// wrapping it in its text extraction (json_extract_string(data.user.id,
+// '$'), VARCHAR, see jsonText). Mutates stmt in place.
 //
 // DuckDB's own dot access on a JSON value returns JSON, so data.user.id =
 // 'u1' casts 'u1' to JSON, which fails ('u1' isn't valid JSON text), and
@@ -17,8 +17,8 @@ import (
 // "u1", quotes and all). Everywhere else the dot access is left alone:
 // projected, grouped or ordered it stays JSON (an object stays an object),
 // and compared against a number or boolean DuckDB already casts the JSON to
-// that type itself (data.n > 5 works, data.n ->> ... > 5 wouldn't: VARCHAR
-// vs INTEGER needs an explicit cast).
+// that type itself (data.n > 5 works, its text extraction > 5 wouldn't:
+// VARCHAR vs INTEGER needs an explicit cast).
 //
 // What counts as "compared against a string" (see stringPeer):
 //
@@ -101,12 +101,12 @@ func (r *exprRewriter) textIfStringPeer(operands ...*parser.Expr) {
 	}
 }
 
-// textAlways rewrites each JSON dot access among operands to its text
+// textAlways wraps each JSON dot access among operands in its text
 // extraction.
 func (r *exprRewriter) textAlways(operands ...*parser.Expr) {
 	for _, op := range operands {
-		if base, path, ok := jsonAccess(*op, r.scope, r.isBound); ok && len(path) > 0 {
-			*op = jsonTextAccess(base, path)
+		if isJSONDot(*op, r.scope, r.isBound) {
+			*op = jsonText(*op)
 		}
 	}
 }
@@ -130,46 +130,51 @@ func (r *exprRewriter) selectType(sel *parser.SelectStatement) ColumnType {
 	return col.colType
 }
 
-// jsonAccess reports whether e is a JSON value: a json column (data, or
-// table-qualified e.data), a computed one (isComputedJSON), or a dot access
-// into either (data.user.id, or the
-// parenthesized (data.user).id, a DotExpr), returning the column reference
-// as base and the keys past it as path (user, id; nil for the column
-// itself). Name resolution matches checkQualifiedIdent (validate.go): a
-// leading table name wins over a same-named column. bound, if non-nil,
-// reports a list-comprehension variable, which shadows any column.
-func jsonAccess(e parser.Expr, scope *tableScope, bound func(string) bool) (base parser.Expr, path []string, ok bool) {
+// jsonAccess reports whether e is a JSON value (json): a json column (data,
+// or table-qualified e.data), a computed one (isComputedJSON), or a dot
+// access into either; and whether it's such a dot access (dot): data.user.id,
+// or the parenthesized (data.user).id (a DotExpr). Name resolution matches
+// checkQualifiedIdent (validate.go): a leading table name wins over a
+// same-named column. bound, if non-nil, reports a list-comprehension
+// variable, which shadows any column.
+func jsonAccess(e parser.Expr, scope *tableScope, bound func(string) bool) (json, dot bool) {
 	switch x := e.(type) {
 	case *parser.Ident:
 		if bound != nil && bound(x.Parts[0]) {
-			return nil, nil, false
+			return false, false
 		}
-		if len(x.Parts) >= 2 {
-			if tbl, isTable := scope.lookup(x.Parts[0]); isTable {
-				col, found := tbl.column(x.Parts[1])
-				if !found || !col.json {
-					return nil, nil, false
-				}
-				return &parser.Ident{Parts: append([]string(nil), x.Parts[:2]...)}, x.Parts[2:], true
-			}
-		}
-		col, found := scope.uniqueColumn(x.Parts[0])
+		col, rest, found := resolveColumnPrefix(x.Parts, scope)
 		if !found || !col.json {
-			return nil, nil, false
+			return false, false
 		}
-		return &parser.Ident{Parts: []string{x.Parts[0]}}, x.Parts[1:], true
+		return true, len(rest) > 0
 	case *parser.DotExpr:
-		base, path, ok := jsonAccess(x.X, scope, bound)
-		if !ok {
-			return nil, nil, false
-		}
-		return base, append(append([]string(nil), path...), x.Field), true
+		json, _ := jsonAccess(x.X, scope, bound)
+		return json, json
 	default:
-		if isComputedJSON(e) {
-			return e, nil, true
-		}
-		return nil, nil, false
+		return isComputedJSON(e), false
 	}
+}
+
+// resolveColumnPrefix resolves the column parts names (table.col.rest... if
+// parts[0] is a table in scope, else col.rest...), returning it and the
+// parts past it.
+func resolveColumnPrefix(parts []string, scope *tableScope) (col knownColumn, rest []string, ok bool) {
+	if len(parts) >= 2 {
+		if tbl, isTable := scope.lookup(parts[0]); isTable {
+			col, ok = tbl.column(parts[1])
+			return col, parts[2:], ok
+		}
+	}
+	col, ok = scope.uniqueColumn(parts[0])
+	return col, parts[1:], ok
+}
+
+// isJSONDot reports whether e is a dot access into a JSON value (see
+// jsonAccess).
+func isJSONDot(e parser.Expr, scope *tableScope, bound func(string) bool) bool {
+	_, dot := jsonAccess(e, scope, bound)
+	return dot
 }
 
 // jsonReturningFunctions return a single JSON value whatever their
@@ -222,28 +227,23 @@ func isScalarJSONPath(e parser.Expr) bool {
 	}
 }
 
-// jsonTextAccess builds base ->> '$."k1"."k2"', every key quoted so one
-// holding a dot, space or other JSONPath syntax is still one key (as
-// DuckDB's own dot access treats it), matching defer.go's
-// (pkg/duckdb/query) ->>'$."key"' quoting.
-func jsonTextAccess(base parser.Expr, path []string) parser.Expr {
-	var sb strings.Builder
-	sb.WriteString("$")
-	for _, key := range path {
-		sb.WriteString(`."`)
-		sb.WriteString(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(key))
-		sb.WriteString(`"`)
-	}
-	return &parser.BinaryExpr{
-		Op:    "->>",
-		Left:  base,
-		Right: &parser.Literal{Kind: parser.LitString, Text: sb.String()},
+// jsonText wraps e, a JSON value, in json_extract_string(e, '$'): its
+// text, the same VARCHAR ->> extracts (a string unquoted, a number, bool,
+// object or array as its JSON text, a JSON null or missing key as NULL).
+// Wrapping the dot access as written, rather than re-encoding its keys as
+// one ->> JSONPath, keeps any base (a parenthesized or computed one) and key
+// (dots, quotes) exactly as DuckDB resolves it. json_extract(e, '$') would
+// be a no-op, still JSON.
+func jsonText(e parser.Expr) parser.Expr {
+	return &parser.FunctionExpr{
+		Name: []string{"json_extract_string"},
+		Args: []parser.Expr{e, &parser.Literal{Kind: parser.LitString, Text: "$"}},
 	}
 }
 
 // isJSONValue reports whether expr is a JSON value (see jsonAccess), for
 // a derived table's json flag.
 func isJSONValue(expr parser.Expr, scope *tableScope) bool {
-	_, _, ok := jsonAccess(expr, scope, nil)
-	return ok
+	json, _ := jsonAccess(expr, scope, nil)
+	return json
 }

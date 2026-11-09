@@ -30,7 +30,7 @@ derive.go        deriveTable — synthesizes a logicalTable for a CTE/subquery f
 typecheck.go     inferType — static, allowlist-only expression type inference (backs deriveTable)
 validate.go      the validate stage — table/column/function allowlisting; validateWithCTEs threads CTE scope
 rewrite.go       rewriteScopedExprs — scoped bottom-up expression rewriter (array-of-struct col.field -> ->>)
-jsondot.go       rewriteJSONDotComparison — JSON col.key compared to a string -> col ->> '$."key"'
+jsondot.go       rewriteJSONDotComparison — JSON col.key compared to a string -> json_extract_string(col.key, '$')
 jsonpath.go      jsonPathAccess — recognizes every "->>'/->/json_extract*" shape for hint-tracing
 columnhints.go   the buildColumnHints stage
 queryinfo.go     the extractQueryInfo stage
