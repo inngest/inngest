@@ -13,15 +13,24 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// fakeDocker puts a docker script first in PATH.  it writes its args and
-// its stdin to files in the returned directory.
+// fakeDocker puts a docker script first in PATH.  `docker build` writes its
+// args and its stdin to files in the returned directory.  `docker image
+// inspect` reports a linux/amd64 image, and `docker save -o path` writes
+// "image bytes" to path.
 func fakeDocker(t *testing.T) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("fake docker is a shell script")
 	}
 	dir := t.TempDir()
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + dir + "/args\"\ncat > \"" + dir + "/stdin\"\n"
+	script := `#!/bin/sh
+case "$1" in
+image) printf '{"Os":"linux","Architecture":"amd64"}'; exit 0;;
+save) printf 'image bytes' > "$3"; exit 0;;
+esac
+printf '%s\n' "$@" > "` + dir + `/args"
+cat > "` + dir + `/stdin"
+`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker"), []byte(script), 0o755))
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return dir

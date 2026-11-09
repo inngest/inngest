@@ -162,7 +162,7 @@ func newClient(ctx context.Context) (*client, error) {
 	token := func(ctx context.Context) (string, error) {
 		token, _, err := manager.AccessToken(ctx, resource)
 		if errors.Is(err, cliauth.ErrNotLoggedIn) {
-			return "", errors.New("authentication required to push images; log in with `inngest login`")
+			return "", errors.New("authentication required; log in with `inngest login`")
 		}
 		return token, err
 	}

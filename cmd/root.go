@@ -102,6 +102,7 @@ func execute() {
 			authcmd.LogoutCommand(),
 			authcmd.AuthCommand(),
 			imagecmd.Command(),
+			imagecmd.DeployCommand(),
 			apiv2cli.Command(),
 			devserver.Command(),
 			duckdb.Command(),

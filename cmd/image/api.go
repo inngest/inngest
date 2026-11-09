@@ -64,6 +64,33 @@ func (c *client) getBuild(ctx context.Context, buildID string) (*apiv2.Build, er
 	return resp.GetData(), nil
 }
 
+func (c *client) createDeploy(ctx context.Context, req *apiv2.CreateDeployRequest) (*apiv2.CreateDeployResponse, error) {
+	resp := &apiv2.CreateDeployResponse{}
+	err := c.do(ctx, http.MethodPost, "/deploys/"+url.PathEscape(req.GetName()), req, resp)
+	return resp, err
+}
+
+func (c *client) commitDeploy(ctx context.Context, name, deployID string) (*apiv2.Deploy, error) {
+	req := &apiv2.CommitDeployRequest{
+		DeployId: deployID,
+		Name:     name,
+	}
+	resp := &apiv2.DeployResponse{}
+	path := "/deploys/" + url.PathEscape(name) + "/" + url.PathEscape(deployID) + "/commit"
+	if err := c.do(ctx, http.MethodPost, path, req, resp); err != nil {
+		return nil, err
+	}
+	return resp.GetData(), nil
+}
+
+func (c *client) getDeploy(ctx context.Context, deployID string) (*apiv2.Deploy, error) {
+	resp := &apiv2.DeployResponse{}
+	if err := c.do(ctx, http.MethodGet, "/deploys/"+url.PathEscape(deployID), nil, resp); err != nil {
+		return nil, err
+	}
+	return resp.GetData(), nil
+}
+
 func (c *client) do(ctx context.Context, method, path string, in, out proto.Message) error {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
