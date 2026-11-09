@@ -445,6 +445,12 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				)
 			}
 
+		case enums.OpcodeLoopReturn:
+			// a LoopReturn is only checked in the run response path.  a
+			// checkpoint cannot carry one, since nothing here validates it
+			// before the loop state is written.
+			return fmt.Errorf("step %s: a LoopReturn cannot be checkpointed, it must be the run response", op.ID)
+
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span
