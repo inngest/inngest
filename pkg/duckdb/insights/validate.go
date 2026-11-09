@@ -19,9 +19,15 @@ import (
 // bounds how size-limited calls compose across the whole statement (see
 // checkSizeComposition) and how much a list comprehension can fan out (see
 // checkComprehensionFanOut).
-func validate(stmt *parser.SelectStatement) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
+func validate(stmt *parser.SelectStatement, cat catalog) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
 	var diags []Diagnostic
-	scope, ctes, err := validateWithCTEs(stmt, nil, nil, &diags)
+	// The catalog's tables are the root of the CTE chain every scope
+	// resolves names through.
+	root := make(map[string]logicalTable, len(cat.tables))
+	for name, tbl := range cat.tables {
+		root[name] = tbl
+	}
+	scope, ctes, err := validateWithCTEs(stmt, root, nil, &diags)
 	if err == nil {
 		err = checkSizeComposition(stmt)
 	}
@@ -429,7 +435,7 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 			return nil
 		}
 	case *parser.Parameter:
-		// remapTables binds every macro call's (account_id, env_id) to
+		// Render binds every macro call's (account_id, env_id) to
 		// anonymous "?" placeholders, positionally. A user's own "?" would
 		// shift those bindings, and "$1"/"$name" could read them back, so
 		// user-written parameters are rejected outright (nothing could

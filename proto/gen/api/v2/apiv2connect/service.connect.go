@@ -148,14 +148,24 @@ const (
 	V2CreateScoreProcedure = "/api.v2.V2/CreateScore"
 	// V2SyncAppProcedure is the fully-qualified name of the V2's SyncApp RPC.
 	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
+	// V2ListAppSyncsProcedure is the fully-qualified name of the V2's ListAppSyncs RPC.
+	V2ListAppSyncsProcedure = "/api.v2.V2/ListAppSyncs"
+	// V2GetAppSyncProcedure is the fully-qualified name of the V2's GetAppSync RPC.
+	V2GetAppSyncProcedure = "/api.v2.V2/GetAppSync"
 	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
 	V2GetFunctionProcedure = "/api.v2.V2/GetFunction"
+	// V2CreateCancellationProcedure is the fully-qualified name of the V2's CreateCancellation RPC.
+	V2CreateCancellationProcedure = "/api.v2.V2/CreateCancellation"
 	// V2PauseFunctionProcedure is the fully-qualified name of the V2's PauseFunction RPC.
 	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2ResumeFunctionProcedure is the fully-qualified name of the V2's ResumeFunction RPC.
 	V2ResumeFunctionProcedure = "/api.v2.V2/ResumeFunction"
+	// V2PauseFunctionsProcedure is the fully-qualified name of the V2's PauseFunctions RPC.
+	V2PauseFunctionsProcedure = "/api.v2.V2/PauseFunctions"
+	// V2ResumeFunctionsProcedure is the fully-qualified name of the V2's ResumeFunctions RPC.
+	V2ResumeFunctionsProcedure = "/api.v2.V2/ResumeFunctions"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
 	V2GetFunctionsProcedure = "/api.v2.V2/GetFunctions"
 	// V2ListEventsProcedure is the fully-qualified name of the V2's ListEvents RPC.
@@ -185,6 +195,8 @@ const (
 	V2ListSessionsProcedure = "/api.v2.V2/ListSessions"
 	// V2ListSessionRunsProcedure is the fully-qualified name of the V2's ListSessionRuns RPC.
 	V2ListSessionRunsProcedure = "/api.v2.V2/ListSessionRuns"
+	// V2SubmitFeedbackProcedure is the fully-qualified name of the V2's SubmitFeedback RPC.
+	V2SubmitFeedbackProcedure = "/api.v2.V2/SubmitFeedback"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -246,10 +258,15 @@ type V2Client interface {
 	StreamSandboxProcessOutput(context.Context, *connect.Request[v2.StreamSandboxProcessOutputRequest]) (*connect.ServerStreamForClient[v2.StreamSandboxProcessOutputResponse], error)
 	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error)
+	GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
+	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
 	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
@@ -264,6 +281,7 @@ type V2Client interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -601,6 +619,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("SyncApp")),
 			connect.WithClientOptions(opts...),
 		),
+		listAppSyncs: connect.NewClient[v2.ListAppSyncsRequest, v2.ListAppSyncsResponse](
+			httpClient,
+			baseURL+V2ListAppSyncsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListAppSyncs")),
+			connect.WithClientOptions(opts...),
+		),
+		getAppSync: connect.NewClient[v2.GetAppSyncRequest, v2.GetAppSyncResponse](
+			httpClient,
+			baseURL+V2GetAppSyncProcedure,
+			connect.WithSchema(v2Methods.ByName("GetAppSync")),
+			connect.WithClientOptions(opts...),
+		),
 		getFunctionTrace: connect.NewClient[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse](
 			httpClient,
 			baseURL+V2GetFunctionTraceProcedure,
@@ -613,6 +643,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		createCancellation: connect.NewClient[v2.CreateCancellationRequest, v2.CreateCancellationResponse](
+			httpClient,
+			baseURL+V2CreateCancellationProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateCancellation")),
+			connect.WithClientOptions(opts...),
+		),
 		pauseFunction: connect.NewClient[v2.PauseFunctionRequest, v2.PauseFunctionResponse](
 			httpClient,
 			baseURL+V2PauseFunctionProcedure,
@@ -623,6 +659,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2ResumeFunctionProcedure,
 			connect.WithSchema(v2Methods.ByName("ResumeFunction")),
+			connect.WithClientOptions(opts...),
+		),
+		pauseFunctions: connect.NewClient[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse](
+			httpClient,
+			baseURL+V2PauseFunctionsProcedure,
+			connect.WithSchema(v2Methods.ByName("PauseFunctions")),
+			connect.WithClientOptions(opts...),
+		),
+		resumeFunctions: connect.NewClient[v2.ResumeFunctionsRequest, v2.ResumeFunctionsResponse](
+			httpClient,
+			baseURL+V2ResumeFunctionsProcedure,
+			connect.WithSchema(v2Methods.ByName("ResumeFunctions")),
 			connect.WithClientOptions(opts...),
 		),
 		getFunctions: connect.NewClient[v2.GetFunctionsRequest, v2.GetFunctionsResponse](
@@ -709,6 +757,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
 			connect.WithClientOptions(opts...),
 		),
+		submitFeedback: connect.NewClient[v2.SubmitFeedbackRequest, v2.SubmitFeedbackResponse](
+			httpClient,
+			baseURL+V2SubmitFeedbackProcedure,
+			connect.WithSchema(v2Methods.ByName("SubmitFeedback")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -768,10 +822,15 @@ type v2Client struct {
 	streamSandboxProcessOutput *connect.Client[v2.StreamSandboxProcessOutputRequest, v2.StreamSandboxProcessOutputResponse]
 	createScore                *connect.Client[v2.CreateScoreRequest, v2.CreateScoreResponse]
 	syncApp                    *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
+	listAppSyncs               *connect.Client[v2.ListAppSyncsRequest, v2.ListAppSyncsResponse]
+	getAppSync                 *connect.Client[v2.GetAppSyncRequest, v2.GetAppSyncResponse]
 	getFunctionTrace           *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
+	createCancellation         *connect.Client[v2.CreateCancellationRequest, v2.CreateCancellationResponse]
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	resumeFunction             *connect.Client[v2.ResumeFunctionRequest, v2.ResumeFunctionResponse]
+	pauseFunctions             *connect.Client[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse]
+	resumeFunctions            *connect.Client[v2.ResumeFunctionsRequest, v2.ResumeFunctionsResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
 	listEvents                 *connect.Client[v2.ListEventsRequest, v2.ListEventsResponse]
 	getEvent                   *connect.Client[v2.GetEventRequest, v2.GetEventResponse]
@@ -786,6 +845,7 @@ type v2Client struct {
 	listSessionKeys            *connect.Client[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse]
 	listSessions               *connect.Client[v2.ListSessionsRequest, v2.ListSessionsResponse]
 	listSessionRuns            *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
+	submitFeedback             *connect.Client[v2.SubmitFeedbackRequest, v2.SubmitFeedbackResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -1058,6 +1118,16 @@ func (c *v2Client) SyncApp(ctx context.Context, req *connect.Request[v2.SyncAppR
 	return c.syncApp.CallUnary(ctx, req)
 }
 
+// ListAppSyncs calls api.v2.V2.ListAppSyncs.
+func (c *v2Client) ListAppSyncs(ctx context.Context, req *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error) {
+	return c.listAppSyncs.CallUnary(ctx, req)
+}
+
+// GetAppSync calls api.v2.V2.GetAppSync.
+func (c *v2Client) GetAppSync(ctx context.Context, req *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error) {
+	return c.getAppSync.CallUnary(ctx, req)
+}
+
 // GetFunctionTrace calls api.v2.V2.GetFunctionTrace.
 func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
 	return c.getFunctionTrace.CallUnary(ctx, req)
@@ -1068,6 +1138,11 @@ func (c *v2Client) GetFunction(ctx context.Context, req *connect.Request[v2.GetF
 	return c.getFunction.CallUnary(ctx, req)
 }
 
+// CreateCancellation calls api.v2.V2.CreateCancellation.
+func (c *v2Client) CreateCancellation(ctx context.Context, req *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error) {
+	return c.createCancellation.CallUnary(ctx, req)
+}
+
 // PauseFunction calls api.v2.V2.PauseFunction.
 func (c *v2Client) PauseFunction(ctx context.Context, req *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
 	return c.pauseFunction.CallUnary(ctx, req)
@@ -1076,6 +1151,16 @@ func (c *v2Client) PauseFunction(ctx context.Context, req *connect.Request[v2.Pa
 // ResumeFunction calls api.v2.V2.ResumeFunction.
 func (c *v2Client) ResumeFunction(ctx context.Context, req *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error) {
 	return c.resumeFunction.CallUnary(ctx, req)
+}
+
+// PauseFunctions calls api.v2.V2.PauseFunctions.
+func (c *v2Client) PauseFunctions(ctx context.Context, req *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {
+	return c.pauseFunctions.CallUnary(ctx, req)
+}
+
+// ResumeFunctions calls api.v2.V2.ResumeFunctions.
+func (c *v2Client) ResumeFunctions(ctx context.Context, req *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error) {
+	return c.resumeFunctions.CallUnary(ctx, req)
 }
 
 // GetFunctions calls api.v2.V2.GetFunctions.
@@ -1148,6 +1233,11 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, req *connect.Request[v2.
 	return c.listSessionRuns.CallUnary(ctx, req)
 }
 
+// SubmitFeedback calls api.v2.V2.SubmitFeedback.
+func (c *v2Client) SubmitFeedback(ctx context.Context, req *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error) {
+	return c.submitFeedback.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -1207,10 +1297,15 @@ type V2Handler interface {
 	StreamSandboxProcessOutput(context.Context, *connect.Request[v2.StreamSandboxProcessOutputRequest], *connect.ServerStream[v2.StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error)
+	GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
+	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
 	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
@@ -1225,6 +1320,7 @@ type V2Handler interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -1558,6 +1654,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("SyncApp")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListAppSyncsHandler := connect.NewUnaryHandler(
+		V2ListAppSyncsProcedure,
+		svc.ListAppSyncs,
+		connect.WithSchema(v2Methods.ByName("ListAppSyncs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetAppSyncHandler := connect.NewUnaryHandler(
+		V2GetAppSyncProcedure,
+		svc.GetAppSync,
+		connect.WithSchema(v2Methods.ByName("GetAppSync")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetFunctionTraceHandler := connect.NewUnaryHandler(
 		V2GetFunctionTraceProcedure,
 		svc.GetFunctionTrace,
@@ -1570,6 +1678,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateCancellationHandler := connect.NewUnaryHandler(
+		V2CreateCancellationProcedure,
+		svc.CreateCancellation,
+		connect.WithSchema(v2Methods.ByName("CreateCancellation")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2PauseFunctionHandler := connect.NewUnaryHandler(
 		V2PauseFunctionProcedure,
 		svc.PauseFunction,
@@ -1580,6 +1694,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2ResumeFunctionProcedure,
 		svc.ResumeFunction,
 		connect.WithSchema(v2Methods.ByName("ResumeFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2PauseFunctionsHandler := connect.NewUnaryHandler(
+		V2PauseFunctionsProcedure,
+		svc.PauseFunctions,
+		connect.WithSchema(v2Methods.ByName("PauseFunctions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ResumeFunctionsHandler := connect.NewUnaryHandler(
+		V2ResumeFunctionsProcedure,
+		svc.ResumeFunctions,
+		connect.WithSchema(v2Methods.ByName("ResumeFunctions")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2GetFunctionsHandler := connect.NewUnaryHandler(
@@ -1664,6 +1790,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2ListSessionRunsProcedure,
 		svc.ListSessionRuns,
 		connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2SubmitFeedbackHandler := connect.NewUnaryHandler(
+		V2SubmitFeedbackProcedure,
+		svc.SubmitFeedback,
+		connect.WithSchema(v2Methods.ByName("SubmitFeedback")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1776,14 +1908,24 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateScoreHandler.ServeHTTP(w, r)
 		case V2SyncAppProcedure:
 			v2SyncAppHandler.ServeHTTP(w, r)
+		case V2ListAppSyncsProcedure:
+			v2ListAppSyncsHandler.ServeHTTP(w, r)
+		case V2GetAppSyncProcedure:
+			v2GetAppSyncHandler.ServeHTTP(w, r)
 		case V2GetFunctionTraceProcedure:
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2GetFunctionProcedure:
 			v2GetFunctionHandler.ServeHTTP(w, r)
+		case V2CreateCancellationProcedure:
+			v2CreateCancellationHandler.ServeHTTP(w, r)
 		case V2PauseFunctionProcedure:
 			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2ResumeFunctionProcedure:
 			v2ResumeFunctionHandler.ServeHTTP(w, r)
+		case V2PauseFunctionsProcedure:
+			v2PauseFunctionsHandler.ServeHTTP(w, r)
+		case V2ResumeFunctionsProcedure:
+			v2ResumeFunctionsHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
 			v2GetFunctionsHandler.ServeHTTP(w, r)
 		case V2ListEventsProcedure:
@@ -1812,6 +1954,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListSessionsHandler.ServeHTTP(w, r)
 		case V2ListSessionRunsProcedure:
 			v2ListSessionRunsHandler.ServeHTTP(w, r)
+		case V2SubmitFeedbackProcedure:
+			v2SubmitFeedbackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -2037,6 +2181,14 @@ func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncA
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SyncApp is not implemented"))
 }
 
+func (UnimplementedV2Handler) ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListAppSyncs is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetAppSync is not implemented"))
+}
+
 func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTrace is not implemented"))
 }
@@ -2045,12 +2197,24 @@ func (UnimplementedV2Handler) GetFunction(context.Context, *connect.Request[v2.G
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunction is not implemented"))
 }
 
+func (UnimplementedV2Handler) CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateCancellation is not implemented"))
+}
+
 func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseFunction is not implemented"))
 }
 
 func (UnimplementedV2Handler) ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseFunctions is not implemented"))
+}
+
+func (UnimplementedV2Handler) ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeFunctions is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {
@@ -2107,4 +2271,8 @@ func (UnimplementedV2Handler) ListSessions(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListSessionRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SubmitFeedback is not implemented"))
 }

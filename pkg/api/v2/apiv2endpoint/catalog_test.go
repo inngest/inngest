@@ -42,6 +42,13 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, http.MethodPost, byMethod["PauseFunction"].HTTPMethod)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", byMethod["PauseFunction"].Path)
 	require.Empty(t, byMethod["PauseFunction"].Body)
+	require.Equal(t, "runs:write:bulk_cancel", byMethod["CreateCancellation"].AuthzPermission)
+	require.Equal(t, "create-cancellation", byMethod["CreateCancellation"].CommandName)
+	require.Equal(t, "create_cancellation", byMethod["CreateCancellation"].ToolName)
+	require.Equal(t, http.MethodPost, byMethod["CreateCancellation"].HTTPMethod)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/cancellations", byMethod["CreateCancellation"].Path)
+	require.Equal(t, "*", byMethod["CreateCancellation"].Body)
+	require.Equal(t, []string{"app_id", "function_id"}, byMethod["CreateCancellation"].PathParams)
 	require.Equal(t, "functions:write:resume", byMethod["ResumeFunction"].AuthzPermission)
 	require.Equal(t, "resume-function", byMethod["ResumeFunction"].CommandName)
 	require.Equal(t, "resume_function", byMethod["ResumeFunction"].ToolName)
@@ -79,5 +86,45 @@ func TestEventReadCatalog(t *testing.T) {
 		require.Equal(t, tc.path, endpoint.Path)
 		require.Equal(t, tc.permission, endpoint.AuthzPermission)
 		require.Equal(t, []string{"payload"}, FieldEnum(endpoint.Input.Fields().ByName("include")))
+	}
+}
+
+func TestFunctionsPauseResumeCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, action string }{
+		{"PauseFunctions", "pause"},
+		{"ResumeFunctions", "resume"},
+	} {
+		endpoint := byMethod[tc.method]
+		require.Equal(t, "functions:write:"+tc.action, endpoint.AuthzPermission)
+		require.Equal(t, tc.action+"-functions", endpoint.CommandName)
+		require.Equal(t, tc.action+"_functions", endpoint.ToolName)
+		require.Equal(t, http.MethodPost, endpoint.HTTPMethod)
+		require.Equal(t, "/apps/{app_id}/functions/"+tc.action, endpoint.Path)
+		require.Equal(t, "*", endpoint.Body)
+		require.True(t, IsRequired(endpoint.Input.Fields().ByName("function_ids")))
+	}
+}
+
+func TestAppSyncReadCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, command, tool, path, permission string }{
+		{"ListAppSyncs", "list-app-syncs", "list_app_syncs", "/apps/{app_id}/syncs", "apps:read:list_syncs"},
+		{"GetAppSync", "get-app-sync", "get_app_sync", "/apps/{app_id}/syncs/{sync_id}", "apps:read:get_sync"},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			endpoint := byMethod[tc.method]
+			require.Equal(t, tc.command, endpoint.CommandName)
+			require.Equal(t, tc.tool, endpoint.ToolName)
+			require.Equal(t, http.MethodGet, endpoint.HTTPMethod)
+			require.Equal(t, tc.path, endpoint.Path)
+			require.Equal(t, tc.permission, endpoint.AuthzPermission)
+		})
 	}
 }

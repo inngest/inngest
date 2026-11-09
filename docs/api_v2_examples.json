@@ -405,5 +405,137 @@
         ]
       }
     }
+  },
+  "/apps/{appId}/functions/pause": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": true,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions/resume": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": false,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/syncs": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "id": "7d9a8e1b-3f24-4d6c-9a50-2e7f6b8c1d03",
+            "appId": "my-app",
+            "status": "success",
+            "url": "https://example.com/api/inngest",
+            "sdkLanguage": "typescript",
+            "sdkVersion": "3.22.0",
+            "framework": "nextjs",
+            "appVersion": "v1.2.3",
+            "createdAt": "2026-06-10T11:55:00Z"
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        },
+        "page": {
+          "limit": 20,
+          "hasMore": false
+        }
+      }
+    }
+  },
+  "/apps/{appId}/syncs/{syncId}": {
+    "get": {
+      "200": {
+        "data": {
+          "id": "7d9a8e1b-3f24-4d6c-9a50-2e7f6b8c1d03",
+          "appId": "my-app",
+          "status": "success",
+          "url": "https://example.com/api/inngest",
+          "sdkLanguage": "typescript",
+          "sdkVersion": "3.22.0",
+          "framework": "nextjs",
+          "appVersion": "v1.2.3",
+          "createdAt": "2026-06-10T11:55:00Z"
+        },
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        }
+      }
+    }
   }
 }

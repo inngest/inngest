@@ -1,0 +1,4 @@
+{
+  "description": "A LEFT JOIN's ON condition on the preserved side doesn't filter its rows, so it mustn't be pushed.",
+  "mode": "product"
+}

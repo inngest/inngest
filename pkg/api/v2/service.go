@@ -25,8 +25,10 @@ type Service struct {
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
 	apps           AppProvider
+	appSyncs       AppSyncProvider
 	functions      FunctionProvider
 	functionPauser FunctionPauser
+	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
 	events         EventProvider
@@ -53,8 +55,10 @@ type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
 	Apps                AppProvider
+	AppSyncs            AppSyncProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
+	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
 	Events              EventProvider
@@ -84,8 +88,10 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		apps:           opts.Apps,
+		appSyncs:       opts.AppSyncs,
 		functions:      opts.Functions,
 		functionPauser: opts.FunctionPauser,
+		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
 		events:         opts.Events,
@@ -249,7 +255,12 @@ func normalizedV2Path(path string) string {
 func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		type route struct{ method, path string }
-		limits := map[string]int64{"SendEvent": maxEventBytes, "CreateReplay": 64 << 10}
+		limits := map[string]int64{
+			"SendEvent":       maxEventBytes,
+			"CreateReplay":    64 << 10,
+			"PauseFunctions":  256 << 10,
+			"ResumeFunctions": 256 << 10,
+		}
 		handlers := map[route]http.Handler{}
 		paths := chi.NewRouter()
 		for _, endpoint := range apiv2endpoint.Discover() {

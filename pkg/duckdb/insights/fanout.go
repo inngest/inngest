@@ -134,7 +134,7 @@ func fanOutAllowed(n parser.Node) bool {
 		*parser.LikeExpr, *parser.CastExpr, *parser.CaseExpr, *parser.CaseWhen,
 		*parser.ListExpr, *parser.StructExpr, *parser.StructField, *parser.MapExpr,
 		*parser.IntervalExpr, *parser.TypeLiteral, *parser.NamedArg, *parser.DotExpr,
-		*parser.SliceExpr:
+		*parser.SliceExpr, *parser.TypeName, *parser.TypeField:
 		return true
 	case *parser.InExpr:
 		return x.Subquery == nil

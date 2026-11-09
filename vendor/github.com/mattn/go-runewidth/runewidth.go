@@ -2,8 +2,11 @@ package runewidth
 
 import (
 	"os"
+	"sort"
+	"strings"
+	"unicode/utf8"
 
-	"github.com/rivo/uniseg"
+	"github.com/clipperhouse/uax29/v2/graphemes"
 )
 
 //go:generate go run script/generate.go
@@ -22,8 +25,52 @@ var (
 	}
 )
 
+var (
+	zerowidth       table // combining + nonprint merged for faster zero-width lookup
+	widewidth       table // ambiguous + doublewidth merged for EA path
+	eastAsianWidth  widthTable
+	eastAsianWidth0 [0x300]byte
+)
+
 func init() {
+	zerowidth = mergeIntervals(combining, nonprint)
+	widewidth = mergeIntervals(ambiguous, doublewidth)
+	eastAsianWidth = makeWidthTable(zerowidth, widewidth)
+	for r := range eastAsianWidth0 {
+		eastAsianWidth0[r] = byte(runeWidthEastAsian(rune(r)))
+	}
 	handleEnv()
+}
+
+func mergeIntervals(t1, t2 table) table {
+	merged := make(table, 0, len(t1)+len(t2))
+	i, j := 0, 0
+	for i < len(t1) && j < len(t2) {
+		if t1[i].first <= t2[j].first {
+			merged = append(merged, t1[i])
+			i++
+		} else {
+			merged = append(merged, t2[j])
+			j++
+		}
+	}
+	merged = append(merged, t1[i:]...)
+	merged = append(merged, t2[j:]...)
+	if len(merged) == 0 {
+		return merged
+	}
+	result := merged[:1]
+	for _, iv := range merged[1:] {
+		last := &result[len(result)-1]
+		if iv.first <= last.last+1 {
+			if iv.last > last.last {
+				last.last = iv.last
+			}
+		} else {
+			result = append(result, iv)
+		}
+	}
+	return result
 }
 
 func handleEnv() {
@@ -34,7 +81,13 @@ func handleEnv() {
 		EastAsianWidth = env == "1"
 	}
 	// update DefaultCondition
-	DefaultCondition.EastAsianWidth = EastAsianWidth
+	if DefaultCondition.EastAsianWidth != EastAsianWidth {
+		DefaultCondition.EastAsianWidth = EastAsianWidth
+		if len(DefaultCondition.combinedLut) > 0 {
+			DefaultCondition.combinedLut = DefaultCondition.combinedLut[:0]
+			CreateLUT()
+		}
+	}
 }
 
 type interval struct {
@@ -44,17 +97,19 @@ type interval struct {
 
 type table []interval
 
-func inTables(r rune, ts ...table) bool {
-	for _, t := range ts {
-		if inTable(r, t) {
-			return true
-		}
-	}
-	return false
+type widthInterval struct {
+	first rune
+	last  rune
+	width byte
 }
+
+type widthTable []widthInterval
 
 func inTable(r rune, t table) bool {
 	if r < t[0].first {
+		return false
+	}
+	if r > t[len(t)-1].last {
 		return false
 	}
 
@@ -76,6 +131,71 @@ func inTable(r rune, t table) bool {
 	return false
 }
 
+func makeWidthTable(zero, two table) widthTable {
+	wt := make(widthTable, 0, len(zero)+len(two))
+	zi := 0
+	for _, iv := range two {
+		start := iv.first
+		for zi < len(zero) && zero[zi].last < start {
+			zi++
+		}
+		for i := zi; i < len(zero) && zero[i].first <= iv.last; i++ {
+			if start < zero[i].first {
+				wt = append(wt, widthInterval{start, zero[i].first - 1, 2})
+			}
+			if start <= zero[i].last {
+				start = zero[i].last + 1
+			}
+			if start > iv.last {
+				break
+			}
+		}
+		if start <= iv.last {
+			wt = append(wt, widthInterval{start, iv.last, 2})
+		}
+	}
+	for _, iv := range zero {
+		wt = append(wt, widthInterval{iv.first, iv.last, 0})
+	}
+	sort.Slice(wt, func(i, j int) bool {
+		return wt[i].first < wt[j].first
+	})
+	return wt
+}
+
+func inWidthTable(r rune, t widthTable) (int, bool) {
+	if r < t[0].first {
+		return 0, false
+	}
+	if r > t[len(t)-1].last {
+		return 0, false
+	}
+
+	bot := 0
+	top := len(t) - 1
+	for top >= bot {
+		mid := (bot + top) >> 1
+
+		switch {
+		case t[mid].last < r:
+			bot = mid + 1
+		case t[mid].first > r:
+			top = mid - 1
+		default:
+			return int(t[mid].width), true
+		}
+	}
+
+	return 0, false
+}
+
+func runeWidthEastAsian(r rune) int {
+	if w, ok := inWidthTable(r, eastAsianWidth); ok {
+		return w
+	}
+	return 1
+}
+
 var private = table{
 	{0x00E000, 0x00F8FF}, {0x0F0000, 0x0FFFFD}, {0x100000, 0x10FFFD},
 }
@@ -89,6 +209,7 @@ var nonprint = table{
 
 // Condition have flag EastAsianWidth whether the current locale is CJK or not.
 type Condition struct {
+	combinedLut        []byte
 	EastAsianWidth     bool
 	StrictEmojiNeutral bool
 }
@@ -104,46 +225,99 @@ func NewCondition() *Condition {
 // RuneWidth returns the number of cells in r.
 // See http://www.unicode.org/reports/tr11/
 func (c *Condition) RuneWidth(r rune) int {
+	if r < 0 || r > 0x10FFFF {
+		return 0
+	}
+	if len(c.combinedLut) > 0 {
+		return int(c.combinedLut[r>>1]>>(uint(r&1)*4)) & 3
+	}
 	// optimized version, verified by TestRuneWidthChecksums()
 	if !c.EastAsianWidth {
+		if r < 0x20 {
+			return 0
+		}
+		if (r >= 0x7F && r <= 0x9F) || r == 0xAD { // nonprint
+			return 0
+		}
+		if r < 0x300 {
+			return 1
+		}
 		switch {
-		case r < 0x20 || r > 0x10FFFF:
-			return 0
-		case (r >= 0x7F && r <= 0x9F) || r == 0xAD: // nonprint
-			return 0
-		case r < 0x300:
-			return 1
-		case inTable(r, narrow):
-			return 1
-		case inTables(r, nonprint, combining):
+		case inTable(r, zerowidth):
 			return 0
 		case inTable(r, doublewidth):
 			return 2
 		default:
 			return 1
 		}
-	} else {
-		switch {
-		case r < 0 || r > 0x10FFFF || inTables(r, nonprint, combining):
-			return 0
-		case inTable(r, narrow):
-			return 1
-		case inTables(r, ambiguous, doublewidth):
-			return 2
-		case !c.StrictEmojiNeutral && inTables(r, ambiguous, emoji, narrow):
-			return 2
-		default:
-			return 1
-		}
 	}
+
+	if r < 0x300 {
+		return int(eastAsianWidth0[r])
+	}
+	if w, ok := inWidthTable(r, eastAsianWidth); ok {
+		return w
+	}
+	if !c.StrictEmojiNeutral && inTable(r, emoji) {
+		return 2
+	}
+	return 1
+}
+
+// CreateLUT will create an in-memory lookup table of 557056 bytes for faster operation.
+// This should not be called concurrently with other operations on c.
+// If options in c is changed, CreateLUT should be called again.
+func (c *Condition) CreateLUT() {
+	const max = 0x110000
+	lut := c.combinedLut
+	if len(c.combinedLut) != 0 {
+		// Remove so we don't use it.
+		c.combinedLut = nil
+	} else {
+		lut = make([]byte, max/2)
+	}
+	for i := range lut {
+		i32 := int32(i * 2)
+		x0 := c.RuneWidth(i32)
+		x1 := c.RuneWidth(i32 + 1)
+		lut[i] = uint8(x0) | uint8(x1)<<4
+	}
+	c.combinedLut = lut
 }
 
 // StringWidth return width as you can see
 func (c *Condition) StringWidth(s string) (width int) {
-	g := uniseg.NewGraphemes(s)
+	if len(s) == 1 {
+		b := s[0]
+		if b < 0x20 || b == 0x7F {
+			return 0
+		}
+		return 1
+	}
+	if len(s) > 0 && len(s) <= utf8.UTFMax {
+		r, size := utf8.DecodeRuneInString(s)
+		if size == len(s) {
+			return c.RuneWidth(r)
+		}
+	}
+	// ASCII fast path: no grapheme clustering needed for pure ASCII
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b >= 0x80 {
+			goto graphemes
+		}
+		if b >= 0x20 && b != 0x7F {
+			width++
+		}
+	}
+	return
+
+graphemes:
+	width = 0
+	g := graphemes.FromString(s)
 	for g.Next() {
 		var chWidth int
-		for _, r := range g.Runes() {
+		for _, r := range g.Value() {
 			chWidth = c.RuneWidth(r)
 			if chWidth > 0 {
 				break // Our best guess at this point is to use the width of the first non-zero-width rune.
@@ -162,17 +336,17 @@ func (c *Condition) Truncate(s string, w int, tail string) string {
 	w -= c.StringWidth(tail)
 	var width int
 	pos := len(s)
-	g := uniseg.NewGraphemes(s)
+	g := graphemes.FromString(s)
 	for g.Next() {
 		var chWidth int
-		for _, r := range g.Runes() {
+		for _, r := range g.Value() {
 			chWidth = c.RuneWidth(r)
 			if chWidth > 0 {
 				break // See StringWidth() for details.
 			}
 		}
 		if width+chWidth > w {
-			pos, _ = g.Positions()
+			pos = g.Start()
 			break
 		}
 		width += chWidth
@@ -180,27 +354,64 @@ func (c *Condition) Truncate(s string, w int, tail string) string {
 	return s[:pos] + tail
 }
 
+// TruncateLeft cuts w cells from the beginning of the `s`.
+func (c *Condition) TruncateLeft(s string, w int, prefix string) string {
+	if c.StringWidth(s) <= w {
+		return prefix
+	}
+
+	var width int
+	pos := len(s)
+
+	g := graphemes.FromString(s)
+	for g.Next() {
+		var chWidth int
+		for _, r := range g.Value() {
+			chWidth = c.RuneWidth(r)
+			if chWidth > 0 {
+				break // See StringWidth() for details.
+			}
+		}
+
+		if width+chWidth > w {
+			if width < w {
+				pos = g.End()
+				prefix += strings.Repeat(" ", width+chWidth-w)
+			} else {
+				pos = g.Start()
+			}
+
+			break
+		}
+
+		width += chWidth
+	}
+
+	return prefix + s[pos:]
+}
+
 // Wrap return string wrapped with w cells
 func (c *Condition) Wrap(s string, w int) string {
 	width := 0
-	out := ""
-	for _, r := range []rune(s) {
+	var out strings.Builder
+	out.Grow(len(s) + len(s)/w + 1)
+	for _, r := range s {
 		cw := c.RuneWidth(r)
 		if r == '\n' {
-			out += string(r)
+			out.WriteRune(r)
 			width = 0
 			continue
 		} else if width+cw > w {
-			out += "\n"
+			out.WriteByte('\n')
 			width = 0
-			out += string(r)
+			out.WriteRune(r)
 			width += cw
 			continue
 		}
-		out += string(r)
+		out.WriteRune(r)
 		width += cw
 	}
-	return out
+	return out.String()
 }
 
 // FillLeft return string filled in left by spaces in w cells
@@ -239,7 +450,12 @@ func RuneWidth(r rune) int {
 
 // IsAmbiguousWidth returns whether is ambiguous width or not.
 func IsAmbiguousWidth(r rune) bool {
-	return inTables(r, private, ambiguous)
+	return inTable(r, private) || inTable(r, ambiguous)
+}
+
+// IsCombiningWidth returns whether is combining width or not.
+func IsCombiningWidth(r rune) bool {
+	return inTable(r, combining)
 }
 
 // IsNeutralWidth returns whether is neutral width or not.
@@ -257,6 +473,11 @@ func Truncate(s string, w int, tail string) string {
 	return DefaultCondition.Truncate(s, w, tail)
 }
 
+// TruncateLeft cuts w cells from the beginning of the `s`.
+func TruncateLeft(s string, w int, prefix string) string {
+	return DefaultCondition.TruncateLeft(s, w, prefix)
+}
+
 // Wrap return string wrapped with w cells
 func Wrap(s string, w int) string {
 	return DefaultCondition.Wrap(s, w)
@@ -270,4 +491,13 @@ func FillLeft(s string, w int) string {
 // FillRight return string filled in left by spaces in w cells
 func FillRight(s string, w int) string {
 	return DefaultCondition.FillRight(s, w)
+}
+
+// CreateLUT will create an in-memory lookup table of 557055 bytes for faster operation.
+// This should not be called concurrently with other operations.
+func CreateLUT() {
+	if len(DefaultCondition.combinedLut) > 0 {
+		return
+	}
+	DefaultCondition.CreateLUT()
 }

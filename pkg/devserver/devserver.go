@@ -51,6 +51,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -611,6 +612,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
+		// records never expire; each step reads all of a function's cancellations
+		executor.WithCancellationChecker(cancellation.NewChecker(cancellation.NewRedisReader(unshardedRc, ""))),
 		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
@@ -824,12 +827,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Create the API v2 service handler
+	appProvider := NewAppProvider(dbcqrs)
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
-		Apps:                NewAppProvider(dbcqrs),
+		Apps:                appProvider,
 		Functions:           functionProvider,
 		FunctionPauser:      functionProvider,
+		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),
 		Runs:                NewRunProvider(gqlData, exec),
 		Events:              NewEventProvider(gqlData),
 		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {

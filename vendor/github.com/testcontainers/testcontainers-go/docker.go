@@ -3,6 +3,7 @@ package testcontainers
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -87,6 +88,8 @@ type DockerContainer struct {
 	// logProductionCancel is used to signal the log production to stop.
 	logProductionCancel context.CancelCauseFunc
 	logProductionCtx    context.Context
+	// logProductionDone is closed when the log production goroutine exits.
+	logProductionDone chan struct{}
 
 	logProductionTimeout *time.Duration
 	logger               log.Logger
@@ -584,8 +587,29 @@ func (c *DockerContainer) Exec(ctx context.Context, cmd []string, options ...tce
 	if err != nil {
 		return 0, nil, fmt.Errorf("container exec attach: %w", err)
 	}
+	defer hijack.Close()
 
-	processOptions.Reader = hijack.Reader
+	// A not-yet-started exec inspects as {Running:false, ExitCode:null->0}, which
+	// is indistinguishable from "exited 0". The daemon closes the stream only once
+	// the process ends, so drain to EOF before inspecting; buffer it so callers
+	// can still read the output from the returned reader.
+	var buf bytes.Buffer
+	drained := make(chan error, 1) // buffered so the goroutine can finish after we return on ctx cancel
+	go func() {
+		_, copyErr := io.Copy(&buf, hijack.Reader)
+		drained <- copyErr
+	}()
+
+	select {
+	case copyErr := <-drained:
+		if copyErr != nil {
+			return 0, nil, fmt.Errorf("container exec read: %w", copyErr)
+		}
+	case <-ctx.Done():
+		return 0, nil, ctx.Err()
+	}
+
+	processOptions.Reader = bytes.NewReader(buf.Bytes())
 
 	// second loop to process the multiplexed option, as now we have a reader
 	// from the created exec response.
@@ -593,6 +617,9 @@ func (c *DockerContainer) Exec(ctx context.Context, cmd []string, options ...tce
 		o.Apply(processOptions)
 	}
 
+	// The daemon marks the exec stopped asynchronously after closing the stream,
+	// so a single immediate inspect can still observe Running:true; poll until it
+	// reports terminal.
 	var exitCode int
 	for {
 		execResp, err := cli.ExecInspect(ctx, response.ID, client.ExecInspectOptions{})
@@ -605,7 +632,11 @@ func (c *DockerContainer) Exec(ctx context.Context, cmd []string, options ...tce
 			break
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return 0, nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 
 	return exitCode, processOptions.Reader, nil
@@ -813,16 +844,19 @@ func (c *DockerContainer) startLogProduction(ctx context.Context, opts ...LogPro
 
 	// Setup the log production context which will be used to stop the log production.
 	c.logProductionCtx, c.logProductionCancel = context.WithCancelCause(ctx)
+	c.logProductionDone = make(chan struct{})
 
 	// We capture context cancel function to avoid data race with multiple
 	// calls to startLogProduction.
-	go func(cancel context.CancelCauseFunc) {
+	go func(cancel context.CancelCauseFunc, done chan struct{}) {
 		// Ensure the context is cancelled when log productions completes
 		// so that GetLogProductionErrorChannel functions correctly.
 		defer cancel(nil)
+		// Signal that the goroutine has exited so stopLogProduction can drain.
+		defer close(done)
 
 		c.logProducer(stdout, stderr)
-	}(c.logProductionCancel)
+	}(c.logProductionCancel, c.logProductionDone)
 
 	return nil
 }
@@ -903,8 +937,37 @@ func (c *DockerContainer) stopLogProduction() error {
 		return nil
 	}
 
-	// Signal the log production to stop.
+	// Wait for the log production goroutine to finish draining any buffered
+	// logs before cancelling. When the container has already exited, the
+	// goroutine will reach EOF naturally and close logProductionDone on its
+	// own. The bounded timeout prevents blocking indefinitely when the
+	// container is still actively streaming (e.g. Stop() called on a running
+	// container).
+	if c.logProductionDone != nil {
+		select {
+		case <-c.logProductionDone:
+			// Goroutine already finished naturally; nothing more to do.
+			return nil
+		case <-time.After(minLogProductionTimeout):
+			// Timed out waiting for natural exit; force-cancel now.
+		}
+	}
+
+	// Signal the log production to stop (for still-running containers).
 	c.logProductionCancel(errLogProductionStop)
+
+	// Wait for the goroutine to acknowledge the cancellation. Context
+	// cancellation propagates into the Docker transport and should unblock
+	// stdcopy.StdCopy promptly, but we bound the wait to match
+	// minLogProductionTimeout to guard against stuck kernel socket reads or
+	// daemon transport failures that might not honour context cancellation.
+	if c.logProductionDone != nil {
+		select {
+		case <-c.logProductionDone:
+		case <-time.After(minLogProductionTimeout):
+			c.logger.Printf("timeout waiting for log production goroutine to exit; a goroutine may have leaked")
+		}
+	}
 
 	if err := context.Cause(c.logProductionCtx); err != nil {
 		switch {
@@ -947,7 +1010,7 @@ func (c *DockerContainer) connectReaper(ctx context.Context) error {
 		return nil
 	}
 
-	reaper, err := spawner.reaper(context.WithValue(ctx, core.DockerHostContextKey, c.provider.host), core.SessionID(), c.provider)
+	reaper, err := spawner.reaper(context.WithValue(ctx, core.DockerHostContextKey, c.provider.host), c.provider.config.SessionID, c.provider)
 	if err != nil {
 		return fmt.Errorf("reaper: %w", err)
 	}
@@ -1319,7 +1382,7 @@ func (p *DockerProvider) findContainerByName(ctx context.Context, name string) (
 	// Note that, 'name' filter will use regex to find the containers
 	containers, err := p.client.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
-		Filters: make(client.Filters).Add("name", fmt.Sprintf("^%s$", name)),
+		Filters: make(client.Filters).Add("name", fmt.Sprintf("^%s$", regexp.QuoteMeta(name))),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("container list: %w", err)
@@ -1861,6 +1924,7 @@ func (p *DockerProvider) SaveImagesWithOpts(ctx context.Context, output string, 
 func SaveDockerImageWithPlatforms(platforms ...specs.Platform) SaveImageOption {
 	return func(opts *saveImageOptions) error {
 		opts.dockerSaveOpts = append(opts.dockerSaveOpts, client.ImageSaveWithPlatforms(platforms...))
+		opts.platforms = append(opts.platforms, platforms...)
 
 		return nil
 	}
@@ -1869,6 +1933,27 @@ func SaveDockerImageWithPlatforms(platforms ...specs.Platform) SaveImageOption {
 // PullImage pulls image from registry
 func (p *DockerProvider) PullImage(ctx context.Context, img string) error {
 	return p.attemptToPullImage(ctx, img, client.ImagePullOptions{})
+}
+
+// PullImageWithOpts pulls image from registry, passing options to the provider.
+func (p *DockerProvider) PullImageWithOpts(ctx context.Context, img string, opts ...PullImageOption) error {
+	pullOpts := pullImageOptions{}
+
+	for _, opt := range opts {
+		if err := opt(&pullOpts); err != nil {
+			return fmt.Errorf("applying pull image option: %w", err)
+		}
+	}
+
+	return p.attemptToPullImage(ctx, img, pullOpts.dockerPullOpts)
+}
+
+func PullDockerImageWithPlatform(platform specs.Platform) PullImageOption {
+	return func(opts *pullImageOptions) error {
+		opts.dockerPullOpts.Platforms = append(opts.dockerPullOpts.Platforms, platform)
+
+		return nil
+	}
 }
 
 var permanentClientErrors = []func(error) bool{

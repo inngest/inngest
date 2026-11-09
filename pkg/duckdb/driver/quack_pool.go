@@ -62,6 +62,16 @@ func (c *pooledQuackConn) Query(ctx context.Context, sqlText string) (cols []str
 	return cols, types, rows, err
 }
 
+// QueryWithStreams is process.QueryWithStreams on c's own session.
+func (c *pooledQuackConn) QueryWithStreams(ctx context.Context, sqlText string, streams []quack.SendStream) (cols []string, types []string, rows []result.Row, err error) {
+	err = c.run(ctx, onceOnly(func(s *quack.Session) error {
+		var e error
+		cols, types, rows, e = s.QueryWithStreams(ctx, sqlText, streams)
+		return e
+	}))
+	return cols, types, rows, err
+}
+
 // run executes fn on a current session, applying the same failure policy as
 // process.runWithRestartLocked: statement errors and caller cancellation are
 // surfaced as-is; any other failure restarts the subprocess (at most once
@@ -158,6 +168,7 @@ func (c *pooledQuackConn) currentSession(ctx context.Context) (*quack.Session, e
 func (c *pooledQuackConn) shouldRecover(ctx context.Context, err error) bool {
 	switch {
 	case errors.Is(err, result.ErrStatementFailed),
+		errors.Is(err, quack.ErrStreamSource),
 		errors.Is(err, ErrDisabled),
 		errors.Is(err, errQuackUnavailable),
 		errors.Is(err, ErrTooManyAbandoned):

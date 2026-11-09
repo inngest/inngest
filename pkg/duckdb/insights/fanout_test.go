@@ -12,6 +12,13 @@ import (
 func TestComprehensionFanOut(t *testing.T) {
 	accepts := []string{
 		"SELECT [x.key FOR x IN runs.sessions] AS k FROM runs",
+		"SELECT [x::INTEGER FOR x IN ['1', '2']]",
+		"SELECT [CAST(x AS DECIMAL(10, 2)) FOR x IN ['1', '2']]",
+		"SELECT [TRY_CAST(x AS INTEGER) FOR x IN ['1', 'bad']]",
+		"SELECT [DATE '2026-11-04' FOR x IN [1]]",
+		"SELECT [CAST({'value': x} AS STRUCT(value INTEGER)) FOR x IN [1, 2]]",
+		"SELECT [CAST([x] AS INTEGER[1]) FOR x IN [1, 2]]",
+		"SELECT [x FOR x IN ['1', '2'] IF x::INTEGER > 1]",
 		"SELECT [x.key FOR x IN sessions] AS k FROM runs",
 		"SELECT [x FOR x IN event_ids IF x != ''] AS e FROM runs",
 		"SELECT [upper(x) || '-' FOR x IN string_split(run_id, '-') IF length(x) > 2] AS p FROM runs",
@@ -23,7 +30,7 @@ func TestComprehensionFanOut(t *testing.T) {
 	}
 	for _, q := range accepts {
 		t.Run(q, func(t *testing.T) {
-			_, _, _, err := validate(mustParse(t, q))
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
 			require.NoError(t, err)
 		})
 	}
@@ -31,6 +38,10 @@ func TestComprehensionFanOut(t *testing.T) {
 	const own = "a list comprehension can only reference its own variables"
 	const nested = "a list comprehension can't be nested inside another list comprehension"
 	rejects := map[string]string{
+		"SELECT [CAST(run_id AS VARCHAR) FOR x IN event_ids] FROM runs":                                   own + `, not "run_id"`,
+		"SELECT [TRY_CAST(run_id AS INTEGER) FOR x IN event_ids] FROM runs":                               own + `, not "run_id"`,
+		"SELECT [x FOR x IN event_ids IF CAST(run_id AS VARCHAR) = x] FROM runs":                          own + `, not "run_id"`,
+		"SELECT [CAST((SELECT max(run_id) FROM runs) AS VARCHAR) FOR x IN event_ids] FROM runs":           "can only use its own variables, literals",
 		"SELECT [run_id FOR x IN string_split(run_id, '')] AS r FROM runs":                                own + `, not "run_id"`,
 		"SELECT [x || run_id FOR x IN event_ids] AS r FROM runs":                                          own + `, not "run_id"`,
 		"SELECT [x FOR x IN event_ids IF x <> run_id] AS r FROM runs":                                     own + `, not "run_id"`,
@@ -46,7 +57,7 @@ func TestComprehensionFanOut(t *testing.T) {
 	}
 	for q, want := range rejects {
 		t.Run(q, func(t *testing.T) {
-			_, _, _, err := validate(mustParse(t, q))
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
 			require.ErrorContains(t, err, want)
 		})
 	}

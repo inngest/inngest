@@ -718,3 +718,12 @@ func TestWriteSyntaxCoalesceMustBeSpellable(t *testing.T) {
 	f.Distinct = true
 	require.ErrorContains(t, Write(&strings.Builder{}, stmt), "can't be written as COALESCE(...)")
 }
+
+func TestWriteTableRefAt(t *testing.T) {
+	stmt, err := ParseString("SELECT * FROM inngest.runs AS r")
+	require.NoError(t, err)
+	ref := stmt.From.Refs[0].(*BaseTableRef)
+	ref.At = &AtClause{Unit: "VERSION", Expr: &Literal{Kind: LitNumber, Text: "3"}}
+	require.Equal(t, "SELECT * FROM inngest.runs AS r AT (VERSION => 3)", String(stmt))
+	require.Equal(t, "inngest.runs AS r AT (VERSION => 3)", String(ref), "a table ref writes on its own")
+}

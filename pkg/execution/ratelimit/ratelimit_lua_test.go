@@ -997,3 +997,37 @@ func TestLuaRateLimit_NilRemainingEdgeCase(t *testing.T) {
 		require.Greater(t, res.RetryAfter, time.Duration(0))
 	})
 }
+
+func TestLuaRateLimitBurstOverride(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		options  []RateLimitOptionFn
+		capacity int
+	}{
+		{name: "default", capacity: 1},
+		{name: "five at once", options: []RateLimitOptionFn{WithBurst(4)}, capacity: 5},
+		{name: "explicit zero", options: []RateLimitOptionFn{WithBurst(0)}, capacity: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, rc, clock := initRedis(t)
+			defer rc.Close()
+			limiter := New(t.Context(), rc, prefix)
+			config := inngest.RateLimit{Limit: 5, Period: "1h"}
+			check := func(limited bool) {
+				options := append([]RateLimitOptionFn{WithNow(clock.Now())}, tc.options...)
+				result, err := limiter.RateLimit(t.Context(), "burst", config, options...)
+				require.NoError(t, err)
+				require.Equal(t, limited, result.Limited)
+			}
+			for range tc.capacity {
+				check(false)
+			}
+			check(true)
+			clock.Advance(12*time.Minute - time.Second)
+			check(true)
+			clock.Advance(time.Second)
+			check(false)
+			check(true)
+		})
+	}
+}

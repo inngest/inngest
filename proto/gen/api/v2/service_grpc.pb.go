@@ -74,10 +74,15 @@ const (
 	V2_StreamSandboxProcessOutput_FullMethodName = "/api.v2.V2/StreamSandboxProcessOutput"
 	V2_CreateScore_FullMethodName                = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
+	V2_ListAppSyncs_FullMethodName               = "/api.v2.V2/ListAppSyncs"
+	V2_GetAppSync_FullMethodName                 = "/api.v2.V2/GetAppSync"
 	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
+	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
+	V2_PauseFunctions_FullMethodName             = "/api.v2.V2/PauseFunctions"
+	V2_ResumeFunctions_FullMethodName            = "/api.v2.V2/ResumeFunctions"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
 	V2_ListEvents_FullMethodName                 = "/api.v2.V2/ListEvents"
 	V2_GetEvent_FullMethodName                   = "/api.v2.V2/GetEvent"
@@ -92,6 +97,7 @@ const (
 	V2_ListSessionKeys_FullMethodName            = "/api.v2.V2/ListSessionKeys"
 	V2_ListSessions_FullMethodName               = "/api.v2.V2/ListSessions"
 	V2_ListSessionRuns_FullMethodName            = "/api.v2.V2/ListSessionRuns"
+	V2_SubmitFeedback_FullMethodName             = "/api.v2.V2/SubmitFeedback"
 )
 
 // V2Client is the client API for V2 service.
@@ -155,10 +161,15 @@ type V2Client interface {
 	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
+	ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error)
+	GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
+	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
+	PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error)
+	ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
 	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
 	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error)
@@ -173,6 +184,7 @@ type V2Client interface {
 	ListSessionKeys(ctx context.Context, in *ListSessionKeysRequest, opts ...grpc.CallOption) (*ListSessionKeysResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	ListSessionRuns(ctx context.Context, in *ListSessionRunsRequest, opts ...grpc.CallOption) (*ListSessionRunsResponse, error)
+	SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error)
 }
 
 type v2Client struct {
@@ -750,6 +762,26 @@ func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *v2Client) ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAppSyncsResponse)
+	err := c.cc.Invoke(ctx, V2_ListAppSyncs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAppSyncResponse)
+	err := c.cc.Invoke(ctx, V2_GetAppSync_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionTraceResponse)
@@ -770,6 +802,16 @@ func (c *v2Client) GetFunction(ctx context.Context, in *GetFunctionRequest, opts
 	return out, nil
 }
 
+func (c *v2Client) CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateCancellationResponse)
+	err := c.cc.Invoke(ctx, V2_CreateCancellation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PauseFunctionResponse)
@@ -784,6 +826,26 @@ func (c *v2Client) ResumeFunction(ctx context.Context, in *ResumeFunctionRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResumeFunctionResponse)
 	err := c.cc.Invoke(ctx, V2_ResumeFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_PauseFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_ResumeFunctions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -930,6 +992,16 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, in *ListSessionRunsReque
 	return out, nil
 }
 
+func (c *v2Client) SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitFeedbackResponse)
+	err := c.cc.Invoke(ctx, V2_SubmitFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -991,10 +1063,15 @@ type V2Server interface {
 	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
+	ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error)
+	GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
+	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
+	PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error)
+	ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
 	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
 	GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error)
@@ -1009,6 +1086,7 @@ type V2Server interface {
 	ListSessionKeys(context.Context, *ListSessionKeysRequest) (*ListSessionKeysResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error)
+	SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -1181,17 +1259,32 @@ func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
 }
+func (UnimplementedV2Server) ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAppSyncs not implemented")
+}
+func (UnimplementedV2Server) GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAppSync not implemented")
+}
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
 }
 func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
 }
+func (UnimplementedV2Server) CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCancellation not implemented")
+}
 func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PauseFunction not implemented")
 }
 func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeFunction not implemented")
+}
+func (UnimplementedV2Server) PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PauseFunctions not implemented")
+}
+func (UnimplementedV2Server) ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeFunctions not implemented")
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
@@ -1234,6 +1327,9 @@ func (UnimplementedV2Server) ListSessions(context.Context, *ListSessionsRequest)
 }
 func (UnimplementedV2Server) ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSessionRuns not implemented")
+}
+func (UnimplementedV2Server) SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitFeedback not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -2207,6 +2303,42 @@ func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListAppSyncs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAppSyncsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListAppSyncs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListAppSyncs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListAppSyncs(ctx, req.(*ListAppSyncsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetAppSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAppSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetAppSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetAppSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetAppSync(ctx, req.(*GetAppSyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionTraceRequest)
 	if err := dec(in); err != nil {
@@ -2243,6 +2375,24 @@ func _V2_GetFunction_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_CreateCancellation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCancellationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateCancellation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateCancellation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateCancellation(ctx, req.(*CreateCancellationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_PauseFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PauseFunctionRequest)
 	if err := dec(in); err != nil {
@@ -2275,6 +2425,42 @@ func _V2_ResumeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).ResumeFunction(ctx, req.(*ResumeFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_PauseFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).PauseFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_PauseFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).PauseFunctions(ctx, req.(*PauseFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ResumeFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ResumeFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ResumeFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ResumeFunctions(ctx, req.(*ResumeFunctionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2531,6 +2717,24 @@ func _V2_ListSessionRuns_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_SubmitFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).SubmitFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_SubmitFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).SubmitFeedback(ctx, req.(*SubmitFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2743,6 +2947,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_SyncApp_Handler,
 		},
 		{
+			MethodName: "ListAppSyncs",
+			Handler:    _V2_ListAppSyncs_Handler,
+		},
+		{
+			MethodName: "GetAppSync",
+			Handler:    _V2_GetAppSync_Handler,
+		},
+		{
 			MethodName: "GetFunctionTrace",
 			Handler:    _V2_GetFunctionTrace_Handler,
 		},
@@ -2751,12 +2963,24 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_GetFunction_Handler,
 		},
 		{
+			MethodName: "CreateCancellation",
+			Handler:    _V2_CreateCancellation_Handler,
+		},
+		{
 			MethodName: "PauseFunction",
 			Handler:    _V2_PauseFunction_Handler,
 		},
 		{
 			MethodName: "ResumeFunction",
 			Handler:    _V2_ResumeFunction_Handler,
+		},
+		{
+			MethodName: "PauseFunctions",
+			Handler:    _V2_PauseFunctions_Handler,
+		},
+		{
+			MethodName: "ResumeFunctions",
+			Handler:    _V2_ResumeFunctions_Handler,
 		},
 		{
 			MethodName: "GetFunctions",
@@ -2813,6 +3037,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSessionRuns",
 			Handler:    _V2_ListSessionRuns_Handler,
+		},
+		{
+			MethodName: "SubmitFeedback",
+			Handler:    _V2_SubmitFeedback_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

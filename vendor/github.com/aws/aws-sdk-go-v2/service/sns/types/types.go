@@ -141,10 +141,22 @@ type PublishBatchRequestEntry struct {
 
 	// This parameter applies only to FIFO (first-in-first-out) topics.
 	//
-	// The token used for deduplication of messages within a 5-minute minimum
-	// deduplication interval. If a message with a particular MessageDeduplicationId
-	// is sent successfully, subsequent messages with the same MessageDeduplicationId
-	// are accepted successfully but aren't delivered.
+	//   - This parameter applies only to FIFO (first-in-first-out) topics. The
+	//   MessageDeduplicationId can contain up to 128 alphanumeric characters (a-z,
+	//   A-Z, 0-9) and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
+	//
+	//   - Every message must have a unique MessageDeduplicationId , which is a token
+	//   used for deduplication of sent messages within the 5 minute minimum
+	//   deduplication interval.
+	//
+	//   - The scope of deduplication depends on the FifoThroughputScope attribute,
+	//   when set to Topic the message deduplication scope is across the entire topic,
+	//   when set to MessageGroup the message deduplication scope is within each
+	//   individual message group.
+	//
+	//   - If a message with a particular MessageDeduplicationId is sent successfully,
+	//   subsequent messages within the deduplication scope and interval, with the same
+	//   MessageDeduplicationId , are accepted successfully but aren't delivered.
 	//
 	//   - Every message must have a unique MessageDeduplicationId .
 	//
@@ -162,13 +174,14 @@ type PublishBatchRequestEntry struct {
 	//   MessageDeduplicationId overrides the generated one.
 	//
 	//   - When ContentBasedDeduplication is in effect, messages with identical content
-	//   sent within the deduplication interval are treated as duplicates and only one
-	//   copy of the message is delivered.
+	//   sent within the deduplication scope and interval are treated as duplicates and
+	//   only one copy of the message is delivered.
 	//
 	//   - If you send one message with ContentBasedDeduplication enabled, and then
 	//   another message with a MessageDeduplicationId that is the same as the one
 	//   generated for the first MessageDeduplicationId , the two messages are treated
-	//   as duplicates and only one copy of the message is delivered.
+	//   as duplicates, within the deduplication scope and interval, and only one copy of
+	//   the message is delivered.
 	//
 	// The MessageDeduplicationId is available to the consumer of the message (this
 	// can be useful for troubleshooting delivery issues).
@@ -179,33 +192,28 @@ type PublishBatchRequestEntry struct {
 	//
 	// Amazon SNS continues to keep track of the message deduplication ID even after
 	// the message is received and deleted.
-	//
-	// The length of MessageDeduplicationId is 128 characters.
-	//
-	// MessageDeduplicationId can contain alphanumeric characters (a-z, A-Z, 0-9) and
-	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	MessageDeduplicationId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) topics.
+	// FIFO topics: The tag that specifies that a message belongs to a specific
+	// message group. Messages that belong to the same message group are processed in a
+	// FIFO manner (however, messages in different message groups might be processed
+	// out of order). To interleave multiple ordered streams within a single topic, use
+	// MessageGroupId values (for example, session data for multiple users). In this
+	// scenario, multiple consumers can process the topic, but the session data of each
+	// user is processed in a FIFO fashion. You must associate a non-empty
+	// MessageGroupId with a message. If you do not provide a MessageGroupId , the
+	// action fails.
 	//
-	// The tag that specifies that a message belongs to a specific message group.
-	// Messages that belong to the same message group are processed in a FIFO manner
-	// (however, messages in different message groups might be processed out of order).
-	// To interleave multiple ordered streams within a single topic, use MessageGroupId
-	// values (for example, session data for multiple users). In this scenario,
-	// multiple consumers can process the topic, but the session data of each user is
-	// processed in a FIFO fashion.
-	//
-	// You must associate a non-empty MessageGroupId with a message. If you don't
-	// provide a MessageGroupId , the action fails.
+	// Standard topics: The MessageGroupId is optional and is forwarded only to Amazon
+	// SQS standard subscriptions to activate [fair queues]. The MessageGroupId is not used for, or
+	// sent to, any other endpoint types.
 	//
 	// The length of MessageGroupId is 128 characters.
 	//
 	// MessageGroupId can contain alphanumeric characters (a-z, A-Z, 0-9) and
 	// punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	//
-	// MessageGroupId is required for FIFO topics. You can't use it for standard
-	// topics.
+	// [fair queues]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-fair-queues.html
 	MessageGroupId *string
 
 	// Set MessageStructure to json if you want to send a different message for each
@@ -219,7 +227,7 @@ type PublishBatchRequestEntry struct {
 	//   string.
 	//
 	// You can define other top-level keys that define the message you want to send to
-	// a specific transport protocol (e.g. http).
+	// a specific transport protocol (for example, http).
 	MessageStructure *string
 
 	// The subject of the batch message.

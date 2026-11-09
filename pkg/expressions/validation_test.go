@@ -7,6 +7,37 @@ import (
 	"testing"
 )
 
+func TestValidationRequireBoolean(t *testing.T) {
+	for _, tc := range []struct {
+		expression string
+		valid      bool
+	}{
+		{"true", true},
+		{"false", true},
+		{"event.data.cancel", true},
+		{"event.data.count > 1", true},
+		{"123", false},
+		{"1.5", false},
+		{`"true"`, false},
+		{"null", false},
+		{"[true]", false},
+		{`{"cancel": true}`, false},
+		{"event", false},
+		{"int(event.data.count)", false},
+	} {
+		t.Run(tc.expression, func(t *testing.T) {
+			policy := DefaultRestrictiveValidationPolicy()
+			if err := Validate(t.Context(), policy, tc.expression); err != nil {
+				t.Fatalf("default validation changed: %v", err)
+			}
+			policy.RequireBoolean = true
+			if err := Validate(t.Context(), policy, tc.expression); (err == nil) != tc.valid {
+				t.Errorf("valid = %v, want %v: %v", err == nil, tc.valid, err)
+			}
+		})
+	}
+}
+
 func Test_Validation(t *testing.T) {
 	t.Parallel()
 

@@ -2,6 +2,96 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.51.0] - 2026-11-06
+
+### 🚀 Features
+
+- *(drivers)* Allow drivers to be registered with schemes at init (#5198)
+- *(api)* Bulk pause/resume functions via v2 api, cli & mcp (#5152)
+- *(duckdb)* Stamp lake rows w/ bucket_at and read tables by name (#5160)
+- *(duckdb)* Stream query relations into DuckDB over quack (#5154)
+- *(duckdb)* Federate reads across the lake and a buffer (#5155)
+- *(insights)* Add raw mode and federated reads (#5156)
+- *(duckdb)* Aggregate federated reads (#5157)
+- *(duckdb)* Push a query's top-n into federated sources (#5158)
+- *(duckdb)* Skip the raw_runs collapse for flat lakes and use TIMESTAMPTZ in federate (#5159)
+
+## [v1.50.0] - 2026-11-06
+
+### 🚀 Features
+
+- *(dashboard)* Simplify Runs AI plugin setup (#5078)
+- *(duckdb)* Dual-write duckdb POC (#4880)
+- *(duckdb)* Duckdb-backed Insights  (#4882)
+- *(duckdb)* Add Insights & Sessions UI pages (#4885)
+- *(batch)* Support account-scoped migration (#5104)
+- *(dashboard)* Show when a function is draining (#5077)
+- *(dashboard)* Show paused and draining status in function lists (#5115)
+- *(batch)* Report debug batch API results per store (#5127)
+- *(batch)* Tag batch metrics by store and add per-call metrics (#5139)
+- *(api)* V2 list and get events (#5095)
+- *(queue)* Add queue_item_start_latency metric, comparable across queue backends (#5151)
+- *(api)* Paginate GQL Sessions queries (#5120)
+- *(connect)* Optimize routing (#5166)
+- *(queue)* EnqueueOpts.CallerLease to lease an item for its enqueuing caller (#5147)
+- *(dev-server-ui)* Add AI-assisted onboarding (#5100)
+- *(api)* Add deploy API proto stubs (#5169)
+- *(images)* Add `image` subcommands (#5041)
+- *(api)* Authed feedback api/cli/mcp -> plain (#4637)
+- *(api)* Bulk cancel a function's runs via v2 api, cli & mcp (#5058)
+
+### 🐛 Bug Fixes
+
+- *(connect)* Avoid blocking replies on unreachable executors (#5074)
+- *(queue)* Wake Redis partitions after confirmed capacity release (#5088)
+- *(insights)* Fix JSONPath index hang and list_aggregate argument forwarding (#5105)
+- *(connect)* Release leases for undispatched requests (#5101)
+- *(dashboard)* Add copyable chart tooltip timestamps (#5125)
+- *(executor)* Accept successful pause iterator completion (#5129)
+- *(pauses)* Delete from existing blocks regardless of feature flags (#5128)
+- *(queue)* Preserve singleton ownership and report migration read failures (#5131)
+- *(trace)* Failed step timing after sleep (#5130)
+- *(api)* Match REST Insights to GQL's info, hints and metrics (#5117)
+- *(connect)* Bound gateway Forward and accept keepalive pings (#5102)
+- *(connect)* Hash function config independent of function order (#5126)
+- *(duckdb)* Break latest-run-row ties by lifecycle stage (#5118)
+- *(executor)* Resume invoke pauses with missing correlation indexes (#5134)
+- *(connect)* Enable gRPC client keepalive for Connect peers (#5103)
+- *(api)* Encode non-finite floats and big ints in Insights results (#5116)
+- *(pauses)* Make block deletion by ID retry-safe (#5138)
+- *(batch)* Bound batch payloads across append paths (#5143)
+- *(api)* Return 400s for bad Sessions time ranges and cursors (#5121)
+- *(duckdb)* Use exported session time-range resolver (#5162)
+- *(insights)* Close transpiler gaps from the DuckDB Insights review (#5109)
+- *(parser)* Make written SQL match the AST (#5110)
+- *(duckdb)* Bound Insights queries' cancellation, memory and size args (#5111)
+- *(duckdb)* Make CEL run/event search match CEL semantics (#5112)
+- *(registration)* Keep inngest://serve app URLs (INF-765) (#5167)
+- *(batch)* Only send delete keys to secondary if absent in primary (#5170)
+- *(util)* Apply De Morgan in NormalizeAppURL to fix lint (INF-765) (#5174)
+
+### 🚜 Refactor
+
+- *(checkpoint)* Remove step size enforcement option (#5153)
+
+### ⚡ Performance
+
+- *(duckdb)* Filter Sessions by time before collapsing runs (#5119)
+- *(executor)* Look up invoke pauses by deterministic ID first (#5140)
+- *(expressions)* Share lifted CEL execution plans (#4965)
+
+### 🎨 Styling
+
+- *(ui)* Unify dropdown styling across dashboard and dev server (#5016)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add how to revert section to pr template (#5082)
+- Run DuckDB tests in the unit test job (#5123)
+- *(batch)* Log primary store name on fallback reads (#5161)
+- *(deploys)* Add new deploy types (#5045)
+- *(release)* V1.50.0 (#5075)
+
 ## [v1.49.0] - 2026-10-23
 
 ### 🚀 Features
@@ -14,6 +104,10 @@ All notable changes to this project will be documented in this file.
 - *(cqrs)* Include skipped runs and keep precise paging (#5015)
 - *(api)* Enforce request limits before parsing (#5025)
 - *(dashboard)* Show replay failures and correct skipped counts (#5018)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.49.0 (#5072)
 
 ## [v1.48.0] - 2026-10-22
 

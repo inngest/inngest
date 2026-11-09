@@ -3,12 +3,20 @@ package registration
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/execution/driver/schemes"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	schemes.Register("test", func(u *url.URL) string {
+		return "test"
+	})
+}
 
 func TestProcessFunctions(t *testing.T) {
 	tests := []struct {
@@ -119,7 +127,7 @@ func TestProcessFunctions(t *testing.T) {
 			},
 		},
 		{
-			name: "valid hosted serve step",
+			name: "registered scheme",
 			r: sdk.RegisterRequest{
 				Functions: []sdk.SDKFunction{
 					{
@@ -136,7 +144,7 @@ func TestProcessFunctions(t *testing.T) {
 								ID:   "step",
 								Name: "step",
 								Runtime: map[string]any{
-									"url": "inngest://serve?fnId=app-hello&stepId=step",
+									"url": "test://serve?fnId=app-hello&stepId=step",
 								},
 							},
 						},
@@ -145,7 +153,7 @@ func TestProcessFunctions(t *testing.T) {
 			},
 		},
 		{
-			name: "unknown hosted step host",
+			name: "unregistered scheme",
 			r: sdk.RegisterRequest{
 				Functions: []sdk.SDKFunction{
 					{
@@ -162,14 +170,14 @@ func TestProcessFunctions(t *testing.T) {
 								ID:   "step",
 								Name: "step",
 								Runtime: map[string]any{
-									"url": "inngest://foo?fnId=app-hello&stepId=step",
+									"url": "foo://serve?fnId=app-hello&stepId=step",
 								},
 							},
 						},
 					},
 				},
 			},
-			err: fmt.Errorf("Non-supported step host: foo"),
+			err: fmt.Errorf("Non-supported step schema: foo"),
 		},
 	}
 

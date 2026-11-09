@@ -51,8 +51,8 @@ func (responseEnumMarshaler) StreamContentType(any) string {
 
 func (m responseEnumMarshaler) Marshal(v any) ([]byte, error) {
 	switch v.(type) {
-	case *apiv2.ListEventsResponse, *apiv2.GetEventResponse:
-		// event fields are user data; preserve strings and empty lists
+	case *apiv2.ListEventsResponse, *apiv2.GetEventResponse, *apiv2.ListAppSyncsResponse, *apiv2.GetAppSyncResponse:
+		// preserve user strings and empty lists
 		marshaler := *m.JSONPb
 		marshaler.EmitDefaultValues = true
 		return marshaler.Marshal(v)

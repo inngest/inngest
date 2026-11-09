@@ -34,7 +34,7 @@ type ReaderOptions struct {
 	// which case it should not be called at all.
 	// asFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
-	BeforeRead func(asFunc func(interface{}) bool) error
+	BeforeRead func(asFunc func(any) bool) error
 }
 
 // Reader reads an object from the blob.
@@ -47,7 +47,7 @@ type Reader interface {
 
 	// As allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
-	As(interface{}) bool
+	As(any) bool
 }
 
 // Downloader has an optional extra method for readers.
@@ -109,7 +109,12 @@ type WriterOptions struct {
 	// which case it should not be called.
 	// asFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
-	BeforeWrite func(asFunc func(interface{}) bool) error
+	BeforeWrite func(asFunc func(any) bool) error
+
+	// IfNotExist is used for conditional writes.
+	// When set to true, if a blob exists for the same key in the bucket, the write operation
+	// won't take place.
+	IfNotExist bool
 }
 
 // CopyOptions controls options for Copy.
@@ -117,7 +122,19 @@ type CopyOptions struct {
 	// BeforeCopy is a callback that must be called before initiating the Copy.
 	// asFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
-	BeforeCopy func(asFunc func(interface{}) bool) error
+	BeforeCopy func(asFunc func(any) bool) error
+}
+
+// DeleteOptions controls options for Delete.
+type DeleteOptions struct {
+	// BeforeDelete is a callback that must be called exactly once before
+	// deleting, and may be used to apply a driver-specific precondition to the
+	// delete (for example a generation/version/ETag match, so the delete is
+	// refused if the object changed since it was observed). It is nil if the
+	// caller passed no hook.
+	// asFunc allows drivers to expose driver-specific types;
+	// see Bucket.As for more details.
+	BeforeDelete func(asFunc func(any) bool) error
 }
 
 // ReaderAttributes contains a subset of attributes about a blob that are
@@ -171,7 +188,7 @@ type Attributes struct {
 	// AsFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
 	// If not set, no driver-specific types are supported.
-	AsFunc func(interface{}) bool
+	AsFunc func(any) bool
 }
 
 // ListOptions sets options for listing objects in the bucket.
@@ -202,7 +219,7 @@ type ListOptions struct {
 	// before the underlying service's list is executed.
 	// asFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
-	BeforeList func(asFunc func(interface{}) bool) error
+	BeforeList func(asFunc func(any) bool) error
 }
 
 // ListObject represents a specific blob object returned from ListPaged.
@@ -223,7 +240,7 @@ type ListObject struct {
 	// AsFunc allows drivers to expose driver-specific types;
 	// see Bucket.As for more details.
 	// If not set, no driver-specific types are supported.
-	AsFunc func(interface{}) bool
+	AsFunc func(any) bool
 }
 
 // ListPage represents a page of results return from ListPaged.
@@ -252,12 +269,12 @@ type Bucket interface {
 
 	// As converts i to driver-specific types.
 	// See https://gocloud.dev/concepts/as/ for background information.
-	As(i interface{}) bool
+	As(i any) bool
 
 	// ErrorAs allows drivers to expose driver-specific types for returned
 	// errors.
 	// See https://gocloud.dev/concepts/as/ for background information.
-	ErrorAs(error, interface{}) bool
+	ErrorAs(error, any) bool
 
 	// Attributes returns attributes for the blob. If the specified object does
 	// not exist, Attributes must return an error for which ErrorCode returns
@@ -320,7 +337,8 @@ type Bucket interface {
 	// Delete deletes the object associated with key. If the specified object does
 	// not exist, Delete must return an error for which ErrorCode returns
 	// gcerrors.NotFound.
-	Delete(ctx context.Context, key string) error
+	// opts is guaranteed to be non-nil.
+	Delete(ctx context.Context, key string, opts *DeleteOptions) error
 
 	// SignedURL returns a URL that can be used to GET the blob for the duration
 	// specified in opts.Expiry. opts is guaranteed to be non-nil.
@@ -368,7 +386,7 @@ type SignedURLOptions struct {
 	// the underlying service's sign functionality.
 	// asFunc converts its argument to driver-specific types.
 	// See https://gocloud.dev/concepts/as/ for background information.
-	BeforeSign func(asFunc func(interface{}) bool) error
+	BeforeSign func(asFunc func(any) bool) error
 }
 
 // prefixedBucket implements Bucket by prepending prefix to all keys.
@@ -384,8 +402,8 @@ func NewPrefixedBucket(b Bucket, prefix string) Bucket {
 }
 
 func (b *prefixedBucket) ErrorCode(err error) gcerrors.ErrorCode { return b.base.ErrorCode(err) }
-func (b *prefixedBucket) As(i interface{}) bool                  { return b.base.As(i) }
-func (b *prefixedBucket) ErrorAs(err error, i interface{}) bool  { return b.base.ErrorAs(err, i) }
+func (b *prefixedBucket) As(i any) bool                          { return b.base.As(i) }
+func (b *prefixedBucket) ErrorAs(err error, i any) bool          { return b.base.ErrorAs(err, i) }
 func (b *prefixedBucket) Attributes(ctx context.Context, key string) (*Attributes, error) {
 	return b.base.Attributes(ctx, b.prefix+key)
 }
@@ -421,8 +439,8 @@ func (b *prefixedBucket) Copy(ctx context.Context, dstKey, srcKey string, opts *
 	return b.base.Copy(ctx, b.prefix+dstKey, b.prefix+srcKey, opts)
 }
 
-func (b *prefixedBucket) Delete(ctx context.Context, key string) error {
-	return b.base.Delete(ctx, b.prefix+key)
+func (b *prefixedBucket) Delete(ctx context.Context, key string, opts *DeleteOptions) error {
+	return b.base.Delete(ctx, b.prefix+key, opts)
 }
 
 func (b *prefixedBucket) SignedURL(ctx context.Context, key string, opts *SignedURLOptions) (string, error) {
@@ -442,14 +460,14 @@ func NewSingleKeyBucket(b Bucket, key string) Bucket {
 }
 
 func (b *singleKeyBucket) ErrorCode(err error) gcerrors.ErrorCode { return b.base.ErrorCode(err) }
-func (b *singleKeyBucket) As(i interface{}) bool                  { return b.base.As(i) }
-func (b *singleKeyBucket) ErrorAs(err error, i interface{}) bool  { return b.base.ErrorAs(err, i) }
+func (b *singleKeyBucket) As(i any) bool                          { return b.base.As(i) }
+func (b *singleKeyBucket) ErrorAs(err error, i any) bool          { return b.base.ErrorAs(err, i) }
 func (b *singleKeyBucket) Attributes(ctx context.Context, _ string) (*Attributes, error) {
 	return b.base.Attributes(ctx, b.key)
 }
 
 func (b *singleKeyBucket) ListPaged(ctx context.Context, opts *ListOptions) (*ListPage, error) {
-	return nil, errors.New("List not supported for SingleKey buckets")
+	return nil, errors.New("List not supported for SingleKey buckets") // nolint
 }
 
 func (b *singleKeyBucket) NewRangeReader(ctx context.Context, _ string, offset, length int64, opts *ReaderOptions) (Reader, error) {
@@ -464,8 +482,8 @@ func (b *singleKeyBucket) Copy(ctx context.Context, dstKey, _ string, opts *Copy
 	return b.base.Copy(ctx, dstKey, b.key, opts)
 }
 
-func (b *singleKeyBucket) Delete(ctx context.Context, _ string) error {
-	return b.base.Delete(ctx, b.key)
+func (b *singleKeyBucket) Delete(ctx context.Context, _ string, opts *DeleteOptions) error {
+	return b.base.Delete(ctx, b.key, opts)
 }
 
 func (b *singleKeyBucket) SignedURL(ctx context.Context, _ string, opts *SignedURLOptions) (string, error) {

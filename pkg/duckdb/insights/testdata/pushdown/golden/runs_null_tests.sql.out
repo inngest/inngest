@@ -1,0 +1,4 @@
+{
+  "description": "NULL tests aren't null-rejecting filters: not extracted.",
+  "mode": "product"
+}
