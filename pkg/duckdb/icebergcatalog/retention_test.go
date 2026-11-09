@@ -191,6 +191,69 @@ func TestRetentionTableProperties(t *testing.T) {
 	}
 }
 
+func TestRetentionMaxSnapshots(t *testing.T) {
+	// Everything's in the age window, the cap still applies.
+	rt := newRetentionTable(t, Retention{MinSnapshotsToKeep: 2, MaxSnapshotAge: time.Hour, MaxSnapshots: 5}, "")
+	var md map[string]any
+	for i := 1; i <= 10; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, seq(6, 10)) {
+		t.Fatalf("expected the newest 5 snapshots, got %v", got)
+	}
+
+	// Ref targets past the cap are kept (and still count toward it).
+	rt = newRetentionTable(t, Retention{MinSnapshotsToKeep: 2, MaxSnapshotAge: time.Hour, MaxSnapshots: 5}, "")
+	rt.commit(1)
+	rt.commit(2, `{"action":"set-snapshot-ref","ref-name":"pinned","type":"tag","snapshot-id":1}`)
+	for i := 3; i <= 10; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, append([]int{1}, seq(6, 10)...)) {
+		t.Fatalf("expected the tagged + newest 5 snapshots, got %v", got)
+	}
+
+	// The cap never goes below MinSnapshotsToKeep.
+	rt = newRetentionTable(t, Retention{MinSnapshotsToKeep: 4, MaxSnapshotAge: time.Hour, MaxSnapshots: 2}, "")
+	for i := 1; i <= 8; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, seq(5, 8)) {
+		t.Fatalf("expected the newest 4 snapshots, got %v", got)
+	}
+
+	// The default is on.
+	rt = newRetentionTable(t, Retention{MaxSnapshotAge: time.Hour}, "")
+	for i := 1; i <= DefaultMaxSnapshots+3; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, seq(4, DefaultMaxSnapshots+3)) {
+		t.Fatalf("expected the newest %d snapshots, got %v", DefaultMaxSnapshots, got)
+	}
+}
+
+func TestRetentionMaxSnapshotsTableProperty(t *testing.T) {
+	rt := newRetentionTable(t, Retention{MinSnapshotsToKeep: 1, MaxSnapshotAge: time.Hour, MaxSnapshots: 100},
+		`{"history.expire.max-snapshots":"3"}`)
+	var md map[string]any
+	for i := 1; i <= 6; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, seq(4, 6)) {
+		t.Fatalf("expected the table's cap, got %v", got)
+	}
+
+	// Negative turns the cap off for the table.
+	rt = newRetentionTable(t, Retention{MinSnapshotsToKeep: 1, MaxSnapshotAge: time.Hour, MaxSnapshots: 2},
+		`{"history.expire.max-snapshots":"-1"}`)
+	for i := 1; i <= 6; i++ {
+		md = rt.commit(i)
+	}
+	if got := snapshotIDs(md); !slices.Equal(got, seq(1, 6)) {
+		t.Fatalf("expected no cap, got %v", got)
+	}
+}
+
 func TestRetentionDisabled(t *testing.T) {
 	rt := newRetentionTable(t, Retention{Disabled: true, MinSnapshotsToKeep: 1, MaxSnapshotAge: time.Millisecond}, "")
 	var md map[string]any

@@ -26,6 +26,18 @@ const (
 	// table changed. Both only bind the snapshot at the start of a
 	// statement, so this is way more than they need.
 	DefaultMaxSnapshotAge = 5 * time.Minute
+	// DefaultMaxSnapshots is Retention.MaxSnapshots's default. Every
+	// duckdb write is a snapshot, so a table taking a steady stream of
+	// small appends piles up way more than MinSnapshotsToKeep inside
+	// MaxSnapshotAge, and each commit rewrites (and each load parses) all
+	// of them (~1.3MB of metadata.json at 1000-run batches w/o the cap vs
+	// ~111KB w/ it).
+	DefaultMaxSnapshots = 100
+
+	// MaxSnapshotsKey is the table property that overrides
+	// Retention.MaxSnapshots. It's ours, not a standard Iceberg property
+	// (Java only has the min-keep/max-age pair), but named like them.
+	MaxSnapshotsKey = "history.expire.max-snapshots"
 )
 
 // Retention configures the snapshot expiry and metadata file cleanup the
@@ -36,10 +48,12 @@ const (
 // every load parses) a metadata.json that grows w/ each snapshot, and the
 // old ones pile up forever.
 //
-// A snapshot is expired only if it's older than MaxSnapshotAge AND not one
-// of the newest MinSnapshotsToKeep, and never if a ref points at it. Tables
-// override both w/ the standard `history.expire.min-snapshots-to-keep` and
-// `history.expire.max-snapshot-age-ms` properties.
+// A snapshot is expired if it's older than MaxSnapshotAge AND not one of
+// the newest MinSnapshotsToKeep, or if it's past the newest MaxSnapshots
+// regardless of age. A snapshot a ref points at is never expired. Tables
+// override these w/ the standard `history.expire.min-snapshots-to-keep` and
+// `history.expire.max-snapshot-age-ms` properties and our own
+// `history.expire.max-snapshots` (MaxSnapshotsKey).
 //
 // Only snapshots are dropped from the metadata, never data files or
 // manifests (the lake is append-only so an expired snapshot's files are
@@ -53,32 +67,62 @@ type Retention struct {
 	// MaxSnapshotAge is how old a snapshot has to be before it can be
 	// expired, 0 -> DefaultMaxSnapshotAge.
 	MaxSnapshotAge time.Duration
+	// MaxSnapshots caps how many snapshots a table keeps: past the newest
+	// MaxSnapshots (counting ref targets, which are still kept) snapshots
+	// are expired regardless of MaxSnapshotAge. 0 -> DefaultMaxSnapshots,
+	// negative -> no cap. It never goes below MinSnapshotsToKeep.
+	//
+	// NOTE: this can expire a snapshot younger than MaxSnapshotAge, so a
+	// reader pinned to it (see DefaultMaxSnapshotAge) fails if the table
+	// takes more than MaxSnapshots commits in between.
+	MaxSnapshots int
 	// KeepOldMetadata turns off deleting metadata.json files that fell out
 	// of the metadata log (a table can also opt out w/
 	// `write.metadata.delete-after-commit.enabled=false`).
 	KeepOldMetadata bool
 }
 
-// policy is r's min-keep/max-age for a table w/ props.
-func (r Retention) policy(props iceberg.Properties) (int, time.Duration) {
-	keep := cmp.Or(r.MinSnapshotsToKeep, DefaultMinSnapshotsToKeep)
-	maxAge := cmp.Or(r.MaxSnapshotAge, DefaultMaxSnapshotAge)
+// retentionPolicy is a table's effective Retention.
+type retentionPolicy struct {
+	keep   int
+	maxAge time.Duration
+	// maxSnapshots is the count cap, 0 for none.
+	maxSnapshots int
+}
+
+// policy is r's policy for a table w/ props.
+func (r Retention) policy(props iceberg.Properties) retentionPolicy {
+	p := retentionPolicy{
+		keep:         cmp.Or(r.MinSnapshotsToKeep, DefaultMinSnapshotsToKeep),
+		maxAge:       cmp.Or(r.MaxSnapshotAge, DefaultMaxSnapshotAge),
+		maxSnapshots: cmp.Or(r.MaxSnapshots, DefaultMaxSnapshots),
+	}
 	if n, err := strconv.Atoi(props[table.MinSnapshotsToKeepKey]); err == nil && n > 0 {
-		keep = n
+		p.keep = n
 	}
 	if ms, err := strconv.ParseInt(props[table.MaxSnapshotAgeMsKey], 10, 64); err == nil && ms >= 0 {
-		maxAge = time.Duration(ms) * time.Millisecond
+		p.maxAge = time.Duration(ms) * time.Millisecond
 	}
-	return max(keep, 1), maxAge
+	if n, err := strconv.Atoi(props[MaxSnapshotsKey]); err == nil && n != 0 {
+		p.maxSnapshots = n
+	}
+	p.keep = max(p.keep, 1)
+	if p.maxSnapshots < 0 {
+		p.maxSnapshots = 0
+	} else {
+		p.maxSnapshots = max(p.maxSnapshots, p.keep)
+	}
+	return p
 }
 
 // expireSnapshots picks the snapshots to drop from md, the metadata a
 // commit produces (the client's updates already applied, so its new
-// snapshot and ref moves count). Newest first, the first keep snapshots and
-// any younger than maxAge are kept, plus every ref target regardless.
-func expireSnapshots(md table.Metadata, keep int, maxAge time.Duration, now time.Time) []int64 {
+// snapshot and ref moves count). Newest first, the first p.keep snapshots
+// and any younger than p.maxAge are kept up to p.maxSnapshots, plus every
+// ref target regardless.
+func expireSnapshots(md table.Metadata, p retentionPolicy, now time.Time) []int64 {
 	snaps := slices.Clone(md.Snapshots())
-	if len(snaps) <= keep {
+	if len(snaps) <= p.keep {
 		return nil
 	}
 	refs := map[int64]bool{}
@@ -88,10 +132,14 @@ func expireSnapshots(md table.Metadata, keep int, maxAge time.Duration, now time
 	slices.SortStableFunc(snaps, func(a, b table.Snapshot) int {
 		return cmp.Or(cmp.Compare(b.SequenceNumber, a.SequenceNumber), cmp.Compare(b.TimestampMs, a.TimestampMs))
 	})
-	cutoff := now.Add(-maxAge).UnixMilli()
+	cutoff := now.Add(-p.maxAge).UnixMilli()
 	var ids []int64
 	for i, snap := range snaps {
-		if i < keep || refs[snap.SnapshotID] || snap.TimestampMs >= cutoff {
+		if refs[snap.SnapshotID] {
+			continue
+		}
+		capped := p.maxSnapshots > 0 && i >= p.maxSnapshots
+		if !capped && (i < p.keep || snap.TimestampMs >= cutoff) {
 			continue
 		}
 		ids = append(ids, snap.SnapshotID)
@@ -119,8 +167,7 @@ func (s *Server) retain(base, md table.Metadata, client table.Updates, req *comm
 			return
 		}
 	}
-	keep, maxAge := s.opts.Retention.policy(md.Properties())
-	ids := expireSnapshots(md, keep, maxAge, now)
+	ids := expireSnapshots(md, s.opts.Retention.policy(md.Properties()), now)
 	if len(ids) == 0 {
 		return
 	}
