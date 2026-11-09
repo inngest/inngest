@@ -43,7 +43,7 @@ func newRetentionTable(t *testing.T, r Retention, props string) *retentionTable 
 		t.Fatal(err)
 	}
 	rt := &retentionTable{t: t, clock: time.Now().Add(time.Second)}
-	srv := New(cat, Options{Warehouse: wh, Retention: r})
+	srv := New(cat, Options{Warehouse: wh, Retention: r, CatalogDB: testCatalogDB(db, wh)})
 	srv.now = func() time.Time { return rt.clock }
 	rt.ts = httptest.NewServer(srv)
 	t.Cleanup(rt.ts.Close)
