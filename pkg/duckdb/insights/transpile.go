@@ -93,6 +93,7 @@ var pipeline = []stage{
 	stageExtractPushdown,
 	stageBuildColumnHints,
 	stageRewriteArrayOfStructAccess,
+	stageRewriteJSONDotComparison,
 	stageRemapTables,
 	stageAddDefaultLimit,
 }
@@ -138,6 +139,14 @@ func stageBuildColumnHints(ps *pipelineState) error {
 // with remapping.
 func stageRewriteArrayOfStructAccess(ps *pipelineState) error {
 	diags, err := rewriteArrayOfStructAccess(ps.stmt, ps.ctes, nil)
+	ps.diagnostics = append(ps.diagnostics, diags...)
+	return err
+}
+
+// stageRewriteJSONDotComparison runs where stageRewriteArrayOfStructAccess
+// does, for the same reasons.
+func stageRewriteJSONDotComparison(ps *pipelineState) error {
+	diags, err := rewriteJSONDotComparison(ps.stmt, ps.ctes, nil)
 	ps.diagnostics = append(ps.diagnostics, diags...)
 	return err
 }

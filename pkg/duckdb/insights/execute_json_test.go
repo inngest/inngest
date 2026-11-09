@@ -2,6 +2,7 @@ package insights_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -65,5 +66,74 @@ func TestExecuteJSONColumns(t *testing.T) {
 		res := run(t, tr)
 		require.Equal(t, insights.ColumnTypeJSON, res.Columns[0].Type)
 		require.Equal(t, "u1", res.Rows[0][1])
+	})
+}
+
+// TestExecuteJSONDotComparison checks dot access into a JSON column
+// compares like the value it holds against a lake w/ JSON text columns:
+// as text against a string (rewriteJSONDotComparison), natively against
+// a number or boolean, and stays JSON when projected.
+func TestExecuteJSONDotComparison(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	accountID, envID := uuid.New(), uuid.New()
+	for i, data := range []string{
+		`{"user":{"id":"u1","name":"Ann"},"n":5,"ok":true,"z":null,"a.b":"dotted"}`,
+		`{"user":{"id":"u2"},"n":10,"ok":false}`,
+		`{"n":"7"}`,
+	} {
+		_, err := db.ExecContext(ctx,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, now(), 'api', ?, 'app/x', ?, '1', now(), '{}');`,
+			accountID.String(), envID.String(), fmt.Sprintf("internal-%d", i), fmt.Sprintf("evt-%d", i), json.RawMessage(data),
+		)
+		require.NoError(t, err)
+	}
+
+	ids := func(t *testing.T, where string) []any {
+		t.Helper()
+		tr, err := insights.Transpile("SELECT id FROM events WHERE "+where+" ORDER BY id", accountID, envID)
+		require.NoError(t, err)
+		res, err := insights.Execute(ctx, db, tr)
+		require.NoError(t, err)
+		out := []any{}
+		for _, row := range res.Rows {
+			out = append(out, row[0])
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		where string
+		want  []any
+	}{
+		{`data.user.id = 'u1'`, []any{"evt-0"}},
+		{`events.data.user.id <> 'u1'`, []any{"evt-1"}},
+		{`data.user.id IN ('u1', 'u2')`, []any{"evt-0", "evt-1"}},
+		{`data.user.id LIKE 'u%'`, []any{"evt-0", "evt-1"}},
+		{`data.user.id IS NULL`, []any{"evt-2"}},
+		{`data.z IS NULL`, []any{"evt-0", "evt-1", "evt-2"}},
+		{`data."a.b" = 'dotted'`, []any{"evt-0"}},
+		{`data.n = '7'`, []any{"evt-2"}},
+		{`data.n = 5`, []any{"evt-0"}},
+		{`data.n > 6`, []any{"evt-1", "evt-2"}},
+		{`data.n BETWEEN 4 AND 8`, []any{"evt-0", "evt-2"}},
+		{`data.ok = true`, []any{"evt-0"}},
+		{`data.user.id = (SELECT 'u2' AS u)`, []any{"evt-1"}},
+	} {
+		t.Run(tc.where, func(t *testing.T) {
+			require.Equal(t, tc.want, ids(t, tc.where))
+		})
+	}
+
+	t.Run("projection stays JSON", func(t *testing.T) {
+		tr, err := insights.Transpile("SELECT data.user AS u, data.user.id AS uid FROM events WHERE data.user.id = 'u1'", accountID, envID)
+		require.NoError(t, err)
+		res, err := insights.Execute(ctx, db, tr)
+		require.NoError(t, err)
+		require.Equal(t, insights.ColumnTypeJSON, res.Columns[0].Type)
+		require.Equal(t, insights.ColumnTypeJSON, res.Columns[1].Type)
+		require.Equal(t, [][]any{{map[string]any{"id": "u1", "name": "Ann"}, "u1"}}, res.Rows)
 	})
 }
