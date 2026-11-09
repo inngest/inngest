@@ -3802,6 +3802,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		})
 
 		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
+			// If we did not consume the pause, another event already stored a
+			// different response for it and that handler owns the discovery.
+			// Enqueueing here would claim the round's shared coalesce job ID
+			// while steps are still pending, deduping the real discovery.
+			if !consumeResult.DidConsume {
+				return nil
+			}
 			if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
 				return fmt.Errorf("error resetting force step plan: %w", err)
 			}
@@ -3856,12 +3863,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			// if we did not consume the pause, it implies another handler raced to consume
-			// the pause first. Drop the span and exit and let the other handler write spans.
-			if !consumeResult.DidConsume {
-				nextStepSpan.Drop()
-				return nil
-			}
 
 			if err != nil {
 				if errors.Is(err, queue.ErrQueueItemExists) {

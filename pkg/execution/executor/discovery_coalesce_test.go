@@ -177,6 +177,48 @@ func TestResumeCoalesceJobID(t *testing.T) {
 	}
 }
 
+// A second event that resumes the same pause with a different payload is not
+// consumed (DidConsume=false). It must not enqueue discovery, otherwise it takes
+// the round's shared coalesce job ID while steps are pending and the real
+// discovery is deduped, wedging the run.
+func TestResumeNotConsumedDoesNotEnqueueDiscovery(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+	wsID, fnID, aID := uuid.New(), uuid.New(), uuid.New()
+
+	md := sv2.Metadata{
+		ID: sv2.ID{
+			RunID:      runID,
+			FunctionID: fnID,
+			Tenant:     sv2.Tenant{EnvID: wsID, AccountID: aID},
+		},
+		Config: *sv2.InitConfig(&sv2.Config{}),
+	}
+
+	q := &stubQueue{}
+	e := &executor{
+		smv2:           &stubRunServiceMD{md: md},
+		pm:             &stubPauseMgr{consumeResult: state.ConsumePauseResult{}},
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	pause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: wsID,
+		DataKey:     "wait-step",
+		Identifier: state.PauseIdentifier{
+			RunID:      runID,
+			FunctionID: fnID,
+			AccountID:  aID,
+		},
+		ParallelCoalesceKey: "def456",
+	}
+
+	require.NoError(t, e.Resume(context.Background(), pause, execution.ResumeRequest{}))
+	require.Empty(t, q.enqueued)
+}
+
 // trackingRunSvc records SavePending invocations so tests can assert whether
 // pending-step tracking was populated for a given batch.
 type trackingRunSvc struct {
