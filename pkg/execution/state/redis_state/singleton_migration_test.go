@@ -1,6 +1,7 @@
 package redis_state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -56,6 +57,52 @@ func TestSingletonMigrationBlocksAdmissionBeforeFirstCopy(t *testing.T) {
 	item.ID = uuid.NewString()
 	_, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true})
 	require.NoError(t, err, "scheduling resumes after migration cleanup")
+}
+
+func TestSingletonMigrationLateEnqueueRetriesWithExistingOwner(t *testing.T) {
+	_, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	_, shard := newQueue(t, rc)
+	item := migrationTestItem()
+	item.Data.Singleton = &osqueue.Singleton{Key: "held-key"}
+	scope := osqueue.ScopeFromQueueItem(item)
+	// Admission happened before preparation copied an owner to this shard.
+	registry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	owner, err := singleton.New(t.Context(), registry).HandleSingleton(t.Context(), scope, "held-key", inngest.Singleton{Mode: enums.SingletonModeSkip})
+	require.NoError(t, err)
+	require.Nil(t, owner)
+	require.NoError(t, shard.(osqueue.SingletonMigrationOperations).BeginSingletonMigration(t.Context(), scope, "migration"))
+	existingRun := ulid.Make()
+	require.NoError(t, shard.(osqueue.SingletonMigrationRunProtector).ProtectSingletonMigrationRun(t.Context(), scope, "migration", "held-key", existingRun))
+	_, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true})
+	require.ErrorIs(t, err, osqueue.ErrSingletonMigrationInProgress, "an ordinary late enqueue must retry, never skip")
+	owner, err = shard.SingletonGetRunID(t.Context(), scope, "held-key")
+	require.NoError(t, err)
+	require.Equal(t, &existingRun, owner)
+	_, err = shard.LoadQueueItem(t.Context(), item.ID)
+	require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+	// A migration copy still cannot replace a different run's owner.
+	_, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true, SingletonMigrationKey: "held-key"})
+	require.ErrorIs(t, err, osqueue.ErrQueueItemSingletonExists)
+}
+
+func TestSingletonMigrationSourceDrainedIncludesNormalizingBacklog(t *testing.T) {
+	r, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	_, shard := newQueue(t, rc, osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }))
+	item := migrationTestItem()
+	_, err := shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+	backlog := osqueue.ItemBacklog(t.Context(), item)
+	partition := osqueue.ItemShadowPartition(t.Context(), item)
+	require.NoError(t, shard.BacklogPrepareNormalize(t.Context(), &backlog, &partition))
+	kg := shard.Client().kg
+	require.False(t, r.Exists(kg.ShadowPartitionSet(partition.PartitionID)))
+	require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(partition.PartitionID), backlog.BacklogID))
+	drained, err := shard.(osqueue.SingletonMigrationOperations).SingletonMigrationSourceDrained(t.Context(), osqueue.ScopeFromQueueItem(item))
+	require.NoError(t, err)
+	require.False(t, drained, "normalizing source work must retain migration protection")
 }
 
 func TestSingletonMigrationSourceDrained(t *testing.T) {

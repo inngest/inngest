@@ -105,6 +105,7 @@ func (q *queue) SingletonMigrationSourceDrained(ctx context.Context, scope osque
 		kg.PartitionQueueSet(enums.PartitionTypeDefault, scope.FunctionID.String(), ""),
 		kg.PartitionScavengerIndex(scope.FunctionID.String()),
 		kg.ShadowPartitionSet(scope.FunctionID.String()),
+		kg.PartitionNormalizeSet(scope.FunctionID.String()),
 	}
 	result, err := singletonMigrationSourceDrained.Exec(ctx, q.RedisClient.unshardedRc, keys, nil).AsInt64()
 	if err != nil {

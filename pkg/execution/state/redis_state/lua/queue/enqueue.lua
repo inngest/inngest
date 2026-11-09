@@ -76,14 +76,14 @@ end
 local singletonMigration = ARGV[15] == "1"
 -- Check if the item is a singleton and if an existing item already exists
 if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
+  -- A late ordinary enqueue must retry even if preparation has already
+  -- copied an owner. Returning a singleton conflict would skip its event.
+  if not singletonMigration and redis.call("EXISTS", keySingletonMigration) == 1 then
+    return 3
+  end
   local holder = redis.call("GET", singletonKey)
   if holder and (not singletonMigration or holder ~= runID) then
     return 2
-  end
-  -- Close the race with a scheduler that passed its early check before the
-  -- hold was installed. Migration copies may still join the existing run.
-  if not singletonMigration and redis.call("EXISTS", keySingletonMigration) == 1 then
-    return 3
   end
 end
 
