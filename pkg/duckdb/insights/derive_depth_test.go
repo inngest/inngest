@@ -26,13 +26,14 @@ func nestedSubqueryShapes(depth int) map[string]string {
 // TestTranspileDeepNestingIsFast guards against deriveTable re-deriving a
 // subquery's FROM clause after validating it, which made Transpile
 // exponential in nesting depth (depth 16 took ~0.7s; depth 30 would take
-// hours).
+// hours). It takes ~10ms (~50ms w/ -race), so the budget is loose enough to
+// not flake on a busy CI runner while still catching the blowup.
 func TestTranspileDeepNestingIsFast(t *testing.T) {
 	for shape, q := range nestedSubqueryShapes(30) {
 		start := time.Now()
 		_, err := Transpile(q, uuid.New(), uuid.New())
 		require.NoError(t, err, shape)
-		require.Less(t, time.Since(start), 200*time.Millisecond, shape)
+		require.Less(t, time.Since(start), 2*time.Second, shape)
 	}
 }
 
