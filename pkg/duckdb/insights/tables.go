@@ -131,7 +131,7 @@ var logicalTables = map[string]logicalTable{
 			"started_at", "ended_at", "app_id", "function_id", "status",
 			"event_ids", "sessions",
 			"attributes",
-			"inputs", "output",
+			"inputs", "output", "error",
 			"is_deferred",
 			"defer_parent_function_id", "defer_parent_run_ids",
 			"metadata", "inngest",
@@ -153,6 +153,7 @@ var logicalTables = map[string]logicalTable{
 			// shallower).
 			"inputs": {physical: "inputs", colType: ColumnTypeJSON, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
 			"output": {physical: "output", colType: ColumnTypeJSON, description: "The run's final output, once it completes successfully."},
+			"error":  {physical: "error", colType: ColumnTypeJSON, description: "The error the run failed with, if it failed."},
 			// event_ids is array-valued (VARCHAR[], so JSON per
 			// DuckDBToColumnType). The hint describes each element, not the
 			// column's own value -- an array of event IDs isn't itself an
@@ -349,7 +350,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 	order := []string{
 		"run_id", "run_queued_at", "app_id",
 		"function_id", "span_id", "trace_id", "parent_span_id", "name",
-		"start_time", "end_time", "output", "input", "attributes",
+		"start_time", "end_time", "output", "error", "input", "attributes",
 	}
 	cols := map[string]knownColumn{
 		"run_id":         {colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this step belongs to."},
@@ -363,6 +364,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"start_time":     {colType: ColumnTypeDatetime, description: "When this step attempt started."},
 		"end_time":       {colType: ColumnTypeDatetime, description: "When this step attempt ended."},
 		"output":         {colType: ColumnTypeJSON, description: "The step's output, once this attempt completes successfully."},
+		"error":          {colType: ColumnTypeJSON, description: "The error this attempt failed with, if it failed."},
 		"input":          {colType: ColumnTypeJSON, description: "The input passed to this step attempt."},
 		"attributes":     {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
 	}
@@ -370,7 +372,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"run_id": "run_id", "run_queued_at": "run_queued_at", "app_id": "app_name", "function_id": "function_slug",
 	}
 	if !collapsed {
-		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "output", "input", "attributes"} {
+		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "output", "error", "input", "attributes"} {
 			physical[c] = c
 		}
 	}
