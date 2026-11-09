@@ -158,6 +158,39 @@ describe('renderCell', () => {
     expect(hasMore).toBe(false);
   });
 
+  it('renders a string value in a Json-typed column as plain text, not JSON-encoded', () => {
+    const element = renderCell(
+      'u1',
+      InsightsColumnType.Json,
+      null,
+      pathCreator,
+    );
+
+    expect(element.type).toBe(CopyableCell);
+    expect(element.props.value).toBe('u1');
+    const cell = element.props.children;
+    expect(cell.type).toBe(TextCell);
+    expect(cell.props.children).toBe('u1');
+  });
+
+  it.each([
+    [{ a: 1 }, '{"a":1}'],
+    [[1, 'x'], '[1,"x"]'],
+    [5, '5'],
+    [true, 'true'],
+  ])('renders %j in a Json-typed column as JSON', (value, want) => {
+    const element = renderCell(
+      value,
+      InsightsColumnType.Json,
+      null,
+      pathCreator,
+    );
+
+    expect(element.type).toBe(CopyableCell);
+    expect(element.props.value).toBe(want);
+    expect(element.props.children.props.children).toBe(want);
+  });
+
   it('renders a JSON-stringified object for an Unknown-typed column carrying an object value, wrapped in a copy affordance', () => {
     const value = { conversationId: '336khdd91hd', totalTurns: 5 };
     const element = renderCell(
