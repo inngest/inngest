@@ -31,6 +31,12 @@ import (
 // LIKE/ILIKE/GLOB/SIMILAR TO y and x IS [NOT] NULL unconditionally (a
 // pattern is always text, and a JSON null is SQL NULL once extracted as
 // text, so IS NULL matches a null value and a missing key alike).
+//
+// Text contexts get the same extraction anywhere in the query: x || y (both
+// operands), x directly an argument of a string function (stringFunctions),
+// and CAST(x AS VARCHAR) (TEXT, STRING, ::VARCHAR, TRY_CAST), which the
+// extraction replaces. A projected x on its own stays JSON: Execute decodes
+// it to its native value already.
 func rewriteJSONDotComparison(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope) ([]Diagnostic, error) {
 	return rewriteScopedExprs(stmt, ctes, outerScope, (*exprRewriter).rewriteJSONDotOperands)
 }
@@ -42,12 +48,43 @@ var comparisonOps = map[string]bool{
 	"<": true, "<=": true, ">": true, ">=": true,
 }
 
+// stringFunctions take their arguments as text, so a JSON dot access passed
+// directly to one is wrapped in its text extraction. length/len/strlen
+// included: DuckDB already measures a JSON value (array included) as its
+// text, so the only change is a string's quotes no longer counting.
+var stringFunctions = map[string]bool{
+	"starts_with": true, "prefix": true, "ends_with": true, "suffix": true, "contains": true,
+	"lower": true, "lcase": true, "upper": true, "ucase": true,
+	"length": true, "strlen": true, "len": true,
+	"regexp_matches": true, "regexp_full_match": true, "regexp_extract": true, "regexp_replace": true, "regexp_split_to_array": true,
+	"substring": true, "substr": true, "replace": true, "trim": true, "ltrim": true, "rtrim": true,
+	"split_part": true, "left": true, "right": true, "strpos": true, "instr": true, "position": true,
+	"concat": true, "concat_ws": true,
+}
+
 // rewriteJSONDotOperands is rewriteJSONDotComparison's exprHook.
 func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 	switch x := e.(type) {
 	case *parser.BinaryExpr:
-		if comparisonOps[x.Op] {
+		switch {
+		case comparisonOps[x.Op]:
 			r.textIfStringPeer(&x.Left, &x.Right)
+		case x.Op == "||":
+			r.textAlways(&x.Left, &x.Right)
+		}
+	case *parser.CastExpr:
+		// A cast to text already asks for the value as text, so its
+		// extraction replaces the cast outright (TRY_CAST included: neither
+		// can fail on JSON).
+		if len(x.Type.Arrays) == 0 && x.Type.BaseTypeName() == "VARCHAR" && isJSONDot(x.X, r.scope, r.isBound) {
+			return jsonText(x.X)
+		}
+	case *parser.FunctionExpr:
+		if stringFunctions[strings.ToLower(strings.Join(x.Name, "."))] {
+			r.textAlways(&x.Receiver)
+			for i := range x.Args {
+				r.textAlways(&x.Args[i])
+			}
 		}
 	case *parser.DistinctFromExpr:
 		r.textIfStringPeer(&x.Left, &x.Right)

@@ -122,6 +122,12 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		{`data.n BETWEEN 4 AND 8`, []any{"evt-0", "evt-2"}},
 		{`data.ok = true`, []any{"evt-0"}},
 		{`data.user.id = (SELECT 'u2' AS u)`, []any{"evt-1"}},
+		{`data.user.id::VARCHAR = 'u1'`, []any{"evt-0"}},
+		{`starts_with(data.user.id, 'u')`, []any{"evt-0", "evt-1"}},
+		{`regexp_matches(data.user.id, '^u2$')`, []any{"evt-1"}},
+		{`data.user.id || '!' = 'u1!'`, []any{"evt-0"}},
+		{`lower(data.user.name) = 'ann'`, []any{"evt-0"}},
+		{`length(data.user.id) = 2`, []any{"evt-0", "evt-1"}},
 	} {
 		t.Run(tc.where, func(t *testing.T) {
 			require.Equal(t, tc.want, ids(t, tc.where))
@@ -134,6 +140,19 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		res, err := insights.Execute(ctx, db, tr)
 		require.NoError(t, err)
 		require.Equal(t, [][]any{{"evt-1"}}, res.Rows)
+	})
+
+	t.Run("cast to text", func(t *testing.T) {
+		tr, err := insights.Transpile("SELECT data.user.id::VARCHAR AS uid, CAST(data.n AS TEXT) AS n, data.user::VARCHAR AS u, data.tags::VARCHAR AS tags, data.z::VARCHAR AS z, TRY_CAST(data.missing AS VARCHAR) AS missing FROM events WHERE id = 'evt-0'", accountID, envID)
+		require.NoError(t, err)
+		res, err := insights.Execute(ctx, db, tr)
+		require.NoError(t, err)
+		for _, c := range res.Columns {
+			require.Equal(t, insights.ColumnTypeString, c.Type, c.Name)
+		}
+		// A string unquoted, anything else its JSON text, a JSON null
+		// SQL NULL (a plain cast gives the text "null").
+		require.Equal(t, [][]any{{"u1", "5", `{"id":"u1","name":"Ann"}`, `["a",1]`, nil, nil}}, res.Rows)
 	})
 
 	t.Run("projection stays JSON, decoded", func(t *testing.T) {

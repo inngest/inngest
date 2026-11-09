@@ -155,6 +155,26 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 			want: `SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE json_extract_string(data.user.id, '$') = 'u1')`,
 		},
 		{
+			name: "cast to text",
+			in:   "SELECT data.n::VARCHAR AS n, CAST(data.user.id AS TEXT) AS uid, TRY_CAST(data.obj AS STRING) AS o FROM events WHERE data.user.id::VARCHAR = 'u1' GROUP BY CAST(data.user.id AS VARCHAR)",
+			want: "SELECT json_extract_string(data.n, '$') AS n, json_extract_string(data.user.id, '$') AS uid, json_extract_string(data.obj, '$') AS o FROM events WHERE json_extract_string(data.user.id, '$') = 'u1' GROUP BY json_extract_string(data.user.id, '$')",
+		},
+		{
+			name: "cast to non-text untouched",
+			in:   "SELECT data.n::INTEGER AS n, CAST(data.f AS DOUBLE) AS f, data.ok::BOOLEAN AS ok, data.user::JSON AS u, data.tags::VARCHAR[] AS t, data::VARCHAR AS d FROM events",
+			want: "SELECT data.n::INTEGER AS n, data.f::DOUBLE AS f, data.ok::BOOLEAN AS ok, data.user::JSON AS u, data.tags::VARCHAR[] AS t, data::VARCHAR AS d FROM events",
+		},
+		{
+			name: "string functions",
+			in:   "SELECT lower(data.user.id) AS l, LENGTH(data.user.id) AS n, data.user.id || '-' || data.name AS c, concat_ws(',', data.a, name) AS w FROM events WHERE starts_with(data.user.id, 'u') AND regexp_matches(data.user.id, '^u') AND left(data.user.id, 1) = 'u'",
+			want: "SELECT lower(json_extract_string(data.user.id, '$')) AS l, LENGTH(json_extract_string(data.user.id, '$')) AS n, json_extract_string(data.user.id, '$') || '-' || json_extract_string(data.name, '$') AS c, concat_ws(',', json_extract_string(data.a, '$'), name) AS w FROM events WHERE starts_with(json_extract_string(data.user.id, '$'), 'u') AND regexp_matches(json_extract_string(data.user.id, '$'), '^u') AND left(json_extract_string(data.user.id, '$'), 1) = 'u'",
+		},
+		{
+			name: "other functions and nested args untouched",
+			in:   "SELECT coalesce(data.user.id, data.x) AS c, json_extract(data.user, '$.id') AS j, lower(coalesce(data.a, data.b)) AS l FROM events",
+			want: "SELECT COALESCE(data.user.id, data.x) AS c, json_extract(data.user, '$.id') AS j, lower(COALESCE(data.a, data.b)) AS l FROM events",
+		},
+		{
 			name: "array of structs untouched",
 			in:   "SELECT run_id FROM runs WHERE sessions.key = 'x'",
 			want: "SELECT run_id FROM runs WHERE sessions.key = 'x'",
