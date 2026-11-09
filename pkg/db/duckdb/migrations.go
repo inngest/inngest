@@ -63,7 +63,7 @@ func (m Mode) String() string {
 // modeEnv is the env vars each Mode sets while migrating.
 //
 // DUCKDB_ICEBERG_ONLY replaces each table's Iceberg-only clause
-// (PARTITIONED BY/SORTED BY/WITH), which a plain duckdb table rejects.
+// (PARTITIONED BY/WITH), which a plain duckdb table rejects.
 // Every occurrence uses the no-colon "${VAR-default}" form, which (unlike
 // "${VAR:-default}") only falls back to the default when the var is
 // completely unset, so an explicitly empty value wins.

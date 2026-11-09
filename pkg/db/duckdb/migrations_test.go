@@ -60,7 +60,7 @@ func TestMigrateCreatesStagingTables(t *testing.T) {
 // TestMigrateInMemoryWithoutLake proves persist=false's whole point: the
 // same migration files run cleanly against a bare in-memory catalog with no
 // lake ATTACH at all, because the ENVSUB-wrapped Iceberg-only clauses
-// (PARTITIONED BY/SORTED BY/WITH, which a plain duckdb table rejects) are
+// (PARTITIONED BY/WITH, which a plain duckdb table rejects) are
 // overridden to nothing, and the "inngest" schema Migrate creates directly
 // stands in for the catalog the lake ATTACH would otherwise have provided.
 func TestMigrateInMemoryWithoutLake(t *testing.T) {
@@ -191,6 +191,8 @@ func TestLakeTableProperties(t *testing.T) {
 			props := lt.Properties()
 			require.Equal(t, "zstd", props["write.parquet.compression-codec"])
 			require.Equal(t, "false", props["commit.manifest-merge.enabled"])
+			// No declared sort order, see schema.Table.SortKey.
+			require.True(t, lt.SortOrder().IsUnsorted(), "sort order %v", lt.SortOrder())
 		})
 	}
 }
