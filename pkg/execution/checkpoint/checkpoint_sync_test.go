@@ -1373,3 +1373,24 @@ type mockInngestFunction struct{}
 func (m *mockInngestFunction) MaxAttempts() int {
 	return 3
 }
+
+// TestCheckpointSyncSteps_RejectsLoopReturn proves a LoopReturn cannot be
+// checkpointed.  the loop state is written only from the run response.
+func TestCheckpointSyncSteps_RejectsLoopReturn(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	ops := []state.GeneratorOpcode{{
+		ID:   "loop-return",
+		Op:   enums.OpcodeLoopReturn,
+		Data: json.RawMessage(`{"state":{"n":1},"version":0}`),
+	}}
+	mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.ErrorContains(err, "cannot be checkpointed")
+
+	mocks.state.AssertNotCalled(t, "SaveStep")
+	mocks.executor.AssertNotCalled(t, "Finalize")
+	mocks.executor.AssertNotCalled(t, "HandleGenerator")
+}
