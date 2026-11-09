@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -32,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/kv/kvredis"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
@@ -256,9 +258,14 @@ func newExecutor(p executorParams) (execution.Executor, error) {
 	agg := expragg.NewAggregator(p.Context, 100, 100, p.Pauses, expressions.ExprEvaluator, nil, nil)
 	topic := p.Opts.Config.EventStream.Service.Concrete.TopicName()
 
+	// loop records live under "{kv}:".  the key text after the prefix
+	// starts with the tenant.
+	loopStore := loops.NewStore(kvredis.New(p.Clients.unsharded, "{kv}:"))
+
 	return executor.NewExecutor(
 		executor.WithHTTPClient(p.HTTPClient),
 		executor.WithStateManager(p.RunService),
+		executor.WithLoopStore(loopStore),
 		executor.WithPauseManager(p.Pauses),
 		executor.WithDriverV1(drivers...),
 		executor.WithDriverV2(httpv2.NewDriver(p.HTTPClient)),
