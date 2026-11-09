@@ -14,13 +14,13 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const spanColumns = "span_id, trace_id, parent_span_id, start_time, end_time, name, attributes, run_id, app_id, function_id, output, input"
+const spanColumns = "span_id, trace_id, parent_span_id, start_time, end_time, name, attributes, run_id, app_id, function_id, output, error, input"
 
 // spanColumnsPrefixed is spanColumns with each column prefixed "s." for use
 // inside GetSpansByRunID's latest_metadata CTE, which joins run_trace_spans
 // (aliased s) against run_metadata (aliased m) and needs the two
 // disambiguated.
-const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_time, s.end_time, s.name, s.attributes, s.run_id, s.app_id, s.function_id, s.output, s.input"
+const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_time, s.end_time, s.name, s.attributes, s.run_id, s.app_id, s.function_id, s.output, s.error, s.input"
 
 // GetSpansByRunID builds the run's span tree from inngest.run_trace_spans.
 // This table is flat — one physical row is one logical span — so there's
@@ -154,8 +154,9 @@ func selectRootSpan(candidates []rootCandidate) *cqrs.OtelSpan {
 }
 
 // GetSpanOutput backs Query.RunTraceSpanOutputByID's preview path.
-// output/input are stored directly on the row, so this is a direct
-// (run_id, span_id) lookup — no separate output-span indirection.
+// output/error/input are stored directly on the row, already split at write
+// time, so this is a direct (run_id, span_id) lookup — no separate
+// output-span indirection and no envelope to unwrap.
 func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
 	if id.SpanID == "" {
 		return nil, fmt.Errorf("span ID is required to retrieve output")
@@ -178,7 +179,7 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 	}
 
 	query := fmt.Sprintf(
-		"SELECT output, input FROM %s.run_trace_spans WHERE run_id = ? AND span_id IN (%s);",
+		"SELECT output, error, input FROM %s.run_trace_spans WHERE run_id = ? AND span_id IN (%s);",
 		driver.DuckLakeAlias, strings.Join(placeholders, ", "),
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
@@ -189,11 +190,15 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 
 	so := &cqrs.SpanOutput{}
 	for rows.Next() {
-		var rawOutput, rawInput any
-		if err := rows.Scan(&rawOutput, &rawInput); err != nil {
+		var rawOutput, rawError, rawInput any
+		if err := rows.Scan(&rawOutput, &rawError, &rawInput); err != nil {
 			return nil, fmt.Errorf("duckdbquery: scanning span output row: %w", err)
 		}
 		output, err := asJSON(rawOutput, "output")
+		if err != nil {
+			return nil, err
+		}
+		errVal, err := asJSON(rawError, "error")
 		if err != nil {
 			return nil, err
 		}
@@ -201,9 +206,7 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 		if err != nil {
 			return nil, err
 		}
-		if cqrs.UnwrapSpanOutputEnvelope(so, output, input) {
-			break
-		}
+		cqrs.ApplySpanOutputColumns(so, output, errVal, input)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("duckdbquery: reading span output rows: %w", err)
@@ -222,12 +225,12 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		name                              string
 		rawAttributes                     any
 		rawRunID, rawAppID, rawFunctionID any
-		rawOutput, rawInput               any
+		rawOutput, rawError, rawInput     any
 		rawMetadata                       any
 	)
 	if err := rows.Scan(
 		&spanID, &traceID, &rawParentSpanID, &rawStartTime, &rawEndTime, &name,
-		&rawAttributes, &rawRunID, &rawAppID, &rawFunctionID, &rawOutput, &rawInput,
+		&rawAttributes, &rawRunID, &rawAppID, &rawFunctionID, &rawOutput, &rawError, &rawInput,
 		&rawMetadata,
 	); err != nil {
 		return nil, "", err
@@ -286,17 +289,20 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		return nil, "", err
 	}
 
-	// Set OutputID whenever either column is non-NULL — a span's own row
-	// carries its output/input directly, so this is always its own ID.
-	output, err := asJSON(rawOutput, "output")
-	if err != nil {
-		return nil, "", err
+	// Set OutputID whenever any of output/error/input is non-NULL — a
+	// span's own row carries them directly, so this is always its own ID.
+	hasIO := false
+	for _, c := range []struct {
+		v    any
+		name string
+	}{{rawOutput, "output"}, {rawError, "error"}, {rawInput, "input"}} {
+		b, err := asJSON(c.v, c.name)
+		if err != nil {
+			return nil, "", err
+		}
+		hasIO = hasIO || len(b) > 0
 	}
-	input, err := asJSON(rawInput, "input")
-	if err != nil {
-		return nil, "", err
-	}
-	if len(output) > 0 || len(input) > 0 {
+	if hasIO {
 		preview := true
 		id := cqrs.SpanIdentifier{RunID: runID.String(), SpanID: spanID, Preview: &preview}
 		encoded, err := id.Encode()

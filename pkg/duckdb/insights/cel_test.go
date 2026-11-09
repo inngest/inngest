@@ -200,31 +200,31 @@ func TestCELOutputFilters(t *testing.T) {
 		expected []sq.Expression
 	}{
 		{
-			name: "output boolean true targets the data envelope",
+			name: "output boolean true targets the output column",
 			cel:  []string{`output.success == true`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>?)", "$.data.success").Eq("true"),
+				sq.L("(output::JSON->>?)", "$.success").Eq("true"),
 			},
 		},
 		{
 			name: "output null",
 			cel:  []string{`output.result == null`},
 			expected: []sq.Expression{
-				sq.L("((output::JSON->?) IS NULL OR (output::JSON->?) = 'null'::JSON)", "$.data.result", "$.data.result"),
+				sq.L("((output::JSON->?) IS NULL OR (output::JSON->?) = 'null'::JSON)", "$.result", "$.result"),
 			},
 		},
 		{
-			name: "bare output targets the whole data envelope",
+			name: "bare output targets the whole output column",
 			cel:  []string{`output == "x"`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>?)", "$.data").Eq("x"),
+				sq.L("(output::JSON->>?)", "$").Eq("x"),
 			},
 		},
 		{
 			name: "output numeric comparison",
 			cel:  []string{`output.count >= 3`},
 			expected: []sq.Expression{
-				sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(3)),
+				sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.count").Gte(int64(3)),
 			},
 		},
 		{
@@ -234,8 +234,8 @@ func TestCELOutputFilters(t *testing.T) {
 			cel:  []string{`output.count >= 0`},
 			expected: []sq.Expression{
 				sq.Or(
-					sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(0)),
-					sq.L("json_type(output::JSON, ?) = 'NULL'", "$.data.count"),
+					sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.count").Gte(int64(0)),
+					sq.L("json_type(output::JSON, ?) = 'NULL'", "$.count"),
 				),
 			},
 		},
@@ -243,14 +243,14 @@ func TestCELOutputFilters(t *testing.T) {
 			name: "output nested path",
 			cel:  []string{`output.nested.value == "x"`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>?)", "$.data.nested.value").Eq("x"),
+				sq.L("(output::JSON->>?)", "$.nested.value").Eq("x"),
 			},
 		},
 		{
-			name: "error targets the error envelope",
+			name: "error targets the error column",
 			cel:  []string{`error.message == "boom"`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>?)", "$.error.message").Eq("boom"),
+				sq.L("(error::JSON->>?)", "$.message").Eq("boom"),
 			},
 		},
 		{
@@ -279,7 +279,7 @@ func TestCELEventAndOutputFiltersSplitAMixedExpression(t *testing.T) {
 
 	outputFilters, err := CELOutputFilters(ctx, cel)
 	require.NoError(t, err)
-	assert.Equal(t, []sq.Expression{sq.L("(output::JSON->>?)", "$.data.ok").Eq("true")}, outputFilters)
+	assert.Equal(t, []sq.Expression{sq.L("(output::JSON->>?)", "$.ok").Eq("true")}, outputFilters)
 }
 
 func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
@@ -298,7 +298,7 @@ func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
 	sqlText, args, err := RenderWhereSQL(outputFilters)
 	require.NoError(t, err)
 	assert.Equal(t, `(len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: (COALESCE((x::JSON->>?), '') = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
-	assert.Equal(t, []any{"$.name", "x", "$.data.ok", "true"}, args)
+	assert.Equal(t, []any{"$.name", "x", "$.ok", "true"}, args)
 }
 
 func TestCELEventTableFiltersNestedOrGroup(t *testing.T) {

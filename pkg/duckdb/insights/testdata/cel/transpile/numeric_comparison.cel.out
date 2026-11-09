@@ -11,4 +11,4 @@ OUTPUT SQL
 (TRY_CAST((output::JSON->>?) AS DOUBLE) >= ?)
 
 OUTPUT ARGS
-[$.data.count 3]
+[$.count 3]

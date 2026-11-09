@@ -11,4 +11,4 @@ OUTPUT SQL
 ((output::JSON->>?) = ?)
 
 OUTPUT ARGS
-[$.data.success true]
+[$.success true]
