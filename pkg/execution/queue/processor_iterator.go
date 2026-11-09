@@ -28,8 +28,9 @@ type ProcessorIterator struct {
 	// Dispatch sends a leased item to the execution layer.
 	Dispatch DispatchFunc
 
-	// error returned when processing
-	Err error
+	// Err records a lease error and is safe to read after Iterate returns.
+	Err   error
+	errMu sync.Mutex
 
 	// StaticTime is used as the processing time for all items in the queue.
 	// We process queue items sequentially, and time progresses linearly as each
@@ -43,6 +44,8 @@ type ProcessorIterator struct {
 	// Parallel indicates whether the partition's jobs can be processed in Parallel.
 	// Parallel processing breaks best effort fifo but increases throughput.
 	Parallel bool
+	// Zero preserves batch-wide parallelism for existing callers.
+	ParallelLimit int
 
 	// These flags are used to handle partition requeueing.
 	// These counters must be accessed atomically as they may be incremented
@@ -114,6 +117,9 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
+	if p.Parallel && p.ParallelLimit > 0 {
+		eg.SetLimit(p.ParallelLimit)
+	}
 	for idx, i := range p.Items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
@@ -285,7 +291,9 @@ func (p *ProcessorIterator) applyLeaseItemResult(result LeaseItemResult) {
 	case LeaseItemStatusSemaphoreLimited:
 		p.CtrConcurrency.Add(1)
 	case LeaseItemStatusLeaseError:
+		p.errMu.Lock()
 		p.Err = result.Err
+		p.errMu.Unlock()
 	}
 }
 

@@ -56,6 +56,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
+	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
+	queueClaimConcurrency := localconfig.GetIntValue(cmd, "queue-claim-concurrency", devserver.DefaultQueueClaimConcurrency)
+	if err := localconfig.ValidateQueueClaimConcurrency(queueClaimConcurrency, queueWorkers); err != nil {
+		return err
+	}
+
 	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
@@ -73,7 +79,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	noPoll := localconfig.GetBoolValue(cmd, "no-poll", false)
 	pollInterval := localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval)
 	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", 0)
-	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
 	persist := localconfig.GetBoolValue(cmd, "persist", false)
 	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
@@ -107,16 +112,17 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		Autodiscover:       !noDiscovery,
-		Config:             *conf,
-		Poll:               !noPoll,
-		PollInterval:       pollInterval,
-		RetryInterval:      retryInterval,
-		QueueWorkers:       queueWorkers,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               urls,
-		ConnectGatewayPort: connectGatewayPort,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
+		Autodiscover:          !noDiscovery,
+		Config:                *conf,
+		Poll:                  !noPoll,
+		PollInterval:          pollInterval,
+		RetryInterval:         retryInterval,
+		QueueWorkers:          queueWorkers,
+		QueueClaimConcurrency: queueClaimConcurrency,
+		Tick:                  time.Duration(tick) * time.Millisecond,
+		URLs:                  urls,
+		ConnectGatewayPort:    connectGatewayPort,
+		ConnectGatewayHost:    conf.CoreAPI.Addr,
 		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
 			ctx,
 			connectGatewayGRPCIP, connectGatewayGRPCPort,

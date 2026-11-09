@@ -381,6 +381,12 @@ func WithPeekSizeForFunction(mapping map[string]int64) QueueOpt {
 	}
 }
 
+// WithParallelClaimLimit bounds concurrent claims for user partitions with FIFO disabled.
+// Zero keeps the existing unbounded parallel iterator. System queues are unchanged.
+func WithParallelClaimLimit(limit int) QueueOpt {
+	return func(q *QueueOptions) { q.parallelClaimLimit = limit }
+}
+
 func WithDisableFifoForAccounts(mapping map[string]struct{}) QueueOpt {
 	return func(q *QueueOptions) {
 		q.disableFifoForAccounts = mapping
@@ -540,6 +546,7 @@ type QueueOptions struct {
 	queueAttemptResetter    AttemptResetter
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
+	parallelClaimLimit      int
 	peekSizeForFunctions    map[string]int64
 	log                     logger.Logger
 

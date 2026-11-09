@@ -33,6 +33,7 @@ type Config struct {
 	PollInterval            int    `koanf:"poll-interval"`
 	RetryInterval           int    `koanf:"retry-interval"`
 	QueueWorkers            int    `koanf:"queue-workers"`
+	QueueClaimConcurrency   int    `koanf:"queue-claim-concurrency"`
 	Tick                    int    `koanf:"tick"`
 	ConnectGatewayPort      int    `koanf:"connect-gateway-port"`
 	ConnectGatewayGRPCIP    string `koanf:"connect-gateway-grpc-ip"`
@@ -302,4 +303,14 @@ func GetBoolValue(cmd *cli.Command, key string, defaultValue bool) bool {
 
 	// Finally return default
 	return defaultValue
+}
+
+func ValidateQueueClaimConcurrency(concurrency, workers int) error {
+	if concurrency < 1 {
+		return fmt.Errorf("queue-claim-concurrency must be at least 1 (got %d)", concurrency)
+	}
+	if concurrency > workers {
+		return fmt.Errorf("queue-claim-concurrency (%d) must not exceed queue-workers (%d)", concurrency, workers)
+	}
+	return nil
 }
