@@ -570,6 +570,14 @@
             "message": "Webhook not found"
           }
         ]
+      },
+      "413": {
+        "errors": [
+          {
+            "code": "invalid_request",
+            "message": "Request body cannot exceed 16384 bytes"
+          }
+        ]
       }
     }
   }

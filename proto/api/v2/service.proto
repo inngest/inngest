@@ -970,6 +970,17 @@ service V2 {
         }
       }
       responses: {
+        key: "413"
+        value: {
+          description: "Request body too large (max 16KiB)"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Internal Server Error"

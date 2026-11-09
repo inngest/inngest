@@ -33,6 +33,8 @@ func TestHTTPGateway_UpdateWebhook(t *testing.T) {
 		{"transform only", id, "production", `{"transform":"function transform(evt) { return evt; }"}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 		{"both fields", id, "production", `{"name":"Renamed","transform":"function transform(evt) { return evt; }"}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 		{"whitespace name", id, "production", `{"name":" "}`, "not_implemented", "Webhooks not implemented in OSS", 501},
+		{"name too long", id, "production", `{"name":"` + strings.Repeat("é", 129) + `"}`, "invalid_field_format", "Webhook name must be at most 128 characters", 400},
+		{"name at limit", id, "production", `{"name":"` + strings.Repeat("é", 128) + `"}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 		{"unknown field", id, "production", `{"name":"Renamed","url":"https://example.com"}`, "invalid_request", "Unexpected request body field \"url\"", 400},
 		{"whitespace transform", id, "production", `{"transform":" "}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 	} {

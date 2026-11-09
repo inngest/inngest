@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
@@ -286,6 +287,9 @@ func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookReq
 	}
 	if req.Name != nil && *req.Name == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name cannot be empty")
+	}
+	if req.Name != nil && utf8.RuneCountInString(*req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
 	}
 	if req.Transform != nil && *req.Transform == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Transform function cannot be empty")
