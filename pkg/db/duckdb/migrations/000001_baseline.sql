@@ -1,5 +1,5 @@
 -- +goose Up
--- JSON payloads (attributes, inputs/input, output, values, event_data,
+-- JSON payloads (attributes, inputs/input, output, error, values, event_data,
 -- event_meta) are stored as JSON text in plain VARCHAR columns: duckdb's
 -- shredded VARIANT is a net loss here (no UINT64 shredding
 -- (duckdb/duckdb#28166), integers > INT64_MAX fail parquet writes
@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   status VARCHAR NOT NULL,
   attributes VARCHAR NOT NULL,
   inputs VARCHAR NOT NULL,
+  -- The run's output, split like run_trace_spans' (below).
   output VARCHAR,
+  error VARCHAR,
   -- event_ids holds the run's triggering event(s) internal ULID(s) — see
   -- pkg/duckdb/tracing/listener.go's addRunEventAttrs, which sources it
   -- from sv2.Metadata.Config.EventIDs (the same persisted field
@@ -135,7 +137,12 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   span_id VARCHAR NOT NULL,
   parent_span_id VARCHAR,
   attributes VARCHAR NOT NULL,
+  -- The SDK's output envelope, split once at write time
+  -- (cqrs.SplitSpanOutputEnvelope): output is the {"data": ...} value and
+  -- error the {"error": ...} value, NULL unless the span failed. A
+  -- step.waitForEvent-shaped or unrecognized output is all output.
   output VARCHAR,
+  error VARCHAR,
   input VARCHAR,
   -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
   -- LogAppendTime for exported rows, the insert time for rows written here
@@ -177,6 +184,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (y
 --     attributes,
 --     input as inputs,
 --     output,
+--     error,
 --     TRY_CAST(attributes ->> '_inngest.event.ids' AS VARCHAR[]) AS event_ids,
 --     TRY_CAST (attributes ->> '_inngest.event.sessions' AS STRUCT(key VARCHAR, id VARCHAR)[]) AS sessions,
 --     attributes->>'_inngest.defer.parent_fn_slug' IS NOT NULL AS is_deferred,
@@ -239,12 +247,12 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- spanning lines.
 -- +goose ENVSUB ON
 CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
-SELECT * REPLACE (attributes::JSON AS attributes, inputs::JSON AS inputs, output::JSON AS output) FROM query_table(p_runs)
+SELECT * REPLACE (attributes::JSON AS attributes, inputs::JSON AS inputs, output::JSON AS output, error::JSON AS error) FROM query_table(p_runs)
 ${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC, CASE WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2 WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1 ELSE 0 END DESC, status DESC) = 1};
 -- +goose ENVSUB OFF
 
 CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
-SELECT * REPLACE (attributes::JSON AS attributes, output::JSON AS output, input::JSON AS input) FROM query_table(p_spans);
+SELECT * REPLACE (attributes::JSON AS attributes, output::JSON AS output, error::JSON AS error, input::JSON AS input) FROM query_table(p_spans);
 
 -- raw_events is inngest.events as is: an event is never re-written.
 CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE

@@ -28,23 +28,33 @@ func useInsightsCEL(t *testing.T) {
 	})
 }
 
+// nullableRaw is SQL NULL for a nil value, else its JSON text.
+func nullableRaw(v []byte) any {
+	if v == nil {
+		return nil
+	}
+	return json.RawMessage(v)
+}
+
 type celTestRun struct {
 	inputs string
 	output *string
 }
 
-// seedCELRun inserts one completed run with the given inputs/output.
+// seedCELRun inserts one completed run with the given inputs/output, its
+// output envelope split into output/error the way the dual-write does.
 func seedCELRun(t *testing.T, ctx context.Context, m *Manager, accountID, envID uuid.UUID, runID string, queuedAt time.Time, r celTestRun) {
 	t.Helper()
-	var output any
+	var output, errVal any
 	if r.output != nil {
-		output = json.RawMessage(*r.output)
+		data, e, _ := cqrs.SplitSpanOutputEnvelope([]byte(*r.output))
+		output, errVal = nullableRaw(data), nullableRaw(e)
 	}
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, output)
-		 VALUES (?, ?, ?, ?, ?, ?, 'test-app', ?, 'test-fn', '{}', ?, ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, output, error)
+		 VALUES (?, ?, ?, ?, ?, ?, 'test-app', ?, 'test-fn', '{}', ?, ?, ?, ?);`,
 		accountID.String(), envID.String(), runID, queuedAt, queuedAt, uuid.New().String(), uuid.New().String(),
-		json.RawMessage(r.inputs), enums.StepStatusCompleted.String(), output,
+		json.RawMessage(r.inputs), enums.StepStatusCompleted.String(), output, errVal,
 	)
 	require.NoError(t, err)
 }

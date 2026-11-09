@@ -16,7 +16,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids, is_deferred, trace_id"
+const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, error, event_ids, is_deferred, trace_id"
 
 // runStatusToStepStatusString maps a cqrs.TraceRun filter's RunStatus back
 // to the StepStatus string inngest.runs.status actually stores. Only
@@ -490,14 +490,17 @@ func (m *Manager) getTraceRunsBatch(ctx context.Context, opt cqrs.GetTraceRunOpt
 			err  error
 		)
 		if rq.matcher != nil {
-			var rawInputs any
-			trun, err = scanTraceRun(rows, &rawInputs)
+			var (
+				rawInputs any
+				out       runOutput
+			)
+			trun, out, err = scanTraceRunOutput(rows, &rawInputs)
 			if err != nil {
 				return 0, nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
 			}
 			scanned++
 			last = trun
-			ok, err := rq.matchRow(ctx, rawInputs, trun.Output)
+			ok, err := rq.matchRow(ctx, rawInputs, out)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -528,14 +531,32 @@ func (m *Manager) getTraceRunsBatch(ctx context.Context, opt cqrs.GetTraceRunOpt
 	return scanned, last, nil
 }
 
-// matchRow checks one candidate row's scanned inputs column and output
-// against rq.matcher.
-func (rq runsQuery) matchRow(ctx context.Context, rawInputs any, output []byte) (bool, error) {
+// matchRow checks one candidate row's scanned inputs column and
+// output/error against rq.matcher.
+func (rq runsQuery) matchRow(ctx context.Context, rawInputs any, out runOutput) (bool, error) {
 	inputs, err := asJSON(rawInputs, "inputs")
 	if err != nil {
 		return false, err
 	}
-	return rq.matcher.match(ctx, inputs, output)
+	return rq.matcher.match(ctx, inputs, out)
+}
+
+// runOutput is a run's output and error columns, as stored (already split
+// from the output envelope at write time).
+type runOutput struct {
+	data, err []byte
+}
+
+func scanRunOutput(rawOutput, rawError any) (runOutput, error) {
+	data, err := asJSON(rawOutput, "output")
+	if err != nil {
+		return runOutput{}, err
+	}
+	errVal, err := asJSON(rawError, "error")
+	if err != nil {
+		return runOutput{}, err
+	}
+	return runOutput{data: data, err: errVal}, nil
 }
 
 func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
@@ -577,7 +598,7 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 // which (unlike rq's SQL) can't be pushed into a COUNT(*).
 func (m *Manager) countTraceRunsInGo(ctx context.Context, rq runsQuery, args []any) (int, error) {
 	query := fmt.Sprintf(
-		"SELECT inputs, output FROM %s.runs WHERE %s QUALIFY %s;",
+		"SELECT inputs, output, error FROM %s.runs WHERE %s QUALIFY %s;",
 		driver.DuckLakeAlias, rq.preWhere, rq.qualify,
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
@@ -588,15 +609,15 @@ func (m *Manager) countTraceRunsInGo(ctx context.Context, rq runsQuery, args []a
 
 	n := 0
 	for rows.Next() {
-		var rawInputs, rawOutput any
-		if err := rows.Scan(&rawInputs, &rawOutput); err != nil {
+		var rawInputs, rawOutput, rawError any
+		if err := rows.Scan(&rawInputs, &rawOutput, &rawError); err != nil {
 			return 0, fmt.Errorf("duckdbquery: scanning trace run count row: %w", err)
 		}
-		output, err := asJSON(rawOutput, "output")
+		out, err := scanRunOutput(rawOutput, rawError)
 		if err != nil {
 			return 0, err
 		}
-		ok, err := rq.matchRow(ctx, rawInputs, output)
+		ok, err := rq.matchRow(ctx, rawInputs, out)
 		if err != nil {
 			return 0, err
 		}
@@ -614,58 +635,67 @@ func (m *Manager) countTraceRunsInGo(ctx context.Context, rq runsQuery, args []a
 // *cqrs.TraceRun. Destination order must match runColumns exactly; extra
 // receives any columns selected after runColumns.
 func scanTraceRun(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, error) {
+	trun, _, err := scanTraceRunOutput(rows, extra...)
+	return trun, err
+}
+
+// scanTraceRunOutput is scanTraceRun, also returning the run's output/error
+// columns as stored. TraceRun.Output re-wraps them in the {"data": ...}/
+// {"error": ...} envelope every other cqrs backend returns.
+func scanTraceRunOutput(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, runOutput, error) {
 	var (
 		rawAccountID, rawEnvID, rawAppID, rawFunctionID any
 		runID                                           string
 		rawQueuedAt, rawStartedAt, rawEndedAt           any
 		status                                          string
-		rawOutput, rawEventIDs, rawIsDeferred           any
+		rawOutput, rawError                             any
+		rawEventIDs, rawIsDeferred                      any
 		traceID                                         sql.NullString
 	)
 	dest := append([]any{
 		&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &runID,
-		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs, &rawIsDeferred,
+		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawError, &rawEventIDs, &rawIsDeferred,
 		&traceID,
 	}, extra...)
 	if err := rows.Scan(dest...); err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 
 	accountID, err := uuidColumn(rawAccountID, "account_id")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	envID, err := uuidColumn(rawEnvID, "env_id")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	appID, err := uuidColumn(rawAppID, "app_id")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	functionID, err := uuidColumn(rawFunctionID, "function_id")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	queuedAt, err := asTimestamp(rawQueuedAt, "queued_at")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	startedAt, err := asNullableTimestamp(rawStartedAt, "started_at")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	endedAt, err := asNullableTimestamp(rawEndedAt, "ended_at")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 	stepStatus, err := enums.StepStatusString(status)
 	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: parsing run status %q: %w", status, err)
+		return nil, runOutput{}, fmt.Errorf("duckdbquery: parsing run status %q: %w", status, err)
 	}
-	output, err := asJSON(rawOutput, "output")
+	out, err := scanRunOutput(rawOutput, rawError)
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 
 	// event_ids is a VARCHAR[] (NULL for cron-only runs), decoded as []any.
@@ -673,13 +703,13 @@ func scanTraceRun(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, error) {
 	if rawEventIDs != nil {
 		items, ok := rawEventIDs.([]any)
 		if !ok {
-			return nil, fmt.Errorf("duckdbquery: event_ids has unexpected type %T", rawEventIDs)
+			return nil, runOutput{}, fmt.Errorf("duckdbquery: event_ids has unexpected type %T", rawEventIDs)
 		}
 		triggerIDs = make([]string, len(items))
 		for i, item := range items {
 			s, ok := item.(string)
 			if !ok {
-				return nil, fmt.Errorf("duckdbquery: event_ids element %d has unexpected type %T", i, item)
+				return nil, runOutput{}, fmt.Errorf("duckdbquery: event_ids element %d has unexpected type %T", i, item)
 			}
 			triggerIDs[i] = s
 		}
@@ -687,7 +717,7 @@ func scanTraceRun(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, error) {
 
 	isDeferred, err := asNullableBool(rawIsDeferred, "is_deferred")
 	if err != nil {
-		return nil, err
+		return nil, runOutput{}, err
 	}
 
 	return &cqrs.TraceRun{
@@ -700,9 +730,9 @@ func scanTraceRun(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, error) {
 		QueuedAt:    queuedAt,
 		StartedAt:   startedAt,
 		EndedAt:     endedAt,
-		Output:      output,
+		Output:      cqrs.SpanOutputEnvelope(out.data, out.err),
 		Status:      enums.StepStatusToRunStatus(stepStatus),
 		TriggerIDs:  triggerIDs,
 		IsDeferred:  isDeferred,
-	}, nil
+	}, out, nil
 }
