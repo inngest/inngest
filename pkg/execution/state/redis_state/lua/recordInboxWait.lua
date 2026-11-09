@@ -19,9 +19,12 @@ the run's continuation. The SDK reports a pending read again in the response of
 a sibling step, so this can be that report arriving late. It is not recorded and
 wakes nothing: a second wake would run every step after the read twice.
 
-A read whose record is still here is the exception: the path that took it out
-deletes the record only once the wake is queued, so this is that same call sent
-again after its response was lost, and it is answered again.
+A single-message read this script answered is the exception. It leaves a mark
+naming the message it gave, which is removed with the wait once the wake is
+queued, so a mark still here means this same call was sent again after its
+response was lost: it is answered again with the same message. Only this script
+writes the mark, so a read that an arrival, a timeout or a close took is not
+re-answered by it; those paths own the run's continuation themselves.
 
 Output:
   { 0 }                           recorded; nothing for it to read
@@ -63,26 +66,16 @@ if cjson.decode(record)["pck"] ~= nil and redis.call("SISMEMBER", keyStepsPendin
 		return { 3, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
 	end
 
-	-- A single-message read saves nothing of its own, so its record is what
-	-- says the same thing: a satisfied wait stays recorded until its wake is
-	-- queued, so a record still here for this wait means nobody queued one.
-	-- This call is then the same one sent again after its response was lost,
-	-- and the message it found is still the one at its position: answer it
-	-- again. The wake is named by the read alone, so queueing it twice queues
-	-- it once.
+	-- The mark this script leaves when it answers a single-message read. It is
+	-- still here only if the wake was never queued, so this call is the same
+	-- one sent again after its response was lost: answer it with the message it
+	-- gave the first time. Another path's read has no mark and is not answered
+	-- here, as that path owns the run's continuation.
 	if batch == nil then
-		local held = redis.call("HGET", keyWaits, inbox)
+		local answered = redis.call("HGET", keyWaits, inbox .. ":answered:" .. waitID)
 
-		if held then
-			local wait = cjson.decode(held)
-
-			if wait["id"] == waitID then
-				local first = inbox_cut(keyStep, keyStack, inbox, wait["seen"], 1)
-
-				if first ~= nil then
-					return { 1, first, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
-				end
-			end
+		if answered then
+			return { 1, answered, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
 		end
 	end
 
@@ -116,6 +109,10 @@ end
 local first = inbox_cut(keyStep, keyStack, inbox, seen, 1)
 
 if first ~= nil then
+	-- Mark which message this read was given, so the same call sent again after
+	-- a lost response is answered with it rather than read as ended elsewhere.
+	-- deleteInboxWait removes the mark once the wake is queued.
+	redis.call("HSET", keyWaits, inbox .. ":answered:" .. waitID, first)
 	redis.call("SREM", keyStepsPending, waitID)
 
 	return { 1, first, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }

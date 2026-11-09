@@ -1394,6 +1394,12 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 			continue
 		}
 
+		// The mark that a read was answered is not a wait and holds a step id
+		// rather than a record, so it is passed over.
+		if strings.Contains(field, inboxAnsweredInfix) {
+			continue
+		}
+
 		var wait statev2.InboxWait
 		if err := json.Unmarshal([]byte(record), &wait); err != nil {
 			return statev2.InboxWaitSet{}, fmt.Errorf("error decoding inbox wait %s: %w", field, err)
@@ -1412,6 +1418,12 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 // of a run's inbox waits. The inbox's own wait is the field named by the inbox.
 // The closeInbox script writes it.
 const inboxClosedSuffix = ":closed"
+
+// inboxAnsweredInfix is in the field that marks which message recordInboxWait
+// answered a single read with, named `<inbox>:answered:<waitID>`. It lets the
+// same call sent again after a lost response be answered with that message,
+// and is removed with the wait once the wake is queued.
+const inboxAnsweredInfix = ":answered:"
 
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePending"), redis_telemetry.ScopeFnRunState)
