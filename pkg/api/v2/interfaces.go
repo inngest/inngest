@@ -70,8 +70,13 @@ type GetAppsResult struct {
 }
 
 type AppSyncProvider interface {
-	// newest first
+	// ListAppSyncs returns syncs scoped to app and the current environment,
+	// ordered by created_at DESC, id DESC. Cursor is the last returned sync ID
+	// and is exclusive; an unknown cursor or one belonging to another app or
+	// environment returns ErrInvalidCursor (HTTP 400).
 	ListAppSyncs(ctx context.Context, app App, opts ListAppSyncsOpts) (*ListAppSyncsResult, error)
+	// GetAppSync is scoped to app and the current environment. Missing syncs,
+	// including those belonging to another app or environment, return ErrAppSyncNotFound.
 	GetAppSync(ctx context.Context, app App, syncID uuid.UUID) (AppSyncRecord, error)
 }
 

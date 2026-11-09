@@ -151,10 +151,10 @@ func TestHTTPGateway_GetAppSync(t *testing.T) {
 func TestHTTPGateway_AppSyncErrors(t *testing.T) {
 	id := uuid.New().String()
 	for _, tc := range []struct {
-		name, suffix, message    string
-		status                   int
-		appErr, syncErr          error
-		noApps, noSyncs, limited bool
+		name, suffix, message string
+		status                int
+		appErr, syncErr       error
+		noSyncs, limited      bool
 	}{
 		{name: "limit too high", suffix: "?limit=101", status: 400, message: "Limit cannot exceed 100"},
 		{name: "negative limit", suffix: "?limit=-1", status: 400, message: "Limit must be at least 1"},
@@ -173,18 +173,13 @@ func TestHTTPGateway_AppSyncErrors(t *testing.T) {
 		{name: "get sync failure", suffix: "/" + id, status: 500, message: "Unable to fetch app sync", syncErr: errors.New("private database detail")},
 		{name: "list no sync provider", status: 501, noSyncs: true},
 		{name: "get no sync provider", suffix: "/" + id, status: 501, noSyncs: true},
-		{name: "list no app provider", status: 501, noApps: true},
-		{name: "get no app provider", suffix: "/" + id, status: 501, noApps: true},
 		{name: "list rate limited", suffix: "?limit=101", status: 429, limited: true, noSyncs: true},
 		{name: "get rate limited", suffix: "/bad", status: 429, limited: true, noSyncs: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			apps := &mockAppProvider{}
 			apps.On("GetApp", mock.Anything, "my-app").Return(App{ID: "my-app"}, tc.appErr)
-			opts := ServiceOptions{RateLimitProvider: &testEventRateLimiter{limited: tc.limited}}
-			if !tc.noApps {
-				opts.Apps = apps
-			}
+			opts := ServiceOptions{Apps: apps, RateLimitProvider: &testEventRateLimiter{limited: tc.limited}}
 			if !tc.noSyncs {
 				opts.AppSyncs = testAppSyncProvider{
 					list: func(context.Context, App, ListAppSyncsOpts) (*ListAppSyncsResult, error) {

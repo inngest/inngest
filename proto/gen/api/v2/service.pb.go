@@ -11728,7 +11728,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\async_id\x18\x02 \x01(\tB\x0e\x92A\v2\tSync UUIDR\x06syncId\"l\n" +
 	"\x12GetAppSyncResponse\x12 \n" +
 	"\x04data\x18\x01 \x01(\v2\f.api.v2.SyncR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xb7\t\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xed\b\n" +
 	"\x04Sync\x12C\n" +
 	"\x02id\x18\x01 \x01(\tB3\x92A02.Sync UUID, matching the ID returned by SyncAppR\x02id\x123\n" +
 	"\x06app_id\x18\x02 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12\xe8\x02\n" +
@@ -11749,8 +11749,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"_frameworkB\x0e\n" +
 	"\f_app_versionB\b\n" +
-	"\x06_errorJ\x04\b\n" +
-	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rR\x0fadded_functionsR\x12modified_functionsR\x11removed_functions\"t\n" +
+	"\x06_error\"t\n" +
 	"\x14QueryInsightsRequest\x12\\\n" +
 	"\x05query\x18\x01 \x01(\tBF\x92AC2AThe insights query to execute, written in modified ClickHouse SQLR\x05query\"|\n" +
 	"\x15QueryInsightsResponse\x12-\n" +
@@ -12235,7 +12234,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032ڙ\x02\n" +
+	"\x04INFO\x10\x032\xfe\x98\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12768,17 +12767,17 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xe1\x03\n" +
-	"\fListAppSyncs\x12\x1b.api.v2.ListAppSyncsRequest\x1a\x1c.api.v2.ListAppSyncsResponse\"\x95\x03\x92A\xd9\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xb3\x03\n" +
+	"\fListAppSyncs\x12\x1b.api.v2.ListAppSyncsRequest\x1a\x1c.api.v2.ListAppSyncsResponse\"\xe7\x02\x92A\xab\x02\n" +
 	"\x04Apps\n" +
-	"\x04Beta\x12\x0eList app syncs\x1a\xa8\x02Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x04Beta\x12\x0eList app syncs\x1a\xfa\x01Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server does not support sync history and returns 501 for both list and get. Use GetApp latestSync for the dev server's current state.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x18\b\x01\x12\x14apps:read:list_syncs\x82\xd3\xe4\x93\x02\x16\x12\x14/apps/{app_id}/syncs\x12\xd5\x03\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x18\b\x01\x12\x14apps:read:list_syncs\x82\xd3\xe4\x93\x02\x16\x12\x14/apps/{app_id}/syncs\x12\xa7\x03\n" +
 	"\n" +
-	"GetAppSync\x12\x19.api.v2.GetAppSyncRequest\x1a\x1a.api.v2.GetAppSyncResponse\"\x8f\x03\x92A\xcb\x02\n" +
+	"GetAppSync\x12\x19.api.v2.GetAppSyncRequest\x1a\x1a.api.v2.GetAppSyncResponse\"\xe1\x02\x92A\x9d\x02\n" +
 	"\x04Apps\n" +
-	"\x04Beta\x12\fGet app sync\x1a\x9c\x02Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x04Beta\x12\fGet app sync\x1a\xee\x01Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server does not support sync history and returns 501 for both list and get. Use GetApp latestSync for the dev server's current state.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12apps:read:get_sync\x82\xd3\xe4\x93\x02 \x12\x1e/apps/{app_id}/syncs/{sync_id}\x12\xf6\x01\n" +

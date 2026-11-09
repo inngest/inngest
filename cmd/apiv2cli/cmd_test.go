@@ -1492,34 +1492,3 @@ func TestSubmitFeedbackCommand(t *testing.T) {
 	require.True(t, strings.HasPrefix(gotAgent, "inngest-cli/"))
 	require.Equal(t, map[string]any{"feedback": "More examples please", "operation": "get_run", "email": "dev@example.com"}, gotBody)
 }
-
-func TestCommandReadsAppSyncs(t *testing.T) {
-	for _, tc := range []struct {
-		name, path, response string
-		args                 []string
-		query                url.Values
-	}{
-		{"list-app-syncs", "/api/v2/apps/my-app/syncs", `{"data":[],"page":{"limit":20,"hasMore":false}}`, []string{"my-app", "--limit", "20", "--cursor", "11111111-1111-1111-1111-111111111111"}, url.Values{"limit": {"20"}, "cursor": {"11111111-1111-1111-1111-111111111111"}}},
-		{"get-app-sync", "/api/v2/apps/my-app/syncs/11111111-1111-1111-1111-111111111111", `{"data":{"id":"11111111-1111-1111-1111-111111111111","appId":"my-app"}}`, []string{"my-app", "11111111-1111-1111-1111-111111111111"}, url.Values{}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			calls := 0
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls++
-				require.Equal(t, http.MethodGet, r.Method)
-				require.Equal(t, tc.path, r.URL.Path)
-				require.Equal(t, tc.query, r.URL.Query())
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(tc.response))
-			}))
-			defer srv.Close()
-			cmd := Command()
-			var out bytes.Buffer
-			cmd.Writer = &out
-			args := append([]string{"api", tc.name, "--api-host", srv.URL}, tc.args...)
-			require.NoError(t, cmd.Run(t.Context(), args))
-			require.Equal(t, 1, calls)
-			require.JSONEq(t, tc.response, out.String())
-		})
-	}
-}

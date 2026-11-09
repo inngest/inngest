@@ -832,7 +832,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                appProvider,
-		AppSyncs:            appProvider,
 		Functions:           functionProvider,
 		FunctionPauser:      functionProvider,
 		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),

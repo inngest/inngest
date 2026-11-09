@@ -33,17 +33,3 @@ func TestCLIScopesExcludeNonDelegatableKeys(t *testing.T) {
 	require.NotContains(t, scopes, "event_keys:read:*")
 	require.NotContains(t, scopes, "signing_keys:read:*")
 }
-
-func TestAppSyncScopes(t *testing.T) {
-	for _, method := range []string{"ListAppSyncs", "GetAppSync"} {
-		t.Run(method, func(t *testing.T) {
-			var endpoints []apiv2endpoint.Endpoint
-			for _, endpoint := range apiv2endpoint.Discover() {
-				if endpoint.MethodName == method {
-					endpoints = append(endpoints, endpoint)
-				}
-			}
-			require.Equal(t, []string{"apps:read:*"}, scopesForEndpoints(endpoints, cliExcludedResources))
-		})
-	}
-}

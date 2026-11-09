@@ -1853,7 +1853,7 @@ service V2 {
       summary: "List app syncs"
       tags: "Apps"
       tags: "Beta"
-      description: "Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state."
+      description: "Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server does not support sync history and returns 501 for both list and get. Use GetApp latestSync for the dev server's current state."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -1873,7 +1873,7 @@ service V2 {
       summary: "Get app sync"
       tags: "Apps"
       tags: "Beta"
-      description: "Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state."
+      description: "Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server does not support sync history and returns 501 for both list and get. Use GetApp latestSync for the dev server's current state."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -4003,9 +4003,6 @@ message GetAppSyncResponse {
 }
 
 message Sync {
-  reserved 10, 11, 12;
-  reserved "added_functions", "modified_functions", "removed_functions";
-
   string id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Sync UUID, matching the ID returned by SyncApp"

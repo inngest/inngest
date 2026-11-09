@@ -13,10 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
-var (
-	_ apiv2.AppProvider     = (*CQRSAppProvider)(nil)
-	_ apiv2.AppSyncProvider = (*CQRSAppProvider)(nil)
-)
+var _ apiv2.AppProvider = (*CQRSAppProvider)(nil)
 
 type CQRSAppProvider struct {
 	reader appProviderReader
@@ -124,15 +121,4 @@ func toApp(app *cqrs.App, functionCount int) apiv2.App {
 		result.Method = method
 	}
 	return result
-}
-
-func (p *CQRSAppProvider) ListAppSyncs(ctx context.Context, app apiv2.App, opts apiv2.ListAppSyncsOpts) (*apiv2.ListAppSyncsResult, error) {
-	if opts.Cursor != uuid.Nil {
-		return nil, apiv2.ErrInvalidCursor
-	}
-	return &apiv2.ListAppSyncsResult{}, nil
-}
-
-func (p *CQRSAppProvider) GetAppSync(ctx context.Context, app apiv2.App, syncID uuid.UUID) (apiv2.AppSyncRecord, error) {
-	return apiv2.AppSyncRecord{}, apiv2.ErrAppSyncNotFound
 }
