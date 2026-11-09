@@ -76,6 +76,10 @@ type Options struct {
 	// OnRequest, when non-nil, is called after every request (used by tests
 	// to record what DuckDB actually calls).
 	OnRequest func(method, path string, status int)
+	// CatalogDB, when non-nil, is the database the sql catalog behind cat
+	// was created on. It turns on the load/commit fast path (see
+	// fastPath), which skips re-reading metadata.json on every request.
+	CatalogDB *CatalogDB
 }
 
 // Server is an Iceberg REST catalog backed by a catalog.Catalog.
@@ -84,13 +88,15 @@ type Server struct {
 	opts   Options
 	mux    *http.ServeMux
 	tables tableCache
+	// fast is nil w/o Options.CatalogDB.
+	fast *fastPath
 	// now is the clock snapshot ages are measured against (tests swap it).
 	now func() time.Time
 }
 
 // New returns a Server. The caller owns cat (and its *sql.DB).
 func New(cat Catalog, opts Options) *Server {
-	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux(), now: time.Now}
+	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux(), fast: newFastPath(opts.CatalogDB), now: time.Now}
 	s.routes()
 	return s
 }
@@ -525,6 +531,14 @@ func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 	// `snapshots=refs` and X-Iceberg-Access-Delegation are ignored, we
 	// always return all snapshots and never vend creds.
 	ident := pathTable(r)
+	if c, ok := s.cachedCurrent(r.Context(), ident); ok {
+		writeJSON(w, http.StatusOK, loadTableResponse{
+			MetadataLocation: c.loc,
+			Metadata:         c.body,
+			Config:           iceberg.Properties{},
+		})
+		return
+	}
 	tbl, err := s.cat.LoadTable(r.Context(), ident)
 	if err != nil {
 		writeCatalogError(w, err)
@@ -590,12 +604,27 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	// stale one can't let a bad commit through (CommitTable re-validates
 	// against what's actually stored). A requirement failure against it is
 	// re-checked against a fresh load so a stale cache never fakes a 409.
-	var current table.Metadata
-	cached, fromCache := s.tables.get(ident)
+	//
+	// W/ the fast path the cached version is checked against the catalog
+	// db first, and if it's current (and the requirements hold) the commit
+	// skips the sql catalog entirely (see fastPath).
+	var (
+		current  table.Metadata
+		cached   cachedTable
+		verified bool
+	)
+	fromCache := false
+	if s.fast != nil {
+		cached, verified = s.cachedCurrent(ctx, ident)
+		fromCache = verified
+	} else {
+		cached, fromCache = s.tables.get(ident)
+	}
 	if fromCache {
 		current = cached.md
 	}
 	if !fromCache || !requirementsHold(req.Requirements, current) {
+		verified = false
 		current = nil
 		if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
 			current = tbl.Metadata()
@@ -623,7 +652,15 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	// remove snapshots (see retain).
 	s.retain(current, next, checkUpdates, &req, s.now())
 
-	md, loc, err := s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
+	var (
+		md  table.Metadata
+		loc string
+	)
+	if verified {
+		md, loc, err = s.fast.commit(ctx, ident, cached, req.Requirements, req.Updates)
+	} else {
+		md, loc, err = s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
+	}
 	if err != nil {
 		s.tables.drop(ident)
 		writeCatalogError(w, err)
@@ -865,4 +902,27 @@ func requirementsHold(reqs []table.Requirement, md table.Metadata) bool {
 		}
 	}
 	return true
+}
+
+// cachedCurrent is ident's cached metadata if the fast path is on and the
+// catalog db says it's still the current version.
+func (s *Server) cachedCurrent(ctx context.Context, ident table.Identifier) (cachedTable, bool) {
+	if s.fast == nil {
+		return cachedTable{}, false
+	}
+	c, ok := s.tables.get(ident)
+	if !ok {
+		return cachedTable{}, false
+	}
+	loc, ok, err := s.fast.currentLocation(ctx, ident)
+	if err != nil {
+		if s.opts.Logger != nil {
+			s.opts.Logger.Warn("iceberg catalog fast path: checking metadata location", "table", strings.Join(ident, "."), "error", err)
+		}
+		return cachedTable{}, false
+	}
+	if !ok || loc != c.loc || parseMetadataVersion(loc) < 0 {
+		return cachedTable{}, false
+	}
+	return c, true
 }

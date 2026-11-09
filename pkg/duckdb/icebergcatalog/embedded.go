@@ -137,7 +137,13 @@ func Open(ctx context.Context, cfg Config) (*Embedded, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("icebergcatalog: listening: %w", err)
 	}
-	srv := New(cat, Options{Warehouse: warehouse, Token: token, Logger: cfg.Logger, Retention: cfg.Retention})
+	srv := New(cat, Options{
+		Warehouse: warehouse,
+		Token:     token,
+		Logger:    cfg.Logger,
+		Retention: cfg.Retention,
+		CatalogDB: &CatalogDB{DB: db, Dialect: dialect, Name: CatalogName, Properties: props},
+	})
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(srvCtx, l) }()
 
