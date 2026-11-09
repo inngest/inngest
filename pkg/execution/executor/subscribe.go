@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 // An inbox is opened by an OpcodeSubscribe op: one long-lived pause per source,
@@ -49,6 +50,12 @@ const (
 	inboxOverflowKey   = "inboxOverflow"
 	inboxOverflowState = "state"
 )
+
+// inboxArrivalLimit is how many of the inboxes one event matched are saved at
+// the same time. Saving one inbox is a handful of calls, so an event a great
+// many runs subscribe to would take far too long one inbox at a time; a limit
+// keeps it short without letting one event hold every connection.
+const inboxArrivalLimit = 32
 
 // inboxMessageStepID is the id of the step a message is saved as.
 func inboxMessageStepID(inbox string, eventID ulid.ULID) string {
@@ -555,8 +562,6 @@ func (e *executor) timeoutInboxRead(ctx context.Context, pause state.Pause) erro
 // deletes the read's record. The record outlives the queued wake, so a crash in
 // between is repaired by the event being delivered again.
 func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxWake) error {
-	wait := wake.Wait
-
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err != nil {
 		if errors.Is(err, state.ErrRunNotFound) {
@@ -565,6 +570,15 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 
 		return fmt.Errorf("error loading metadata to wake an inbox read: %w", err)
 	}
+
+	return e.wakeInboxReadWith(ctx, md, wake)
+}
+
+// wakeInboxReadWith is wakeInboxRead for a caller that has already loaded the
+// run's metadata.
+func (e *executor) wakeInboxReadWith(ctx context.Context, md sv2.Metadata, wake sv2.InboxWake) error {
+	wait := wake.Wait
+	id := md.ID
 
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  id,
@@ -756,77 +770,106 @@ func (a *inboxArrivals) add(pause *state.Pause) {
 
 // saveInboxMessages saves the event as a message of every inbox it matched, and
 // wakes the reads that wait for it.
+//
+// One event can match any number of inboxes, and each one is several calls, so
+// they are saved a few at a time rather than one after another: the last inbox
+// of a broadcast would otherwise wait for every inbox before it. The limit is
+// what keeps a broadcast from holding every connection at once. The arrivals
+// are one per inbox, and the order of an inbox's messages is the order they are
+// saved in, so nothing here depends on the order the arrivals are handled in.
 func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent, arrivals *inboxArrivals) error {
-	var goerr error
+	var (
+		mu    sync.Mutex
+		goerr error
+		eg    errgroup.Group
+	)
+
+	eg.SetLimit(inboxArrivalLimit)
 
 	for _, arrival := range arrivals.arrivals {
-		value, err := json.Marshal(inboxMessageValue{
-			Data:  evt.GetEvent().Map(),
-			Inbox: arrival.inbox,
-		})
-		if err != nil {
-			goerr = errors.Join(goerr, fmt.Errorf("error encoding inbox message: %w", err))
-
-			continue
-		}
-
-		stepID := inboxMessageStepID(arrival.inbox, evt.GetInternalID())
-
-		wake, err := e.smv2.SaveInboxMessage(ctx, arrival.id, sv2.InboxMessage{
-			StepID:       stepID,
-			Inbox:        arrival.inbox,
-			Value:        value,
-			MaxSteps:     e.inboxMaxSteps(arrival.id),
-			MaxStateSize: e.inboxMaxStateSize(arrival.id),
-		})
-		if errors.Is(err, sv2.ErrInboxStepsFull) || errors.Is(err, sv2.ErrInboxStateFull) {
-			if err := e.queueInboxOverflow(ctx, arrival, errors.Is(err, sv2.ErrInboxStateFull)); err != nil {
+		eg.Go(func() error {
+			// Every inbox is saved whatever the others did, as they were when
+			// they were saved one after another: one inbox's failure is not a
+			// reason to drop another inbox's message. The errors are gathered
+			// and returned together, so the event is delivered again.
+			if err := e.saveInboxMessage(ctx, evt, arrival); err != nil {
+				mu.Lock()
 				goerr = errors.Join(goerr, err)
+				mu.Unlock()
 			}
 
-			continue
-		}
-		// A message that reaches state after its inbox closed or its run ended
-		// is not wanted by anyone.
-		if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrInboxClosed) {
-			continue
-		}
-		if errors.Is(err, state.ErrDuplicateResponse) {
-			logger.StdlibLogger(ctx).Warn("inbox message already saved with other data", "step_id", stepID, "run_id", arrival.id.RunID.String())
-
-			continue
-		}
-		if err != nil {
-			goerr = errors.Join(goerr, err)
-
-			continue
-		}
-
-		e.tickInboxArrival(ctx, arrival, stepID)
-
-		if wake != nil {
-			if err := e.wakeInboxRead(ctx, arrival.id, *wake); err != nil {
-				goerr = errors.Join(goerr, err)
-			}
-		}
+			return nil
+		})
 	}
+
+	_ = eg.Wait()
 
 	return goerr
 }
 
-// tickInboxArrival draws the message as a tick on the row of the inbox. Traces
-// are best effort: a failure is logged.
-func (e *executor) tickInboxArrival(ctx context.Context, arrival *inboxArrival, stepID string) {
-	md, err := e.smv2.LoadMetadata(ctx, arrival.id)
+// saveInboxMessage saves the event as a message of one inbox and wakes the read
+// that waits for it, if one does.
+func (e *executor) saveInboxMessage(ctx context.Context, evt event.TrackedEvent, arrival *inboxArrival) error {
+	value, err := json.Marshal(inboxMessageValue{
+		Data:  evt.GetEvent().Map(),
+		Inbox: arrival.inbox,
+	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn("could not load metadata to draw an inbox arrival", "error", err)
-
-		return
+		return fmt.Errorf("error encoding inbox message: %w", err)
 	}
 
+	stepID := inboxMessageStepID(arrival.inbox, evt.GetInternalID())
+
+	wake, err := e.smv2.SaveInboxMessage(ctx, arrival.id, sv2.InboxMessage{
+		StepID:       stepID,
+		Inbox:        arrival.inbox,
+		Value:        value,
+		MaxSteps:     e.inboxMaxSteps(arrival.id),
+		MaxStateSize: e.inboxMaxStateSize(arrival.id),
+	})
+	if errors.Is(err, sv2.ErrInboxStepsFull) || errors.Is(err, sv2.ErrInboxStateFull) {
+		return e.queueInboxOverflow(ctx, arrival, errors.Is(err, sv2.ErrInboxStateFull))
+	}
+	// A message that reaches state after its inbox closed or its run ended
+	// is not wanted by anyone.
+	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrInboxClosed) {
+		return nil
+	}
+	if errors.Is(err, state.ErrDuplicateResponse) {
+		logger.StdlibLogger(ctx).Warn("inbox message already saved with other data", "step_id", stepID, "run_id", arrival.id.RunID.String())
+
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// The tick and the wake both want the run's metadata, so it is loaded once
+	// here and given to each of them.
+	md, err := e.smv2.LoadMetadata(ctx, arrival.id)
+	if err != nil {
+		if errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("error loading metadata for an inbox arrival: %w", err)
+	}
+
+	e.tickInboxArrival(ctx, &md, arrival, stepID)
+
+	if wake == nil {
+		return nil
+	}
+
+	return e.wakeInboxReadWith(ctx, md, *wake)
+}
+
+// tickInboxArrival draws the message as a tick on the row of the inbox. Traces
+// are best effort: a failure is logged.
+func (e *executor) tickInboxArrival(ctx context.Context, md *sv2.Metadata, arrival *inboxArrival, stepID string) {
 	slices.Sort(arrival.src)
 
-	if err := tracing.InboxArrivalTick(ctx, e.tracerProvider, &md, arrival.inbox, stepID, arrival.src, e.now()); err != nil {
+	if err := tracing.InboxArrivalTick(ctx, e.tracerProvider, md, arrival.inbox, stepID, arrival.src, e.now()); err != nil {
 		logger.StdlibLogger(ctx).Warn("could not draw an inbox arrival", "error", err)
 	}
 }

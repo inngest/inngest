@@ -19,6 +19,10 @@ the run's continuation. The SDK reports a pending read again in the response of
 a sibling step, so this can be that report arriving late. It is not recorded and
 wakes nothing: a second wake would run every step after the read twice.
 
+A read whose record is still here is the exception: the path that took it out
+deletes the record only once the wake is queued, so this is that same call sent
+again after its response was lost, and it is answered again.
+
 Output:
   { 0 }                           recorded; nothing for it to read
   { 1, messageStepID, pending }   recorded and satisfied; pending is 1 when
@@ -57,6 +61,29 @@ if cjson.decode(record)["pck"] ~= nil and redis.call("SISMEMBER", keyStepsPendin
 	-- has queued the wake yet: answer it as satisfied.
 	if batch ~= nil and redis.call("HEXISTS", keyStep, waitID) == 1 then
 		return { 3, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+	end
+
+	-- A single-message read saves nothing of its own, so its record is what
+	-- says the same thing: a satisfied wait stays recorded until its wake is
+	-- queued, so a record still here for this wait means nobody queued one.
+	-- This call is then the same one sent again after its response was lost,
+	-- and the message it found is still the one at its position: answer it
+	-- again. The wake is named by the read alone, so queueing it twice queues
+	-- it once.
+	if batch == nil then
+		local held = redis.call("HGET", keyWaits, inbox)
+
+		if held then
+			local wait = cjson.decode(held)
+
+			if wait["id"] == waitID then
+				local first = inbox_cut(keyStep, keyStack, inbox, wait["seen"], 1)
+
+				if first ~= nil then
+					return { 1, first, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+				end
+			end
+		end
 	end
 
 	return { 4 }
