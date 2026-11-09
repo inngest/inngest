@@ -354,9 +354,9 @@ func logCtx(t *testing.T) (context.Context, *syncBuffer) {
 	return logger.WithStdlib(t.Context(), l), buf
 }
 
-// conflictErr is what a DuckLake commit conflict looks like coming out of
+// errConflict is what a DuckLake commit conflict looks like coming out of
 // the driver: a statement error, so it definitely didn't commit.
-var conflictErr = fmt.Errorf("%w: TransactionContext Error: Failed to commit DuckLake transaction: Transaction conflict - attempting to insert into table with index \"1\"", duckdbdriver.ErrStatementFailed)
+var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit DuckLake transaction: Transaction conflict - attempting to insert into table with index \"1\"", duckdbdriver.ErrStatementFailed)
 
 // fastRetry keeps retry tests quick.
 func fastRetry(o batcherOpts) batcherOpts {
@@ -371,7 +371,7 @@ func TestRetryableFlushError(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"ducklake conflict", conflictErr, true},
+		{"ducklake conflict", errConflict, true},
 		{"aborted txn", fmt.Errorf("%w: TransactionContext Error: Current transaction is aborted (please ROLLBACK)", duckdbdriver.ErrStatementFailed), true},
 		{"sqlite catalog busy", fmt.Errorf("%w: IO Error: database is locked", duckdbdriver.ErrStatementFailed), true},
 		{"postgres catalog serialization", fmt.Errorf("%w: could not serialize access due to concurrent update", duckdbdriver.ErrStatementFailed), true},
@@ -428,7 +428,7 @@ func TestBatcherRetriesTransientFlushFailureWithoutDuplicates(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
-	ins := &flakyInserter{next: NewDuckDBInserter(db), errs: []error{conflictErr, conflictErr}}
+	ins := &flakyInserter{next: NewDuckDBInserter(db), errs: []error{errConflict, errConflict}}
 	ch := make(chan Event, 10)
 	b := newBatcher("events", ch, ins.InsertEvents, fastRetry(batcherOpts{maxSize: 2, flushInterval: time.Hour}))
 	go b.run(t.Context())
@@ -483,7 +483,7 @@ func TestBatcherGivesUpAfterMaxAttempts(t *testing.T) {
 	var calls atomic.Int64
 	flush := func(context.Context, []Event) error {
 		calls.Add(1)
-		return conflictErr
+		return errConflict
 	}
 	ch := make(chan Event, 10)
 	b := newBatcher("events", ch, flush, fastRetry(batcherOpts{maxSize: 1, flushInterval: time.Hour, maxAttempts: 3}))
@@ -506,7 +506,7 @@ func TestBatcherStopDuringBackoffKeepsBatchForFinalFlush(t *testing.T) {
 	flush := func(_ context.Context, items []Event) error {
 		if calls.Add(1) == 1 {
 			close(firstFailed)
-			return conflictErr
+			return errConflict
 		}
 		flushed.Add(int64(len(items)))
 		return nil
@@ -537,7 +537,7 @@ func TestBatcherFinalFlushIsBounded(t *testing.T) {
 		name  string
 		flush func(ctx context.Context, _ []Event) error
 	}{
-		{"always conflicts", func(context.Context, []Event) error { return conflictErr }},
+		{"always conflicts", func(context.Context, []Event) error { return errConflict }},
 		{"hangs until ctx ends", func(ctx context.Context, _ []Event) error {
 			<-ctx.Done()
 			return ctx.Err()
