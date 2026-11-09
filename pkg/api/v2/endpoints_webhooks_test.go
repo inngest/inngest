@@ -35,6 +35,7 @@ func TestHTTPGateway_UpdateWebhook(t *testing.T) {
 		{"whitespace name", id, "production", `{"name":" "}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 		{"name too long", id, "production", `{"name":"` + strings.Repeat("é", 129) + `"}`, "invalid_field_format", "Webhook name must be at most 128 characters", 400},
 		{"name at limit", id, "production", `{"name":"` + strings.Repeat("é", 128) + `"}`, "not_implemented", "Webhooks not implemented in OSS", 501},
+		{"name too long before empty transform", id, "production", `{"name":"` + strings.Repeat("é", 129) + `","transform":""}`, "invalid_field_format", "Webhook name must be at most 128 characters", 400},
 		{"unknown field", id, "production", `{"name":"Renamed","url":"https://example.com"}`, "invalid_request", "Unexpected request body field \"url\"", 400},
 		{"whitespace transform", id, "production", `{"transform":" "}`, "not_implemented", "Webhooks not implemented in OSS", 501},
 	} {
@@ -82,6 +83,30 @@ func TestHTTPGateway_WebhookBodyLimit(t *testing.T) {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
 			require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+		})
+	}
+}
+
+func TestHTTPGateway_CreateWebhookNameLength(t *testing.T) {
+	handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		length        int
+		status        int
+		code, message string
+	}{
+		{128, 501, "not_implemented", "Webhooks not implemented in OSS"},
+		{129, 400, "invalid_field_format", "Webhook name must be at most 128 characters"},
+	} {
+		t.Run(fmt.Sprint(tc.length), func(t *testing.T) {
+			body := `{"name":"` + strings.Repeat("é", tc.length) + `","transform":"function transform(e) { return e; }"}`
+			req := httptest.NewRequest(http.MethodPost, "/v2/env/webhooks", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Inngest-Env", "production")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			require.Equal(t, tc.status, rec.Code, rec.Body.String())
+			require.JSONEq(t, fmt.Sprintf(`{"errors":[{"code":%q,"message":%q}]}`, tc.code, tc.message), rec.Body.String())
 		})
 	}
 }

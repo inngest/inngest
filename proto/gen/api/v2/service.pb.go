@@ -11695,9 +11695,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\venvironment\x18\x03 \x01(\tR\venvironment\x12\x10\n" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x128\n" +
-	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb4\x05\n" +
-	"\x14CreateWebhookRequest\x12W\n" +
-	"\x04name\x18\x01 \x01(\tBC\x92A@2 Descriptive name for the webhookJ\x1c\"Payment Processing Webhook\"R\x04name\x12\xda\x01\n" +
+	"\tcreatedAt\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc9\x05\n" +
+	"\x14CreateWebhookRequest\x12l\n" +
+	"\x04name\x18\x01 \x01(\tBX\x92AU25Descriptive name for the webhook (max 128 characters)J\x1c\"Payment Processing Webhook\"R\x04name\x12\xda\x01\n" +
 	"\ttransform\x18\x02 \x01(\tB\xbb\x01\x92A\xb7\x0124The inline JS transform function for incoming eventsJ\x7f\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\"R\ttransform\x12\xdd\x01\n" +
 	"\bresponse\x18\x03 \x01(\tB\xbb\x01\x92A\xb7\x012FOptional inline JS function which is called to respond to GET requestsJm\"function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };\"H\x00R\bresponse\x88\x01\x01\x12h\n" +
 	"\fevent_filter\x18\x04 \x01(\v2\x13.api.v2.EventFilterB+\x92A(2&Optional event filtering configurationH\x01R\veventFilter\x88\x01\x01B\v\n" +
@@ -12356,7 +12356,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x83\xa0\x02\n" +
+	"\x04INFO\x10\x032ؠ\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12577,8 +12577,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00ri\n" +
 	"g\n" +
-	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x16\b\x01\x12\x12webhooks:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\x82\a\n" +
-	"\rUpdateWebhook\x12\x1c.api.v2.UpdateWebhookRequest\x1a\x1d.api.v2.UpdateWebhookResponse\"\xb3\x06\x92A\xf9\x05\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x16\b\x01\x12\x12webhooks:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\xd7\a\n" +
+	"\rUpdateWebhook\x12\x1c.api.v2.UpdateWebhookRequest\x1a\x1d.api.v2.UpdateWebhookResponse\"\x88\a\x92A\xce\x06\n" +
 	"\bWebhooks\x12\x0eUpdate webhook\x1aIUpdates a webhook's name or transform. Omitted fields are left unchanged.JP\n" +
 	"\x03200\x12I\n" +
 	"\x1cWebhook successfully updated\x12)\n" +
@@ -12597,6 +12597,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJN\n" +
 	"\x03413\x12G\n" +
 	"\"Request body too large (max 16KiB)\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJS\n" +
+	"\x03429\x12L\n" +
+	"'Too Many Requests - rate limit exceeded\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +

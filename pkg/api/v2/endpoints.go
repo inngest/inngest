@@ -237,6 +237,9 @@ func (s *Service) CreateWebhook(ctx context.Context, req *apiv2.CreateWebhookReq
 	if req.Name == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook name is required")
 	}
+	if utf8.RuneCountInString(req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
+	}
 
 	if req.Transform == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Transform function is required")

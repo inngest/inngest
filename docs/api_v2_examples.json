@@ -578,6 +578,14 @@
             "message": "Request body cannot exceed 16384 bytes"
           }
         ]
+      },
+      "429": {
+        "errors": [
+          {
+            "code": "rate_limited",
+            "message": "API rate limit exceeded. The request was rejected and the webhook was not updated."
+          }
+        ]
       }
     }
   }

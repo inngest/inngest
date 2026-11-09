@@ -981,6 +981,17 @@ service V2 {
         }
       }
       responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Internal Server Error"
@@ -3714,7 +3725,7 @@ message SigningKey {
 message CreateWebhookRequest {
   string name = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Descriptive name for the webhook"
+      description: "Descriptive name for the webhook (max 128 characters)"
       example: "\"Payment Processing Webhook\""
     }
   ];
