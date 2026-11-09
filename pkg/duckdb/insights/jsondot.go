@@ -131,7 +131,8 @@ func (r *exprRewriter) selectType(sel *parser.SelectStatement) ColumnType {
 }
 
 // jsonAccess reports whether e is a JSON value: a json column (data, or
-// table-qualified e.data) or a dot access into one (data.user.id, or the
+// table-qualified e.data), a computed one (isComputedJSON), or a dot access
+// into either (data.user.id, or the
 // parenthesized (data.user).id, a DotExpr), returning the column reference
 // as base and the keys past it as path (user, id; nil for the column
 // itself). Name resolution matches checkQualifiedIdent (validate.go): a
@@ -164,7 +165,60 @@ func jsonAccess(e parser.Expr, scope *tableScope, bound func(string) bool) (base
 		}
 		return base, append(append([]string(nil), path...), x.Field), true
 	default:
+		if isComputedJSON(e) {
+			return e, nil, true
+		}
 		return nil, nil, false
+	}
+}
+
+// jsonReturningFunctions return a single JSON value whatever their
+// arguments.
+var jsonReturningFunctions = map[string]bool{
+	"to_json": true, "json_object": true, "json_array": true, "json_merge_patch": true,
+}
+
+// isComputedJSON reports whether e is an expression DuckDB types as JSON
+// proper: a cast to JSON, a JSON-building function, or a single-path
+// extraction (json_extract(x, '$.k'), x -> 'k'). A wildcard path
+// ('$[*].k') or a list of paths extracts JSON[] instead, which isn't.
+func isComputedJSON(e parser.Expr) bool {
+	switch x := e.(type) {
+	case *parser.CastExpr:
+		return len(x.Type.Arrays) == 0 && x.Type.BaseTypeName() == "JSON"
+	case *parser.FunctionExpr:
+		name := strings.ToLower(strings.Join(x.Name, "."))
+		if jsonReturningFunctions[name] {
+			return true
+		}
+		if (name != "json_extract" && name != "json_extract_path") || len(x.Args) != 2 {
+			return false
+		}
+		return isScalarJSONPath(x.Args[1])
+	case *parser.BinaryExpr:
+		return x.Op == "->" && isScalarJSONPath(x.Right)
+	case *parser.LambdaExpr:
+		// A bare col -> 'key' (see jsonPathAccess, jsonpath.go).
+		return len(x.Params) == 1 && isScalarJSONPath(x.Body)
+	default:
+		return false
+	}
+}
+
+// isScalarJSONPath reports whether e is a literal JSON path (or array
+// index) without a wildcard.
+func isScalarJSONPath(e parser.Expr) bool {
+	lit, ok := e.(*parser.Literal)
+	if !ok {
+		return false
+	}
+	switch lit.Kind {
+	case parser.LitNumber:
+		return true
+	case parser.LitString:
+		return !strings.Contains(lit.Text, "*")
+	default:
+		return false
 	}
 }
 

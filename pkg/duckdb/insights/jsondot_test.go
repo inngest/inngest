@@ -135,6 +135,21 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 			want: `WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE data ->> '$."user"."id"' = 'u1'`,
 		},
 		{
+			name: "computed JSON base",
+			in:   "SELECT id FROM events WHERE json_extract(data, '$.user').id = 'u1' AND (data -> 'user').id = 'u1' AND (data::JSON).name LIKE 'a%'",
+			want: `SELECT id FROM events WHERE json_extract(data, '$.user') ->> '$."id"' = 'u1' AND (data -> 'user') ->> '$."id"' = 'u1' AND data::JSON ->> '$."name"' LIKE 'a%'`,
+		},
+		{
+			name: "CTE computed JSON keeps JSON",
+			in:   "WITH e AS (SELECT json_extract(data, '$.user') AS u, to_json(name) AS n FROM events) SELECT u.id AS uid FROM e WHERE u.id = 'u1' AND n.x = 'y'",
+			want: `WITH e AS (SELECT json_extract(data, '$.user') AS u, to_json(name) AS n FROM events) SELECT u.id AS uid FROM e WHERE u ->> '$."id"' = 'u1' AND n ->> '$."x"' = 'y'`,
+		},
+		{
+			name: "CTE wildcard extraction is not JSON",
+			in:   "WITH e AS (SELECT json_extract(data, '$[*].user') AS u FROM events) SELECT 1 AS one FROM e WHERE u.id = 'u1'",
+			want: "WITH e AS (SELECT json_extract(data, '$[*].user') AS u FROM events) SELECT 1 AS one FROM e WHERE u.id = 'u1'",
+		},
+		{
 			name: "subquery",
 			in:   "SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE data.user.id = 'u1')",
 			want: `SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE data ->> '$."user"."id"' = 'u1')`,

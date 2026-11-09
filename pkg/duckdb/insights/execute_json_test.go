@@ -128,6 +128,14 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		})
 	}
 
+	t.Run("derived JSON column", func(t *testing.T) {
+		tr, err := insights.Transpile("WITH e AS (SELECT id, json_extract(data, '$.user') AS u FROM events) SELECT id FROM e WHERE u.id = 'u2'", accountID, envID)
+		require.NoError(t, err)
+		res, err := insights.Execute(ctx, db, tr)
+		require.NoError(t, err)
+		require.Equal(t, [][]any{{"evt-1"}}, res.Rows)
+	})
+
 	t.Run("projection stays JSON", func(t *testing.T) {
 		tr, err := insights.Transpile("SELECT data.user AS u, data.user.id AS uid FROM events WHERE data.user.id = 'u1'", accountID, envID)
 		require.NoError(t, err)
