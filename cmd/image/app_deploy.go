@@ -26,7 +26,8 @@ func DeployCommand() *cli.Command {
 		UsageText: "inngest deploy [app]",
 		Description: `Reads inngest.toml in the current directory, builds the app's Dockerfile
 for linux/amd64 with docker, uploads the image, and waits for Inngest to
-deploy it.  The current directory is the docker build context.
+deploy it.  The current directory is the docker build context.  Without
+inngest.toml, it asks a few questions in a terminal and writes the file.
 
 app is the name of an [apps.<name>] section.  It can be omitted when the
 file has one app.  Run ` + "`inngest deploy example-config`" + ` for a commented example.
@@ -52,8 +53,12 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("expected at most one app name; usage: inngest deploy [app]")
 	}
 
+	stdin, stdout, stderr := stdio(cmd)
 	f, err := os.Open(appsFile)
 	if errors.Is(err, fs.ErrNotExist) {
+		if isTerminal(stdin, stdout) {
+			return writeAppsFile(stdin, stdout)
+		}
 		return errNoAppsFile
 	}
 	if err != nil {
@@ -72,7 +77,6 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("[apps.%s] dockerfile %s: %w; set dockerfile in %s to the app's Dockerfile", name, a.dockerfile(), err, appsFile)
 	}
 
-	stdin, stdout, stderr := stdio(cmd)
 	dc, err := docker.New(stdin, stdout, stderr)
 	if err != nil {
 		return err
@@ -85,9 +89,9 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 }
 
 var errNoAppsFile = errors.New(appsFile + ` not found in the current directory.  inngest deploy reads the apps to deploy from it.
-Create it with:
-  inngest deploy example-config > ` + appsFile + `
-then edit the file.`)
+Create it with one of:
+  inngest deploy example-config > ` + appsFile + `   then edit the file
+  inngest deploy                                 in a terminal, which asks a few questions and writes the file`)
 
 // deployApp builds the app's image, uploads it, and waits until Inngest has
 // built and published the app.
