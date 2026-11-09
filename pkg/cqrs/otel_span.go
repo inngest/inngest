@@ -57,7 +57,7 @@ func ApplyExtractedSpanAttributes(ctx context.Context, span *OtelSpan) error {
 // step.waitForEvent output ({name, data, ts}), which — unlike every other
 // step output — is not wrapped in a {"data": ...}/{"error": ...} envelope
 // and must be returned as-is.
-func isWaitForEventOutput(o map[string]any) bool {
+func isWaitForEventOutput[V any](o map[string]V) bool {
 	_, name := o["name"]
 	_, data := o["data"]
 	_, ts := o["ts"]
@@ -83,26 +83,22 @@ func UnwrapSpanOutputEnvelope(so *SpanOutput, output, input []byte) (done bool) 
 		return false
 	}
 
-	var m map[string]any
+	// Take the envelope's data/error as their stored bytes rather than
+	// re-marshaling a decoded value, so key order and number text (IE 1.10,
+	// ints past 2^53) come back as the SDK sent them.
+	var m map[string]json.RawMessage
 	so.Data = output
-	if err := json.Unmarshal(so.Data, &m); err != nil || m == nil {
+	if err := json.Unmarshal(output, &m); err != nil || m == nil {
 		return false
 	}
 	if isWaitForEventOutput(m) {
 		return true
 	}
-	// Take the envelope's data/error as their stored bytes rather than
-	// re-marshaling the decoded value, so key order and number text (IE
-	// 1.10, ints past 2^53) come back as the SDK sent them.
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(output, &raw); err != nil {
-		return false
-	}
-	if _, ok := m["error"]; ok {
+	if v, ok := m["error"]; ok {
 		so.IsError = true
-		so.Data = raw["error"]
-	} else if _, ok := m["data"]; ok {
-		so.Data = raw["data"]
+		so.Data = v
+	} else if v, ok := m["data"]; ok {
+		so.Data = v
 	}
 	return false
 }
