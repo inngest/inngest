@@ -94,6 +94,9 @@ type Function struct {
 	// Slug is the human-friendly ID for the function
 	Slug string `json:"slug"`
 
+	// Loop represents the config if this function is a loop
+	Loop *Loop `json:"loop,omitempty"`
+
 	Priority *Priority `json:"priority,omitempty"`
 
 	// Timeouts represents timeouts for a function.
@@ -210,6 +213,73 @@ func (f *Function) DeterministicUUID() uuid.UUID {
 	return DeterministicSha1UUID(f.Name + f.URI().String())
 }
 
+// Loop is the config for a function that keeps state per key.  each input
+// is one run.
+type Loop struct {
+	// Kind names the SDK's type of loop, for the dashboard, docs, and
+	// validation.  the executor runs every kind the same way.
+	Kind string `json:"kind"`
+	// Key is an expression over the event that picks the loop state.
+	Key     string        `json:"key"`
+	Tick    time.Duration `json:"tick,omitempty"`
+	IdleTTL time.Duration `json:"idle_ttl,omitempty"`
+}
+
+// loopKinds lists the values Loop.Kind accepts.
+var loopKinds = map[string]struct{}{
+	"loop":  {},
+	"fsm":   {},
+	"agent": {},
+}
+
+// loopJSON is the wire shape of Loop.  tick and idle_ttl are str2duration
+// strings such as "30s", the same as throttle.period.
+type loopJSON struct {
+	Kind    string `json:"kind"`
+	Key     string `json:"key"`
+	Tick    string `json:"tick,omitempty"`
+	IdleTTL string `json:"idle_ttl,omitempty"`
+}
+
+func (l *Loop) UnmarshalJSON(in []byte) error {
+	input := loopJSON{}
+	if err := json.Unmarshal(in, &input); err != nil {
+		return err
+	}
+
+	l.Kind = input.Kind
+	l.Key = input.Key
+	l.Tick = 0
+	l.IdleTTL = 0
+
+	var err error
+	if input.Tick != "" {
+		if l.Tick, err = str2duration.ParseDuration(input.Tick); err != nil {
+			return fmt.Errorf("The loop tick of '%s' is invalid: %w", input.Tick, err)
+		}
+	}
+	if input.IdleTTL != "" {
+		if l.IdleTTL, err = str2duration.ParseDuration(input.IdleTTL); err != nil {
+			return fmt.Errorf("The loop idle_ttl of '%s' is invalid: %w", input.IdleTTL, err)
+		}
+	}
+	return nil
+}
+
+func (l Loop) MarshalJSON() ([]byte, error) {
+	out := loopJSON{
+		Kind: l.Kind,
+		Key:  l.Key,
+	}
+	if l.Tick != 0 {
+		out.Tick = str2duration.String(l.Tick)
+	}
+	if l.IdleTTL != 0 {
+		out.IdleTTL = str2duration.String(l.IdleTTL)
+	}
+	return json.Marshal(out)
+}
+
 // Throttle represents concurrency over time.
 type Throttle struct {
 	// Limit is how often the function can be called within the specified period.  The
@@ -252,10 +322,6 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 	if t.Limit == 0 {
 		t.Limit = 1
 	}
-	// NOTE: why is there a min 1?
-	// if t.Burst == 0 {
-	// 	t.Burst = 1
-	// }
 	return err
 }
 
@@ -541,6 +607,81 @@ func (f Function) Validate(ctx context.Context) error {
 		if rateLimitErr := f.RateLimit.IsValid(ctx); rateLimitErr != nil {
 			err = multierror.Append(err, rateLimitErr)
 		}
+	}
+
+	if f.Loop != nil {
+		if lerr := f.validateLoop(ctx); lerr != nil {
+			err = multierror.Append(err, lerr)
+		}
+	}
+
+	return err
+}
+
+// validateLoop checks the loop block against the rest of the config.  a
+// singleton, function concurrency, a keyed step concurrency limit, or a
+// sync endpoint is rejected.  a loop takes one input per run, so batching
+// and debouncing are rejected.
+func (f Function) validateLoop(ctx context.Context) error {
+	var err error
+
+	if f.Loop.Key == "" {
+		err = multierror.Append(err, fmt.Errorf("A loop key is required"))
+	} else if exprErr := expressions.Validate(ctx, nil, f.Loop.Key); exprErr != nil {
+		err = multierror.Append(err, fmt.Errorf("Loop key expression is invalid: %s", exprErr))
+	}
+
+	if _, ok := loopKinds[f.Loop.Kind]; !ok {
+		err = multierror.Append(err, fmt.Errorf("The loop kind of '%s' is invalid: must be one of loop, fsm, agent", f.Loop.Kind))
+	}
+
+	if f.Loop.Tick < 0 {
+		err = multierror.Append(err, fmt.Errorf("The loop tick of '%s' must not be negative", f.Loop.Tick))
+	}
+	if f.Loop.IdleTTL < 0 {
+		err = multierror.Append(err, fmt.Errorf("The loop idle_ttl of '%s' must not be negative", f.Loop.IdleTTL))
+	}
+
+	// a driver metadata type of "sync" selects the httpv2 sync driver.  a
+	// sync request carries no loop block, so the run has no state to work
+	// on.
+	if typ, _ := f.Driver.Metadata["type"].(string); typ == "sync" {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "A loop cannot run on a sync endpoint",
+		})
+	}
+
+	if f.Singleton != nil {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "Loops and singletons are mutually exclusive",
+		})
+	}
+	if f.IsBatchEnabled() {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "Loops and batching are mutually exclusive",
+		})
+	}
+	if f.Debounce != nil {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "Loops and debouncing are mutually exclusive",
+		})
+	}
+
+	if f.Concurrency != nil && len(f.Concurrency.Fn) > 0 {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "A loop cannot set function concurrency.  A loop always runs one input per key",
+		})
+	}
+	if f.Concurrency != nil && f.Concurrency.hasKeyedStepLimit() {
+		err = multierror.Append(err, syscode.Error{
+			Code:    syscode.CodeComboUnsupported,
+			Message: "Loops and keyed step concurrency limits are mutually exclusive",
+		})
 	}
 
 	return err

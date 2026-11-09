@@ -41,6 +41,22 @@ func (c ConcurrencyLimits) PartitionConcurrency() int {
 	return 0
 }
 
+// hasKeyedStepLimit reports whether any step limit has a key.  Step and
+// Limits are both checked because a struct built in code may set only one.
+func (c ConcurrencyLimits) hasKeyedStepLimit() bool {
+	for _, item := range c.Step {
+		if item.Key != nil {
+			return true
+		}
+	}
+	for _, item := range c.Limits {
+		if item.Key != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c ConcurrencyLimits) Validate(ctx context.Context) error {
 	if len(c.Limits) > consts.MaxConcurrencyLimits {
 		return syscode.Error{
