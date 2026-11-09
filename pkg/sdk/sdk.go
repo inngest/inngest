@@ -101,12 +101,16 @@ const (
 	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
 	ConnectV1    string = "v1"
+	LoopV1       string = "v1"
 )
 
 type Capabilities struct {
 	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
 	Connect    string `json:"connect"`
+	// Loop is set when the SDK can run loop functions.  a function with a
+	// loop block is rejected at sync when this is empty.
+	Loop string `json:"loop"`
 }
 
 type Headers struct {

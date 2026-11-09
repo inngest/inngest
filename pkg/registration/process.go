@@ -97,8 +97,30 @@ func ProcessFunctions(ctx context.Context, req sdk.RegisterRequest, opts Process
 			continue
 		}
 
+		if fn.Loop != nil && req.Capabilities.Loop != sdk.LoopV1 {
+			errs = multierror.Append(errs, fmt.Errorf("The function '%s' has a loop block but the SDK must declare the loop capability", fn.Name))
+			continue
+		}
+
 		if opts.UseDeterministicIDs {
 			fn.ID = fn.DeterministicUUID()
+		}
+
+		// a loop runs one input per key at a time.  the keyed function
+		// semaphore with limit 1 gives that, and the loop key doubles as
+		// the semaphore key.  Validate rejects user function concurrency
+		// on a loop, so this is the only function level entry.
+		if fn.Loop != nil {
+			if fn.Concurrency == nil {
+				fn.Concurrency = &inngest.ConcurrencyLimits{}
+			}
+			key := fn.Loop.Key
+			fn.Concurrency.Fn = []inngest.FnConcurrency{
+				{
+					Limit: 1,
+					Key:   &key,
+				},
+			}
 		}
 
 		// Inject app semaphore for connect apps. Runs AFTER Validate()
