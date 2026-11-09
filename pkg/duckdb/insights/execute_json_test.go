@@ -172,3 +172,70 @@ func TestExecuteJSONDotComparison(t *testing.T) {
 		require.Equal(t, [][]any{{map[string]any{"id": "u1", "name": "Ann"}, "u1", float64(5), true, nil, nil, []any{"a", float64(1)}}}, res.Rows)
 	})
 }
+
+// TestExecuteJSONDotNumeric checks a JSON dot access compared against a
+// number reads as a DOUBLE: no rounding to an integer literal's type, no
+// failing on a value wider than a decimal literal, and a non-numeric value
+// just not matching.
+func TestExecuteJSONDotNumeric(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	accountID, envID := uuid.New(), uuid.New()
+	for i, n := range []string{`6.4`, `6.6`, `5.5`, `1e2`, `"7"`, `"x"`, `6`} {
+		_, err := db.ExecContext(ctx,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, now(), 'api', ?, 'app/x', ?, '1', now(), '{}');`,
+			accountID.String(), envID.String(), fmt.Sprintf("internal-%d", i), fmt.Sprintf("evt-%d", i), json.RawMessage(`{"n":`+n+`}`),
+		)
+		require.NoError(t, err)
+	}
+
+	query := func(t *testing.T, sql string) [][]any {
+		t.Helper()
+		tr, err := insights.Transpile(sql, accountID, envID)
+		require.NoError(t, err)
+		res, err := insights.Execute(ctx, db, tr)
+		require.NoError(t, err)
+		return res.Rows
+	}
+	ids := func(t *testing.T, where string) []any {
+		t.Helper()
+		out := []any{}
+		for _, row := range query(t, "SELECT id FROM events WHERE "+where+" ORDER BY id") {
+			out = append(out, row[0])
+		}
+		return out
+	}
+
+	// evt-0 6.4, evt-1 6.6, evt-2 5.5, evt-3 1e2, evt-4 "7", evt-5 "x", evt-6 6
+	for _, tc := range []struct {
+		where string
+		want  []any
+	}{
+		{`data.n > 6`, []any{"evt-0", "evt-1", "evt-3", "evt-4"}},
+		{`data.n >= 7`, []any{"evt-3", "evt-4"}},
+		{`data.n = 6`, []any{"evt-6"}},
+		{`data.n > 6.5`, []any{"evt-1", "evt-3", "evt-4"}},
+		{`data.n BETWEEN 6 AND 7`, []any{"evt-0", "evt-1", "evt-4", "evt-6"}},
+		{`data.n IN (6, 7)`, []any{"evt-4", "evt-6"}},
+		{`data.n NOT IN (6, 7)`, []any{"evt-0", "evt-1", "evt-2", "evt-3"}},
+		{`data.n < (SELECT 6 AS six)`, []any{"evt-2"}},
+		{`data.n = 'x'`, []any{"evt-5"}},
+	} {
+		t.Run(tc.where, func(t *testing.T) {
+			require.Equal(t, tc.want, ids(t, tc.where))
+		})
+	}
+
+	t.Run("numeric column peer", func(t *testing.T) {
+		rows := query(t, "WITH s AS (SELECT 6 AS six) SELECT id FROM events, s WHERE data.n <= s.six ORDER BY id")
+		require.Equal(t, [][]any{{"evt-2"}, {"evt-6"}}, rows)
+	})
+
+	t.Run("sum and arithmetic", func(t *testing.T) {
+		rows := query(t, "SELECT sum(data.n) AS s, max(data.n + 1) AS m FROM events")
+		require.InDelta(t, 6.4+6.6+5.5+100+7+6, rows[0][0], 1e-9)
+		require.InDelta(t, 101.0, rows[0][1], 1e-9)
+	})
+}

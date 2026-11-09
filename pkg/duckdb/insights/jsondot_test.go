@@ -35,9 +35,24 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 			want: `SELECT e.id FROM events AS e WHERE json_extract_string(e.data.user.id, '$') = 'u1'`,
 		},
 		{
-			name: "number comparison stays JSON",
-			in:   "SELECT id FROM events WHERE data.n > 5 AND data.n BETWEEN 1 AND 9 AND data.n IN (1, 2)",
-			want: "SELECT id FROM events WHERE data.n > 5 AND data.n BETWEEN 1 AND 9 AND data.n IN (1, 2)",
+			name: "number comparison reads DOUBLE",
+			in:   "SELECT id FROM events WHERE data.n > 5 AND data.n BETWEEN 1 AND 9.5 AND data.n IN (1, 2, NULL) AND 6 <> data.n AND CASE data.n WHEN 1 THEN true END",
+			want: "SELECT id FROM events WHERE TRY_CAST(data.n AS DOUBLE) > 5 AND TRY_CAST(data.n AS DOUBLE) BETWEEN 1 AND 9.5 AND TRY_CAST(data.n AS DOUBLE) IN (1, 2, NULL) AND 6 <> TRY_CAST(data.n AS DOUBLE) AND CASE TRY_CAST(data.n AS DOUBLE) WHEN 1 THEN TRUE END",
+		},
+		{
+			name: "numeric column and subquery peers",
+			in:   "SELECT run_id FROM steps WHERE output.n = step_attempt AND output.m IN (SELECT step_index FROM steps) AND output.k > (SELECT max(step_index) AS m FROM steps)",
+			want: "SELECT run_id FROM steps WHERE TRY_CAST(output.n AS DOUBLE) = step_attempt AND TRY_CAST(output.m AS DOUBLE) IN (SELECT step_index FROM steps) AND TRY_CAST(output.k AS DOUBLE) > (SELECT max(step_index) AS m FROM steps)",
+		},
+		{
+			name: "mixed peers: string wins, other types leave it",
+			in:   "SELECT id FROM events WHERE data.n IN (6, 'x') AND data.m IN (6, meta) AND data.b = true",
+			want: "SELECT id FROM events WHERE json_extract_string(data.n, '$') IN (6, 'x') AND data.m IN (6, meta) AND data.b = TRUE",
+		},
+		{
+			name: "arithmetic and numeric aggregates",
+			in:   "SELECT sum(data.n) AS s, avg(data.n) AS a, max(data.n) AS mx, data.n + 1 AS p, data.n * data.m AS t FROM events GROUP BY data.n, data.m",
+			want: "SELECT sum(TRY_CAST(data.n AS DOUBLE)) AS s, avg(TRY_CAST(data.n AS DOUBLE)) AS a, max(data.n) AS mx, TRY_CAST(data.n AS DOUBLE) + 1 AS p, data.n * data.m AS t FROM events GROUP BY data.n, data.m",
 		},
 		{
 			name: "boolean stays JSON",

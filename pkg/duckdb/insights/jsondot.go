@@ -9,25 +9,30 @@ import (
 // rewriteJSONDotComparison makes a dot access into a JSON column
 // (data.user.id) compare as text wherever it's compared against a string,
 // wrapping it in its text extraction (json_extract_string(data.user.id,
-// '$'), VARCHAR, see jsonText). Mutates stmt in place.
+// '$'), VARCHAR, see jsonText), and as a number wherever it's compared
+// against a number (TRY_CAST(data.n AS DOUBLE), see jsonDouble). Mutates
+// stmt in place.
 //
 // DuckDB's own dot access on a JSON value returns JSON, so data.user.id =
 // 'u1' casts 'u1' to JSON, which fails ('u1' isn't valid JSON text), and
 // data.user.id LIKE 'u%' silently matches nothing (the JSON text is
-// "u1", quotes and all). Everywhere else the dot access is left alone:
-// projected, grouped or ordered it stays JSON (an object stays an object),
-// and compared against a number or boolean DuckDB already casts the JSON to
-// that type itself (data.n > 5 works, its text extraction > 5 wouldn't:
-// VARCHAR vs INTEGER needs an explicit cast).
+// "u1", quotes and all). Against a number DuckDB casts the JSON to the
+// number's own type, which rounds or fails (see jsonDouble). Against a
+// boolean it's left alone (DuckDB casts the JSON to BOOLEAN, which is
+// right), and projected, grouped or ordered it stays JSON (an object stays
+// an object).
 //
-// What counts as "compared against a string" (see stringPeer):
+// What counts as "compared against a string" or "a number" (see
+// castByPeer):
 //
 //	x = | <> | != | < | <= | > | >= y, x IS [NOT] DISTINCT FROM y
 //	x [NOT] IN (y, ...), x [NOT] IN (SELECT y ...), x op ANY|ALL (...)
 //	x [NOT] BETWEEN y AND z
 //	CASE x WHEN y ...
 //
-// where some other operand is string-typed (inferType), plus x [NOT]
+// where some other operand is string-typed (inferType), or every other
+// non-NULL operand is numeric (a string anywhere wins, matching how a
+// mixed list was compared before), plus x [NOT]
 // LIKE/ILIKE/GLOB/SIMILAR TO y and x IS [NOT] NULL unconditionally (a
 // pattern is always text, and a JSON null is SQL NULL once extracted as
 // text, so IS NULL matches a null value and a missing key alike).
@@ -35,8 +40,10 @@ import (
 // Text contexts get the same extraction anywhere in the query: x || y (both
 // operands), x directly an argument of a string function (stringFunctions),
 // and CAST(x AS VARCHAR) (TEXT, STRING, ::VARCHAR, TRY_CAST), which the
-// extraction replaces. A projected x on its own stays JSON: Execute decodes
-// it to its native value already.
+// extraction replaces. Number contexts get TRY_CAST(x AS DOUBLE): x op y
+// for an arithmetic op and a numeric y, and x directly an argument of
+// sum/avg (numericAggregates), all binder errors on JSON. A projected x on
+// its own stays JSON: Execute decodes it to its native value already.
 func rewriteJSONDotComparison(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope) ([]Diagnostic, error) {
 	return rewriteScopedExprs(stmt, ctes, outerScope, (*exprRewriter).rewriteJSONDotOperands)
 }
@@ -62,15 +69,27 @@ var stringFunctions = map[string]bool{
 	"concat": true, "concat_ws": true,
 }
 
+// arithmeticOps are the BinaryExpr arithmetic operators.
+var arithmeticOps = map[string]bool{"+": true, "-": true, "*": true, "/": true, "//": true, "%": true}
+
+// numericAggregates take a number, so a JSON dot access passed directly to
+// one is read as its DOUBLE value. min/max aren't: they work on JSON (as
+// text) and could as well be over strings.
+var numericAggregates = map[string]bool{"sum": true, "avg": true, "mean": true}
+
 // rewriteJSONDotOperands is rewriteJSONDotComparison's exprHook.
 func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 	switch x := e.(type) {
 	case *parser.BinaryExpr:
 		switch {
 		case comparisonOps[x.Op]:
-			r.textIfStringPeer(&x.Left, &x.Right)
+			r.castByPeer(&x.Left, &x.Right)
 		case x.Op == "||":
 			r.textAlways(&x.Left, &x.Right)
+		case arithmeticOps[x.Op]:
+			// JSON has no arithmetic at all (a binder error), so a numeric
+			// peer means the JSON side is a number too.
+			r.castByPeer(&x.Left, &x.Right)
 		}
 	case *parser.CastExpr:
 		// A cast to text already asks for the value as text, so its
@@ -80,18 +99,25 @@ func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 			return jsonText(x.X)
 		}
 	case *parser.FunctionExpr:
-		if stringFunctions[strings.ToLower(strings.Join(x.Name, "."))] {
+		name := strings.ToLower(strings.Join(x.Name, "."))
+		if numericAggregates[name] {
+			// sum/avg(JSON) is a binder error too.
+			for i := range x.Args {
+				r.doubleAlways(&x.Args[i])
+			}
+		}
+		if stringFunctions[name] {
 			r.textAlways(&x.Receiver)
 			for i := range x.Args {
 				r.textAlways(&x.Args[i])
 			}
 		}
 	case *parser.DistinctFromExpr:
-		r.textIfStringPeer(&x.Left, &x.Right)
+		r.castByPeer(&x.Left, &x.Right)
 	case *parser.QuantifiedExpr:
-		r.textIfStringPeer(&x.Left, &x.Right)
+		r.castByPeer(&x.Left, &x.Right)
 	case *parser.BetweenExpr:
-		r.textIfStringPeer(&x.X, &x.Low, &x.High)
+		r.castByPeer(&x.X, &x.Low, &x.High)
 	case *parser.InExpr:
 		if x.Contains {
 			// x IN list_expr is list containment, not a comparison.
@@ -101,11 +127,16 @@ func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 		for i := range x.List {
 			operands = append(operands, &x.List[i])
 		}
-		if x.Subquery != nil && r.selectType(x.Subquery) == ColumnTypeString {
-			r.textAlways(operands...)
+		if x.Subquery != nil {
+			switch r.selectType(x.Subquery) {
+			case ColumnTypeString:
+				r.textAlways(operands...)
+			case ColumnTypeNumber:
+				r.doubleAlways(operands...)
+			}
 			return e
 		}
-		r.textIfStringPeer(operands...)
+		r.castByPeer(operands...)
 	case *parser.CaseExpr:
 		if x.Operand == nil {
 			return e
@@ -114,7 +145,7 @@ func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 		for _, w := range x.Whens {
 			operands = append(operands, &w.Cond)
 		}
-		r.textIfStringPeer(operands...)
+		r.castByPeer(operands...)
 	case *parser.LikeExpr:
 		r.textAlways(&x.X, &x.Pattern)
 	case *parser.NullTest:
@@ -127,13 +158,41 @@ func (r *exprRewriter) rewriteJSONDotOperands(e parser.Expr) parser.Expr {
 	return e
 }
 
-// textIfStringPeer rewrites each JSON dot access among operands to its text
-// extraction when any operand is string-typed.
-func (r *exprRewriter) textIfStringPeer(operands ...*parser.Expr) {
+// castByPeer rewrites each JSON dot access among operands to its text
+// extraction when any other operand is string-typed, or to its DOUBLE value
+// when every other (non-NULL) operand is numeric.
+func (r *exprRewriter) castByPeer(operands ...*parser.Expr) {
+	var hasString, hasNumber, hasOther bool
 	for _, op := range operands {
-		if *op != nil && r.peerType(*op) == ColumnTypeString {
-			r.textAlways(operands...)
-			return
+		if *op == nil || isJSONDot(*op, r.scope, r.isBound) {
+			continue
+		}
+		if lit, ok := (*op).(*parser.Literal); ok && lit.Kind == parser.LitNull {
+			continue
+		}
+		switch r.peerType(*op) {
+		case ColumnTypeString:
+			hasString = true
+		case ColumnTypeNumber:
+			hasNumber = true
+		default:
+			hasOther = true
+		}
+	}
+	switch {
+	case hasString:
+		r.textAlways(operands...)
+	case hasNumber && !hasOther:
+		r.doubleAlways(operands...)
+	}
+}
+
+// doubleAlways replaces each JSON dot access among operands with its
+// numeric value, TRY_CAST(x AS DOUBLE) (see jsonDouble).
+func (r *exprRewriter) doubleAlways(operands ...*parser.Expr) {
+	for _, op := range operands {
+		if isJSONDot(*op, r.scope, r.isBound) {
+			*op = jsonDouble(*op)
 		}
 	}
 }
@@ -276,6 +335,18 @@ func jsonText(e parser.Expr) parser.Expr {
 		Name: []string{"json_extract_string"},
 		Args: []parser.Expr{e, &parser.Literal{Kind: parser.LitString, Text: "$"}},
 	}
+}
+
+// jsonDouble reads e, a JSON value, as TRY_CAST(e AS DOUBLE). Compared
+// against a number, DuckDB would otherwise cast the JSON to the number
+// literal's own type: to INTEGER, which rounds (data.n > 6 drops 6.4,
+// data.n = 6 matches 5.5), or to the literal's exact DECIMAL, which fails
+// on a wider value (1e2 vs 6.5). TRY_CAST, not CAST, so a field that's
+// sometimes not a number (a string "x", an object) just doesn't match on
+// those rows instead of failing the whole query. A numeric string ("7")
+// still reads as its number, and a JSON true/false as 1/0.
+func jsonDouble(e parser.Expr) parser.Expr {
+	return &parser.CastExpr{X: e, Type: &parser.TypeName{Name: []string{"DOUBLE"}, Keyword: true}, TryCast: true}
 }
 
 // isJSONValue reports whether expr is a JSON value (see jsonAccess), for
