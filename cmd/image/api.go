@@ -106,9 +106,25 @@ func (c *client) do(ctx context.Context, method, path string, in, out proto.Mess
 		return err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(respBody)))
+		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, errorMessage(respBody))
 	}
 	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(respBody, out)
+}
+
+// errorMessage returns "code: message" for each error in a v2 error
+// response, such as a 403 machine_size_not_allowed for a spec larger than
+// the plan allows.  other bodies are returned as they are.
+func errorMessage(body []byte) string {
+	resp := &apiv2.ErrorResponse{}
+	err := protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, resp)
+	if err != nil || len(resp.GetErrors()) == 0 {
+		return strings.TrimSpace(string(body))
+	}
+	messages := make([]string, 0, len(resp.GetErrors()))
+	for _, e := range resp.GetErrors() {
+		messages = append(messages, e.GetCode()+": "+e.GetMessage())
+	}
+	return strings.Join(messages, "; ")
 }
 
 // uploadArchive sends the archive to the signed URL from createBuild.
