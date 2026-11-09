@@ -66,14 +66,17 @@ func TestHTTPGateway_UpdateWebhookRateLimited(t *testing.T) {
 }
 
 func TestHTTPGateway_WebhookBodyLimit(t *testing.T) {
-	for _, tc := range []struct{ path, body string }{
-		{"/v2/env/webhooks", `{"name":"hook","transform":"function transform(e) { return e; }"}`},
-		{"/v2/webhooks/11111111-1111-1111-1111-111111111111", `{"name":"Renamed"}`},
+	for _, tc := range []struct {
+		path, body string
+		limit      int
+	}{
+		{"/v2/env/webhooks", `{"name":"hook","transform":"function transform(e) { return e; }"}`, 64 << 10},
+		{"/v2/webhooks/11111111-1111-1111-1111-111111111111", `{"name":"Renamed"}`, 16 << 10},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
 			require.NoError(t, err)
-			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(strings.Repeat(" ", 16<<10)+tc.body))
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(strings.Repeat(" ", tc.limit)+tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("X-Inngest-Env", "production")
 			rec := httptest.NewRecorder()
