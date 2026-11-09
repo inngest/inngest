@@ -128,3 +128,18 @@ func TestAppSyncReadCatalog(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateWebhookCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	endpoint := byMethod["UpdateWebhook"]
+	require.Equal(t, "webhooks:write:update", endpoint.AuthzPermission)
+	require.Equal(t, "update-webhook", endpoint.CommandName)
+	require.Equal(t, "update_webhook", endpoint.ToolName)
+	require.Equal(t, http.MethodPost, endpoint.HTTPMethod)
+	require.Equal(t, "/env/webhooks/{id}", endpoint.Path)
+	require.Equal(t, "*", endpoint.Body)
+	require.Equal(t, []string{"id"}, endpoint.PathParams)
+}
