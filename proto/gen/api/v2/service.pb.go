@@ -11717,10 +11717,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14ListWebhooksResponse\x12#\n" +
 	"\x04data\x18\x01 \x03(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x9b\x03\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xb0\x03\n" +
 	"\x14UpdateWebhookRequest\x124\n" +
-	"\x02id\x18\x01 \x01(\tB$\x92A!2\x1fThe ID of the webhook to updateR\x02id\x12T\n" +
-	"\x04name\x18\x02 \x01(\tB;\x92A82\x18New name for the webhookJ\x1c\"Payment Processing Webhook\"H\x00R\x04name\x88\x01\x01\x12\xdf\x01\n" +
+	"\x02id\x18\x01 \x01(\tB$\x92A!2\x1fThe ID of the webhook to updateR\x02id\x12i\n" +
+	"\x04name\x18\x02 \x01(\tBP\x92AM2-New name for the webhook (max 128 characters)J\x1c\"Payment Processing Webhook\"H\x00R\x04name\x88\x01\x01\x12\xdf\x01\n" +
 	"\ttransform\x18\x03 \x01(\tB\xbb\x01\x92A\xb7\x0124New inline JS transform function for incoming eventsJ\x7f\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\"H\x01R\ttransform\x88\x01\x01B\a\n" +
 	"\x05_nameB\f\n" +
 	"\n" +

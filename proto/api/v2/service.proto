@@ -3789,7 +3789,7 @@ message UpdateWebhookRequest {
   ];
   optional string name = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "New name for the webhook"
+      description: "New name for the webhook (max 128 characters)"
       example: "\"Payment Processing Webhook\""
     }
   ];
