@@ -1,10 +1,15 @@
 -- +goose Up
--- The lake tables. On an Iceberg lake each one is format-version 3,
--- partitioned by account + month of its run/receive time, and
--- declares a sort order duckdb sorts each write by. DUCKDB_ICEBERG_ONLY is
--- set empty for the in-memory mode, whose plain duckdb tables take none of
--- that. Other Iceberg writers (IE the cloud exporter) have to sort
--- explicitly if they don't honor the table's sort order.
+-- The lake tables. On an Iceberg lake each one is format-version 3 and
+-- partitioned by account + month of its run/receive time.
+-- DUCKDB_ICEBERG_ONLY is set empty for the in-memory mode, whose plain
+-- duckdb tables take none of that.
+--
+-- NOTE: the tables deliberately declare no sort order (no SORTED BY), so
+-- duckdb doesn't sort every append. Each small append's file spans the whole
+-- key range anyways, so sorting it doesn't help pruning, it just slows
+-- inserts down (198k -> 262k runs/s w/o it seeding 10M runs at 10k batches).
+-- Compaction (TODO(maintenance)) owns sorting, by each table's
+-- schema.Table.SortKey in pkg/duckdb/schema.
 --
 -- NOTE: Iceberg stores a column default as a literal, so duckdb freezes
 -- bucket_at's current_timestamp default at CREATE TABLE time on a lake. It
@@ -84,7 +89,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   -- for bucket_at > W, so any W both stores cover gives the same result.
   -- A run row's is its source span's.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(queued_at)) SORTED BY (account_id, env_id, run_id, queued_at) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- inngest.run_metadata holds one row per metadata emission (executor
@@ -129,7 +134,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   -- When the row became visible in the buffer, as on inngest.runs: the
   -- federation split (lake bucket_at <= W, buffer bucket_at > W).
   bucket_at      TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) SORTED BY (account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 
@@ -168,7 +173,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
   -- for bucket_at > W, so any W both stores cover gives the same result.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) SORTED BY (account_id, env_id, run_id, start_time, end_time) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- CREATE TRIGGER inngest_runs_mv AFTER INSERT ON inngest.run_trace_spans is
@@ -229,7 +234,7 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
   -- for bucket_at > W, so any W both stores cover gives the same result.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(received_at)) SORTED BY (account_id, env_id, internal_id, received_at) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(received_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- +goose Down

@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSortRunsMatchesTheRunsTableSortKey pins the exact key schema.go
-// declares for inngest.runs: SORTED BY (year(queued_at), month(queued_at),
+// TestSortRunsMatchesTheRunsTableSortKey pins inngest.runs' partition month
+// + sort key (schema.Runs.SortKey): (year(queued_at), month(queued_at),
 // account_id, env_id, run_id, queued_at) — tenant grouping outranks
 // chronological order within the same year/month, so a later-queued run in
 // an alphabetically-earlier account must still sort first.
@@ -34,7 +34,7 @@ func TestSortRunsMatchesTheRunsTableSortKey(t *testing.T) {
 }
 
 // TestSortSpansMatchesTheSpansTableSortKey pins run_trace_spans' key:
-// SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, start_time, end_time).
 func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
@@ -54,7 +54,7 @@ func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
 }
 
 // TestSortEventsMatchesTheEventsTableSortKey pins events' key:
-// SORTED BY (year(received_at), month(received_at), account_id, env_id,
+// (year(received_at), month(received_at), account_id, env_id,
 // internal_id, received_at).
 func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
@@ -72,7 +72,7 @@ func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
 }
 
 // TestSortMetadataMatchesTheMetadataTableSortKey pins run_metadata's key:
-// SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, scope, step_id, step_index, step_attempt, span_id, kind).
 func TestSortMetadataMatchesTheMetadataTableSortKey(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)

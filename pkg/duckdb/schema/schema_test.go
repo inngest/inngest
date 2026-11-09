@@ -83,3 +83,14 @@ func TestMatchesDuckDBMigrations(t *testing.T) {
 		}
 	})
 }
+
+// TestSortKeysExist checks every sort key column is one of the table's.
+func TestSortKeysExist(t *testing.T) {
+	for _, tbl := range []Table{Runs, Spans, Events, RunMetadata} {
+		require.NotEmpty(t, tbl.SortKey, tbl.Name)
+		for _, name := range tbl.SortKey {
+			_, ok := tbl.Column(name)
+			require.Truef(t, ok, "%s sort key column %s", tbl.Name, name)
+		}
+	}
+}
