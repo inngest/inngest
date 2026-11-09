@@ -127,6 +127,13 @@ func writeOutputSplitRun(t *testing.T, db *sql.DB) sv2.Metadata {
 	t.Helper()
 	ctx := context.Background()
 	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+	// Stop the batching workers (they run on context.Background()) before the
+	// db cleanup registered earlier closes the db.
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		require.NoError(t, l.(Closer).Close(ctx))
+	})
 	md := testMetadata(t)
 	now := time.Now()
 
