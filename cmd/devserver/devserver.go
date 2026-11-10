@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/cmd/internal/cloudsandboxes"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/config"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
@@ -55,6 +56,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+
+	// Sent here instead of the root Before hook so subcommand flags and the
+	// config file/env have been resolved.
+	tel.SendCommandExecutedEvent(ctx, "inngest dev", map[string]any{
+		"flags": localconfig.NonDefaultFlags(cmd),
+	})
 
 	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
 	conf.EventAPI.Port = port
