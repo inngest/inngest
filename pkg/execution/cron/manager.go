@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,14 +48,15 @@ type managerOpt struct {
 	healthCheckInterval        time.Duration
 
 	// splitGlobalCronPartition, when non-nil and returning true for a
-	// given accountID, allows ScheduleNext to use queueNameForCronItem
-	// rather than the shared global cron partition.
+	// given accountID, allows ScheduleNext to enqueue to one of
+	// cronPartitionBuckets cron partitions rather than the shared global cron
+	// partition.
 	splitGlobalCronPartition func(ctx context.Context, accountID uuid.UUID) (enable bool)
 
-	// queueNameForCronItem returns the queue name to use when
-	// splitGlobalCronPartition is enabled. If nil or empty, ScheduleNext
-	// falls back to the shared cron partition.
-	queueNameForCronItem func(ctx context.Context, item CronItem) (queueName string)
+	// cronPartitionBuckets is the number of cron partitions per workspace
+	// type (production and non-production). Values <= 0 keep all cron items
+	// on the shared global cron partition.
+	cronPartitionBuckets int
 }
 
 func (opts *managerOpt) validate() {
@@ -113,21 +115,22 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) ManagerOpt {
 	}
 }
 
-// WithsplitGlobalCronPartition registers a gate that controls whether
-// cron jobs can be enqueued to a custom cron partition instead of the single
-// shared cron partition.
+// WithSplitGlobalCronPartition registers a gate that controls whether an
+// account's cron jobs are enqueued to bucketed cron partitions (see
+// WithCronPartitionBuckets) instead of the single shared cron partition.
 func WithSplitGlobalCronPartition(fn func(ctx context.Context, accountID uuid.UUID) (enable bool)) ManagerOpt {
 	return func(c *managerOpt) {
 		c.splitGlobalCronPartition = fn
 	}
 }
 
-// WithQueueNameForCronItem registers a queue-name resolver used when
-// WithsplitGlobalCronPartition is enabled for the account. The resolver
-// receives the cron item and must return the full queue name to enqueue to.
-func WithQueueNameForCronItem(fn func(ctx context.Context, item CronItem) (queueName string)) ManagerOpt {
+// WithCronPartitionBuckets sets the number of cron partitions per workspace
+// type. Cron items for accounts passing the WithSplitGlobalCronPartition gate
+// are enqueued to "cron:prod:<n>" or "cron:nonprod:<n>", where n is derived
+// from the function ID. Values <= 0 disable bucketing.
+func WithCronPartitionBuckets(n int) ManagerOpt {
 	return func(c *managerOpt) {
-		c.queueNameForCronItem = fn
+		c.cronPartitionBuckets = n
 	}
 }
 
@@ -376,10 +379,8 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 	maxAttempts := consts.MaxRetries + 1
 	// kind here is "cron", and a queueName of "cron" is the global cron partition for all cron items.
 	queueName := kind
-	if c.opt.splitGlobalCronPartition != nil && c.opt.splitGlobalCronPartition(ctx, ci.AccountID) && c.opt.queueNameForCronItem != nil {
-		if resolved := c.opt.queueNameForCronItem(ctx, nextItem); resolved != "" {
-			queueName = resolved
-		}
+	if c.opt.cronPartitionBuckets > 0 && c.opt.splitGlobalCronPartition != nil && c.opt.splitGlobalCronPartition(ctx, ci.AccountID) {
+		queueName = cronPartitionQueueName(nextItem, c.opt.cronPartitionBuckets)
 	}
 
 	err = c.q.Enqueue(ctx, queue.Item{
@@ -412,6 +413,20 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 	}
 
 	return &nextItem, nil
+}
+
+// cronPartitionQueueName returns the bucketed cron partition for a cron item:
+// "cron:prod:<n>" or "cron:nonprod:<n>", where n = fnv64a(functionID) % buckets.
+// buckets must be > 0.
+func cronPartitionQueueName(ci CronItem, buckets int) string {
+	env := "nonprod"
+	if ci.IsProductionWorkspace {
+		env = "prod"
+	}
+
+	h := fnv.New64a()
+	_, _ = h.Write(ci.FunctionID[:])
+	return fmt.Sprintf("%s:%s:%d", queue.KindCron, env, h.Sum64()%uint64(buckets))
 }
 
 // generateJitter generates a random jitter duration between min and max (inclusive)

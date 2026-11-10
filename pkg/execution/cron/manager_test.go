@@ -161,16 +161,11 @@ func TestOptions(t *testing.T) {
 		require.True(t, opt.splitGlobalCronPartition(context.Background(), uuid.New()))
 	})
 
-	t.Run("WithQueueNameForCronItem sets callback", func(t *testing.T) {
+	t.Run("WithCronPartitionBuckets sets bucket count", func(t *testing.T) {
 		opt := managerOpt{}
-		WithQueueNameForCronItem(func(context.Context, CronItem) string {
-			return "hello"
-		})(&opt)
+		WithCronPartitionBuckets(100)(&opt)
 
-		require.NotNil(t, opt.queueNameForCronItem)
-		var ci CronItem
-		require.Equal(t, "hello", opt.queueNameForCronItem(context.Background(), ci))
-
+		require.Equal(t, 100, opt.cronPartitionBuckets)
 	})
 
 	t.Run("validate options", func(t *testing.T) {
@@ -722,55 +717,66 @@ func TestScheduleNextQueueName(t *testing.T) {
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	appID := uuid.New()
-	functionID := uuid.New()
+	// Fixed so bucket numbers are stable: fnv64a(functionID) % 100 == 90, % 4 == 2.
+	functionID := uuid.MustParse("8b41eb40-d8bc-4df1-9e4e-e124c18f5f88")
+
+	enabled := func(context.Context, uuid.UUID) bool { return true }
+	disabled := func(context.Context, uuid.UUID) bool { return false }
 
 	tests := []struct {
 		name              string
 		gate              func(context.Context, uuid.UUID) bool
-		queueNameResolver func(context.Context, CronItem) string
+		buckets           int
+		prod              bool
 		expectedQueueName string
 	}{
 		{
-			name:              "flag gate unset",
-			expectedQueueName: queue.KindCron,
-		}, {
-			name:              "flag gate nil",
-			gate:              nil,
+			name:              "gate unset",
+			buckets:           100,
 			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "flag gate disabled",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return false
-			},
+			name:              "gate disabled",
+			gate:              disabled,
+			buckets:           100,
 			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "flag gate enabled without custom queue name",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return true
-			},
+			name:              "gate enabled, buckets unset",
+			gate:              enabled,
 			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "flag gate enabled with empty custom queue name",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return true
-			},
-			queueNameResolver: func(context.Context, CronItem) string {
-				return ""
-			},
+			name:              "gate enabled, negative buckets",
+			gate:              enabled,
+			buckets:           -1,
 			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "flag gate enabled with custom queue name",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return true
-			},
-			queueNameResolver: func(_ context.Context, item CronItem) string {
-				return "cron:lol:0"
-			},
-			expectedQueueName: "cron:lol:0",
+			name:              "gate enabled, production workspace",
+			gate:              enabled,
+			buckets:           100,
+			prod:              true,
+			expectedQueueName: "cron:prod:90",
+		},
+		{
+			name:              "gate enabled, non-production workspace",
+			gate:              enabled,
+			buckets:           100,
+			expectedQueueName: "cron:nonprod:90",
+		},
+		{
+			name:              "gate enabled, different bucket count",
+			gate:              enabled,
+			buckets:           4,
+			prod:              true,
+			expectedQueueName: "cron:prod:2",
+		},
+		{
+			name:              "gate enabled, single bucket",
+			gate:              enabled,
+			buckets:           1,
+			expectedQueueName: "cron:nonprod:0",
 		},
 	}
 
@@ -779,24 +785,23 @@ func TestScheduleNextQueueName(t *testing.T) {
 			producer := &captureProducer{}
 			opts := []ManagerOpt{
 				WithJitterRange(0, 0),
+				WithCronPartitionBuckets(tt.buckets),
 			}
 			if tt.gate != nil {
 				opts = append(opts, WithSplitGlobalCronPartition(tt.gate))
 			}
-			if tt.queueNameResolver != nil {
-				opts = append(opts, WithQueueNameForCronItem(tt.queueNameResolver))
-			}
 			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx), opts...)
 
 			_, err := mgr.ScheduleNext(ctx, CronItem{
-				ID:              ulid.Make(),
-				AccountID:       accountID,
-				WorkspaceID:     workspaceID,
-				AppID:           appID,
-				FunctionID:      functionID,
-				FunctionVersion: 1,
-				Expression:      "* * * * *",
-				Op:              enums.CronOpProcess,
+				ID:                    ulid.Make(),
+				AccountID:             accountID,
+				WorkspaceID:           workspaceID,
+				AppID:                 appID,
+				FunctionID:            functionID,
+				FunctionVersion:       1,
+				IsProductionWorkspace: tt.prod,
+				Expression:            "* * * * *",
+				Op:                    enums.CronOpProcess,
 			})
 			require.NoError(t, err)
 			require.NotNil(t, producer.item.QueueName)
@@ -804,6 +809,32 @@ func TestScheduleNextQueueName(t *testing.T) {
 			require.Equal(t, queue.KindCron, producer.item.Kind)
 		})
 	}
+}
+
+func TestCronPartitionQueueName(t *testing.T) {
+	const buckets = 100
+
+	t.Run("same function maps to the same bucket regardless of workspace", func(t *testing.T) {
+		functionID := uuid.New()
+		first := cronPartitionQueueName(CronItem{FunctionID: functionID, WorkspaceID: uuid.New()}, buckets)
+		second := cronPartitionQueueName(CronItem{FunctionID: functionID, WorkspaceID: uuid.New()}, buckets)
+		require.Equal(t, first, second)
+	})
+
+	t.Run("buckets stay within range and spread across partitions", func(t *testing.T) {
+		seen := map[string]struct{}{}
+		for i := 0; i < 10_000; i++ {
+			name := cronPartitionQueueName(CronItem{FunctionID: uuid.New(), IsProductionWorkspace: true}, buckets)
+
+			var n int
+			_, err := fmt.Sscanf(name, "cron:prod:%d", &n)
+			require.NoError(t, err, name)
+			require.GreaterOrEqual(t, n, 0)
+			require.Less(t, n, buckets)
+			seen[name] = struct{}{}
+		}
+		require.Len(t, seen, buckets)
+	})
 }
 
 func TestScheduleNextProductionWorkspaceJitter(t *testing.T) {
