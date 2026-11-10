@@ -1394,9 +1394,15 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 			continue
 		}
 
-		// The mark that a read was answered is not a wait and holds a step id
-		// rather than a record, so it is passed over.
-		if strings.Contains(field, inboxAnsweredInfix) {
+		// The mark that a read was answered is not a wait: it holds a step id
+		// rather than a record, and names the read in the field.
+		if inbox, waitID, marked := strings.Cut(field, inboxAnsweredInfix); marked {
+			set.Answered = append(set.Answered, statev2.InboxAnswer{
+				Inbox:       inbox,
+				WaitID:      waitID,
+				MessageStep: record,
+			})
+
 			continue
 		}
 
@@ -1410,6 +1416,13 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 
 	sort.Slice(set.Waits, func(a, b int) bool { return set.Waits[a].Inbox < set.Waits[b].Inbox })
 	sort.Strings(set.Closed)
+	sort.Slice(set.Answered, func(a, b int) bool {
+		if set.Answered[a].Inbox != set.Answered[b].Inbox {
+			return set.Answered[a].Inbox < set.Answered[b].Inbox
+		}
+
+		return set.Answered[a].WaitID < set.Answered[b].WaitID
+	})
 
 	return set, nil
 }
@@ -1419,10 +1432,12 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 // The closeInbox script writes it.
 const inboxClosedSuffix = ":closed"
 
-// inboxAnsweredInfix is in the field that marks which message recordInboxWait
-// answered a single read with, named `<inbox>:answered:<waitID>`. It lets the
-// same call sent again after a lost response be answered with that message,
-// and is removed with the wait once the wake is queued.
+// inboxAnsweredInfix separates the inbox from the read in the field that marks
+// which message recordInboxWait answered a single read with, named
+// `<inbox>:answered:<waitID>`. It lets the same call sent again after a lost
+// response be answered with that message, and is removed with the wait once the
+// wake is queued. The inbox is the hash of a step id, so it holds no colon and
+// the first match splits the field.
 const inboxAnsweredInfix = ":answered:"
 
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {

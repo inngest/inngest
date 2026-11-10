@@ -63,4 +63,9 @@ func TestSubscribeAnsweredMarkIsNotReadAsAWait(t *testing.T) {
 	for _, wait := range waits.Waits {
 		require.NotEmpty(t, wait.ID, "every wait loaded is a real one: %+v", waits.Waits)
 	}
+
+	// The mark is carried as an answer, so moving the run's state keeps it.
+	require.Len(t, waits.Answered, 1)
+	require.Equal(t, "next-1", waits.Answered[0].WaitID)
+	require.Equal(t, messageStepID("inbox", id), waits.Answered[0].MessageStep)
 }

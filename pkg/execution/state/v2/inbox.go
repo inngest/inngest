@@ -64,6 +64,22 @@ type InboxWaitSet struct {
 	// Closed are the ids of the inboxes that were closed, so a read recorded
 	// later under one of them is ended and a message for one is dropped.
 	Closed []string
+	// Answered are the reads that were answered and whose wake is not known to
+	// be queued yet. A run carries them so that moving its state keeps the
+	// answer the same call would be given if it were sent again.
+	Answered []InboxAnswer
+}
+
+// InboxAnswer is the message a single read was answered with, kept until its
+// wake is queued so that the same call sent again after a lost response is
+// answered with that message rather than read as ended by another path.
+type InboxAnswer struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string
+	// WaitID is the id of the read's op.
+	WaitID string
+	// MessageStep is the step id of the message the read was given.
+	MessageStep string
 }
 
 // InboxBatch is what makes a read a batch read.
