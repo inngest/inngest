@@ -1,4 +1,4 @@
-package imagecmd
+package computecmd
 
 import (
 	"context"
@@ -105,4 +105,25 @@ func TestWaitForBuildFailed(t *testing.T) {
 		Error:  "bad layer",
 	})
 	require.ErrorContains(t, err, "bad layer")
+}
+
+func TestErrorMessage(t *testing.T) {
+	for _, tc := range []struct {
+		body string
+		want string
+	}{
+		{
+			body: `{"errors":[{"code":"artifact_name_conflict","message":"Artifact name is already used by a different type"}]}`,
+			want: "artifact_name_conflict: Artifact name is already used by a different type",
+		},
+		{
+			body: `{"errors":[{"code":"a","message":"first"},{"code":"b","message":"second"}]}`,
+			want: "a: first; b: second",
+		},
+		{body: "upstream connect error\n", want: "upstream connect error"},
+		{body: `{"errors":[]}`, want: `{"errors":[]}`},
+		{body: `{"message":"not a v2 error"}`, want: `{"message":"not a v2 error"}`},
+	} {
+		require.Equal(t, tc.want, errorMessage([]byte(tc.body)), tc.body)
+	}
 }

@@ -78,6 +78,12 @@ func (c *Client) Save(ctx context.Context, tag, path string) error {
 	return nil
 }
 
+// Remove removes the image tag, and the image if no other tag has it.  it
+// does not print docker's output.
+func (c *Client) Remove(ctx context.Context, tag string) error {
+	return exec.CommandContext(ctx, c.path, "image", "rm", tag).Run()
+}
+
 // Image is the part of `docker image inspect` output that the build checks.
 type Image struct {
 	OS           string `json:"Os"`

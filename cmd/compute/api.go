@@ -1,4 +1,4 @@
-package imagecmd
+package computecmd
 
 import (
 	"bytes"
@@ -64,6 +64,33 @@ func (c *client) getBuild(ctx context.Context, buildID string) (*apiv2.Build, er
 	return resp.GetData(), nil
 }
 
+func (c *client) createDeploy(ctx context.Context, req *apiv2.CreateDeployRequest) (*apiv2.CreateDeployResponse, error) {
+	resp := &apiv2.CreateDeployResponse{}
+	err := c.do(ctx, http.MethodPost, "/deploys/"+url.PathEscape(req.GetName()), req, resp)
+	return resp, err
+}
+
+func (c *client) commitDeploy(ctx context.Context, name, deployID string) (*apiv2.Deploy, error) {
+	req := &apiv2.CommitDeployRequest{
+		DeployId: deployID,
+		Name:     name,
+	}
+	resp := &apiv2.DeployResponse{}
+	path := "/deploys/" + url.PathEscape(name) + "/" + url.PathEscape(deployID) + "/commit"
+	if err := c.do(ctx, http.MethodPost, path, req, resp); err != nil {
+		return nil, err
+	}
+	return resp.GetData(), nil
+}
+
+func (c *client) getDeploy(ctx context.Context, deployID string) (*apiv2.Deploy, error) {
+	resp := &apiv2.DeployResponse{}
+	if err := c.do(ctx, http.MethodGet, "/deploys/"+url.PathEscape(deployID), nil, resp); err != nil {
+		return nil, err
+	}
+	return resp.GetData(), nil
+}
+
 func (c *client) do(ctx context.Context, method, path string, in, out proto.Message) error {
 	ctx, cancel := context.WithTimeout(ctx, apiTimeout)
 	defer cancel()
@@ -106,9 +133,25 @@ func (c *client) do(ctx context.Context, method, path string, in, out proto.Mess
 		return err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(respBody)))
+		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, errorMessage(respBody))
 	}
 	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(respBody, out)
+}
+
+// errorMessage returns "code: message" for each error in a v2 error
+// response, such as a 403 machine_size_not_allowed for a spec larger than
+// the plan allows.  other bodies are returned as they are.
+func errorMessage(body []byte) string {
+	resp := &apiv2.ErrorResponse{}
+	err := protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, resp)
+	if err != nil || len(resp.GetErrors()) == 0 {
+		return strings.TrimSpace(string(body))
+	}
+	messages := make([]string, 0, len(resp.GetErrors()))
+	for _, e := range resp.GetErrors() {
+		messages = append(messages, e.GetCode()+": "+e.GetMessage())
+	}
+	return strings.Join(messages, "; ")
 }
 
 // uploadArchive sends the archive to the signed URL from createBuild.

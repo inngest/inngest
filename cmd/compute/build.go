@@ -1,9 +1,9 @@
-package imagecmd
+package computecmd
 
 import (
 	"context"
 
-	"github.com/inngest/inngest/cmd/image/internal/docker"
+	"github.com/inngest/inngest/cmd/compute/internal/docker"
 	"github.com/urfave/cli/v3"
 )
 

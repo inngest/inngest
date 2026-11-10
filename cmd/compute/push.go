@@ -1,4 +1,4 @@
-package imagecmd
+package computecmd
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/inngest/inngest/cmd/image/internal/docker"
+	"github.com/inngest/inngest/cmd/compute/internal/docker"
 	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/urfave/cli/v3"
@@ -162,7 +162,7 @@ func newClient(ctx context.Context) (*client, error) {
 	token := func(ctx context.Context) (string, error) {
 		token, _, err := manager.AccessToken(ctx, resource)
 		if errors.Is(err, cliauth.ErrNotLoggedIn) {
-			return "", errors.New("authentication required to push images; log in with `inngest login`")
+			return "", errors.New("authentication required; log in with `inngest login`")
 		}
 		return token, err
 	}
