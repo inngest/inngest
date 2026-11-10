@@ -14,7 +14,7 @@ export function CompactDeploymentGuide({
         Inngest Cloud coordinates and monitors your workflows in production. You
         can deploy your app to any hosting provider.
       </p>
-      <ol className="text-muted mt-auto list-inside list-decimal space-y-1 text-xs leading-4">
+      <ol className="text-muted mt-auto list-outside list-decimal space-y-1 pl-5 text-xs leading-4">
         <li>
           Sign in to{' '}
           <Link
@@ -28,8 +28,8 @@ export function CompactDeploymentGuide({
         </li>
         <li>Add your signing and event keys, then deploy.</li>
         <li>
-          For HTTP apps, sync your endpoint in Cloud. For Connect apps, start
-          your workers and verify registration in Cloud.
+          Sync your deployed HTTP endpoint in Cloud. If you use Connect, start
+          your workers and confirm they appear in Cloud.
         </li>
       </ol>
       <div className="mt-auto pt-2">
