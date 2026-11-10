@@ -27,7 +27,10 @@ export function CompactDeploymentGuide({
           and choose your environment.
         </li>
         <li>Add your signing and event keys, then deploy.</li>
-        <li>Sync your deployed endpoint in Cloud.</li>
+        <li>
+          For HTTP apps, sync your endpoint in Cloud. For Connect apps, start
+          your workers and verify registration in Cloud.
+        </li>
       </ol>
       <div className="mt-auto pt-2">
         <Link
