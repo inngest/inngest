@@ -108,7 +108,7 @@ func TestWorkerGroupSyncSendsPlatformHeader(t *testing.T) {
 	err := group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
 		AuthData:     &connectpb.AuthData{SyncToken: "sync-token"},
 		Capabilities: []byte(`{"connect":"v1"}`),
-		Platform:     proto.String("inngest-serverless"),
+		Platform:     new("inngest-serverless"),
 	}, true)
 	require.NoError(t, err)
 	require.NotNil(t, header, "expected a sync request")
