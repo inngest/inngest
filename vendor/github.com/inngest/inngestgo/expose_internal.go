@@ -104,4 +104,27 @@ type (
 	// InputCtx is the additional context for a given function run, including the run ID,
 	// function ID, step ID, attempt, etc.
 	InputCtx = fn.InputCtx
+
+	// LoopInput is the read-only input for a loop or fsm run.  Loop says
+	// what started it.  the state is the handler's third argument.
+	LoopInput[EVENT any] = fn.LoopInput[EVENT]
+
+	// LoopCtx says what started a loop run and which state version it loaded.
+	LoopCtx = fn.LoopCtx
+
+	// LoopInputKind names the kinds of input that start a loop run.
+	LoopInputKind = fn.LoopInputKind
+)
+
+const (
+	// LoopInputEvent is a run started by a triggering event.
+	LoopInputEvent = fn.LoopInputEvent
+	// LoopInputSubscription is a run started by an event the instance
+	// subscribed to.  LoopCtx.ID is the subscription id.
+	LoopInputSubscription = fn.LoopInputSubscription
+	// LoopInputWake is a run started by a wake the instance asked for.
+	// LoopCtx.ID is the wake id.
+	LoopInputWake = fn.LoopInputWake
+	// LoopInputTick is a run started by the tick interval in LoopOpts.
+	LoopInputTick = fn.LoopInputTick
 )

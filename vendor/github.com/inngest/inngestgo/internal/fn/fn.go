@@ -49,9 +49,9 @@ type FunctionOpts struct {
 	// Name represents a human-readable function name.
 	Name string
 
-	// Checkpoint configues checkpointing for the current function.  Checkpointing
-	// allows each step.Run result to be stored via an API call, lowering latency between
-	// steps.
+	// Checkpoint sets the default for functions created with this client.  nil
+	// uses safe checkpointing.  set Disable to true to disable checkpointing,
+	// forcing a new request for each step.
 	Checkpoint *checkpoint.Config
 
 	// Priority allows you to specify priority options for the function.
@@ -82,6 +82,9 @@ type FunctionOpts struct {
 	BatchEvents *EventBatchConfig
 	// Singleton ensures only one active function run per key.
 	Singleton *Singleton
+	// Loop marks the function as a loop, fsm, or agent.  set by CreateLoop
+	// and CreateFSM.  CreateFunction rejects it.
+	Loop *Loop
 }
 
 func (f FunctionOpts) Validate() error {
@@ -371,4 +374,25 @@ type Singleton struct {
 	// Mode determines how to handle a new run when another singleton instance is already active.
 	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
 	Mode enums.SingletonMode `json:"mode"`
+}
+
+const (
+	// LoopKindLoop is a loop.  an instance can subscribe to events.
+	LoopKindLoop = "loop"
+	// LoopKindFSM is an fsm.  an instance cannot subscribe to events.
+	LoopKindFSM = "fsm"
+)
+
+// Loop is the sync config for a loop, fsm, or agent.  Key is a CEL
+// expression over the event that names the instance.  Tick and IdleTTL
+// are sent as str2duration strings such as "30s" and dropped when zero.
+type Loop struct {
+	Kind    string        `json:"kind"`
+	Key     string        `json:"key"`
+	Tick    time.Duration `json:"tick,omitempty"`
+	IdleTTL time.Duration `json:"idle_ttl,omitempty"`
+}
+
+func (l Loop) MarshalJSON() ([]byte, error) {
+	return encodeJSONWithDuration(l, "tick", "idle_ttl")
 }
