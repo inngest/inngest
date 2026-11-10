@@ -81,7 +81,11 @@ async function openPopover() {
 
 it('copies the reviewed prompt and only confirms the clipboard operation', async () => {
   await openPopover();
-  expect(screen.queryByRole('textbox')).toBeNull();
+  const preview = screen.getByRole<HTMLTextAreaElement>('textbox', {
+    name: 'Cloud deployment prompt',
+  });
+  expect(preview.value).toBe(DEPLOYMENT_PROMPT);
+  expect(preview.readOnly).toBe(true);
   await act(async () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Copy deployment prompt' }),
@@ -96,32 +100,7 @@ it('copies the reviewed prompt and only confirms the clipboard operation', async
   ]);
 });
 
-it('copies edits from the preview and disables copying an empty prompt', async () => {
-  await openPopover();
-  fireEvent.click(screen.getByRole('button', { name: 'View prompt' }));
-  const textarea = screen.getByRole('textbox', {
-    name: 'Cloud deployment prompt',
-  });
-  fireEvent.change(textarea, {
-    target: { value: 'Deploy this specific app.' },
-  });
-  await act(async () => {
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy deployment prompt' }),
-    );
-  });
-  expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-    'Deploy this specific app.',
-  );
-  fireEvent.change(textarea, { target: { value: '  ' } });
-  expect(
-    screen.getByRole<HTMLButtonElement>('button', {
-      name: 'Copy deployment prompt',
-    }).disabled,
-  ).toBe(true);
-});
-
-it('reveals and selects the prompt when clipboard access fails', async () => {
+it('selects the prompt when clipboard access fails', async () => {
   vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(
     new Error('denied'),
   );
@@ -142,42 +121,8 @@ it('reveals and selects the prompt when clipboard access fails', async () => {
   expect(screen.queryByRole('button', { name: 'Copied!' })).toBeNull();
 });
 
-it('does not confirm an old copy after the prompt changes', async () => {
-  let resolveCopy!: () => void;
-  vi.mocked(navigator.clipboard.writeText).mockReturnValueOnce(
-    new Promise<void>((resolve) => {
-      resolveCopy = resolve;
-    }),
-  );
+it('shows the manual guide in place and returns to the prompt preview', async () => {
   await openPopover();
-  fireEvent.click(screen.getByRole('button', { name: 'View prompt' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Copy deployment prompt' }),
-  );
-  fireEvent.change(screen.getByRole('textbox'), {
-    target: { value: 'Use this updated deployment prompt.' },
-  });
-  await act(async () => {
-    resolveCopy();
-  });
-  expect(screen.queryByRole('button', { name: 'Copied!' })).toBeNull();
-  await act(async () => {
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy deployment prompt' }),
-    );
-  });
-  expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
-    'Use this updated deployment prompt.',
-  );
-  expect(screen.getByRole('button', { name: 'Copied!' })).toBeTruthy();
-});
-
-it('shows the manual guide in place and returns to the edited prompt', async () => {
-  await openPopover();
-  fireEvent.click(screen.getByRole('button', { name: 'View prompt' }));
-  fireEvent.change(screen.getByRole('textbox'), {
-    target: { value: 'Deploy this app.' },
-  });
   fireEvent.click(screen.getByRole('button', { name: 'Deploy manually' }));
   expect(screen.getByRole('dialog')).toBeTruthy();
   expect(screen.queryByRole('textbox')).toBeNull();
@@ -194,18 +139,14 @@ it('shows the manual guide in place and returns to the edited prompt', async () 
   fireEvent.click(screen.getByRole('link', { name: 'Cloud' }));
   fireEvent.click(screen.getByRole('link', { name: 'Full deployment guide' }));
   expect(trackedActions()).toEqual(
-    [
-      'opened',
-      'prompt_viewed',
-      'manual_opened',
-      'cloud_clicked',
-      'docs_clicked',
-    ].map(trackingEvent),
+    ['opened', 'manual_opened', 'cloud_clicked', 'docs_clicked'].map(
+      trackingEvent,
+    ),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Back to AI setup' }));
-  expect(screen.getByRole<HTMLTextAreaElement>('textbox').value).toBe(
-    'Deploy this app.',
-  );
+  expect(
+    screen.getByRole('textbox', { name: 'Cloud deployment prompt' }),
+  ).toBeTruthy();
   expect(document.activeElement).toBe(
     screen.getByRole('button', { name: 'Deploy manually' }),
   );

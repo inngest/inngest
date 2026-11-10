@@ -2,21 +2,23 @@ import { Link } from '@inngest/components/Link';
 import { RiExternalLinkLine } from '@remixicon/react';
 
 export function CompactDeploymentGuide({
+  descriptionID,
   onLinkClick,
 }: {
+  descriptionID?: string;
   onLinkClick: (action: 'cloud_clicked' | 'docs_clicked') => void;
 }) {
   return (
-    <div className="pt-3">
-      <p className="text-muted mb-5 text-sm">
+    <>
+      <p id={descriptionID} className="text-muted mb-2 text-xs leading-4">
         Inngest Cloud coordinates and monitors your workflows in production. You
         can deploy your app to any hosting provider.
       </p>
-      <ol className="text-muted list-inside list-decimal space-y-2 text-sm">
+      <ol className="text-muted mt-auto list-inside list-decimal space-y-1 text-xs leading-4">
         <li>
           Sign in to{' '}
           <Link
-            className="inline"
+            className="inline text-xs leading-4"
             href="https://app.inngest.com"
             onClick={() => onLinkClick('cloud_clicked')}
           >
@@ -27,8 +29,9 @@ export function CompactDeploymentGuide({
         <li>Add your signing and event keys, then deploy.</li>
         <li>Sync your deployed endpoint in Cloud.</li>
       </ol>
-      <div className="border-subtle mt-5 border-t pt-4">
+      <div className="mt-auto pt-2">
         <Link
+          className="text-xs leading-4"
           href="https://www.inngest.com/docs/durable-execution/deploying-functions/platforms"
           onClick={() => onLinkClick('docs_clicked')}
           iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
@@ -36,6 +39,6 @@ export function CompactDeploymentGuide({
           Full deployment guide
         </Link>
       </div>
-    </div>
+    </>
   );
 }

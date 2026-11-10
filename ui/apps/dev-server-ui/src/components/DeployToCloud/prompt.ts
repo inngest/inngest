@@ -1,7 +1,5 @@
 // Reviewed deployment handoff; copying this is not proof of a Cloud deployment.
-export const DEPLOYMENT_PROMPT = `Help me deploy this project's Inngest app and verify its first sync in Inngest Cloud.
-
-Inspect the project, Inngest integration, SDK version, hosting configuration, and deployment workflow. Reuse working code and preserve the running local app and Dev Server. If several apps are plausible, help me select one. If no integration exists, explain the local setup needed first. Do not create a second integration or change SDK versions just for deployment.
+export const DEPLOYMENT_PROMPT = `Help me deploy this project's Inngest app and verify its first sync in Inngest Cloud. Inspect the project, Inngest integration, SDK version, hosting configuration, and deployment workflow. Reuse working code and preserve the running local app and Dev Server. If several apps are plausible, help me select one. If no integration exists, explain the local setup needed first. Do not create a second integration or change SDK versions just for deployment.
 
 Prefer the existing host’s supported Inngest integration for key configuration and automatic sync, unless I choose manual setup. Do not switch hosts just for this task.
 

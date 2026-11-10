@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Textarea } from '@inngest/components/Forms/Textarea';
 import {
@@ -23,7 +23,6 @@ import { CompactDeploymentGuide } from './CompactDeploymentGuide';
 
 type DeployAction =
   | 'opened'
-  | 'prompt_viewed'
   | 'prompt_copied'
   | 'manual_opened'
   | 'cloud_clicked'
@@ -40,26 +39,12 @@ export function DeployToCloudPopover() {
   const [animateSwitch, setAnimateSwitch] = useState(false);
   const manualTitle = useRef<HTMLHeadingElement>(null);
   const manualEntry = useRef<HTMLButtonElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [prompt, setPrompt] = useState(DEPLOYMENT_PROMPT);
   const [copyState, setCopyState] = useState<
     'idle' | 'copying' | 'copied' | 'failed'
   >('idle');
-  const panelID = useId();
   const titleID = useId();
   const descriptionID = useId();
   const panel = useRef<HTMLDivElement>(null);
-  const copyAttempt = useRef(0);
-  const [contentHeight, setContentHeight] = useState<number>();
-  const contentObserver = useRef<ResizeObserver | null>(null);
-  const measureContent = useCallback((node: HTMLDivElement | null) => {
-    contentObserver.current?.disconnect();
-    if (!node) return;
-    const updateHeight = () => setContentHeight(node.offsetHeight);
-    updateHeight();
-    contentObserver.current = new ResizeObserver(updateHeight);
-    contentObserver.current.observe(node);
-  }, []);
 
   useEffect(() => {
     if (manual) manualTitle.current?.focus({ preventScroll: true });
@@ -73,25 +58,22 @@ export function DeployToCloudPopover() {
   }, [copyState]);
 
   useEffect(() => {
-    if (open && expanded && copyState === 'failed') {
+    if (open && !manual && copyState === 'failed') {
       const textarea = panel.current?.querySelector('textarea');
       textarea?.focus();
       textarea?.select();
     }
-  }, [open, expanded, copyState]);
+  }, [open, manual, copyState]);
 
   async function copyPrompt() {
-    if (copyState === 'copying' || !prompt.trim()) return;
-    const attempt = ++copyAttempt.current;
+    if (copyState === 'copying') return;
     setCopyState('copying');
     try {
-      await navigator.clipboard.writeText(prompt);
+      await navigator.clipboard.writeText(DEPLOYMENT_PROMPT);
       track('prompt_copied');
-      if (attempt === copyAttempt.current) setCopyState('copied');
+      setCopyState('copied');
     } catch {
-      if (attempt !== copyAttempt.current) return;
       setCopyState('failed');
-      setExpanded(true);
     }
   }
 
@@ -101,7 +83,6 @@ export function DeployToCloudPopover() {
       onOpenChange={(nextOpen) => {
         setAnimateSwitch(false);
         if (nextOpen) track('opened');
-        else setContentHeight(undefined);
         setOpen(nextOpen);
       }}
     >
@@ -118,11 +99,11 @@ export function DeployToCloudPopover() {
         align="end"
         sideOffset={8}
         collisionPadding={12}
-        className="max-h-[min(calc(100dvh-24px),var(--radix-popover-content-available-height))] w-[360px] max-w-[calc(100vw-24px)] overflow-y-auto p-5 shadow-lg"
+        className="max-h-[min(calc(100dvh-24px),var(--radix-popover-content-available-height))] w-[300px] max-w-[calc(100vw-24px)] overflow-y-auto p-3 shadow-lg"
         aria-labelledby={titleID}
-        aria-describedby={manual ? undefined : descriptionID}
+        aria-describedby={descriptionID}
       >
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {manual && (
               <Button
@@ -141,7 +122,7 @@ export function DeployToCloudPopover() {
               id={titleID}
               ref={manualTitle}
               tabIndex={-1}
-              className="font-medium outline-none"
+              className="text-sm font-medium leading-5 outline-none"
             >
               {manual ? 'Deploy manually' : 'Deploy to Cloud'}
             </h2>
@@ -156,99 +137,75 @@ export function DeployToCloudPopover() {
             />
           </PopoverClose>
         </div>
-        <div
-          className="cloud-deploy-viewport"
-          style={{ height: contentHeight }}
-        >
+        {/* Both panels size the same grid row, including when one is hidden. */}
+        <div className={animateSwitch ? 'cloud-deploy-switch grid' : 'grid'}>
           <div
-            key={manual ? 'manual' : 'agent'}
-            ref={measureContent}
-            className={`flow-root ${animateSwitch ? (manual ? 'cloud-deploy-forward' : 'cloud-deploy-back') : ''}`}
+            className={`col-start-1 row-start-1 min-w-0 ${manual ? 'pointer-events-none opacity-0' : ''}`}
+            aria-hidden={manual}
+            inert={manual}
           >
-            {manual ? (
-              <CompactDeploymentGuide onLinkClick={track} />
-            ) : (
-              <>
-                <p id={descriptionID} className="text-muted mb-5 text-sm">
-                  Use your coding agent to deploy your app and verify its Cloud
-                  sync.
+            <p
+              id={manual ? undefined : descriptionID}
+              className="text-muted mb-2 text-xs leading-4"
+            >
+              Use your coding agent to deploy your app and verify its Cloud
+              sync.
+            </p>
+            <div ref={panel} className="mb-2 space-y-1.5">
+              <Textarea
+                aria-label="Cloud deployment prompt"
+                value={DEPLOYMENT_PROMPT}
+                rows={3}
+                readOnly
+                className="cloud-deploy-prompt block resize-none overflow-y-scroll py-2 font-mono text-xs leading-4 caret-transparent focus:outline-muted focus:-outline-offset-2"
+              />
+              {copyState === 'failed' && (
+                <p role="status" className="text-muted text-xs">
+                  Couldn’t copy. Select and copy the prompt above.
                 </p>
-                <Button
-                  className="w-full"
-                  label={
-                    copyState === 'copied'
-                      ? 'Copied!'
-                      : 'Copy deployment prompt'
-                  }
-                  icon={
-                    copyState === 'copied' ? (
-                      <RiCheckLine />
-                    ) : (
-                      <RiSparklingLine />
-                    )
-                  }
-                  iconSide="left"
-                  disabled={!prompt.trim() || copyState === 'copying'}
-                  onClick={copyPrompt}
-                />
-                <div className="mt-1.5 flex justify-center">
-                  <Button
-                    kind="primary"
-                    appearance="ghost"
-                    size="small"
-                    label={expanded ? 'Hide prompt' : 'View prompt'}
-                    aria-expanded={expanded}
-                    aria-controls={panelID}
-                    onClick={() => {
-                      if (!expanded) track('prompt_viewed');
-                      setExpanded(!expanded);
-                    }}
-                  />
-                </div>
-                {expanded && (
-                  <div id={panelID} ref={panel} className="mt-4 space-y-1.5">
-                    <p className="text-muted text-xs">
-                      Cloud deployment prompt
-                    </p>
-                    <Textarea
-                      aria-label="Cloud deployment prompt"
-                      value={prompt}
-                      rows={7}
-                      className="bg-disabled text-basis border-transparent font-mono text-xs"
-                      onChange={(value) => {
-                        copyAttempt.current++;
-                        setPrompt(value);
-                        setCopyState('idle');
-                      }}
-                    />
-                  </div>
-                )}
-                {copyState === 'failed' && (
-                  <p role="status" className="text-muted mt-2 text-xs">
-                    Couldn’t copy. Select and copy the prompt above.
-                  </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1">
-                  <span className="text-muted text-xs">
-                    Want to do it yourself?
-                  </span>
-                  <Button
-                    ref={manualEntry}
-                    kind="secondary"
-                    appearance="ghost"
-                    size="small"
-                    label="Deploy manually"
-                    icon={<RiArrowRightLine />}
-                    iconSide="right"
-                    onClick={() => {
-                      setAnimateSwitch(true);
-                      setManual(true);
-                      track('manual_opened');
-                    }}
-                  />
-                </div>
-              </>
-            )}
+              )}
+            </div>
+            <Button
+              className="w-full"
+              label={
+                copyState === 'copied' ? 'Copied!' : 'Copy deployment prompt'
+              }
+              icon={
+                copyState === 'copied' ? <RiCheckLine /> : <RiSparklingLine />
+              }
+              iconSide="left"
+              disabled={copyState === 'copying'}
+              onClick={copyPrompt}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1">
+              <span className="text-muted text-xs">
+                Want to do it yourself?
+              </span>
+              <Button
+                ref={manualEntry}
+                kind="secondary"
+                appearance="ghost"
+                size="small"
+                label="Deploy manually"
+                icon={<RiArrowRightLine />}
+                iconSide="right"
+                onClick={() => {
+                  setAnimateSwitch(true);
+                  setManual(true);
+                  track('manual_opened');
+                }}
+              />
+            </div>
+          </div>
+          <div
+            className={`col-start-1 row-start-1 flex min-w-0 flex-col ${!manual ? 'pointer-events-none opacity-0' : ''}`}
+            aria-hidden={!manual}
+            inert={!manual}
+          >
+            <CompactDeploymentGuide
+              descriptionID={manual ? descriptionID : undefined}
+              onLinkClick={track}
+            />
           </div>
         </div>
       </PopoverContent>
