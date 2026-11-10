@@ -35,7 +35,21 @@ vi.mock('@inngest/components/Link', () => ({
   ),
 }));
 
+const sendTelemetry = vi.fn();
+
+function trackedActions() {
+  return sendTelemetry.mock.calls.map(([, request]) =>
+    JSON.parse(request.body),
+  );
+}
+
+function trackingEvent(action: string) {
+  return { eventName: 'cli/dev_ui.deploy_to_cloud.action', action };
+}
+
 beforeEach(() => {
+  sendTelemetry.mockReset().mockResolvedValue({ ok: true });
+  vi.stubGlobal('fetch', sendTelemetry);
   const modals = document.createElement('div');
   modals.id = 'modals';
   document.body.appendChild(modals);
@@ -76,6 +90,10 @@ it('copies the reviewed prompt and only confirms the clipboard operation', async
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(DEPLOYMENT_PROMPT);
   expect(screen.getByRole('button', { name: 'Copied!' })).toBeTruthy();
   expect(screen.queryByText(/successfully deployed/i)).toBeNull();
+  expect(trackedActions()).toEqual([
+    trackingEvent('opened'),
+    trackingEvent('prompt_copied'),
+  ]);
 });
 
 it('copies edits from the preview and disables copying an empty prompt', async () => {
@@ -120,6 +138,7 @@ it('reveals and selects the prompt when clipboard access fails', async () => {
   expect(document.activeElement).toBe(textarea);
   expect(textarea.selectionStart).toBe(0);
   expect(textarea.selectionEnd).toBe(DEPLOYMENT_PROMPT.length);
+  expect(trackedActions()).toEqual([trackingEvent('opened')]);
   expect(screen.queryByRole('button', { name: 'Copied!' })).toBeNull();
 });
 
@@ -171,6 +190,17 @@ it('shows the manual guide in place and returns to the edited prompt', async () 
   ).toBeTruthy();
   expect(document.activeElement).toBe(
     screen.getByRole('heading', { name: 'Deploy manually' }),
+  );
+  fireEvent.click(screen.getByRole('link', { name: 'Cloud' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Full deployment guide' }));
+  expect(trackedActions()).toEqual(
+    [
+      'opened',
+      'prompt_viewed',
+      'manual_opened',
+      'cloud_clicked',
+      'docs_clicked',
+    ].map(trackingEvent),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Back to AI setup' }));
   expect(screen.getByRole<HTMLTextAreaElement>('textbox').value).toBe(

@@ -16,10 +16,25 @@ import {
   RiSparklingLine,
 } from '@remixicon/react';
 
+import { useTracking } from '@/hooks/useTracking';
+
 import { DEPLOYMENT_PROMPT } from './prompt';
 import { CompactDeploymentGuide } from './CompactDeploymentGuide';
 
+type DeployAction =
+  | 'opened'
+  | 'prompt_viewed'
+  | 'prompt_copied'
+  | 'manual_opened'
+  | 'cloud_clicked'
+  | 'docs_clicked';
+
 export function DeployToCloudPopover() {
+  const { trackEvent } = useTracking();
+  function track(action: DeployAction) {
+    void trackEvent('cli/dev_ui.deploy_to_cloud.action', { action });
+  }
+
   const [open, setOpen] = useState(false);
   const [manual, setManual] = useState(false);
   const [animateSwitch, setAnimateSwitch] = useState(false);
@@ -71,6 +86,7 @@ export function DeployToCloudPopover() {
     setCopyState('copying');
     try {
       await navigator.clipboard.writeText(prompt);
+      track('prompt_copied');
       if (attempt === copyAttempt.current) setCopyState('copied');
     } catch {
       if (attempt !== copyAttempt.current) return;
@@ -84,7 +100,8 @@ export function DeployToCloudPopover() {
       open={open}
       onOpenChange={(nextOpen) => {
         setAnimateSwitch(false);
-        if (!nextOpen) setContentHeight(undefined);
+        if (nextOpen) track('opened');
+        else setContentHeight(undefined);
         setOpen(nextOpen);
       }}
     >
@@ -149,7 +166,7 @@ export function DeployToCloudPopover() {
             className={`flow-root ${animateSwitch ? (manual ? 'cloud-deploy-forward' : 'cloud-deploy-back') : ''}`}
           >
             {manual ? (
-              <CompactDeploymentGuide />
+              <CompactDeploymentGuide onLinkClick={track} />
             ) : (
               <>
                 <p id={descriptionID} className="text-muted mb-5 text-sm">
@@ -182,7 +199,10 @@ export function DeployToCloudPopover() {
                     label={expanded ? 'Hide prompt' : 'View prompt'}
                     aria-expanded={expanded}
                     aria-controls={panelID}
-                    onClick={() => setExpanded(!expanded)}
+                    onClick={() => {
+                      if (!expanded) track('prompt_viewed');
+                      setExpanded(!expanded);
+                    }}
                   />
                 </div>
                 {expanded && (
@@ -223,6 +243,7 @@ export function DeployToCloudPopover() {
                     onClick={() => {
                       setAnimateSwitch(true);
                       setManual(true);
+                      track('manual_opened');
                     }}
                   />
                 </div>
