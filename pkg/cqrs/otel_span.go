@@ -1,6 +1,7 @@
 package cqrs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -152,10 +153,11 @@ func SpanOutputEnvelope(data, errVal []byte) []byte {
 	if v == nil {
 		return nil
 	}
-	out := make([]byte, 0, len(key)+len(v)+5)
-	out = append(out, `{"`...)
-	out = append(out, key...)
-	out = append(out, `":`...)
-	out = append(out, v...)
-	return append(out, '}')
+	var buf bytes.Buffer
+	buf.WriteString(`{"`)
+	buf.WriteString(key)
+	buf.WriteString(`":`)
+	buf.Write(v)
+	buf.WriteByte('}')
+	return buf.Bytes()
 }
