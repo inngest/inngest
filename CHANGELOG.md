@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.52.0] - 2026-11-10
+
+### 🚀 Features
+
+- *(api)* Get app sync history via v2 api (#5163)
+- *(executor)* Step.subscribe inboxes (#5149)
+- *(cli)* Add inngest deploy for apps in inngest.toml (INF-801) (#5226)
+
+### 🐛 Bug Fixes
+
+- *(ui)* Don't report dev server flags as ready before they load (#5201)
+- *(ui)* Reset run-scoped state when navigating between runs (#5222)
+- *(executor)* Don't emit lifecycle events for runs triggered by function.cancelled (#5220)
+- *(insights)* Show a JSON column's string values unquoted (#5225)
+
+### 🧪 Testing
+
+- *(insights)* Loosen the deep nesting transpile budget to 2s (#5233)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(duckdb)* Remove cmd/duckdbbench (#5228)
+
 ## [v1.51.0] - 2026-11-06
 
 ### 🚀 Features
@@ -15,6 +38,10 @@ All notable changes to this project will be documented in this file.
 - *(duckdb)* Aggregate federated reads (#5157)
 - *(duckdb)* Push a query's top-n into federated sources (#5158)
 - *(duckdb)* Skip the raw_runs collapse for flat lakes and use TIMESTAMPTZ in federate (#5159)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.51.0 (#5199)
 
 ## [v1.50.0] - 2026-11-06
 
