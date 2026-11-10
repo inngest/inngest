@@ -1388,12 +1388,6 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 
 	set := statev2.InboxWaitSet{}
 	for field, record := range recorded {
-		if inbox, closed := strings.CutSuffix(field, inboxClosedSuffix); closed {
-			set.Closed = append(set.Closed, inbox)
-
-			continue
-		}
-
 		// The mark that a read was answered is not a wait: it holds a step id
 		// rather than a record, and names the read in the field.
 		if inbox, waitID, marked := strings.Cut(field, inboxAnsweredInfix); marked {
@@ -1402,6 +1396,12 @@ func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (sta
 				WaitID:      waitID,
 				MessageStep: record,
 			})
+
+			continue
+		}
+
+		if inbox, closed := strings.CutSuffix(field, inboxClosedSuffix); closed {
+			set.Closed = append(set.Closed, inbox)
 
 			continue
 		}
