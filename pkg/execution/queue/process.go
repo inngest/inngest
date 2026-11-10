@@ -601,6 +601,16 @@ func (q *queueProcessor) ProcessItem(
 					return ProcessItemResult{}, nil
 				}
 
+				// the item is still in the queue with its lease, and the queue
+				// scavenger requeues it when that lease expires.  give the slot
+				// back here too.  the normal release deletes the capacity lease
+				// and keeps the slot, so the retry blocks on it forever.
+				if hasManualSemaphore(qi.Data.Semaphores) {
+					releaseCapacityLeaseMu.Lock()
+					forceReleaseSemaphores = true
+					releaseCapacityLeaseMu.Unlock()
+				}
+
 				l.Error("error requeuing job", "error", requeueErr, "item", requeueItem)
 				return ProcessItemResult{}, requeueErr
 			}
