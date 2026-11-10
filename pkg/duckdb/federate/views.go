@@ -16,12 +16,14 @@ var TerminalStatuses = schema.TerminalStatuses
 // DeltaColumns is the projection every delta for t returns: all of its
 // physical table's columns, in declared order.
 //
-// TODO(federation): runs/run_trace_spans' output is split into output and
-// error at write time (cqrs.SplitSpanOutputEnvelope), so a buffer that
-// still stores the unsplit envelope has to derive both the same way:
-// output is the envelope's "data" value (the whole value for a
-// step.waitForEvent-shaped or unrecognized output), error its "error"
-// value, else NULL.
+// NOTE: runs/run_trace_spans' output is split into output and error at
+// write time (cqrs.SplitSpanOutputEnvelope), and a delta carries both, so a
+// DeltaStreamer over a buffer that stores the unsplit envelope must derive
+// them the same way: output is the envelope's "data" value (the whole value
+// for a step.waitForEvent-shaped or unrecognized output, NULL for an error
+// envelope w/o data), error its "error" value (else NULL). A buffer can
+// store the envelope w/ both halves (IE {"data": ..., "error": ...}) so it
+// splits back to exactly what the lake stores.
 func DeltaColumns(t Table) []Column {
 	phys := Physical[t]
 	cols := make([]Column, len(phys.Columns))
