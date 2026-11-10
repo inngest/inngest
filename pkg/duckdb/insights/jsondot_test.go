@@ -145,6 +145,11 @@ func TestRewriteJSONDotComparison(t *testing.T) {
 			want: `SELECT run_id FROM runs WHERE json_extract_string(output.a, '$') = 'x' AND json_extract_string(attributes.b, '$') = 'y' AND json_extract_string(inputs.c, '$') = 'z' AND json_extract_string(metadata.d, '$') = 'w'`,
 		},
 		{
+			name: "error column",
+			in:   "SELECT run_id FROM runs WHERE error.message = 'boom' AND error.name LIKE 'Err%' AND run_id IN (SELECT run_id FROM steps WHERE error.message = 'boom')",
+			want: `SELECT run_id FROM runs WHERE json_extract_string(error.message, '$') = 'boom' AND json_extract_string(error.name, '$') LIKE 'Err%' AND run_id IN (SELECT run_id FROM steps WHERE json_extract_string(error.message, '$') = 'boom')`,
+		},
+		{
 			name: "CTE pass-through keeps JSON",
 			in:   "WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE data.user.id = 'u1'",
 			want: `WITH e AS (SELECT data FROM events) SELECT data.user.id AS uid FROM e WHERE json_extract_string(data.user.id, '$') = 'u1'`,

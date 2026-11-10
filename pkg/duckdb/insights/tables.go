@@ -159,7 +159,7 @@ var logicalTables = map[string]logicalTable{
 			// shallower).
 			"inputs": {physical: "inputs", colType: ColumnTypeJSON, json: true, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
 			"output": {physical: "output", colType: ColumnTypeJSON, json: true, description: "The run's final output, once it completes successfully."},
-			"error":  {physical: "error", colType: ColumnTypeJSON, description: "The error the run failed with, if it failed."},
+			"error":  {physical: "error", colType: ColumnTypeJSON, json: true, description: "The error the run failed with, if it failed."},
 			// event_ids is array-valued (VARCHAR[], so JSON per
 			// DuckDBToColumnType). The hint describes each element, not the
 			// column's own value -- an array of event IDs isn't itself an
@@ -370,7 +370,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"start_time":     {colType: ColumnTypeDatetime, description: "When this step attempt started."},
 		"end_time":       {colType: ColumnTypeDatetime, description: "When this step attempt ended."},
 		"output":         {colType: ColumnTypeJSON, json: true, description: "The step's output, once this attempt completes successfully."},
-		"error":          {colType: ColumnTypeJSON, description: "The error this attempt failed with, if it failed."},
+		"error":          {colType: ColumnTypeJSON, json: true, description: "The error this attempt failed with, if it failed."},
 		"input":          {colType: ColumnTypeJSON, json: true, description: "The input passed to this step attempt."},
 		"attributes":     {colType: ColumnTypeJSON, json: true, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
 	}
