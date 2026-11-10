@@ -87,12 +87,13 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
-	// Release any manual-release semaphores held by this run.  Manual-release semaphores
-	// (e.g. function concurrency) are acquired when the start job is dequeued but are NOT
-	// released when individual step leases complete — they persist for the lifetime of the
-	// run.  We must release them here, before state deletion, so that the semaphore info
-	// from run metadata is still available.  The run ID is used as the idempotency key to
-	// guarantee safe retries.
+	// release the function concurrency slot this run holds.  the start item
+	// acquires it on lease and step leases do not give it back.  the queue
+	// gives it back itself when it requeues the start item for a retry, and
+	// the retry acquires it again, so there is one hold to release here.  this
+	// runs before state deletion because the semaphore list lives in run
+	// metadata.  the run ID is the idempotency key, so a repeated finalize
+	// does not decrement twice.
 	if e.semaphoreManager == nil && len(opts.Metadata.Config.Semaphores) > 0 {
 		l.Error(
 			"semaphore manager is nil but run holds semaphores, leading to deadlock",

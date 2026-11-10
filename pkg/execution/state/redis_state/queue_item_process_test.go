@@ -1569,3 +1569,203 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		require.Equal(t, start.Add(osqueue.PartitionConcurrencyLimitRequeueExtension).Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 	})
 }
+
+// a start item carries the run's function concurrency slot.  a requeue for
+// a retry gives the slot back with the lease, a success keeps it for
+// finalize, and an item that is already gone on requeue keeps the normal
+// release because finalize released the slot for that run.
+func TestQueueItemProcessRequeueReleasesManualSemaphore(t *testing.T) {
+	type env struct {
+		ctx          context.Context
+		clock        *clockwork.FakeClock
+		r            *miniredis.Miniredis
+		cm           constraintapi.CapacityManager
+		cmLifecycles *constraintapi.ConstraintApiDebugLifecycles
+		q            queueImpl
+		shard        RedisQueueShard
+		item         osqueue.QueueItem
+		lease        *osqueue.CapacityLease
+		usageKey     string
+	}
+
+	setup := func(t *testing.T) env {
+		ctx := context.Background()
+		clock := clockwork.NewFakeClock()
+
+		r := miniredis.RunT(t)
+		r.SetTime(clock.Now())
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(rc.Close)
+
+		cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+		cm, err := constraintapi.NewRedisCapacityManager(
+			constraintapi.WithClient(rc),
+			constraintapi.WithShardName(consts.DefaultQueueShardName),
+			constraintapi.WithClock(clock),
+			constraintapi.WithLifecycles(cmLifecycles),
+		)
+		require.NoError(t, err)
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithBackoffFunc(func(int) time.Time {
+				return clock.Now().Add(time.Minute)
+			}),
+		)
+
+		accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+		sem := constraintapi.Semaphore{
+			ID:      constraintapi.SemaphoreIDFn(fnID),
+			Weight:  1,
+			Release: constraintapi.SemaphoreReleaseManual,
+		}
+		constraint := constraintapi.SemaphoreConstraint{
+			ID:      sem.ID,
+			Weight:  sem.Weight,
+			Release: sem.Release,
+		}
+		require.NoError(t, r.Set(constraint.CapacityKey(accountID), "1"))
+
+		runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				WorkspaceID: envID,
+				Kind:        osqueue.KindStart,
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+					RunID:       runID,
+				},
+				Semaphores: []constraintapi.Semaphore{sem},
+			},
+		}, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		leaseID, err := shard.Lease(ctx, item, osqueue.QueueLeaseDuration, clock.Now())
+		require.NoError(t, err)
+		item.LeaseID = leaseID
+
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			FunctionID:           fnID,
+			IdempotencyKey:       item.ID,
+			LeaseIdempotencyKeys: []string{item.ID},
+			LeaseRunIDs:          map[string]ulid.ULID{item.ID: runID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Semaphores:      []constraintapi.Semaphore{sem},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{Kind: constraintapi.ConstraintKindSemaphore, Semaphore: &constraint},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        10 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		usageKey := constraint.UsageKey(accountID)
+		val, err := r.Get(usageKey)
+		require.NoError(t, err)
+		require.Equal(t, "1", val)
+
+		return env{
+			ctx:          ctx,
+			clock:        clock,
+			r:            r,
+			cm:           cm,
+			cmLifecycles: cmLifecycles,
+			q:            q,
+			shard:        shard,
+			item:         item,
+			lease: &osqueue.CapacityLease{
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
+			},
+			usageKey: usageKey,
+		}
+	}
+
+	usage := func(t *testing.T, e env) string {
+		val, err := e.r.Get(e.usageKey)
+		require.NoError(t, err)
+		return val
+	}
+
+	t.Run("requeue gives the slot back", func(t *testing.T) {
+		e := setup(t)
+
+		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
+			I:             e.item,
+			CapacityLease: e.lease,
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			return osqueue.RunResult{}, errors.New("sdk unreachable")
+		})
+		require.NoError(t, err)
+		service.Wait()
+
+		loaded, err := e.shard.LoadQueueItem(e.ctx, e.item.ID)
+		require.NoError(t, err)
+		require.Equal(t, 1, loaded.Data.Attempt)
+
+		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
+		require.Equal(t, "0", usage(t, e), "the retry must not wait on its own slot")
+	})
+
+	t.Run("success keeps the slot for finalize", func(t *testing.T) {
+		e := setup(t)
+
+		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
+			I:             e.item,
+			CapacityLease: e.lease,
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+		service.Wait()
+
+		_, err = e.shard.LoadQueueItem(e.ctx, e.item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+
+		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
+		require.Equal(t, "1", usage(t, e), "the run holds the slot until finalize")
+	})
+
+	t.Run("item gone on requeue keeps the normal release", func(t *testing.T) {
+		e := setup(t)
+
+		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
+			I:             e.item,
+			CapacityLease: e.lease,
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			// finalize dequeues the start item while the job is in flight.
+			require.NoError(t, e.shard.Dequeue(ctx, e.item))
+			return osqueue.RunResult{}, errors.New("sdk unreachable")
+		})
+		require.NoError(t, err)
+		service.Wait()
+
+		_, err = e.shard.LoadQueueItem(e.ctx, e.item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+
+		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
+		require.Equal(t, "1", usage(t, e), "finalize owns this release, not the queue")
+	})
+}

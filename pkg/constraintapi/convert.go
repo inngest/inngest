@@ -1128,12 +1128,13 @@ func CapacityReleaseRequestToProto(req *CapacityReleaseRequest) *pb.CapacityRele
 	}
 
 	return &pb.CapacityReleaseRequest{
-		IdempotencyKey: req.IdempotencyKey,
-		AccountId:      req.AccountID.String(),
-		LeaseId:        req.LeaseID.String(),
-		Source:         LeaseSourceToProto(req.Source),
-		RequestAttempt: uint32(req.RequestAttempt),
-		LeaseIssuedAt:  leaseIssuedAt,
+		IdempotencyKey:         req.IdempotencyKey,
+		AccountId:              req.AccountID.String(),
+		LeaseId:                req.LeaseID.String(),
+		Source:                 LeaseSourceToProto(req.Source),
+		RequestAttempt:         uint32(req.RequestAttempt),
+		LeaseIssuedAt:          leaseIssuedAt,
+		ForceReleaseSemaphores: req.ForceReleaseSemaphores,
 	}
 }
 
@@ -1158,12 +1159,13 @@ func CapacityReleaseRequestFromProto(pbReq *pb.CapacityReleaseRequest) (*Capacit
 	}
 
 	return &CapacityReleaseRequest{
-		IdempotencyKey: pbReq.IdempotencyKey,
-		AccountID:      accountID,
-		LeaseID:        leaseID,
-		Source:         LeaseSourceFromProto(pbReq.Source),
-		RequestAttempt: int(pbReq.RequestAttempt),
-		LeaseIssuedAt:  leaseIssuedAt,
+		IdempotencyKey:         pbReq.IdempotencyKey,
+		AccountID:              accountID,
+		LeaseID:                leaseID,
+		Source:                 LeaseSourceFromProto(pbReq.Source),
+		RequestAttempt:         int(pbReq.RequestAttempt),
+		LeaseIssuedAt:          leaseIssuedAt,
+		ForceReleaseSemaphores: pbReq.ForceReleaseSemaphores,
 	}, nil
 }
 

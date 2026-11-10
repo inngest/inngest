@@ -186,6 +186,11 @@ func (q *queueProcessor) ProcessItem(
 
 	releaseCapacityLeaseMu := sync.Mutex{}
 	capacityReleased := false
+	// forceReleaseSemaphores is set once the item is requeued for a retry.
+	// a requeued start item did not start its run, so the function
+	// concurrency slot it acquired on lease goes back with the lease.
+	// otherwise the retry waits on a slot the same run still holds.
+	forceReleaseSemaphores := false
 	releaseCapacityLease := func() {
 		releaseCapacityLeaseMu.Lock()
 		defer releaseCapacityLeaseMu.Unlock()
@@ -211,7 +216,8 @@ func (q *queueProcessor) ProcessItem(
 				Service:           constraintapi.ServiceExecutor,
 				RunProcessingMode: constraintapi.RunProcessingModeBackground,
 			},
-			LeaseIssuedAt: leaseIssuedAt,
+			LeaseIssuedAt:          leaseIssuedAt,
+			ForceReleaseSemaphores: forceReleaseSemaphores,
 		})
 		if err != nil {
 			l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
@@ -597,6 +603,15 @@ func (q *queueProcessor) ProcessItem(
 
 				l.Error("error requeuing job", "error", requeueErr, "item", requeueItem)
 				return ProcessItemResult{}, requeueErr
+			}
+			// the item is back in the queue, so give its function concurrency
+			// slot back with the deferred lease release.  an item that was
+			// gone on requeue returned above and keeps the normal release,
+			// because finalize already released the slot for that run.
+			if hasManualSemaphore(qi.Data.Semaphores) {
+				releaseCapacityLeaseMu.Lock()
+				forceReleaseSemaphores = true
+				releaseCapacityLeaseMu.Unlock()
 			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err

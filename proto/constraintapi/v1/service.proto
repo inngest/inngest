@@ -247,6 +247,8 @@ message CapacityReleaseRequest {
   LeaseSource source = 4;
   uint32 request_attempt = 5;
   google.protobuf.Timestamp lease_issued_at = 6;
+  // decrements manual-release semaphores on this lease.  set when a start item is requeued.
+  bool force_release_semaphores = 7;
 }
 
 message CapacityReleaseResponse {

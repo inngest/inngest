@@ -2053,8 +2053,10 @@ type CapacityReleaseRequest struct {
 	Source         *LeaseSource           `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
 	RequestAttempt uint32                 `protobuf:"varint,5,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	LeaseIssuedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=lease_issued_at,json=leaseIssuedAt,proto3" json:"lease_issued_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// decrements manual-release semaphores on this lease.  set when a start item is requeued.
+	ForceReleaseSemaphores bool `protobuf:"varint,7,opt,name=force_release_semaphores,json=forceReleaseSemaphores,proto3" json:"force_release_semaphores,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CapacityReleaseRequest) Reset() {
@@ -2127,6 +2129,13 @@ func (x *CapacityReleaseRequest) GetLeaseIssuedAt() *timestamppb.Timestamp {
 		return x.LeaseIssuedAt
 	}
 	return nil
+}
+
+func (x *CapacityReleaseRequest) GetForceReleaseSemaphores() bool {
+	if x != nil {
+		return x.ForceReleaseSemaphores
+	}
+	return false
 }
 
 type CapacityReleaseResponse struct {
@@ -2748,7 +2757,7 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"functionId\x127\n" +
 	"\x05usage\x18\x06 \x03(\v2!.constraintapi.v1.ConstraintUsageR\x05usage\x12:\n" +
 	"\x19operation_idempotency_hit\x18\a \x01(\bR\x17operationIdempotencyHitB\v\n" +
-	"\t_lease_id\"\x9f\x02\n" +
+	"\t_lease_id\"\xd9\x02\n" +
 	"\x16CapacityReleaseRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2756,7 +2765,8 @@ const file_constraintapi_v1_service_proto_rawDesc = "" +
 	"\blease_id\x18\x03 \x01(\tR\aleaseId\x125\n" +
 	"\x06source\x18\x04 \x01(\v2\x1d.constraintapi.v1.LeaseSourceR\x06source\x12'\n" +
 	"\x0frequest_attempt\x18\x05 \x01(\rR\x0erequestAttempt\x12B\n" +
-	"\x0flease_issued_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rleaseIssuedAt\"\xfc\x01\n" +
+	"\x0flease_issued_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\rleaseIssuedAt\x128\n" +
+	"\x18force_release_semaphores\x18\a \x01(\bR\x16forceReleaseSemaphores\"\xfc\x01\n" +
 	"\x17CapacityReleaseResponse\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
