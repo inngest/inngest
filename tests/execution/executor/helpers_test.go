@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -45,6 +46,10 @@ type execTestInfra struct {
 	queueShard    redis_state.RedisQueueShard
 	shardRegistry queue.ShardRegistryController
 	rq            queue.Queue
+	// runState is the redis that holds run state, for tests that watch it.
+	runState *miniredis.Miniredis
+	// triggerData is the data of the event scheduleRun triggers a run with.
+	triggerData map[string]any
 }
 
 // newExecTestInfra builds the shared executor test infra. stepID is
@@ -83,7 +88,7 @@ func newExecTestInfra(t *testing.T, stepID string) *execTestInfra {
 	})
 	require.NoError(t, err)
 
-	_, shardedRc, err := createInmemoryRedis(t)
+	runState, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
 	t.Cleanup(func() { shardedRc.Close() })
 
@@ -133,6 +138,7 @@ func newExecTestInfra(t *testing.T, stepID string) *execTestInfra {
 		queueShard:    queueShard,
 		shardRegistry: shardRegistry,
 		rq:            rq,
+		runState:      runState,
 	}
 }
 
@@ -179,7 +185,7 @@ func (i *execTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *stat
 	_, run, err := exec.Schedule(i.ctx, execution.ScheduleRequest{
 		Function: i.fn, At: &now, AccountID: i.aID, WorkspaceID: i.wsID, AppID: i.appID,
 		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, evtID),
+			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event", Data: i.triggerData}, evtID),
 		},
 	})
 	require.NoError(t, err)

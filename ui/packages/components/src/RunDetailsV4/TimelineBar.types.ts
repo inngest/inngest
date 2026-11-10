@@ -5,8 +5,8 @@
 
 import type { ReactNode } from 'react';
 
-import type { StepWarning } from './warnings';
 import type { SandboxBarData } from './utils/sandboxes';
+import type { StepWarning } from './warnings';
 
 // ============================================================================
 // Core Component Types
@@ -100,6 +100,25 @@ export interface BarStyle {
 
   /** Whether this bar should use status-based coloring (green/red/etc based on run status) */
   statusBased?: boolean;
+}
+
+/**
+ * A small tonal dot drawn on a bar at one moment, whatever the row's state.
+ */
+export interface BarMarker {
+  /** Unique identifier for the marker */
+  id: string;
+
+  /** Position on the timeline as a percentage of its width (0-100) */
+  startPercent: number;
+}
+
+/**
+ * A marker as the data layer states it: at a time, not yet a position.
+ */
+export interface BarMarkerData {
+  id: string;
+  at: Date;
 }
 
 /**
@@ -244,6 +263,9 @@ export interface TimelineBarProps {
 
   /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
   dimmed?: boolean;
+
+  /** Small circles drawn on the bar at moments, such as messages arriving */
+  markers?: BarMarker[];
 }
 
 /**
@@ -352,6 +374,9 @@ export interface TimelineBarData {
 
   /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
   dimmed?: boolean;
+
+  /** Small circles drawn on the bar at moments, such as messages arriving */
+  markers?: BarMarkerData[];
 }
 
 /**

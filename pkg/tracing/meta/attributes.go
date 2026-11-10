@@ -58,6 +58,13 @@ var Attrs = struct {
 	DeferStatus       attr[*enums.DeferStatus]
 	DeferUserlandID   attr[*string]
 
+	// Tick attributes: a tick is a small event on its parent's row, such as a
+	// message arriving at an inbox.
+	TickID      attr[*string]
+	TickSources attr[*[]string]
+	TickAt      attr[*time.Time]
+	TickReadAt  attr[*time.Time]
+
 	// Dynamic span controls
 	DynamicSpanID attr[*string]
 	DynamicStatus attr[*enums.StepStatus]
@@ -202,6 +209,10 @@ var Attrs = struct {
 	DeferStatus:                        TextAttr[enums.DeferStatus]("defer.status"),
 	DeferUserlandID:                    StringAttr("defer.userland_id"),
 	DropSpan:                           BoolAttr("executor.drop"),
+	TickID:                             StringAttr("tick.id"),
+	TickSources:                        StringSliceAttr("tick.sources"),
+	TickAt:                             TimeAttr("tick.at"),
+	TickReadAt:                         TimeAttr("tick.read_at"),
 	DynamicTraceID:                     StringAttr("dynamic.trace.id"),
 	DynamicSpanID:                      StringAttr("dynamic.span.id"),
 	DynamicStatus:                      StepStatusAttr("dynamic.status"),

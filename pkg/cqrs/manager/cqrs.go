@@ -429,6 +429,16 @@ fragmentLoop:
 				return nil, err
 			}
 
+			// A tick drawn again is the same span. The first time it was drawn
+			// is when it happened, so a later fragment does not move it.
+			if name, _ := fragment["name"].(string); name == meta.SpanNameTick {
+				for _, key := range []string{meta.Attrs.TickAt.Key(), meta.Attrs.TickReadAt.Key()} {
+					if _, seen := newSpan.RawOtelSpan.Attributes[key]; seen {
+						delete(fragmentAttr, key)
+					}
+				}
+			}
+
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
@@ -507,6 +517,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 	var err error
+	var ticks []*cqrs.OtelSpan
 
 	info := spanRollupInfo{
 		dynamicRefs:      dynamicRefs,
@@ -525,6 +536,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		// in their own view.
 		switch newSpan.Name {
 		case meta.SpanNameMetadata, meta.SpanNameDefer:
+			continue
+		case meta.SpanNameTick:
+			// Ticks ride on their parent's row.
+			ticks = append(ticks, newSpan)
 			continue
 		}
 
@@ -631,6 +646,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 	}
 
+	// inferredStatus holds the spans whose status was taken from a child, as
+	// opposed to the one they report themselves.
+	inferredStatus := map[*cqrs.OtelSpan]bool{}
+
 	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
@@ -675,6 +694,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			// still running
 			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
 				parent.Status = span.Status
+				inferredStatus[parent] = true
 			}
 
 			item, _ := spanMap.Get(span.SpanID)
@@ -739,6 +759,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
+	rollupTicks(ticks, resolveDynamic, spanMap)
+	if !inferredStatus[root] {
+		endWaitingReads(root)
+	}
+
 	// Fold order doesn't matter: the builder rounds the summed cost to
 	// extractors.RoundCost's granularity, absorbing float addition's order
 	// sensitivity, and every other field is order-independent.
@@ -764,6 +789,154 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	computeAndAttachAISummaryMetadata(ctx, root, aiUsage)
 
 	return root, nil
+}
+
+// rollupTicks turns each tick into a child span of the row it belongs to. A
+// message is drawn like an op of its parent: in the parent's group and with its
+// origin, so it shows dimmed inside the group. An arrival has no duration. A
+// read's message runs from the time it arrived, which it takes from the arrival
+// tick of the same message, to the time it was read. A read's row lists the
+// ids it took in its metadata.
+func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), spans *orderedmap.OrderedMap[string, *cqrs.OtelSpan]) {
+	arrivals := map[string]time.Time{}
+	for _, tick := range ticks {
+		if tick.Attributes != nil && tick.Attributes.TickID != nil && tick.Attributes.TickAt != nil {
+			arrivals[*tick.Attributes.TickID] = *tick.Attributes.TickAt
+		}
+	}
+
+	reads := map[string]time.Time{}
+	for _, tick := range ticks {
+		if tick.Attributes != nil && tick.Attributes.TickID != nil && tick.Attributes.TickReadAt != nil {
+			reads[*tick.Attributes.TickID] = *tick.Attributes.TickReadAt
+		}
+	}
+
+	took := map[string][]string{}
+	for _, tick := range ticks {
+		attrs := tick.Attributes
+		if attrs == nil || attrs.TickID == nil || tick.ParentSpanID == nil {
+			continue
+		}
+
+		parentID, ok := resolve(*tick.ParentSpanID)
+		if !ok {
+			continue
+		}
+		parent, _ := spans.Get(parentID)
+
+		start, end := time.Time{}, time.Time{}
+		if attrs.TickAt != nil {
+			start, end = *attrs.TickAt, *attrs.TickAt
+		}
+		if attrs.TickReadAt != nil {
+			end = *attrs.TickReadAt
+			start = end
+			if at, ok := arrivals[*attrs.TickID]; ok {
+				start = at
+			}
+
+			took[parentID] = append(took[parentID], *attrs.TickID)
+		}
+
+		// The tick also stays on its row, for a UI that draws it as a marker.
+		rolled := &cqrs.SpanTick{ID: *attrs.TickID, Sources: []string{}, ReadAt: attrs.TickReadAt}
+		if attrs.TickSources != nil {
+			rolled.Sources = *attrs.TickSources
+		}
+		if at, ok := arrivals[rolled.ID]; ok {
+			rolled.At = at
+		}
+		if readAt, ok := reads[rolled.ID]; ok && rolled.ReadAt == nil {
+			rolled.ReadAt = &readAt
+		}
+		parent.Ticks = append(parent.Ticks, rolled)
+
+		completed := enums.StepStatusCompleted
+		name := *attrs.TickID
+		tick.Name = meta.SpanNameStep
+		tick.Status = completed
+		attrs.StepName = &name
+		attrs.StepID = &name
+		attrs.DynamicStatus = &completed
+		attrs.StartedAt = &start
+		attrs.EndedAt = &end
+		attrs.QueuedAt = &start
+		tick.StartTime = start
+		tick.EndTime = end
+		if parent.Attributes != nil {
+			attrs.StepSpanPath = parent.Attributes.StepSpanPath
+			attrs.StepOrigin = parent.Attributes.StepOrigin
+		}
+
+		// A message is a sibling of its parent row, so the trace API puts it in
+		// the same group. Under the row it would be taken for an attempt.
+		holder := parent
+		if parent.ParentSpanID != nil {
+			if grandparentID, ok := resolve(*parent.ParentSpanID); ok {
+				holder, _ = spans.Get(grandparentID)
+			}
+		}
+		tick.ParentSpanID = &holder.SpanID
+		holder.Children = append(holder.Children, tick)
+	}
+
+	for parentID, ids := range took {
+		parent, _ := spans.Get(parentID)
+		values, err := json.Marshal(ids)
+		if err != nil {
+			continue
+		}
+
+		parent.Metadata = append(parent.Metadata, &cqrs.SpanMetadata{
+			Scope:     enums.MetadataScopeStep,
+			Kind:      metadata.KindInngestInbox,
+			Values:    metadata.Values{"messages": values},
+			UpdatedAt: parent.EndTime,
+		})
+	}
+}
+
+// endWaitingReads draws what a run leaves open as ended once the run has ended:
+// a read that is still waiting (it lost a race, so nothing woke it), and an
+// inbox or listen row that was never closed. The first ends cancelled, since
+// it never got an answer; the second ends with the run.
+func endWaitingReads(root *cqrs.OtelSpan) {
+	if !root.Status.IsEnded() {
+		return
+	}
+
+	endedAt := root.EndTime
+	if root.Attributes != nil && root.Attributes.EndedAt != nil {
+		endedAt = *root.Attributes.EndedAt
+	}
+
+	var walk func(span *cqrs.OtelSpan)
+	walk = func(span *cqrs.OtelSpan) {
+		if span.Attributes != nil && span.Attributes.StepOp != nil {
+			switch {
+			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
+				span.Status = enums.StepStatusCancelled
+				span.Attributes.DynamicStatus = &span.Status
+
+				if span.Attributes.EndedAt == nil {
+					span.Attributes.EndedAt = &endedAt
+				}
+			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
+				span.Status = enums.StepStatusCompleted
+				span.Attributes.DynamicStatus = &span.Status
+
+				if span.Attributes.EndedAt == nil {
+					span.Attributes.EndedAt = &endedAt
+				}
+			}
+		}
+
+		for _, child := range span.Children {
+			walk(child)
+		}
+	}
+	walk(root)
 }
 
 // rollupSpanMetadataFromFragments folds a (span, kind)'s metadata fragments in

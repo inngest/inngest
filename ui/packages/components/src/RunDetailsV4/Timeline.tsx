@@ -612,6 +612,12 @@ function TimelineBarRenderer({
       sandbox={bar.sandbox}
       groupKind={bar.groupKind}
       dimmed={bar.dimmed}
+      markers={bar.markers?.map((marker) => {
+        return {
+          id: marker.id,
+          startPercent: calculateBarPosition(marker.at, marker.at, minTime, maxTime).startPercent,
+        };
+      })}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}

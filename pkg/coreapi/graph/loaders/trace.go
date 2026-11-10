@@ -110,6 +110,12 @@ func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	case enums.OpcodeWaitForSignal:
 		op := models.StepOpWaitForSignal
 		return &op
+	case enums.OpcodeSubscribe:
+		op := models.StepOpSubscribe
+		return &op
+	case enums.OpcodeSubscribeWait:
+		op := models.StepOpInboxRead
+		return &op
 	}
 
 	return nil
@@ -588,7 +594,24 @@ func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*mode
 
 	gqlSpan.Metadata = append(gqlSpan.Metadata, spanMetadataToGQL(span.Metadata)...)
 
+	gqlSpan.Ticks = spanTicksToGQL(span.Ticks)
+
 	return gqlSpan, nil
+}
+
+// spanTicksToGQL maps the ticks of a span to GQL.
+func spanTicksToGQL(ticks []*cqrs.SpanTick) []*models.SpanTick {
+	out := make([]*models.SpanTick, 0, len(ticks))
+	for _, tick := range ticks {
+		out = append(out, &models.SpanTick{
+			ID:      tick.ID,
+			Sources: tick.Sources,
+			At:      tick.At,
+			ReadAt:  tick.ReadAt,
+		})
+	}
+
+	return out
 }
 
 // spanMetadataToGQL maps a span's metadata to GQL as-is. Kinds keep whatever
