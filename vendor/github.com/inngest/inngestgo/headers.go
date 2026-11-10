@@ -11,6 +11,7 @@ const (
 	HeaderKeyEnv                = "X-Inngest-Env"
 	HeaderKeyEventIDSeed        = "x-inngest-event-id-seed"
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
+	HeaderKeyInstanceID         = "x-inngest-instance-id"
 	HeaderKeyNoRetry            = "X-Inngest-No-Retry"
 	HeaderKeyRequestID          = "x-request-id"
 	HeaderKeyJobID              = "x-inngest-job-id"
