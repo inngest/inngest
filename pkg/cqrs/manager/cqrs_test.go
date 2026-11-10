@@ -3169,8 +3169,9 @@ func TestSpanOutputReadBack(t *testing.T) {
 	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{RunID: runID, SpanID: spanID})
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
-	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted.
+	// Compared as JSON since postgres' jsonb re-serializes it (`{"num": 42}`).
+	assert.JSONEq(t, `{"num":42}`, string(out.Data), "output should contain raw JSON, not double-encoded")
 }
 
 // TestExtendedTraceReparenting verifies that orphaned userland spans (extended
