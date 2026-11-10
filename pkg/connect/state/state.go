@@ -380,6 +380,12 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			req.Header.Set("X-Inngest-Env", initialReq.GetEnvironment())
 		}
 
+		// sdk.FromReadCloser replaces the body's headers with the request
+		// headers, so the platform is only read from this header
+		if initialReq.GetPlatform() != "" {
+			req.Header.Set("X-Inngest-Platform", initialReq.GetPlatform())
+		}
+
 		client := &http.Client{
 			Timeout: time.Minute,
 		}
