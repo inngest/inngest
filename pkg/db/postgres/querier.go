@@ -58,6 +58,18 @@ func (pq *pgQuerier) GetAppByID(ctx context.Context, id uuid.UUID) (*db.App, err
 	return appFromPG(r), nil
 }
 
+func (pq *pgQuerier) GetAppsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.App, error) {
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	rows, err := pq.q.GetAppsByIDs(ctx, strs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, appFromPG), nil
+}
+
 func (pq *pgQuerier) GetAppByName(ctx context.Context, name string) (*db.App, error) {
 	r, err := pq.q.GetAppByName(ctx, name)
 	if err != nil {
@@ -204,6 +216,18 @@ func (pq *pgQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db.Fun
 		return nil, err
 	}
 	return functionFromPG(r), nil
+}
+
+func (pq *pgQuerier) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.Function, error) {
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	rows, err := pq.q.GetFunctionsByIDs(ctx, strs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromPG), nil
 }
 
 func (pq *pgQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Function, error) {
