@@ -3960,6 +3960,20 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	if len(resp.Generator) > consts.DefaultMaxStepLimit {
+		// disallow parallel plans that exceed the step limit.
+		return state.WrapInStandardError(
+			state.ErrFunctionOverflowed,
+			state.InngestErrFunctionOverflowed,
+			fmt.Sprintf("The function run exceeded the step limit of %d steps.", consts.DefaultMaxStepLimit),
+			"",
+		)
+	}
+
+	if hasTerminalOp(resp.Generator) {
+		return e.handleTerminalResponse(ctx, i, resp)
+	}
+
 	nonLazy := nonLazyOpCount(resp.Generator)
 
 	{
@@ -4005,18 +4019,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	stepCount := len(resp.Generator)
-
-	if stepCount > consts.DefaultMaxStepLimit {
-		// Disallow parallel plans that exceed the step limit
-		return state.WrapInStandardError(
-			state.ErrFunctionOverflowed,
-			state.InngestErrFunctionOverflowed,
-			fmt.Sprintf("The function run exceeded the step limit of %d steps.", consts.DefaultMaxStepLimit),
-			"",
-		)
-	}
-
 	groups := opGroups(resp.Generator)
 
 	// One handling timestamp for the whole response: handlers run
@@ -4055,6 +4057,159 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	}
 
 	return nil
+}
+
+// isTerminalOp reports whether the opcode ends the run.
+func isTerminalOp(op enums.Opcode) bool {
+	return op == enums.OpcodeRunComplete || op == enums.OpcodeSyncRunComplete
+}
+
+// hasTerminalOp reports whether any opcode in the response ends the run.
+func hasTerminalOp(ops []*state.GeneratorOpcode) bool {
+	for _, op := range ops {
+		if op != nil && isTerminalOp(op.Op) {
+			return true
+		}
+	}
+	return false
+}
+
+// handleTerminalResponse handles a response that ends the run.  it saves no
+// step output and enqueues no discovery item, because Finalize deletes the
+// run state.  DeferAdd and DeferAbort run first so Finalize finds the defer,
+// and each step still gets its span and lifecycle call.
+func (e *executor) handleTerminalResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	edge, ok := i.item.Payload.(queue.PayloadEdge)
+	if !ok {
+		return fmt.Errorf("unknown queue item type handling generator: %T", i.item.Payload)
+	}
+
+	// the first terminal op ends the run.  any extra one is skipped, since an
+	// error here only makes the SDK re-run every step on each retry.
+	var terminal *state.GeneratorOpcode
+	for _, op := range resp.Generator {
+		if op == nil || !isTerminalOp(op.Op) {
+			continue
+		}
+		if terminal == nil {
+			terminal = op
+			continue
+		}
+		e.log.Warn(
+			"skipping extra terminal opcode in a response that ends the run",
+			"opcode", op.Op.String(),
+			"step_id", sanitizeLogValue(op.ID),
+			"run_id", i.md.ID.RunID.String(),
+		)
+	}
+
+	if resp.HasAI() {
+		// OnFunctionFinished listeners read md.Config.HasAI.  the run state
+		// is deleted by the terminal op, so the flag is only set in memory.
+		i.md.Config.HasAI = true
+	}
+
+	group := OpcodeGroup{
+		HandledAt: e.now(),
+	}
+
+	// a WaitForEvent next to a terminal op has nothing to resume, so it is
+	// skipped below with the other non-step ops.
+	runsFirst := func(op *state.GeneratorOpcode) bool {
+		return enums.OpcodeIsPriority(op.Op) && op.Op != enums.OpcodeWaitForEvent
+	}
+
+	for _, op := range resp.Generator {
+		if op == nil {
+			// this is clearly an error.
+			if e.log != nil {
+				e.log.Error("error handling generator", "error", "nil generator returned")
+			}
+			continue
+		}
+		if !runsFirst(op) {
+			continue
+		}
+		if err := e.handleGeneratorOp(ctx, i, *op, group); err != nil {
+			return err
+		}
+	}
+
+	for _, op := range resp.Generator {
+		if op == nil || isTerminalOp(op.Op) || runsFirst(op) {
+			continue
+		}
+		switch op.Op {
+		case enums.OpcodeNone:
+			// older SDKs send OpcodeNone in normal use, so it is not logged.
+		case enums.OpcodeStep, enums.OpcodeStepRun:
+			e.recordGeneratorStep(ctx, i, *op, edge)
+		case enums.OpcodeStepError, enums.OpcodeStepFailed:
+			e.recordFailedGeneratorStep(ctx, i, *op, edge)
+		default:
+			e.log.Warn(
+				"skipping opcode in a response that ends the run",
+				"opcode", op.Op.String(),
+				"step_id", sanitizeLogValue(op.ID),
+				"run_id", i.md.ID.RunID.String(),
+			)
+		}
+	}
+
+	return e.handleGeneratorGroup(ctx, i, OpcodeGroup{
+		Opcodes: []*state.GeneratorOpcode{
+			terminal,
+		},
+		HandledAt: group.HandledAt,
+	}, resp)
+}
+
+// recordGeneratorStep emits the step span and the finished lifecycle call for
+// a step whose output is not saved.  a bad output is logged and the span is
+// still emitted so the trace shows the step.
+func (e *executor) recordGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) {
+	output, err := gen.Output()
+	if err != nil {
+		e.log.Error(
+			"error reading step output in a response that ends the run",
+			"error", err,
+			"step_id", sanitizeLogValue(gen.ID),
+			"run_id", runCtx.Metadata().ID.RunID.String(),
+		)
+	}
+
+	stepDurationMs := gen.Timing.B / 1_000_000
+	extraMetadata := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
+		[]byte(output),
+		stepDurationMs,
+	))
+
+	e.emitStepSpan(ctx, runCtx, &gen, extraMetadata, nil)
+	e.RunStepRunFinishedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, e.now())
+}
+
+// recordFailedGeneratorStep emits the step span and the failed lifecycle call
+// for a StepError or StepFailed whose output is not saved.  the status is
+// errored when the step could still retry and failed otherwise, the same as
+// handleStepError and handleStepFailed.
+func (e *executor) recordFailedGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) {
+	if gen.Error == nil {
+		e.log.Error(
+			"step error opcode without user error in a response that ends the run",
+			"opcode", gen.Op.String(),
+			"step_id", sanitizeLogValue(gen.ID),
+			"run_id", runCtx.Metadata().ID.RunID.String(),
+		)
+		return
+	}
+
+	status := enums.StepStatusFailed
+	if IsStepRetryable(&gen, runCtx) {
+		status = enums.StepStatusErrored
+	}
+
+	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+	e.RunStepRunFailedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, status, runCtx.AttemptCount(), e.now())
 }
 
 func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, group OpcodeGroup, resp *state.DriverResponse) error {
