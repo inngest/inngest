@@ -79,7 +79,18 @@ func execute() {
 				}
 			}
 
-			if cmd.Args().Len() == 0 || cmd.Args().Get(0) != "api" {
+			// `api` and `dev` send their own events w/ flag context. `dev
+			// --help` never reaches the dev action (urfave prints help and
+			// returns first), so it's reported here w/ only the help flag.
+			switch {
+			case cmd.Args().Len() > 0 && cmd.Args().Get(0) == "api":
+			case cmd.Args().Len() > 0 && cmd.Args().Get(0) == "dev":
+				if helpRequested(cmd.Args().Tail()) {
+					tel.SendCommandExecutedEvent(ctx, "inngest dev", map[string]any{
+						"flags": map[string]bool{"help": true},
+					})
+				}
+			default:
 				tel.SendCmdExecutedEvent(ctx, cmd)
 			}
 
@@ -125,4 +136,18 @@ func execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// helpRequested reports whether args contain a help flag before any `--`
+// terminator.
+func helpRequested(args []string) bool {
+	for _, arg := range args {
+		switch arg {
+		case "--":
+			return false
+		case "-h", "-help", "--help":
+			return true
+		}
+	}
+	return false
 }
