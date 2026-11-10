@@ -90,7 +90,7 @@ const reasonLabels: Record<WebhookFailureReason, string> = {
 };
 
 function reasonLabel(reason: WebhookFailureReason): string {
-  return reasonLabels[reason];
+  return reasonLabels[reason] ?? reason;
 }
 
 function shortAge(date: string): string {
