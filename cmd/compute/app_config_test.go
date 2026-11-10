@@ -1,4 +1,4 @@
-package imagecmd
+package computecmd
 
 import (
 	"strings"

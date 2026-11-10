@@ -1,4 +1,4 @@
-package imagecmd
+package computecmd
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/cmd/image/internal/docker"
+	"github.com/inngest/inngest/cmd/compute/internal/docker"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/urfave/cli/v3"
 )

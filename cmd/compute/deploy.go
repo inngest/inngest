@@ -1,10 +1,10 @@
-package imagecmd
+package computecmd
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/inngest/inngest/cmd/image/internal/docker"
+	"github.com/inngest/inngest/cmd/compute/internal/docker"
 	"github.com/urfave/cli/v3"
 )
 
