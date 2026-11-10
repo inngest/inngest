@@ -67,12 +67,6 @@ const traceDetailsFragment = graphql(`
       statusCode
       headers
     }
-    ticks {
-      id
-      sources
-      at
-      readAt
-    }
   }
 `);
 
