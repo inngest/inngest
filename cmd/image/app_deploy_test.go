@@ -3,12 +3,15 @@ package imagecmd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +26,8 @@ func TestDeployApp(t *testing.T) {
 	// the SHA256 of "image bytes", which fake docker saves.
 	const digest = "de7030234493a8bea844dbe1d8676e68a2c1a4b014c721f0425a22b6df66faec"
 	machineSize := `{"errors":[{"code":"machine_size_not_allowed","message":"deploy machine size is not allowed: spec of 2 vCPU and 4096 MiB exceeds this account's limit of 1 vCPU and 1024 MiB per instance; lower spec in inngest.toml or upgrade your plan"}]}`
+	ready := `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc"}}`
+	twoApps := "[apps.web]\nserve = {}\n[apps.worker]\nconnect = {}"
 
 	for _, tc := range []struct {
 		name string
@@ -30,17 +35,21 @@ func TestDeployApp(t *testing.T) {
 		// args follow `inngest deploy`.
 		args []string
 		// wantDocker is the docker build args after --platform and --load,
-		// with the local tag as <ref>.
+		// with the local tag as <ref>.  every build has the same args.
 		wantDocker []string
-		// wantCreate is the CreateDeploy body.
-		wantCreate string
-		// createStatus and createBody replace the CreateDeploy response.
-		createStatus int
-		createBody   string
-		// deploy is the GetDeploy response.
+		// wantBuilt is the apps that docker builds, in order.
+		wantBuilt []string
+		// wantConfig is the CreateDeploy config of each app.
+		wantConfig map[string]string
+		// rejected is an app whose CreateDeploy fails with machineSize.
+		rejected string
+		// deploy is the GetDeploy response, with the deploy ID as {id}.
 		deploy string
-		err    string
-		output []string
+		// wantCalls is the API calls in order.  the API names deploys d1,
+		// d2, and so on.
+		wantCalls []string
+		err       string
+		output    []string
 	}{
 		{
 			name: "serve",
@@ -49,9 +58,10 @@ serve = { port = 8080, path = "/api/inngest" }
 serve_config = { idle = "15s" }
 dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			wantDocker: []string{"-t", "<ref>", "-f", "./cmd/all-in-one/Dockerfile", "."},
-			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `",
-				"config":{"serve":{"port":8080,"path":"/api/inngest"},"serveConfig":{"idle":"15s"}}}`,
-			deploy: `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"serve":{"port":8080,"path":"/api/inngest"},"serveConfig":{"idle":"15s"}}`},
+			deploy:     ready,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
 			output: []string{
 				"Building app inngest from ./cmd/all-in-one/Dockerfile...",
 				"Uploading app inngest (11 bytes) for deploy d1...",
@@ -63,8 +73,10 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			name:       "connect",
 			toml:       "[apps.inngest]\nconnect = { replicas = 2 }",
 			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
-			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{"replicas":2}}}`,
-			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"connect":{"replicas":2}}`},
+			deploy:     ready,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
 			output:     []string{"Deploy d1 is ready.  Artifact digest abc"},
 		},
 		{
@@ -72,62 +84,141 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			toml:       "[apps.web]\nserve = {}\n[apps.inngest]\nconnect = {}",
 			args:       []string{"inngest", "--", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
 			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", ".", "--build-arg", "FDB_VERSION=7.3.68", "--target", "worker"},
-			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
-			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"connect":{}}`},
+			deploy:     ready,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
 		},
 		{
 			name:       "only app with docker build args",
 			toml:       "[apps.inngest]\nconnect = {}",
 			args:       []string{"--", "--build-arg", "VERSION=1"},
 			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", ".", "--build-arg", "VERSION=1"},
-			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"connect":{}}}`,
-			deploy:     `{"data":{"id":"d1","status":"ready","artifact_digest":"abc"}}`,
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"connect":{}}`},
+			deploy:     ready,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
 		},
 		{
-			name:         "spec over the plan limit",
-			toml:         "[apps.inngest]\nconnect = {}\nspec = { cpu = 2, memory = 4096 }",
-			wantDocker:   []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
-			wantCreate:   `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"spec":{"cpu":2,"memory":4096},"connect":{}}}`,
-			createStatus: http.StatusForbidden,
-			createBody:   machineSize,
-			err:          "create deploy: POST /deploys/inngest: 403 Forbidden: machine_size_not_allowed: deploy machine size is not allowed: spec of 2 vCPU and 4096 MiB exceeds this account's limit of 1 vCPU and 1024 MiB per instance; lower spec in inngest.toml or upgrade your plan",
+			name:       "spec over the plan limit",
+			toml:       "[apps.inngest]\nconnect = {}\nspec = { cpu = 2, memory = 4096 }",
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"spec":{"cpu":2,"memory":4096},"connect":{}}`},
+			rejected:   "inngest",
+			// a rejected deploy uploads nothing.
+			wantCalls: []string{"create inngest"},
+			err:       "create deploy: POST /deploys/inngest: 403 Forbidden: machine_size_not_allowed: deploy machine size is not allowed: spec of 2 vCPU and 4096 MiB exceeds this account's limit of 1 vCPU and 1024 MiB per instance; lower spec in inngest.toml or upgrade your plan",
 		},
 		{
 			name:       "failed deploy",
 			toml:       "[apps.inngest]\nserve = {}",
 			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
-			wantCreate: `{"name":"inngest","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"` + digest + `","config":{"serve":{}}}`,
-			deploy:     `{"data":{"id":"d1","status":"failed","error":"Image build failed or timed out"}}`,
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"serve":{}}`},
+			deploy:     `{"data":{"id":"{id}","status":"failed","error":"Image build failed or timed out"}}`,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
 			err:        "deploy d1 failed: Image build failed or timed out",
+		},
+		{
+			name:       "several apps in the order given",
+			toml:       twoApps,
+			args:       []string{"worker", "web"},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"worker", "web"},
+			wantConfig: map[string]string{"web": `{"serve":{}}`, "worker": `{"connect":{}}`},
+			deploy:     ready,
+			wantCalls: []string{
+				"create worker", "upload d1", "commit worker d1", "get d1",
+				"create web", "upload d2", "commit web d2", "get d2",
+			},
+			output: []string{"Summary:\n  worker: deploy d1 is ready\n  web: deploy d2 is ready\n"},
+		},
+		{
+			name: "unknown app after a known app",
+			toml: twoApps,
+			args: []string{"web", "wrker"},
+			// nothing is built or deployed.
+			err: `no app "wrker" in inngest.toml; apps: web, worker`,
+		},
+		{
+			name:       "failed app does not stop the rest",
+			toml:       "[apps.web]\nserve = {}\nspec = { cpu = 2, memory = 4096 }\n[apps.worker]\nconnect = {}",
+			args:       []string{"web", "worker"},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"web", "worker"},
+			wantConfig: map[string]string{"web": `{"spec":{"cpu":2,"memory":4096},"serve":{}}`, "worker": `{"connect":{}}`},
+			rejected:   "web",
+			deploy:     ready,
+			wantCalls:  []string{"create web", "create worker", "upload d1", "commit worker d1", "get d1"},
+			err:        "1 of 2 apps failed to deploy: web",
+			output: []string{
+				"Summary:\n  web: failed: create deploy: POST /deploys/web: 403 Forbidden: machine_size_not_allowed: deploy machine size is not allowed",
+				"\n  worker: deploy d1 is ready\n",
+			},
+		},
+		{
+			name:       "several apps with docker build args",
+			toml:       twoApps,
+			args:       []string{"web", "worker", "--", "--build-arg", "VERSION=1"},
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", ".", "--build-arg", "VERSION=1"},
+			wantBuilt:  []string{"web", "worker"},
+			wantConfig: map[string]string{"web": `{"serve":{}}`, "worker": `{"connect":{}}`},
+			deploy:     ready,
+			wantCalls: []string{
+				"create web", "upload d1", "commit web d1", "get d1",
+				"create worker", "upload d2", "commit worker d2", "get d2",
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dockerDir := fakeDocker(t)
 
-			var uploaded, committed []byte
+			var (
+				mu    sync.Mutex
+				calls []string
+				ids   int
+			)
+			record := func(call string) {
+				mu.Lock()
+				defer mu.Unlock()
+				calls = append(calls, call)
+			}
 			mux := http.NewServeMux()
-			mux.HandleFunc("POST /v2/deploys/inngest", func(w http.ResponseWriter, r *http.Request) {
+			mux.HandleFunc("POST /v2/deploys/{name}", func(w http.ResponseWriter, r *http.Request) {
+				name := r.PathValue("name")
+				record("create " + name)
 				require.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
 				body, _ := io.ReadAll(r.Body)
-				require.JSONEq(t, tc.wantCreate, string(body))
-				if tc.createStatus != 0 {
-					w.WriteHeader(tc.createStatus)
-					_, _ = w.Write([]byte(tc.createBody))
+				require.JSONEq(t, `{"name":"`+name+`","tag":"latest","architecture":"amd64","uploadSizeBytes":"11","uploadSha256":"`+digest+`","config":`+tc.wantConfig[name]+`}`, string(body))
+				if name == tc.rejected {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(machineSize))
 					return
 				}
+				mu.Lock()
+				ids++
+				id := fmt.Sprintf("d%d", ids)
+				mu.Unlock()
 				w.WriteHeader(http.StatusCreated)
-				_, _ = w.Write([]byte(`{"data":{"id":"d1","status":"pending"},"upload_url":"http://` + r.Host + `/upload","upload_headers":{"x-amz-checksum-sha256":"abc"}}`))
+				_, _ = w.Write([]byte(`{"data":{"id":"` + id + `","status":"pending"},"upload_url":"http://` + r.Host + `/upload/` + id + `","upload_headers":{"x-amz-checksum-sha256":"abc"}}`))
 			})
-			mux.HandleFunc("PUT /upload", func(w http.ResponseWriter, r *http.Request) {
+			mux.HandleFunc("PUT /upload/{id}", func(w http.ResponseWriter, r *http.Request) {
+				record("upload " + r.PathValue("id"))
 				require.Equal(t, "abc", r.Header.Get("x-amz-checksum-sha256"))
-				uploaded, _ = io.ReadAll(r.Body)
+				body, _ := io.ReadAll(r.Body)
+				require.Equal(t, "image bytes", string(body))
 			})
-			mux.HandleFunc("POST /v2/deploys/inngest/d1/commit", func(w http.ResponseWriter, r *http.Request) {
-				committed, _ = io.ReadAll(r.Body)
-				_, _ = w.Write([]byte(`{"data":{"id":"d1","status":"uploaded"}}`))
+			mux.HandleFunc("POST /v2/deploys/{name}/{id}/commit", func(w http.ResponseWriter, r *http.Request) {
+				name, id := r.PathValue("name"), r.PathValue("id")
+				record("commit " + name + " " + id)
+				body, _ := io.ReadAll(r.Body)
+				require.JSONEq(t, `{"deployId":"`+id+`","name":"`+name+`"}`, string(body))
+				_, _ = w.Write([]byte(`{"data":{"id":"` + id + `","status":"uploaded"}}`))
 			})
-			mux.HandleFunc("GET /v2/deploys/d1", func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write([]byte(tc.deploy))
+			mux.HandleFunc("GET /v2/deploys/{id}", func(w http.ResponseWriter, r *http.Request) {
+				record("get " + r.PathValue("id"))
+				_, _ = w.Write([]byte(strings.ReplaceAll(tc.deploy, "{id}", r.PathValue("id"))))
 			})
 			srv := httptest.NewServer(mux)
 			defer srv.Close()
@@ -150,30 +241,39 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 				Commands:  []*cli.Command{DeployCommand()},
 			}
 			err := root.Run(context.Background(), append([]string{"inngest", "deploy"}, tc.args...))
-
-			args, readErr := os.ReadFile(filepath.Join(dockerDir, "args"))
-			require.NoError(t, readErr)
-			gotDocker := strings.Fields(string(args))
-			// a tag per run keeps concurrent deploys of an app apart.
-			require.Regexp(t, `^inngest-deploy:inngest-[0-9a-f]{16}$`, gotDocker[5])
-			saved, readErr := os.ReadFile(filepath.Join(dockerDir, "saved"))
-			require.NoError(t, readErr)
-			require.Equal(t, gotDocker[5], string(saved))
-			gotDocker[5] = "<ref>"
-			require.Equal(t, append([]string{"build", "--platform", "linux/amd64", "--load"}, tc.wantDocker...), gotDocker)
-
 			if tc.err != "" {
 				require.EqualError(t, err, tc.err)
-				if tc.createStatus != 0 {
-					require.Nil(t, uploaded, "a rejected deploy uploads nothing")
-				}
-				return
+			} else {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
-			require.Equal(t, "image bytes", string(uploaded))
-			require.JSONEq(t, `{"deployId":"d1","name":"inngest"}`, string(committed))
+
+			// each app has its own local tag, which docker save gets.
+			builds, _ := os.ReadFile(filepath.Join(dockerDir, "args"))
+			saved, _ := os.ReadFile(filepath.Join(dockerDir, "saved"))
+			builtLines := strings.Split(strings.TrimSuffix(string(builds), "\n"), "\n")
+			savedLines := strings.Split(strings.TrimSuffix(string(saved), "\n"), "\n")
+			if len(tc.wantBuilt) == 0 {
+				require.Empty(t, builds, "nothing is built")
+			} else {
+				require.Len(t, builtLines, len(tc.wantBuilt))
+				require.Len(t, savedLines, len(tc.wantBuilt))
+			}
+			for i, app := range tc.wantBuilt {
+				gotDocker := strings.Fields(builtLines[i])
+				require.Regexp(t, `^inngest-deploy:`+regexp.QuoteMeta(app)+`-[0-9a-f]{16}$`, gotDocker[5])
+				require.Equal(t, gotDocker[5], savedLines[i])
+				gotDocker[5] = "<ref>"
+				require.Equal(t, append([]string{"build", "--platform", "linux/amd64", "--load"}, tc.wantDocker...), gotDocker)
+			}
+
+			mu.Lock()
+			require.Equal(t, tc.wantCalls, calls)
+			mu.Unlock()
 			for _, line := range tc.output {
 				require.Contains(t, stdout.String(), line)
+			}
+			if len(tc.wantBuilt) == 1 {
+				require.NotContains(t, stdout.String(), "Summary:", "one app has no summary")
 			}
 			if !strings.Contains(tc.toml, "serve") {
 				require.NotContains(t, stdout.String(), "sync")

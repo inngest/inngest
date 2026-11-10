@@ -74,24 +74,28 @@ func parseApps(r io.Reader) (map[string]*app, error) {
 	return file.Apps, nil
 }
 
-// selectApp returns the app with the given name.  an empty name selects the
-// only app in the file.
-func selectApp(apps map[string]*app, name string) (string, *app, error) {
-	names := slices.Sorted(maps.Keys(apps))
+// selectApps checks that every name is an app in the file, once, and returns
+// the names.  no names selects the only app in the file.
+func selectApps(apps map[string]*app, names []string) ([]string, error) {
+	all := slices.Sorted(maps.Keys(apps))
+	if len(all) == 0 {
+		return nil, fmt.Errorf("%s has no apps; add an [apps.<name>] section, as in `inngest deploy example-config`", appsFile)
+	}
 	if len(names) == 0 {
-		return "", nil, fmt.Errorf("%s has no apps; add an [apps.<name>] section, as in `inngest deploy example-config`", appsFile)
-	}
-	if name == "" {
-		if len(names) > 1 {
-			return "", nil, fmt.Errorf("%s has more than one app; choose one with `inngest deploy <app>`: %s", appsFile, strings.Join(names, ", "))
+		if len(all) > 1 {
+			return nil, fmt.Errorf("%s has more than one app; name the apps to deploy with `inngest deploy <app>...`: %s", appsFile, strings.Join(all, ", "))
 		}
-		name = names[0]
+		return all, nil
 	}
-	a, ok := apps[name]
-	if !ok {
-		return "", nil, fmt.Errorf("no app %q in %s; apps: %s", name, appsFile, strings.Join(names, ", "))
+	for i, name := range names {
+		if _, ok := apps[name]; !ok {
+			return nil, fmt.Errorf("no app %q in %s; apps: %s", name, appsFile, strings.Join(all, ", "))
+		}
+		if slices.Contains(names[:i], name) {
+			return nil, fmt.Errorf("app %q is named more than once", name)
+		}
 	}
-	return name, a, nil
+	return names, nil
 }
 
 // validate checks the settings that do not depend on the account.  the

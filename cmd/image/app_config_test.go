@@ -253,32 +253,34 @@ func uncommentSettings(config, skip string) string {
 	return strings.Join(lines, "\n")
 }
 
-func TestSelectApp(t *testing.T) {
+func TestSelectApps(t *testing.T) {
 	one := map[string]*app{"web": {}}
 	two := map[string]*app{"web": {}, "worker": {}}
 	for _, tc := range []struct {
 		name string
 		apps map[string]*app
-		arg  string
-		want string
+		args []string
+		want []string
 		err  string
 	}{
-		{name: "only app", apps: one, want: "web"},
-		{name: "named app", apps: two, arg: "worker", want: "worker"},
-		{name: "unknown app", apps: two, arg: "api", err: `no app "api" in inngest.toml; apps: web, worker`},
-		{name: "unknown app with one app", apps: one, arg: "api", err: `no app "api" in inngest.toml; apps: web`},
-		{name: "several apps without a name", apps: two, err: "choose one with `inngest deploy <app>`: web, worker"},
+		{name: "only app", apps: one, want: []string{"web"}},
+		{name: "named app", apps: two, args: []string{"worker"}, want: []string{"worker"}},
+		{name: "named apps in the order given", apps: two, args: []string{"worker", "web"}, want: []string{"worker", "web"}},
+		{name: "unknown app", apps: two, args: []string{"api"}, err: `no app "api" in inngest.toml; apps: web, worker`},
+		{name: "unknown app after a known app", apps: two, args: []string{"web", "api"}, err: `no app "api" in inngest.toml; apps: web, worker`},
+		{name: "unknown app with one app", apps: one, args: []string{"api"}, err: `no app "api" in inngest.toml; apps: web`},
+		{name: "app named twice", apps: two, args: []string{"web", "worker", "web"}, err: `app "web" is named more than once`},
+		{name: "several apps without a name", apps: two, err: "name the apps to deploy with `inngest deploy <app>...`: web, worker"},
 		{name: "no apps", apps: nil, err: "inngest.toml has no apps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			name, a, err := selectApp(tc.apps, tc.arg)
+			names, err := selectApps(tc.apps, tc.args)
 			if tc.err != "" {
 				require.ErrorContains(t, err, tc.err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tc.want, name)
-			require.Same(t, tc.apps[tc.want], a)
+			require.Equal(t, tc.want, names)
 		})
 	}
 }
