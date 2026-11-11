@@ -4,9 +4,12 @@ import { generateCurlCode, shellQuote } from './utils';
 
 /**
  * Minimal POSIX shell word parser: returns the single argument that a shell
- * would produce for a word made of single-quoted, double-quoted and
- * backslash-escaped segments. Throws if the word is unterminated or contains
- * an unquoted separator, i.e. if it would not be exactly one argument.
+ * would produce for a word made only of single-quoted segments and
+ * backslash-escaped characters, which is all `shellQuote` emits.
+ *
+ * It is deliberately strict. Anything else left unquoted (`$`, backticks,
+ * double quotes, operators, whitespace, plain text) throws, because a real
+ * shell could expand, execute or split it and this parser does not model that.
  */
 const parseShellWord = (word: string): string => {
   let out = '';
@@ -19,18 +22,37 @@ const parseShellWord = (word: string): string => {
       out += word.slice(i + 1, end);
       i = end + 1;
     } else if (char === '\\') {
-      if (i + 1 >= word.length) throw new Error('trailing backslash');
-      out += word[i + 1];
+      const escaped = word[i + 1];
+      if (escaped === undefined) throw new Error('trailing backslash');
+      if (escaped === '\n') throw new Error('unsupported line continuation');
+      out += escaped;
       i += 2;
-    } else if (/\s/.test(char ?? '')) {
-      throw new Error('unquoted whitespace splits the word');
     } else {
-      out += char;
-      i += 1;
+      throw new Error(`unsupported unquoted character: ${JSON.stringify(char)}`);
     }
   }
   return out;
 };
+
+describe('parseShellWord (test helper)', () => {
+  it.each([
+    ['command substitution', '$(id)'],
+    ['a variable', '$HOME'],
+    ['backticks', '`id`'],
+    ['a double-quoted segment', '"a"'],
+    ['an operator', "'a';id"],
+    ['whitespace', "'a' 'b'"],
+    ['plain text', 'abc'],
+    ['an unterminated quote', "'abc"],
+    ['a trailing backslash', "'a'\\"],
+  ])('rejects %s outside single quotes', (_description, word) => {
+    expect(() => parseShellWord(word)).toThrow();
+  });
+
+  it('keeps shell syntax literal inside single quotes', () => {
+    expect(parseShellWord("'$(id) `id` \"x\"'\\''y'")).toBe('$(id) `id` "x"\'y');
+  });
+});
 
 const dataArgument = (curl: string): string => {
   const marker = '--data ';
