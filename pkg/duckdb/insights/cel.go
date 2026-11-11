@@ -401,16 +401,10 @@ func celFieldConverter(n *expr.Node, scope *celFieldScope) ([]sq.Expression, err
 // unparenthesized comparison right after it (e.g. "expr->'$.a' = ?")
 // associates as "expr->('$.a' = ?)" instead.
 //
-// expr's own ::JSON cast (harmless/a no-op when expr is already JSON, as
-// with runsInputsCELScope's "x" lambda parameter — already the result of
-// json_transform — but load-bearing for eventsTableCELScope's event_data,
-// a VARIANT column) exists because -> and ->> only extract from JSON: given
-// a VARIANT operand instead, DuckDB silently stringifies it first with its
-// own single-quoted struct syntax (e.g. `{'foo': bar}`, not
-// `{"foo":"bar"}`) rather than erroring, so the extraction then re-parses
-// that as JSON and fails with a "Malformed JSON at byte 1" error — see
-// pkg/execution/dualwrite/tracing.go's materializeRuns for the same
-// underlying VARIANT/JSON distinction on the write side.
+// expr's own ::JSON cast is a no-op when expr is already JSON, as with
+// runsInputsCELScope's "x" lambda parameter (already the result of
+// json_transform), and types eventsTableCELScope's event_data (JSON text in
+// the lake) as JSON for -> and ->>.
 //
 // The JSONPath is bound as a query parameter rather than spliced into the
 // SQL text: a CEL string index (e.g. event.data.foo["a'b"]) carries an

@@ -1,4 +1,14 @@
 -- +goose Up
+-- JSON payloads (attributes, inputs/input, output, values, event_data,
+-- event_meta) are stored as JSON text in plain VARCHAR columns: duckdb's
+-- shredded VARIANT is a net loss here (no UINT64 shredding
+-- (duckdb/duckdb#28166), integers > INT64_MAX fail parquet writes
+-- (duckdb/duckdb#28168), a parquet column per distinct key, slow writes and
+-- whole-value reads). They're VARCHAR rather than JSON so an Iceberg lake
+-- (which rejects duckdb's JSON type, and duckdb doesn't keep the alias on a
+-- string column) can share the same column types. Everything above the
+-- tables reads them as JSON: the raw_*/insights_* macros cast them back
+-- (free, JSON is an alias of VARCHAR).
 CREATE TABLE IF NOT EXISTS inngest.runs (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -14,9 +24,9 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
 	function_id UUID NOT NULL,
   function_slug VARCHAR NOT NULL,
   status VARCHAR NOT NULL,
-  attributes VARIANT NOT NULL,
-  inputs VARIANT NOT NULL,
-  output VARIANT,
+  attributes VARCHAR NOT NULL,
+  inputs VARCHAR NOT NULL,
+  output VARCHAR,
   -- event_ids holds the run's triggering event(s) internal ULID(s) — see
   -- pkg/duckdb/tracing/listener.go's addRunEventAttrs, which sources it
   -- from sv2.Metadata.Config.EventIDs (the same persisted field
@@ -91,7 +101,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   step_attempt   INTEGER,
   kind           VARCHAR NOT NULL,
   is_user        BOOLEAN NOT NULL,
-  values         VARIANT NOT NULL,
+  values         VARCHAR NOT NULL,
   created_at     TIMESTAMPTZ NOT NULL,
   -- When the row became visible in the buffer, as on inngest.runs: the
   -- federation split (lake bucket_at <= W, buffer bucket_at > W).
@@ -124,9 +134,9 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   trace_id VARCHAR NOT NULL,
   span_id VARCHAR NOT NULL,
   parent_span_id VARCHAR,
-  attributes VARIANT NOT NULL,
-  output VARIANT,
-  input VARIANT,
+  attributes VARCHAR NOT NULL,
+  output VARCHAR,
+  input VARCHAR,
   -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
   -- LogAppendTime for exported rows, the insert time for rows written here
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
@@ -187,10 +197,10 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   source_id VARCHAR NULL,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
-  event_data VARIANT NOT NULL DEFAULT '{}',
+  event_data VARCHAR NOT NULL DEFAULT '{}',
   event_v VARCHAR NOT NULL,
   event_ts TIMESTAMPTZ NOT NULL,
-  event_meta VARIANT NOT NULL DEFAULT '{}',
+  event_meta VARCHAR NOT NULL DEFAULT '{}',
   -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
   -- LogAppendTime for exported rows, the insert time for rows written here
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
@@ -214,6 +224,13 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- inngest.run_trace_spans as is: spans need no collapse, each row is its own
 -- emission.
 --
+-- The lake stores JSON payloads as JSON text in VARCHAR columns (see the top
+-- of this file). Every macro returns them as JSON (dot access, ->>, JSON
+-- results for Insights), but ::JSON is a validating parse per row, so it's
+-- only applied to a whole value a macro returns or embeds, in its final
+-- projection (after any QUALIFY): the macros' own filters and key
+-- extractions (->>, which parses either way) read the text directly.
+--
 -- A lake whose runs are already one row per run (duckdb.ModeFlatLake: it only
 -- holds exported final rows, and a federated read's delta is each run's
 -- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
@@ -222,21 +239,21 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- spanning lines.
 -- +goose ENVSUB ON
 CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
-SELECT * FROM query_table(p_runs)
+SELECT * REPLACE (attributes::JSON AS attributes, inputs::JSON AS inputs, output::JSON AS output) FROM query_table(p_runs)
 ${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC, CASE WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2 WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1 ELSE 0 END DESC, status DESC) = 1};
 -- +goose ENVSUB OFF
 
 CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
-SELECT * FROM query_table(p_spans);
+SELECT * REPLACE (attributes::JSON AS attributes, output::JSON AS output, input::JSON AS input) FROM query_table(p_spans);
 
 -- raw_events is inngest.events as is: an event is never re-written.
 CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE
-SELECT * FROM query_table(p_events);
+SELECT * REPLACE (event_data::JSON AS event_data, event_meta::JSON AS event_meta) FROM query_table(p_events);
 
 -- raw_run_metadata is inngest.run_metadata as is: one row per emission
 -- (inngest.run_metadata_rollup collapses them).
 CREATE MACRO inngest.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT * FROM query_table(p_metadata);
+SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 
 -- +goose Down
 DROP MACRO IF EXISTS inngest.raw_run_metadata;

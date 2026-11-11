@@ -19,7 +19,9 @@ const (
 	TypeUUID Type = iota
 	// TypeVarchar values are string.
 	TypeVarchar
-	// TypeJSON values are string holding raw JSON text.
+	// TypeJSON values are string holding raw JSON text. They're JSON
+	// everywhere but the lake's own columns, which store that text in a
+	// VARCHAR (see jsonText).
 	TypeJSON
 	// TypeTimestamp values are time.Time (millisecond precision is kept).
 	TypeTimestamp
@@ -63,7 +65,7 @@ type Column struct {
 	// Type is the value's wire kind.
 	Type Type
 	// DuckDB is the column's declared type in the lake, when it differs
-	// from Type.DuckDBType() (VARIANT payloads, STRUCT lists).
+	// from Type.DuckDBType() (JSON text, STRUCT lists).
 	DuckDB string
 	// Nullable is false for a column the lake declares NOT NULL.
 	Nullable bool
@@ -79,6 +81,16 @@ func (c Column) PhysicalType() string {
 		return c.DuckDB
 	}
 	return c.Type.DuckDBType()
+}
+
+// LogicalType is the type readers see the column as: JSON for JSON text
+// (the lake's VARCHAR, which the lake's macros return cast to JSON),
+// else PhysicalType.
+func (c Column) LogicalType() string {
+	if c.Type == TypeJSON && c.DuckDB == jsonText {
+		return TypeJSON.DuckDBType()
+	}
+	return c.PhysicalType()
 }
 
 // IsStringKey reports whether key's value is always a string.
@@ -107,7 +119,14 @@ func (t Table) Column(name string) (Column, bool) {
 	return Column{}, false
 }
 
-const variant = "VARIANT"
+// jsonText is a JSON column's lake type: the JSON text as is, in a VARCHAR
+// rather than JSON so an Iceberg lake (which rejects duckdb's JSON type, and
+// duckdb doesn't keep the alias on a string column) can use the same types.
+// The raw_*/insights_* macros in pkg/db/duckdb's migrations return it as JSON
+// (LogicalType), casting only where a whole value is returned or embedded:
+// the cast is a validating parse per row, so filters and key extractions
+// read the text directly.
+const jsonText = "VARCHAR"
 
 // attributeKeys are the string-valued span attributes: a buffer compares a
 // pushed filter on them directly (any other key only where its value is a
@@ -131,12 +150,12 @@ var Runs = Table{Name: "runs", Columns: []Column{
 	{Name: "function_id", Type: TypeUUID},
 	{Name: "function_slug", Type: TypeVarchar},
 	{Name: "status", Type: TypeVarchar},
-	{Name: "attributes", Type: TypeJSON, DuckDB: variant, StringKeys: attributeKeys},
+	{Name: "attributes", Type: TypeJSON, DuckDB: jsonText, StringKeys: attributeKeys},
 	// The run's triggering events: fixed at schedule time, but an array, so
 	// no key filter means the same thing in both stores.
-	{Name: "inputs", Type: TypeJSON, DuckDB: variant},
+	{Name: "inputs", Type: TypeJSON, DuckDB: jsonText},
 	// Set once, by the final row.
-	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: variant},
+	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
 	{Name: "event_ids", Type: TypeVarcharList, Nullable: true},
 	{Name: "sessions", Type: TypeJSON, Nullable: true, DuckDB: `STRUCT("key" VARCHAR, id VARCHAR)[]`},
 	{Name: "is_deferred", Type: TypeBool},
@@ -166,9 +185,9 @@ var Spans = Table{Name: "run_trace_spans", Columns: []Column{
 	{Name: "trace_id", Type: TypeVarchar},
 	{Name: "span_id", Type: TypeVarchar},
 	{Name: "parent_span_id", Type: TypeVarchar, Nullable: true},
-	{Name: "attributes", Type: TypeJSON, DuckDB: variant, StringKeys: attributeKeys},
-	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: variant},
-	{Name: "input", Type: TypeJSON, Nullable: true, DuckDB: variant},
+	{Name: "attributes", Type: TypeJSON, DuckDB: jsonText, StringKeys: attributeKeys},
+	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
+	{Name: "input", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
@@ -185,10 +204,10 @@ var Events = Table{Name: "events", Columns: []Column{
 	{Name: "source_id", Type: TypeVarchar, Nullable: true},
 	{Name: "event_id", Type: TypeVarchar},
 	{Name: "event_name", Type: TypeVarchar},
-	{Name: "event_data", Type: TypeJSON, DuckDB: variant},
+	{Name: "event_data", Type: TypeJSON, DuckDB: jsonText},
 	{Name: "event_v", Type: TypeVarchar},
 	{Name: "event_ts", Type: TypeTimestamp},
-	{Name: "event_meta", Type: TypeJSON, DuckDB: variant},
+	{Name: "event_meta", Type: TypeJSON, DuckDB: jsonText},
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
@@ -210,7 +229,7 @@ var RunMetadata = Table{Name: "run_metadata", Columns: []Column{
 	{Name: "step_attempt", Type: TypeBigint, Nullable: true, DuckDB: "INTEGER"},
 	{Name: "kind", Type: TypeVarchar},
 	{Name: "is_user", Type: TypeBool},
-	{Name: "values", Type: TypeJSON, DuckDB: variant},
+	{Name: "values", Type: TypeJSON, DuckDB: jsonText},
 	{Name: "created_at", Type: TypeTimestamp},
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.

@@ -302,24 +302,26 @@ SELECT
   -- Every run span carries the run's scheduled_at from its run state,
   -- except for state written before scheduled_at was recorded: those fall
   -- back to queued_at.
-  COALESCE(make_timestamp_ms(TRY_CAST(attributes."_inngest.scheduled_at" AS BIGINT)), run_queued_at) AS scheduled_at,
-  make_timestamp_ms(TRY_CAST(attributes."_inngest.started_at" AS BIGINT)) AS started_at,
-  make_timestamp_ms(TRY_CAST(attributes."_inngest.ended_at" AS BIGINT)) AS ended_at,
+  COALESCE(make_timestamp_ms(TRY_CAST(attributes->>'$."_inngest.scheduled_at"' AS BIGINT)), run_queued_at) AS scheduled_at,
+  make_timestamp_ms(TRY_CAST(attributes->>'$."_inngest.started_at"' AS BIGINT)) AS started_at,
+  make_timestamp_ms(TRY_CAST(attributes->>'$."_inngest.ended_at"' AS BIGINT)) AS ended_at,
   app_id,
   app_name,
   function_id,
   function_slug,
-  attributes."_inngest.dynamic.status"::VARCHAR AS status,
+  attributes->>'$."_inngest.dynamic.status"' AS status,
   attributes,
   input AS inputs,
   output,
   -- Lists are [] (never NULL) when the attribute is missing, as the
   -- ClickHouse buffer stores them, so a run reads the same in either tier.
-  COALESCE(TRY_CAST(attributes."_inngest.event.ids" AS VARCHAR[]), []::VARCHAR[]) AS event_ids,
-  COALESCE(TRY_CAST(attributes."_inngest.event.sessions" AS STRUCT(key VARCHAR, id VARCHAR)[]), []::STRUCT(key VARCHAR, id VARCHAR)[]) AS sessions,
-  attributes."_inngest.defer.parent_fn_slug" IS NOT NULL AS is_deferred,
-  attributes."_inngest.defer.parent_fn_slug"::VARCHAR AS defer_parent_fn_slug,
-  COALESCE(TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]), []::VARCHAR[]) AS defer_parent_run_ids,
+  -- The lists are read as JSON (->), which casts to a LIST/STRUCT list
+  -- element-wise; ->>'s text would go through list-literal parsing instead.
+  COALESCE(TRY_CAST(attributes->'$."_inngest.event.ids"' AS VARCHAR[]), []::VARCHAR[]) AS event_ids,
+  COALESCE(TRY_CAST(attributes->'$."_inngest.event.sessions"' AS STRUCT(key VARCHAR, id VARCHAR)[]), []::STRUCT(key VARCHAR, id VARCHAR)[]) AS sessions,
+  attributes->>'$."_inngest.defer.parent_fn_slug"' IS NOT NULL AS is_deferred,
+  attributes->>'$."_inngest.defer.parent_fn_slug"' AS defer_parent_fn_slug,
+  COALESCE(TRY_CAST(attributes->'$."_inngest.defer.parent_run_ids"' AS VARCHAR[]), []::VARCHAR[]) AS defer_parent_run_ids,
   trace_id,
   bucket_at
 FROM inngest.run_trace_spans

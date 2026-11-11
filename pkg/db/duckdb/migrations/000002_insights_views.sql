@@ -20,7 +20,7 @@ WITH latest AS (
   FROM query_table(p_metadata)
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY account_id, env_id, run_id, span_id, is_user, kind
-    ORDER BY created_at DESC, CAST(values AS VARCHAR) DESC NULLS LAST
+    ORDER BY created_at DESC, values DESC NULLS LAST
   ) = 1
 )
 SELECT
@@ -33,8 +33,10 @@ SELECT
   max(step_id) as step_id,
   max(step_index) as step_index,
   max(step_attempt) as step_attempt,
-  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values} ORDER BY kind) FILTER (is_user))), json_object()) as user_metadata,
-  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values} ORDER BY kind) FILTER (NOT is_user))), json_object()) as internal_metadata,
+  -- values is JSON text: cast to JSON so to_json embeds it as is rather
+  -- than encoding it as a string.
+  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (is_user))), json_object()) as user_metadata,
+  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (NOT is_user))), json_object()) as internal_metadata,
 FROM latest
 GROUP BY account_id, env_id, run_id, span_id
 ;
@@ -88,10 +90,10 @@ CREATE MACRO inngest.insights_events(p_account_id, p_env_id, p_events := 'innges
 SELECT
     event_id as id,
     event_name as name,
-    event_data as data,
+    event_data::JSON as data,
     event_v as v,
     event_ts as ts,
-    event_meta as meta,
+    event_meta::JSON as meta,
     received_at,
 FROM query_table(p_events)
 WHERE account_id = p_account_id AND env_id = p_env_id;
@@ -128,7 +130,7 @@ SELECT
   rts.name,
   rts.start_time,
   rts.end_time,
-  rts.attributes,
+  rts.attributes::JSON AS attributes,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
 FROM query_table(p_spans) rts
@@ -156,7 +158,10 @@ WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id AND name = 'sdk.ex
 -- inngest.run_trace_spans already carries them as real typed columns
 -- (see 007's flat-span finding), so this view just passes them through
 -- like insights_extended_trace_spans does.
-CREATE MACRO inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
+--
+-- step_attempt_rows is its body w/ output/input/attributes still JSON text,
+-- so insights_steps' collapse runs before the JSON casts.
+CREATE MACRO inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT
   rts.run_id as run_id,
   rts.run_queued_at as run_queued_at,
@@ -171,12 +176,12 @@ SELECT
   rts.output as output,
   rts.input as input,
   rts.attributes,
-  rts.attributes."_inngest.step.userland.id"::VARCHAR AS step_id,
-  TRY_CAST(rts.attributes."_inngest.step.userland.index" AS INTEGER) AS step_index,
-  TRY_CAST(rts.attributes."_inngest.step.attempt" AS INTEGER) AS step_attempt,
-  TRY_CAST(rts.attributes."_inngest.step.max_attempts" AS INTEGER) AS step_max_attempts,
-  rts.attributes."_inngest.step.type"::VARCHAR AS step_type,
-  rts.attributes."_inngest.dynamic.status"::VARCHAR AS status,
+  rts.attributes->>'$."_inngest.step.userland.id"' AS step_id,
+  TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER) AS step_index,
+  TRY_CAST(rts.attributes->>'$."_inngest.step.attempt"' AS INTEGER) AS step_attempt,
+  TRY_CAST(rts.attributes->>'$."_inngest.step.max_attempts"' AS INTEGER) AS step_max_attempts,
+  rts.attributes->>'$."_inngest.step.type"' AS step_type,
+  rts.attributes->>'$."_inngest.dynamic.status"' AS status,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
 FROM query_table(p_spans) rts
@@ -184,14 +189,18 @@ LEFT JOIN inngest.run_metadata_rollup(p_metadata := p_metadata) rmp ON rts.accou
 WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
   AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned');
 
+CREATE MACRO inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
+SELECT * REPLACE (output::JSON AS output, input::JSON AS input, attributes::JSON AS attributes)
+FROM inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata);
+
 -- inngest.insights_steps(p_account_id, p_env_id) collapses
 -- insights_step_attempts to the latest attempt per (run_id, step_id) --
 -- highest step_attempt, tie-broken by start_time -- mirroring the
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
 -- Logical tables and views table).
 CREATE MACRO inngest.insights_steps(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT *
-FROM inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
+SELECT * REPLACE (output::JSON AS output, input::JSON AS input, attributes::JSON AS attributes)
+FROM inngest.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
 ) = 1;
@@ -199,6 +208,7 @@ QUALIFY ROW_NUMBER() OVER (
 -- +goose Down
 DROP MACRO IF EXISTS inngest.insights_steps;
 DROP MACRO IF EXISTS inngest.insights_step_attempts;
+DROP MACRO IF EXISTS inngest.step_attempt_rows;
 DROP MACRO IF EXISTS inngest.insights_extended_trace_spans;
 DROP MACRO IF EXISTS inngest.insights_metadata;
 DROP MACRO IF EXISTS inngest.insights_events;

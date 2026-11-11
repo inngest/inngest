@@ -153,7 +153,7 @@ func TestMigrateModeRawRunsCollapse(t *testing.T) {
 			for _, status := range []string{"Queued", "Completed"} {
 				_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.runs
 					(account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
-					VALUES (?::UUID, ?::UUID, 'run-1', now(), now(), CASE WHEN ? = 'Completed' THEN now() END, uuid(), 'app', uuid(), 'fn', ?, '{}'::JSON::VARIANT, '[]'::JSON::VARIANT)`,
+					VALUES (?::UUID, ?::UUID, 'run-1', now(), now(), CASE WHEN ? = 'Completed' THEN now() END, uuid(), 'app', uuid(), 'fn', ?, '{}', '[]')`,
 					account, env, status, status)
 				require.NoError(t, err)
 			}

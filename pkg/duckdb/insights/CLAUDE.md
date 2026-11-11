@@ -29,6 +29,8 @@ scope.go         tableScope — resolves a FROM clause to its in-scope logical t
 derive.go        deriveTable — synthesizes a logicalTable for a CTE/subquery from its validated body
 typecheck.go     inferType — static, allowlist-only expression type inference (backs deriveTable)
 validate.go      the validate stage — table/column/function allowlisting; validateWithCTEs threads CTE scope
+rewrite.go       rewriteScopedExprs — scoped bottom-up expression rewriter (array-of-struct col.field -> ->>)
+jsondot.go       rewriteJSONDotComparison — JSON col.key in a text context -> json_extract_string(col.key, '$'), in a numeric one -> TRY_CAST(col.key AS DOUBLE)
 jsonpath.go      jsonPathAccess — recognizes every "->>'/->/json_extract*" shape for hint-tracing
 columnhints.go   the buildColumnHints stage
 queryinfo.go     the extractQueryInfo stage
