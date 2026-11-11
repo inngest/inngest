@@ -11,4 +11,4 @@ OUTPUT SQL
 (len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: (COALESCE((x::JSON->>?), '') = ?))) > 0 OR ((output::JSON->>?) = ?))
 
 OUTPUT ARGS
-[$.name x $.data.ok true]
+[$.name x $.ok true]

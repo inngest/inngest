@@ -48,8 +48,9 @@ const celMinCandidateBatch = 256
 // MatchEventExpressions/MatchOutputExpressions can't be called directly
 // here, though: they re-create every evaluator per call, and
 // MatchOutputExpressions binds output to the whole stored value, while
-// inngest.runs.output holds a {"data":T}/{"error":T} envelope whose data
-// and error halves the DuckDB SQL scope exposes as output.* and error.*.
+// inngest.runs splits the {"data":T}/{"error":T} envelope into its output
+// and error columns at write time, which the DuckDB SQL scope exposes as
+// output.* and error.*.
 type runCELMatcher struct {
 	eventEvals, outputEvals []expressions.BooleanEvaluator
 }
@@ -83,24 +84,20 @@ func newCELEvaluators(ctx context.Context, exprs []string) ([]expressions.Boolea
 }
 
 // match reports whether a run with the given inputs (inngest.runs.inputs,
-// a JSON array of triggering events) and output (inngest.runs.output)
-// passes every expression.
-func (m *runCELMatcher) match(ctx context.Context, inputs, output []byte) (bool, error) {
+// a JSON array of triggering events) and output/error (inngest.runs'
+// output and error columns) passes every expression.
+func (m *runCELMatcher) match(ctx context.Context, inputs []byte, out runOutput) (bool, error) {
 	if len(m.outputEvals) > 0 {
-		if len(output) == 0 {
+		if len(out.data) == 0 && len(out.err) == 0 {
 			return false, nil
 		}
+		// A column that's NULL (or not JSON) binds nothing, so output.*/
+		// error.* see nothing, same as the SQL scope's paths into it would.
 		vars := map[string]any{}
-		var envelope map[string]any
-		// A non-object output has no data/error half to bind, so output.*
-		// and error.* just see nothing, same as the SQL scope's $.data/
-		// $.error paths would.
-		if err := json.Unmarshal(output, &envelope); err == nil {
-			if v, ok := envelope["data"]; ok {
-				vars["output"] = v
-			}
-			if v, ok := envelope["error"]; ok {
-				vars["error"] = v
+		for name, raw := range map[string][]byte{"output": out.data, "error": out.err} {
+			var v any
+			if len(raw) > 0 && json.Unmarshal(raw, &v) == nil {
+				vars[name] = v
 			}
 		}
 		if !matchAll(ctx, m.outputEvals, vars) {

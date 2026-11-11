@@ -36,7 +36,7 @@ type Templates struct {
 	Tenants  []Tenant
 	Statuses []string
 	Inputs   []string
-	Outputs  []string
+	Outputs  []RunOutput
 	// Traces are whole sampled runs' span trees (see TraceTemplate).
 	Traces []TraceTemplate
 	// EventProfiles are whole sampled runs' sets of triggering events (see
@@ -46,6 +46,14 @@ type Templates struct {
 	// MetadataProfiles are whole sampled runs' worth of metadata shape (see
 	// MetadataProfile).
 	MetadataProfiles []MetadataProfile
+}
+
+// RunOutput is one sampled run's output and error columns, kept together
+// since they're one envelope split at write time (see
+// cqrs.SplitSpanOutputEnvelope). Either is "" for SQL NULL.
+type RunOutput struct {
+	Output string
+	Error  string
 }
 
 // SpanTemplate is one sampled span, stripped of everything that ties it to
@@ -73,6 +81,7 @@ type SpanTemplate struct {
 	Name         string
 	Attributes   string
 	Output       string
+	Error        string
 	Input        string
 	StartOffset  time.Duration
 	EndOffset    time.Duration
@@ -173,6 +182,7 @@ type RunRow struct {
 	Attributes string
 	Inputs     string
 	Output     string
+	Error      string
 	EventIDs   []string
 	// TraceID mirrors inngest.runs.trace_id: the replayed trace's own.
 	TraceID string
@@ -210,6 +220,7 @@ type SpanRow struct {
 	Attributes   string
 	Links        string
 	Output       string
+	Error        string
 	Input        string
 }
 

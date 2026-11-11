@@ -276,7 +276,7 @@ func testMetadata(t *testing.T) sv2.Metadata {
 // name instead of expanding scope here.
 // jsonColumns are the lake's JSON text columns (schema.TypeJSON).
 var jsonColumns = map[string]bool{
-	"attributes": true, "inputs": true, "input": true, "output": true,
+	"attributes": true, "inputs": true, "input": true, "output": true, "error": true,
 	"values": true, "event_data": true, "event_meta": true,
 }
 

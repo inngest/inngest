@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -36,8 +35,10 @@ func seedRunRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID,
 		args = append(args, *endedAt)
 	}
 	if output != nil {
-		cols = append(cols, "output")
-		args = append(args, json.RawMessage(*output))
+		// output is an envelope: store it split, as the dual-write does.
+		data, errVal, _ := cqrs.SplitSpanOutputEnvelope([]byte(*output))
+		cols = append(cols, "output", "error")
+		args = append(args, nullableRaw(data), nullableRaw(errVal))
 	}
 	placeholders := make([]string, len(cols))
 	for i := range placeholders {
@@ -73,10 +74,9 @@ func TestGetTraceRunReturnsLatestRowForRun(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, enums.RunStatusCompleted, run.Status)
 	require.WithinDuration(t, endedAt, run.EndedAt, time.Millisecond)
-	// TraceRun.Output is the raw column content, unwrapped-envelope-free —
-	// no data/error unwrap happens at the run level (only GetSpanOutput does
-	// that, for per-span output).
-	require.JSONEq(t, out, string(run.Output))
+	// TraceRun.Output re-wraps the split output/error columns in the
+	// envelope every other backend returns.
+	require.Equal(t, out, string(run.Output))
 }
 
 func TestGetTraceRunParsesEventIDsArray(t *testing.T) {

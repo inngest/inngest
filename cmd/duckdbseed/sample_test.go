@@ -37,7 +37,7 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, event_ids)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?);`,
 		accountID.String(), envID.String(), runID, now, now, startedAt, endedAt, appID.String(), "my-app", functionID.String(), "my-app-my-function",
-		"Completed", `{"event":{"name":"app/one"}}`, `{"data":"ok"}`, []string{eventInternalID},
+		"Completed", `{"event":{"name":"app/one"}}`, `"ok"`, []string{eventInternalID},
 	)
 	require.NoError(t, err)
 
@@ -45,7 +45,7 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 		`INSERT INTO inngest.run_trace_spans (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, input)
 		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, ?, ?, ?, ?, ?, ?, ?);`,
 		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
-		"my-function", startedAt, endedAt, "trace-1", "span-1", `{"sys.step.name":"my-function"}`, `{"data":"ok"}`, `{"event":{"name":"app/one"}}`,
+		"my-function", startedAt, endedAt, "trace-1", "span-1", `{"sys.step.name":"my-function"}`, `"ok"`, `{"event":{"name":"app/one"}}`,
 	)
 	require.NoError(t, err)
 
@@ -87,7 +87,7 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	require.Nil(t, root.ParentSpanID)
 	require.Equal(t, "my-function", root.Name)
 	require.Equal(t, `{"sys.step.name":"my-function"}`, root.Attributes)
-	require.Equal(t, `{"data":"ok"}`, root.Output)
+	require.Equal(t, `"ok"`, root.Output)
 	require.Equal(t, startedAt.Sub(now), root.StartOffset, "span offsets are relative to the run's own queued_at")
 	require.Equal(t, endedAt.Sub(now), root.EndOffset)
 	require.NotNil(t, trace.StartedOffset)

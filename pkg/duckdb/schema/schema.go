@@ -154,8 +154,10 @@ var Runs = Table{Name: "runs", Columns: []Column{
 	// The run's triggering events: fixed at schedule time, but an array, so
 	// no key filter means the same thing in both stores.
 	{Name: "inputs", Type: TypeJSON, DuckDB: jsonText},
-	// Set once, by the final row.
+	// Set once, by the final row: the run's output split like a span's
+	// (see Spans' output/error).
 	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
+	{Name: "error", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
 	{Name: "event_ids", Type: TypeVarcharList, Nullable: true},
 	{Name: "sessions", Type: TypeJSON, Nullable: true, DuckDB: `STRUCT("key" VARCHAR, id VARCHAR)[]`},
 	{Name: "is_deferred", Type: TypeBool},
@@ -186,7 +188,12 @@ var Spans = Table{Name: "run_trace_spans", Columns: []Column{
 	{Name: "span_id", Type: TypeVarchar},
 	{Name: "parent_span_id", Type: TypeVarchar, Nullable: true},
 	{Name: "attributes", Type: TypeJSON, DuckDB: jsonText, StringKeys: attributeKeys},
+	// output/error are the SDK's output envelope split once at write time
+	// (cqrs.SplitSpanOutputEnvelope): output is the {"data": ...} value,
+	// error the {"error": ...} value (NULL unless the span failed). A
+	// step.waitForEvent-shaped or unrecognized output is all output.
 	{Name: "output", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
+	{Name: "error", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
 	{Name: "input", Type: TypeJSON, Nullable: true, DuckDB: jsonText},
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -208,6 +209,9 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (s Span, ok 
 		l.Error("dualwrite: failed to marshal span attributes", "span_id", spanID, "trace_id", traceID, "error", err)
 		return Span{}, false
 	}
+	// Split once here, so readers take output/error as stored rather than
+	// each unwrapping the envelope.
+	data, errVal, _ := cqrs.SplitSpanOutputEnvelope(anyToJSONBytes(output))
 	s = Span{
 		SpanID:       spanID,
 		TraceID:      traceID,
@@ -224,7 +228,8 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (s Span, ok 
 		FunctionID:   functionID,
 		FunctionSlug: functionSlug,
 		Attributes:   json.RawMessage(attrsByt),
-		Output:       anyToJSONBytes(output),
+		Output:       data,
+		Error:        errVal,
 		Input:        anyToJSONBytes(input),
 	}
 
@@ -313,6 +318,7 @@ SELECT
   attributes,
   input AS inputs,
   output,
+  error,
   -- Lists are [] (never NULL) when the attribute is missing, as the
   -- ClickHouse buffer stores them, so a run reads the same in either tier.
   -- The lists are read as JSON (->), which casts to a LIST/STRUCT list

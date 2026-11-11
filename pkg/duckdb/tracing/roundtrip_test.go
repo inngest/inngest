@@ -41,6 +41,7 @@ func TestJSONRoundTripsByteForByte(t *testing.T) {
 	accountID, envID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	runID := ulid.Make()
 	now := time.Now().UTC().Truncate(time.Millisecond)
+	// Output is already split (spanExportRow splits the envelope).
 	span := func(spanID, name string, output, input string) Span {
 		return Span{
 			AccountID: accountID.String(), EnvID: envID.String(), AppID: appID.String(), AppName: "app",
@@ -52,7 +53,7 @@ func TestJSONRoundTripsByteForByte(t *testing.T) {
 	}
 	require.NoError(t, NewDuckDBInserter(db).InsertSpans(t.Context(), []Span{
 		span("run-span", "executor.run", payload, input),
-		span("step-span", "executor.step", `{"data":`+payload+`}`, payload),
+		span("step-span", "executor.step", payload, payload),
 	}))
 
 	t.Run("ui", func(t *testing.T) {
@@ -64,7 +65,8 @@ func TestJSONRoundTripsByteForByte(t *testing.T) {
 
 		run, err := m.GetTraceRun(t.Context(), cqrs.TraceRunIdentifier{RunID: runID})
 		require.NoError(t, err)
-		require.Equal(t, payload, string(run.Output))
+		// TraceRun.Output is re-wrapped in the envelope, value bytes as is.
+		require.Equal(t, `{"data":`+payload+`}`, string(run.Output))
 	})
 
 	t.Run("insights", func(t *testing.T) {
@@ -75,6 +77,6 @@ func TestJSONRoundTripsByteForByte(t *testing.T) {
 		res, err := insights.Execute(t.Context(), db, tr)
 		require.NoError(t, err)
 		require.Len(t, res.Rows, 1)
-		require.Equal(t, []any{`{"data":` + payload + `}`, payload, payload, input}, res.Rows[0])
+		require.Equal(t, []any{payload, payload, payload, input}, res.Rows[0])
 	})
 }

@@ -8,7 +8,7 @@ EVENT ARGS
 []
 
 OUTPUT SQL
-(((output::JSON->?) IS NULL OR (output::JSON->?) = 'null'::JSON) OR (output::JSON->?) != 'null'::JSON)
+(((output::JSON->?) IS NULL OR (output::JSON->?) = 'null'::JSON) OR (error::JSON->?) != 'null'::JSON)
 
 OUTPUT ARGS
-[$.data.result $.data.result $.error.message]
+[$.result $.result $.message]

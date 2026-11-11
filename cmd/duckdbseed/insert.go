@@ -59,8 +59,8 @@ var (
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, queued_at
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // scheduled_at, started_at, ended_at
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
-		duckdbdriver.QuackColumnVarchar,                                                                   // status
-		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, inputs, output
+		duckdbdriver.QuackColumnVarchar,                                                                                                    // status
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, inputs, output, error
 		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
 		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
 		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
@@ -75,7 +75,7 @@ var (
 		duckdbdriver.QuackColumnVarchar,                                          // name
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
-		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, output, input
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, output, error, input
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
@@ -195,7 +195,7 @@ func runRowValues(r RunRow) []any {
 		r.AccountID, r.EnvID, r.RunID, r.QueuedAt,
 		scheduledAt, nullableTime(r.StartedAt), nullableTime(r.EndedAt),
 		r.AppID, r.AppName, r.FunctionID, r.FunctionSlug, r.Status,
-		nonEmptyJSON(r.Attributes), r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
+		nonEmptyJSON(r.Attributes), r.Inputs, nullableJSON(r.Output), nullableJSON(r.Error), eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
 		"false", // is_deferred — this tool never generates deferred runs
 		nil,     // defer_parent_fn_slug
 		"[]",    // defer_parent_run_ids
@@ -212,7 +212,7 @@ func spanRowValues(s SpanRow) []any {
 	return []any{
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
 		s.AppID, s.AppName, s.FunctionID, s.FunctionSlug, s.Name, s.StartTime, s.EndTime,
-		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
+		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input),
 		s.EndTime, // bucket_at: a span is written when it ends
 	}
 }
@@ -285,7 +285,7 @@ func nonEmptyJSON(s string) string {
 // nullableJSON substitutes SQL NULL for an empty JSON-column value --
 // jsonText (sample.go) returns "" for a sampled column that was itself SQL
 // NULL, and an empty string is not valid JSON, so writing it verbatim into
-// a JSON text column (output/input) would leave readers an unparseable
+// a JSON text column (output/error/input) would leave readers an unparseable
 // value rather than faithfully reproducing "this span/run had no
 // output/input".
 func nullableJSON(s string) any {
