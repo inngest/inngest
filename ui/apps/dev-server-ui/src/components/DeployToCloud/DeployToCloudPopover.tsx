@@ -137,12 +137,15 @@ export function DeployToCloudPopover() {
             />
           </PopoverClose>
         </div>
-        {/* Both panels size the same grid row, including when one is hidden. */}
+        {/* Both panels size the same grid row. Set inert on the DOM because
+            React 18 drops boolean inert props. */}
         <div className={animateSwitch ? 'cloud-deploy-switch grid' : 'grid'}>
           <div
             className={`col-start-1 row-start-1 min-w-0 ${manual ? 'pointer-events-none opacity-0' : ''}`}
             aria-hidden={manual}
-            inert={manual}
+            ref={(node) => {
+              node?.toggleAttribute('inert', manual);
+            }}
           >
             <p
               id={manual ? undefined : descriptionID}
@@ -200,7 +203,9 @@ export function DeployToCloudPopover() {
           <div
             className={`col-start-1 row-start-1 flex min-w-0 flex-col ${!manual ? 'pointer-events-none opacity-0' : ''}`}
             aria-hidden={!manual}
-            inert={!manual}
+            ref={(node) => {
+              node?.toggleAttribute('inert', !manual);
+            }}
           >
             <CompactDeploymentGuide
               descriptionID={manual ? descriptionID : undefined}

@@ -151,3 +151,27 @@ it('shows the manual guide in place and returns to the prompt preview', async ()
     screen.getByRole('button', { name: 'Deploy manually' }),
   );
 });
+
+it('keeps the hidden panel out of the tab order in both views', async () => {
+  await openPopover();
+  const prompt = screen.getByRole('textbox', {
+    name: 'Cloud deployment prompt',
+  });
+  const cloudLink = screen.getByText('Cloud');
+  const manualButton = screen.getByRole('button', { name: 'Deploy manually' });
+
+  expect(prompt.closest('[inert]')).toBeNull();
+  expect(cloudLink.closest('[inert]')).not.toBeNull();
+
+  fireEvent.click(manualButton);
+
+  expect(prompt.closest('[inert]')).not.toBeNull();
+  expect(manualButton.closest('[inert]')).not.toBeNull();
+  expect(cloudLink.closest('[inert]')).toBeNull();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Back to AI setup' }));
+
+  expect(prompt.closest('[inert]')).toBeNull();
+  expect(cloudLink.closest('[inert]')).not.toBeNull();
+  expect(document.activeElement).toBe(manualButton);
+});
