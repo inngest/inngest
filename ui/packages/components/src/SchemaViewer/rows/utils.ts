@@ -32,25 +32,28 @@ export function getTypeLabel(node: TypedNode, override?: string): string {
   return override ?? (Array.isArray(type) ? type.join(' | ') : type);
 }
 
+// The path is formatted as "eventName.field.subfield..."
+// We need to remove the event name prefix (which can contain dots)
+// We do this by finding the first occurrence of a standard field after the event name
+// Strategy: The path after the event name will always start with a dot followed by a field
+export function getRelativePath(path: string): string {
+  for (const field of STANDARD_EVENT_FIELDS) {
+    const pattern = `.${field}`;
+    const index = path.indexOf(pattern);
+    if (index !== -1) {
+      // Found a standard field, extract from this point (excluding the leading dot)
+      return path.substring(index + 1);
+    }
+  }
+
+  return path;
+}
+
 export const handleCopyValue = (node: SchemaNode) => {
   return async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      // The path is formatted as "eventName.field.subfield..."
-      // We need to remove the event name prefix (which can contain dots)
-      // We do this by finding the first occurrence of a standard field after the event name
-      // Strategy: The path after the event name will always start with a dot followed by a field
-      let relativePath = node.path;
-
-      for (const field of STANDARD_EVENT_FIELDS) {
-        const pattern = `.${field}`;
-        const index = node.path.indexOf(pattern);
-        if (index !== -1) {
-          // Found a standard field, extract from this point (excluding the leading dot)
-          relativePath = node.path.substring(index + 1);
-          break;
-        }
-      }
+      const relativePath = getRelativePath(node.path);
 
       await navigator.clipboard.writeText(relativePath);
       toast.success('Path copied to clipboard');
