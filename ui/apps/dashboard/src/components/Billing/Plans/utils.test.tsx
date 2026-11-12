@@ -322,7 +322,7 @@ describe('execution usage description', () => {
     'uses the allowance for %s with %i included',
     (name, limit, price, formattedLimit) => {
       expect(
-        executionUsageDescription({ name, slug: 'paid-plan' }, limit),
+        executionUsageDescription({ name }, { limit, overageAllowed: true }),
       ).toBe(
         `Usage beyond ${formattedLimit} is billed at $${price} per 1,000,000 at the start of the next billing cycle.`,
       );
@@ -330,23 +330,28 @@ describe('execution usage description', () => {
   );
 
   it.each([
-    ['Enterprise', 1_000_000],
-    ['Enterprise - Annual', 10_000_000],
-    ['enterprise custom', 50_000_000],
-    ['Enterprise', null],
-    ['Pro', null],
-  ])('keeps the existing copy for %s with limit %s', (name, limit) => {
-    expect(executionUsageDescription({ name, slug: 'plan' }, limit)).toBe(
-      'Additional usage billed at the start of the next billing cycle.',
-    );
-  });
+    ['Enterprise', 1_000_000, false],
+    ['Enterprise - Annual', 10_000_000, true],
+    ['enterprise custom', 50_000_000, false],
+    ['Enterprise', null, false],
+    ['Pro', null, true],
+  ])(
+    'keeps the existing copy for %s with limit %s',
+    (name, limit, overageAllowed) => {
+      expect(
+        executionUsageDescription({ name }, { limit, overageAllowed }),
+      ).toBe('Additional usage billed at the start of the next billing cycle.');
+    },
+  );
 
-  it('keeps the free Hobby execution limit copy', () => {
+  it.each([
+    ['Hobby', 50_000],
+    // Legacy "free-tier" plan: its slug is not a Hobby slug.
+    ['Free Tier', 50_000],
+    ['Pro', 1_000_000],
+  ])('shows the execution limit copy for %s without overage', (name, limit) => {
     expect(
-      executionUsageDescription(
-        { name: 'Hobby', slug: 'hobby-free-2025-08-08' },
-        50_000,
-      ),
+      executionUsageDescription({ name }, { limit, overageAllowed: false }),
     ).toBe('The maximum number of executions per month');
   });
 });
