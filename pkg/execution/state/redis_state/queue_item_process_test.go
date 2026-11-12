@@ -1570,10 +1570,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 	})
 }
 
-// a start item carries the run's function concurrency slot.  a requeue for
-// a retry gives the slot back with the lease, a success keeps it for
-// finalize, and an item that is already gone on requeue keeps the normal
-// release because finalize released the slot for that run.
+// a start item carries the run's function concurrency slot.  the slot goes
+// back with the capacity lease on every exit, unless the run function calls
+// CapacityLease.KeepManualSemaphores.  after that call the run has the slot
+// through a retry, and the retry does not take one more.
 func TestQueueItemProcessRequeueReleasesManualSemaphore(t *testing.T) {
 	type env struct {
 		ctx          context.Context
@@ -1729,9 +1729,53 @@ func TestQueueItemProcessRequeueReleasesManualSemaphore(t *testing.T) {
 		require.Equal(t, "0", usage(t, e), "the retry must not wait on its own slot")
 	})
 
-	t.Run("success keeps the slot for finalize", func(t *testing.T) {
+	t.Run("retry after the run started keeps the slot", func(t *testing.T) {
 		e := setup(t)
 
+		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
+			I:             e.item,
+			CapacityLease: e.lease,
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			ri.CapacityLease.KeepManualSemaphores()
+			return osqueue.RunResult{}, errors.New("step failed")
+		})
+		require.NoError(t, err)
+		service.Wait()
+
+		loaded, err := e.shard.LoadQueueItem(e.ctx, e.item.ID)
+		require.NoError(t, err)
+		require.Equal(t, 1, loaded.Data.Attempt)
+		require.Empty(t, constraintapi.ManualReleaseSemaphores(loaded.Data.Semaphores), "the retry must not take one more slot")
+
+		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
+		require.Equal(t, "1", usage(t, e), "the run has the slot through the retry")
+	})
+
+	t.Run("success that asks to keep the slot leaves it for finalize", func(t *testing.T) {
+		e := setup(t)
+
+		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
+			I:             e.item,
+			CapacityLease: e.lease,
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			ri.CapacityLease.KeepManualSemaphores()
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+		service.Wait()
+
+		_, err = e.shard.LoadQueueItem(e.ctx, e.item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+
+		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
+		require.Equal(t, "1", usage(t, e), "the slot stays taken until finalize")
+	})
+
+	t.Run("success that does not ask to keep the slot gives it back", func(t *testing.T) {
+		e := setup(t)
+
+		// a start item that exits without the keep call belongs to a run
+		// with no StartedAt, and finalize releases nothing for that run.
 		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
 			I:             e.item,
 			CapacityLease: e.lease,
@@ -1745,10 +1789,10 @@ func TestQueueItemProcessRequeueReleasesManualSemaphore(t *testing.T) {
 		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 
 		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
-		require.Equal(t, "1", usage(t, e), "the run holds the slot until finalize")
+		require.Equal(t, "0", usage(t, e), "nothing else releases this slot")
 	})
 
-	t.Run("item gone on requeue keeps the normal release", func(t *testing.T) {
+	t.Run("item gone on requeue gives the slot back", func(t *testing.T) {
 		e := setup(t)
 
 		_, err := e.q.ProcessItem(e.ctx, osqueue.ProcessItem{
@@ -1766,6 +1810,6 @@ func TestQueueItemProcessRequeueReleasesManualSemaphore(t *testing.T) {
 		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 
 		require.Len(t, e.cmLifecycles.ReleaseCalls, 1)
-		require.Equal(t, "1", usage(t, e), "finalize owns this release, not the queue")
+		require.Equal(t, "0", usage(t, e), "finalize releases only for a run that has StartedAt")
 	})
 }

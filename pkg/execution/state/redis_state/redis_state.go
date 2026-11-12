@@ -478,10 +478,14 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	if err != nil {
 		return err
 	}
-	if status != 0 {
-		return fmt.Errorf("unknown response updating metadata: %w", err)
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrRunNotFound
+	default:
+		return fmt.Errorf("unknown response updating metadata: %d", status)
 	}
-	return nil
 }
 
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {

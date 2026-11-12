@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -87,13 +86,10 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
-	// release the function concurrency slot this run holds.  the start item
-	// acquires it on lease and step leases do not give it back.  the queue
-	// gives it back itself when it requeues the start item for a retry, and
-	// the retry acquires it again, so there is one hold to release here.  this
-	// runs before state deletion because the semaphore list lives in run
-	// metadata.  the run ID is the idempotency key, so a repeated finalize
-	// does not decrement twice.
+	// release the function concurrency slot of a run that has StartedAt in
+	// run metadata.  a run that was cancelled while queued has no StartedAt
+	// and no slot.  this runs before state deletion because StartedAt is in
+	// run metadata, and the run ID is the idempotency key of the release.
 	if e.semaphoreManager == nil && len(opts.Metadata.Config.Semaphores) > 0 {
 		l.Error(
 			"semaphore manager is nil but run holds semaphores, leading to deadlock",
@@ -102,11 +98,8 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	if e.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
-		for _, sem := range opts.Metadata.Config.Semaphores {
-			if sem.Release != constraintapi.SemaphoreReleaseManual {
-				continue
-			}
+	if e.semaphoreManager != nil {
+		for _, sem := range e.semaphoresToRelease(ctx, opts.Metadata) {
 			// Retry semaphore release — a failure here means the semaphore is permanently
 			// held, which deadlocks all future runs waiting on capacity.
 			_, releaseErr := util.WithRetry(ctx, "release-semaphore", func(ctx context.Context) (struct{}, error) {

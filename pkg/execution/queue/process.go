@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -157,8 +158,12 @@ func (q *queueProcessor) ProcessItem(
 						l.Error("error extending lease", "error", err, "qi", qi)
 					}
 
-					// always stop processing the queue item if lease cannot be extended
-					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
+					// always stop processing the queue item if lease cannot be extended.
+					// a lost lease is a queue failure, not an attempt of the job, so it
+					// does not use up an attempt.  on the last attempt a plain error
+					// dequeues the item with no finalize, and the run keeps its
+					// function concurrency slot with nothing left to end it.
+					errCh <- AlwaysRetryError(fmt.Errorf("error extending lease while processing: %w", err))
 					return
 				}
 				setLeaseID(nextLeaseID)
@@ -186,11 +191,22 @@ func (q *queueProcessor) ProcessItem(
 
 	releaseCapacityLeaseMu := sync.Mutex{}
 	capacityReleased := false
-	// forceReleaseSemaphores is set once the item is requeued for a retry.
-	// a requeued start item did not start its run, so the function
-	// concurrency slot it acquired on lease goes back with the lease.
-	// otherwise the retry waits on a slot the same run still holds.
-	forceReleaseSemaphores := false
+	// forceReleaseSemaphores gives the function concurrency slot back with
+	// the capacity lease.  it is on for every item that carries a manual
+	// semaphore, and goes off only when the run function calls
+	// CapacityLease.KeepManualSemaphores.  the run then has the slot, and
+	// Finalize releases it.
+	forceReleaseSemaphores := hasManualSemaphore(qi.Data.Semaphores)
+	var keepManualSemaphores atomic.Bool
+	keepSemaphoresIfAsked := func() bool {
+		if !keepManualSemaphores.Load() {
+			return false
+		}
+		releaseCapacityLeaseMu.Lock()
+		forceReleaseSemaphores = false
+		releaseCapacityLeaseMu.Unlock()
+		return true
+	}
 	releaseCapacityLease := func() {
 		releaseCapacityLeaseMu.Lock()
 		defer releaseCapacityLeaseMu.Unlock()
@@ -496,7 +512,11 @@ func (q *queueProcessor) ProcessItem(
 		// early.
 		// In this case, we need to stop extending the lease,
 		// and call Release() in a non-blocking way.
-		if i.CapacityLease != nil {
+		//
+		// an item with a manual semaphore gets no early release.  the early
+		// release deletes the capacity lease and keeps the slot, so an error
+		// after it leaves nothing for the exit to give back.
+		if i.CapacityLease != nil && !hasManualSemaphore(qi.Data.Semaphores) {
 			// Provide the release handle
 			i.CapacityLease.release = func() error {
 				// Stop extending capacity lease
@@ -506,6 +526,12 @@ func (q *queueProcessor) ProcessItem(
 				service.Go(releaseCapacityLease)
 
 				return nil
+			}
+		}
+
+		if i.CapacityLease != nil {
+			i.CapacityLease.keepManualSemaphores = func() {
+				keepManualSemaphores.Store(true)
 			}
 		}
 
@@ -558,6 +584,7 @@ func (q *queueProcessor) ProcessItem(
 		// Job errored or extending lease errored.  Signal that the job is done to
 		// stop everything.
 		stopItemLeaseRenewal()
+		keptSemaphores := keepSemaphoresIfAsked()
 
 		if ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := q.backoffFunc(qi.Data.Attempt)
@@ -574,6 +601,12 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
+			if keptSemaphores {
+				// the run has the slot, so the retry must not take one more.
+				// a retry that carries the manual semaphore waits on the slot
+				// of its own run.
+				requeueItem.Data.Semaphores = constraintapi.AutoReleaseSemaphores(requeueItem.Data.Semaphores)
+			}
 			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at, requeueOpts...); requeueErr != nil {
 				if requeueErr == ErrQueueItemNotFound {
 					// The item is gone, so there is nothing to requeue and this retry is
@@ -601,27 +634,15 @@ func (q *queueProcessor) ProcessItem(
 					return ProcessItemResult{}, nil
 				}
 
-				// the item is still in the queue with its lease, and the queue
-				// scavenger requeues it when that lease expires.  give the slot
-				// back here too.  the normal release deletes the capacity lease
-				// and keeps the slot, so the retry blocks on it forever.
-				if hasManualSemaphore(qi.Data.Semaphores) {
-					releaseCapacityLeaseMu.Lock()
-					forceReleaseSemaphores = true
-					releaseCapacityLeaseMu.Unlock()
-				}
+				// the item is still in the queue with its manual semaphore,
+				// and takes a slot again when the queue scavenger requeues
+				// it.  give this slot back, or the run has two.
+				releaseCapacityLeaseMu.Lock()
+				forceReleaseSemaphores = hasManualSemaphore(qi.Data.Semaphores)
+				releaseCapacityLeaseMu.Unlock()
 
 				l.Error("error requeuing job", "error", requeueErr, "item", requeueItem)
 				return ProcessItemResult{}, requeueErr
-			}
-			// the item is back in the queue, so give its function concurrency
-			// slot back with the deferred lease release.  an item that was
-			// gone on requeue returned above and keeps the normal release,
-			// because finalize already released the slot for that run.
-			if hasManualSemaphore(qi.Data.Semaphores) {
-				releaseCapacityLeaseMu.Lock()
-				forceReleaseSemaphores = true
-				releaseCapacityLeaseMu.Unlock()
 			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
@@ -647,6 +668,7 @@ func (q *queueProcessor) ProcessItem(
 		}
 	case <-jobCtx.Done():
 		stopItemLeaseRenewal()
+		keepSemaphoresIfAsked()
 		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi), dequeueOpts...); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.

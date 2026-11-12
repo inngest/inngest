@@ -78,7 +78,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 
 	// manual-release semaphores are decremented here only when the scavenger
 	// reclaims an expired lease or the caller asks for it.  the scavenger case
-	// covers a crashed executor.  the caller case covers a requeued start item.
+	// covers a crashed executor.  the caller case covers a start item whose
+	// run has not started.
 	forceReleaseSemaphores := "0"
 	if req.Source.Location == CallerLocationLeaseScavenge || req.ForceReleaseSemaphores {
 		forceReleaseSemaphores = "1"

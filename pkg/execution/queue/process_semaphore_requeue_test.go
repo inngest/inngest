@@ -15,12 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// a retried start item gives its function concurrency slot back with the
-// lease.  a failed requeue leaves the item leased in the queue, and the
-// queue scavenger requeues it later, so that case gives the slot back too.
-// an item that is gone on requeue belongs to a finalized run, and finalize
-// released the slot.
-func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
+// an item with a manual semaphore gives its function concurrency slot back
+// with the capacity lease on every exit, unless the run function calls
+// CapacityLease.KeepManualSemaphores.  after that call the run has the slot,
+// and a retry of the item no longer carries the manual semaphore.
+func TestProcessItemForcesSemaphoreRelease(t *testing.T) {
 	manual := constraintapi.Semaphore{
 		ID:      constraintapi.SemaphoreIDFn(uuid.New()),
 		Weight:  1,
@@ -31,34 +30,104 @@ func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
 		Weight:  1,
 		Release: constraintapi.SemaphoreReleaseAuto,
 	}
+	both := []constraintapi.Semaphore{auto, manual}
+	jobFailed := errors.New("sdk unreachable")
 	requeueFailed := errors.New("redis unavailable")
+	one := 1
 
 	tests := []struct {
-		name       string
-		semaphores []constraintapi.Semaphore
-		requeueErr error
-		wantErr    error
-		wantForce  bool
+		name        string
+		semaphores  []constraintapi.Semaphore
+		maxAttempts *int
+		keep        bool
+		runErr      error
+		requeueErr  error
+		wantErr     error
+		wantForce   bool
+		// wantRequeued is the semaphore list of the item that is requeued.
+		wantRequeued []constraintapi.Semaphore
 	}{
 		{
-			name:       "requeue succeeds",
-			semaphores: []constraintapi.Semaphore{manual},
+			name:         "run not started, job fails, requeue succeeds",
+			semaphores:   both,
+			runErr:       jobFailed,
+			wantForce:    true,
+			wantRequeued: both,
+		},
+		{
+			name:         "run not started, job fails, requeue fails",
+			semaphores:   both,
+			runErr:       jobFailed,
+			requeueErr:   requeueFailed,
+			wantErr:      requeueFailed,
+			wantForce:    true,
+			wantRequeued: both,
+		},
+		{
+			name:         "run not started, job fails, item gone on requeue",
+			semaphores:   both,
+			runErr:       jobFailed,
+			requeueErr:   ErrQueueItemNotFound,
+			wantForce:    true,
+			wantRequeued: both,
+		},
+		{
+			name:        "run not started, job fails on the last attempt",
+			semaphores:  both,
+			maxAttempts: &one,
+			runErr:      jobFailed,
+			wantForce:   true,
+		},
+		{
+			name:       "run not started, job succeeds",
+			semaphores: both,
 			wantForce:  true,
 		},
 		{
-			name:       "requeue fails",
-			semaphores: []constraintapi.Semaphore{manual},
-			requeueErr: requeueFailed,
-			wantErr:    requeueFailed,
-			wantForce:  true,
+			name:         "run started, job fails, requeue succeeds",
+			semaphores:   both,
+			keep:         true,
+			runErr:       jobFailed,
+			wantRequeued: []constraintapi.Semaphore{auto},
 		},
 		{
-			name:       "item gone on requeue",
-			semaphores: []constraintapi.Semaphore{manual},
-			requeueErr: ErrQueueItemNotFound,
+			name:         "run started, job fails, requeue fails",
+			semaphores:   both,
+			keep:         true,
+			runErr:       jobFailed,
+			requeueErr:   requeueFailed,
+			wantErr:      requeueFailed,
+			wantForce:    true,
+			wantRequeued: []constraintapi.Semaphore{auto},
 		},
 		{
-			name:       "no manual semaphore",
+			name:         "run started, job fails, item gone on requeue",
+			semaphores:   both,
+			keep:         true,
+			runErr:       jobFailed,
+			requeueErr:   ErrQueueItemNotFound,
+			wantRequeued: []constraintapi.Semaphore{auto},
+		},
+		{
+			name:        "run started, job fails on the last attempt",
+			semaphores:  both,
+			maxAttempts: &one,
+			keep:        true,
+			runErr:      jobFailed,
+		},
+		{
+			name:       "run started, job succeeds",
+			semaphores: both,
+			keep:       true,
+		},
+		{
+			name:         "no manual semaphore, job fails",
+			semaphores:   []constraintapi.Semaphore{auto},
+			runErr:       jobFailed,
+			wantRequeued: []constraintapi.Semaphore{auto},
+		},
+		{
+			name:       "no manual semaphore, job succeeds",
 			semaphores: []constraintapi.Semaphore{auto},
 		},
 	}
@@ -73,7 +142,7 @@ func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
 			registry, err := NewSingleShardRegistry(shard)
 			require.NoError(t, err)
 
-			releases := make(chan *constraintapi.CapacityReleaseRequest, 1)
+			releases := make(chan *constraintapi.CapacityReleaseRequest, 2)
 			q, err := New(ctx, "test", registry, WithCapacityManager(releaseRecordingManager{
 				releases: releases,
 			}))
@@ -87,7 +156,8 @@ func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
 				FunctionID: uuid.New(),
 				LeaseID:    &itemLeaseID,
 				Data: Item{
-					Kind: KindStart,
+					Kind:        KindStart,
+					MaxAttempts: tc.maxAttempts,
 					Identifier: state.Identifier{
 						AccountID:   uuid.New(),
 						WorkspaceID: uuid.New(),
@@ -104,8 +174,11 @@ func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
 					LeaseID:    capacityLeaseID,
 					IssuedAtMS: time.Now().UnixMilli(),
 				},
-			}, func(context.Context, RunInfo, Item) (RunResult, error) {
-				return RunResult{}, errors.New("sdk unreachable")
+			}, func(_ context.Context, info RunInfo, _ Item) (RunResult, error) {
+				if tc.keep {
+					info.CapacityLease.KeepManualSemaphores()
+				}
+				return RunResult{}, tc.runErr
 			})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
@@ -120,16 +193,101 @@ func TestProcessItemForcesSemaphoreReleaseOnRetry(t *testing.T) {
 			case <-time.After(time.Second):
 				t.Fatal("timed out waiting for the capacity lease release")
 			}
+
+			if tc.wantRequeued == nil {
+				require.Empty(t, shard.requeued)
+				return
+			}
+			require.Len(t, shard.requeued, 1)
+			require.Equal(t, tc.wantRequeued, shard.requeued[0].Data.Semaphores)
 		})
+	}
+}
+
+// the executor releases the capacity lease early once a step is saved.  for
+// an item with a manual semaphore that release is a no-op.  an early release
+// deletes the lease and keeps the slot, and an error after it then leaves
+// nothing for the exit to give back.
+func TestProcessItemSkipsEarlyReleaseWithManualSemaphore(t *testing.T) {
+	ctx := context.Background()
+	shard := &requeueErrorShard{
+		mockShardForIterator: &mockShardForIterator{name: "test"},
+	}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	releases := make(chan *constraintapi.CapacityReleaseRequest, 2)
+	q, err := New(ctx, "test", registry, WithCapacityManager(releaseRecordingManager{
+		releases: releases,
+	}))
+	require.NoError(t, err)
+
+	capacityLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(time.Minute)), rand.Reader)
+	require.NoError(t, err)
+	itemLeaseID := ulid.Make()
+	item := QueueItem{
+		ID:         "start-item",
+		FunctionID: uuid.New(),
+		LeaseID:    &itemLeaseID,
+		Data: Item{
+			Kind: KindStart,
+			Identifier: state.Identifier{
+				AccountID:   uuid.New(),
+				WorkspaceID: uuid.New(),
+				WorkflowID:  uuid.New(),
+				RunID:       ulid.Make(),
+			},
+			Semaphores: []constraintapi.Semaphore{{
+				ID:      constraintapi.SemaphoreIDFn(uuid.New()),
+				Weight:  1,
+				Release: constraintapi.SemaphoreReleaseManual,
+			}},
+		},
+	}
+
+	releasedEarly := make(chan bool, 1)
+	_, err = q.ProcessItem(ctx, ProcessItem{
+		I: item,
+		CapacityLease: &CapacityLease{
+			LeaseID:    capacityLeaseID,
+			IssuedAtMS: time.Now().UnixMilli(),
+		},
+	}, func(_ context.Context, info RunInfo, _ Item) (RunResult, error) {
+		require.NoError(t, info.CapacityLease.Release())
+		select {
+		case <-releases:
+			releasedEarly <- true
+		case <-time.After(100 * time.Millisecond):
+			releasedEarly <- false
+		}
+		return RunResult{}, errors.New("error enqueueing discovery step")
+	})
+	require.NoError(t, err)
+	require.False(t, <-releasedEarly, "the lease must stay until the job exits")
+
+	select {
+	case req := <-releases:
+		require.Equal(t, capacityLeaseID, req.LeaseID)
+		require.True(t, req.ForceReleaseSemaphores, "the exit must give the slot back")
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the capacity lease release")
+	}
+
+	select {
+	case <-releases:
+		t.Fatal("the capacity lease was released twice")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
 type requeueErrorShard struct {
 	*mockShardForIterator
 	requeueErr error
+	requeued   []QueueItem
 }
 
-func (s *requeueErrorShard) Requeue(context.Context, QueueItem, time.Time, ...RequeueOptionFn) error {
+func (s *requeueErrorShard) Requeue(_ context.Context, item QueueItem, _ time.Time, _ ...RequeueOptionFn) error {
+	s.requeued = append(s.requeued, item)
 	return s.requeueErr
 }
 

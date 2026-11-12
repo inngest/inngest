@@ -277,10 +277,10 @@ type CapacityReleaseRequest struct {
 	LeaseIssuedAt time.Time
 
 	// ForceReleaseSemaphores decrements manual-release semaphores on this
-	// lease as if they were auto-release.  the queue sets it when it requeues
-	// a start item, because the run did not start and must not keep its
-	// function concurrency slot through the retry backoff.  without it the
-	// retry blocks on the slot the same run still holds.
+	// lease as if they were auto-release.  the queue sets it when a start
+	// item exits and its run has not started.  Finalize releases only for a
+	// run that has StartedAt in run metadata, so without it the slot stays
+	// taken.
 	ForceReleaseSemaphores bool
 }
 

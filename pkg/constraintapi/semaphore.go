@@ -14,12 +14,12 @@ const (
 	// Used for worker concurrency where each step independently acquires and releases.
 	SemaphoreReleaseAuto SemaphoreReleaseMode = 0
 
-	// SemaphoreReleaseManual keeps the slot past the lease that acquired it.
-	// used for function concurrency.  the slot is taken when the run's start
-	// item is leased and held through every later step until finalize calls
-	// ReleaseSemaphore.  two paths give it back early.  the scavenger
-	// force-releases an expired lease after an executor crash, and the queue
-	// force-releases the lease of a start item it requeues for a retry.
+	// SemaphoreReleaseManual keeps the slot past the lease that acquired it,
+	// for function concurrency.  the slot is taken when the run's start item
+	// is leased, and the run has it from the moment the executor writes
+	// StartedAt to run metadata, until Finalize releases it.  when the start
+	// item exits before that write, and when the lease expires after an
+	// executor crash, the release of the lease gives the slot back.
 	SemaphoreReleaseManual SemaphoreReleaseMode = 1
 )
 

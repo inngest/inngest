@@ -2053,7 +2053,7 @@ type CapacityReleaseRequest struct {
 	Source         *LeaseSource           `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
 	RequestAttempt uint32                 `protobuf:"varint,5,opt,name=request_attempt,json=requestAttempt,proto3" json:"request_attempt,omitempty"`
 	LeaseIssuedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=lease_issued_at,json=leaseIssuedAt,proto3" json:"lease_issued_at,omitempty"`
-	// decrements manual-release semaphores on this lease.  set when a start item is requeued.
+	// decrements manual-release semaphores on this lease.  set when a start item exits and its run has not started.
 	ForceReleaseSemaphores bool `protobuf:"varint,7,opt,name=force_release_semaphores,json=forceReleaseSemaphores,proto3" json:"force_release_semaphores,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
