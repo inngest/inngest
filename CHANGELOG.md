@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.53.0] - 2026-11-12
+
+### 🚀 Features
+
+- *(cli)* Send non-default dev flags in telemetry (#5241)
+- *(duckdb)* Store lake JSON as JSON text instead of VARIANT (#5206)
+- *(duckdb)* Split the lake's output into output and error columns (#5237)
+
+### 🐛 Bug Fixes
+
+- *(connect)* Send X-Inngest-Platform on gateway app sync (#5239)
+- *(executor)* Prevent sleep ID collisions between runs (#5177)
+
+### ⚡ Performance
+
+- *(duckdbseed)* Write each table from its own appender (#5207)
+
 ## [v1.52.0] - 2026-11-10
 
 ### 🚀 Features
@@ -9,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - *(api)* Get app sync history via v2 api (#5163)
 - *(executor)* Step.subscribe inboxes (#5149)
 - *(cli)* Add inngest deploy for apps in inngest.toml (INF-801) (#5226)
+- *(dashboard)* Show webhook health (#5171)
 
 ### 🐛 Bug Fixes
 
@@ -24,6 +42,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - *(duckdb)* Remove cmd/duckdbbench (#5228)
+- *(release)* V1.52.0 (#5202)
 
 ## [v1.51.0] - 2026-11-06
 
