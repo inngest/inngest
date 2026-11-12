@@ -4950,7 +4950,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
+	// Include the run so a reused event key cannot collide with an older sleep.
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s-%s", runCtx.Metadata().IdempotencyKey(), runCtx.Metadata().ID.RunID, gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
