@@ -80,6 +80,8 @@ export const Route = createFileRoute('/_authed/billing/')({
         'limit' in executionsData
           ? (executionsData.limit as number | null)
           : null;
+      const executionOverageAllowed =
+        (entitlements as any).executions?.overageAllowed || false;
 
       runs = {
         isVisible: !!runLimit,
@@ -112,11 +114,13 @@ export const Route = createFileRoute('/_authed/billing/')({
       executions = {
         isVisible: !!executionLimit,
         title: 'Executions',
-        description: executionUsageDescription(currentPlan, executionLimit),
+        description: executionUsageDescription(currentPlan, {
+          limit: executionLimit,
+          overageAllowed: executionOverageAllowed,
+        }),
         current: executionUsage,
         limit: executionLimit,
-        overageAllowed:
-          (entitlements as any).executions?.overageAllowed || false,
+        overageAllowed: executionOverageAllowed,
         tooltipContent: 'Combined total of runs and steps executed.',
       };
     }

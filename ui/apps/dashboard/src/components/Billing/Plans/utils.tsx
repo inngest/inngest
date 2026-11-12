@@ -265,14 +265,23 @@ export function isHobbyPlan(
 }
 
 export function executionUsageDescription(
-  plan: Pick<BillingPlan, 'name' | 'slug'>,
-  includedExecutions: number | null,
+  plan: Pick<BillingPlan, 'name'>,
+  executions: { limit: number | null; overageAllowed: boolean },
 ): string {
-  if (isHobbyPlan(plan)) {
+  // Most Enterprise plans leave executions_overage_allowed unset, so they keep
+  // their existing copy instead of following the entitlement.
+  if (isEnterprisePlan(plan)) {
+    return 'Additional usage billed at the start of the next billing cycle.';
+  }
+
+  // Decide from the entitlement, not the plan slug: legacy free plans such as
+  // "free-tier" do not match the Hobby slugs but cannot pay for overage.
+  if (!executions.overageAllowed) {
     return 'The maximum number of executions per month';
   }
 
-  if (isEnterprisePlan(plan) || includedExecutions === null) {
+  const includedExecutions = executions.limit;
+  if (includedExecutions === null) {
     return 'Additional usage billed at the start of the next billing cycle.';
   }
 
