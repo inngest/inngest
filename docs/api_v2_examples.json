@@ -537,5 +537,56 @@
         }
       }
     }
+  },
+  "/webhooks/{id}": {
+    "post": {
+      "200": {
+        "data": {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Payment Processing Webhook",
+          "url": "https://inn.gs/e/example-webhook",
+          "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+          "environment": "production",
+          "createdAt": "2024-01-10T09:15:00Z",
+          "updatedAt": "2024-01-20T14:22:33Z"
+        },
+        "metadata": {
+          "fetchedAt": "2024-01-20T14:22:33Z",
+          "cachedUntil": null
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Name or transform is required"
+          }
+        ]
+      },
+      "404": {
+        "errors": [
+          {
+            "code": "not_found",
+            "message": "Webhook not found"
+          }
+        ]
+      },
+      "413": {
+        "errors": [
+          {
+            "code": "invalid_request",
+            "message": "Request body cannot exceed 16384 bytes"
+          }
+        ]
+      },
+      "429": {
+        "errors": [
+          {
+            "code": "rate_limited",
+            "message": "API rate limit exceeded. The request was rejected and the webhook was not updated."
+          }
+        ]
+      }
+    }
   }
 }

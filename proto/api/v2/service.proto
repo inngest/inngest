@@ -887,6 +887,124 @@ service V2 {
     };
   }
 
+  rpc UpdateWebhook(UpdateWebhookRequest) returns (UpdateWebhookResponse) {
+    option (google.api.http) = {
+      post: "/webhooks/{id}",
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "webhooks:write:update"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update webhook"
+      description: "Updates a webhook's name or transform. Omitted fields are left unchanged."
+      tags: "Webhooks"
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Target environment for the webhook (e.g., 'production', 'staging', 'development')"
+          type: STRING
+          required: true
+        }
+      }
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Webhook successfully updated"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2UpdateWebhookResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Webhook not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "413"
+        value: {
+          description: "Request body too large (max 16KiB)"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc PatchEnv(PatchEnvRequest) returns (PatchEnvsResponse) {
     option (google.api.http) = {
       patch: "/envs/{id}",
@@ -3607,7 +3725,7 @@ message SigningKey {
 message CreateWebhookRequest {
   string name = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Descriptive name for the webhook"
+      description: "Descriptive name for the webhook (max 128 characters)"
       example: "\"Payment Processing Webhook\""
     }
   ];
@@ -3672,6 +3790,31 @@ message ListWebhooksResponse {
   repeated Webhook data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message UpdateWebhookRequest {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The ID of the webhook to update"
+    }
+  ];
+  optional string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "New name for the webhook (max 128 characters)"
+      example: "\"Payment Processing Webhook\""
+    }
+  ];
+  optional string transform = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "New inline JS transform function for incoming events"
+      example: "\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\""
+    }
+  ];
+}
+
+message UpdateWebhookResponse {
+  Webhook data = 1;
+  ResponseMetadata metadata = 2;
 }
 
 message Webhook {

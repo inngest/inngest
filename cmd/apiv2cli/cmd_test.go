@@ -1492,3 +1492,44 @@ func TestSubmitFeedbackCommand(t *testing.T) {
 	require.True(t, strings.HasPrefix(gotAgent, "inngest-cli/"))
 	require.Equal(t, map[string]any{"feedback": "More examples please", "operation": "get_run", "email": "dev@example.com"}, gotBody)
 }
+
+func TestUpdateWebhookCommand(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	const id = "11111111-1111-1111-1111-111111111111"
+	const response = `{"data":{"id":"11111111-1111-1111-1111-111111111111","name":"Renamed"}}`
+	for _, tc := range []struct {
+		name, body string
+		flags      []string
+	}{
+		{"name only", `{"name":"Renamed"}`, []string{"--name", "Renamed"}},
+		{"transform only", `{"transform":"return evt;"}`, []string{"--transform", "return evt;"}},
+		{"both fields", `{"name":"Renamed","transform":"return evt;"}`, []string{"--name", "Renamed", "--transform", "return evt;"}},
+		{"empty name", `{"name":""}`, []string{"--name", ""}},
+		{"empty transform", `{"transform":""}`, []string{"--transform", ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var method, path, env, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path, env = r.Method, r.URL.Path, r.Header.Get("X-Inngest-Env")
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := []string{"api", "update-webhook", "--api-host", srv.URL, "--env", "production"}
+			args = append(args, tc.flags...)
+			args = append(args, id)
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/webhooks/"+id, path)
+			require.Equal(t, "production", env)
+			require.JSONEq(t, tc.body, body)
+			require.JSONEq(t, response, out.String())
+		})
+	}
+}

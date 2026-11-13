@@ -388,3 +388,38 @@ func TestFeedbackTool(t *testing.T) {
 	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 	require.Equal(t, map[string]any{"feedback": "More examples", "operation": "get_run"}, body)
 }
+
+func TestUpdateWebhookTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "UpdateWebhook")
+	tool := Tool(endpoint)
+	require.Equal(t, "update_webhook", tool.Name)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.True(t, tool.Annotations.IdempotentHint)
+	require.True(t, *tool.Annotations.DestructiveHint)
+	require.Equal(t, []string{"id"}, InputSchema(endpoint)["required"])
+
+	for _, tc := range []struct {
+		name, body string
+		fields     map[string]any
+	}{
+		{"name only", `{"name":"Renamed"}`, map[string]any{"name": "Renamed"}},
+		{"transform only", `{"transform":"return evt;"}`, map[string]any{"transform": "return evt;"}},
+		{"both fields", `{"name":"Renamed","transform":"return evt;"}`, map[string]any{"name": "Renamed", "transform": "return evt;"}},
+		{"empty name", `{"name":""}`, map[string]any{"name": ""}},
+		{"empty transform", `{"transform":""}`, map[string]any{"transform": ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.fields["id"] = "11111111-1111-1111-1111-111111111111"
+			tc.fields["env"] = "production"
+			req, err := Request(t.Context(), endpoint, tc.fields, Options{BasePath: "/v2", EnvHeader: "X-Inngest-Env"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "/v2/webhooks/11111111-1111-1111-1111-111111111111", req.URL.Path)
+			require.Equal(t, "production", req.Header.Get("X-Inngest-Env"))
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.JSONEq(t, tc.body, string(body))
+			require.Empty(t, req.URL.RawQuery)
+		})
+	}
+}
