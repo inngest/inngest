@@ -47,6 +47,7 @@ func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
 }
 
 type RedisQueueShard interface {
+	HasPendingMigrationItems(context.Context, osqueue.Scope, string) (bool, error)
 	osqueue.QueueShard
 	osqueue.BacklogOperations
 	Client() *QueueClient

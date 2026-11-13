@@ -1946,15 +1946,15 @@ func (e *executor) schedule(
 		}
 		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 
-	case errors.Is(err, queue.ErrQueueShardNotFound):
-		if stateCreated {
-			deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
-			if deleteErr != nil && !errors.Is(deleteErr, state.ErrRunNotFound) {
-				l.ReportError(deleteErr, "error deleting function state after permanent queue routing failure")
-				return nil, nil, fmt.Errorf("error deleting function state after queue routing failure: %w", deleteErr)
-			}
+	case errors.Is(err, queue.ErrQueueShardNotFound), errors.Is(err, queue.ErrQueueShardUnavailable):
+		// the run state stays.  the caller decides if the run is retried or
+		// dropped, so only the caller can delete the state.
+		return nil, nil, &ScheduleQueueRoutingError{
+			ID:              sv2.IDFromV1(stv1ID),
+			StateExisted:    !stateCreated,
+			EventInternalID: firstEventInternalID(req.Events),
+			Err:             fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err),
 		}
-		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -2305,19 +2305,45 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			md.Config.RequestVersion = consts.RequestVersionUnknown
 		}
 
-		// Only just starting:  run lifecycles on first attempt.
-		if item.Attempt == 0 {
+		// the run has its function concurrency slot from the moment
+		// StartedAt is in run metadata, and Finalize releases it.  a start
+		// item that took a slot writes StartedAt on every attempt, and then
+		// tells the queue to leave the slot taken when the item exits.
+		takesSlot := takesFnConcurrencySlot(item)
+
+		if item.Attempt == 0 || takesSlot {
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
-			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
+			err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
 				StartedAt:      md.Config.StartedAt,
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
-			}); err != nil {
+			})
+			switch {
+			case sv2.IsRunNotFound(err):
+				// the run is gone, and the queue gives the slot back.
+			case err != nil && takesSlot:
+				// we need the metadata update to succeed for fn-level concurrency/
+				// manual semaphores, as releasing these uses the `StartedAt` field.
+				//
+				// in this case, we're not calling
+				//   item.RunInfo.CapacityLease.KeepManualSemaphores()
+				// so function-level semaphores aren't going to be claimed by
+				// the run when we return the error.
+				return nil, fmt.Errorf("error writing run start to metadata: %w", err)
+			case err != nil:
 				l.ReportError(err, "error updating metadata on function start")
+			case takesSlot:
+				// this ensures that fn run semaphores are kept locked
+				// while the run ends.  without this, the queue and constraint api is
+				// going to release the semaphore when the queue item finishes
+				item.RunInfo.CapacityLease.KeepManualSemaphores()
 			}
+		}
 
+		// Only just starting:  run lifecycles on first attempt.
+		if item.Attempt == 0 {
 			// Set some run span details to be explicit that this has been
 			// kicked off
 			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
@@ -3110,6 +3136,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	evtID := evt.GetInternalID()
 	evtTime := evt.GetReceivedAt()
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
 
@@ -3188,6 +3216,10 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
+
 	if err := iter.Error(); err != nil && err != context.Canceled {
 		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
@@ -3227,6 +3259,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		wg    sync.WaitGroup
 	)
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	for _, i := range evals {
 		// Copy pause into function
 		pause := *i
@@ -3256,6 +3290,10 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		}()
 	}
 	wg.Wait()
+
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
 
 	return res, goerr
 }
@@ -3308,6 +3346,16 @@ func (e *executor) handlePause(
 
 		// NOTE: Make sure the event that created the pause isn't also the one resuming it
 		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
+			return nil
+		}
+
+		// A source of an inbox is not consumed. The event is collected, and
+		// saved as a message once every matching pause has been handled.
+		if pause.Subscribe != nil {
+			if arrivals := inboxArrivalsFrom(ctx); arrivals != nil {
+				arrivals.add(pause)
+			}
+
 			return nil
 		}
 
@@ -3566,6 +3614,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// The timer of an inbox read times the read out, not a pause.
+	if pause.Subscribe != nil {
+		return e.timeoutInboxRead(ctx, pause)
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -3999,7 +4052,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 			update.HasAI = true
 		}
 		if update != nil {
-			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil {
+			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil && !sv2.IsRunNotFound(err) {
 				return fmt.Errorf("error updating function metadata: %w", err)
 			}
 		}
@@ -4157,6 +4210,14 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorSleep(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribe:
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge)
+	case enums.OpcodeSubscribeWait:
+		return e.handleGeneratorSubscribeWait(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribeRead:
+		return e.handleGeneratorSubscribeRead(ctx, runCtx, gen, edge)
+	case enums.OpcodeSubscribeClose:
+		return e.handleGeneratorSubscribeClose(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeInvokeFunction:
 		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeAIGateway:
@@ -4915,7 +4976,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
+	// Include the run so a reused event key cannot collide with an older sleep.
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s-%s", runCtx.Metadata().IdempotencyKey(), runCtx.Metadata().ID.RunID, gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
@@ -5725,6 +5787,40 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	return err
 }
 
+// interpolateTriggerEvent replaces `event.` references in an expression with the
+// run's trigger event data, as values. Matching is faster with values, because
+// the expression can then go into aggregate trees. An expression without an
+// `event.` reference, or none at all, is returned as it was.
+func (e *executor) interpolateTriggerEvent(ctx context.Context, runCtx execution.RunContext, expr *string) (*string, error) {
+	if expr == nil || !strings.Contains(*expr, "event.") {
+		return expr, nil
+	}
+
+	evt := event.Event{}
+	if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
+		logger.StdlibLogger(ctx).Error("error unmarshalling trigger event", "error", err)
+	}
+
+	interpolated, err := expressions.Interpolate(ctx, *expr, map[string]any{
+		"event": evt.Map(),
+	})
+	if err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, state.WrapInStandardError(
+				compileError,
+				"CompileError",
+				"Could not compile expression",
+				compileError.Message(),
+			)
+		}
+
+		return nil, err
+	}
+
+	return &interpolated, nil
+}
+
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
@@ -5765,39 +5861,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 
-	expr := opts.If
-	if expr != nil && strings.Contains(*expr, "event.") {
-		// Remove `event` data from the expression and replace with actual event
-		// data as values, now that we have the event.
-		//
-		// This improves performance in matching, as we can then use the values within
-		// aggregate trees.
-		evt := event.Event{}
-		if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
-			logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
-		}
-
-		interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
-			"event": evt.Map(),
-		})
-		if err != nil {
-			var compileError *expressions.CompileError
-			if errors.As(err, &compileError) {
-				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
-					compileError,
-					"CompileError",
-					"Could not compile expression",
-					compileError.Message(),
-				))
-			}
-
-			return fmt.Errorf("error interpolating wait for event expression: %w", err)
-		}
-		expr = &interpolated
-
+	expr, err := e.interpolateTriggerEvent(ctx, runCtx, opts.If)
+	if err != nil {
+		return fmt.Errorf("error interpolating wait for event expression: %w", err)
+	}
+	if expr != nil && opts.If != nil && *expr != *opts.If {
 		// Update the generator to use the interpolated data, ensuring history
 		// is updated. Only `if` changes, so the SDK's other opts survive.
-		if err := gen.SetOpt("if", interpolated); err != nil {
+		if err := gen.SetOpt("if", *expr); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
 	}
@@ -6673,7 +6744,8 @@ func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 			enums.OpcodeSleep,
 			enums.OpcodeStepPlanned,
 			enums.OpcodeWaitForEvent,
-			enums.OpcodeWaitForSignal:
+			enums.OpcodeWaitForSignal,
+			enums.OpcodeSubscribeWait:
 			return true
 		}
 	}

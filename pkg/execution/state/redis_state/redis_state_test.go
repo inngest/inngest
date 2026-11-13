@@ -23,6 +23,62 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPauseEventBodyExpiry(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			opts := []UnshardedClientOpt{WithWorkspaceScopedPauseKeys()}
+			if enabled {
+				opts = append(opts, WithPauseEventBodyExpiry())
+			}
+			store := NewPauseStore(NewUnshardedClient(rc, "estate", "queue", opts...))
+			ctx := t.Context()
+			ws, event := uuid.New(), "test/expiry"
+			first := state.Pause{
+				ID: uuid.New(), WorkspaceID: ws, Event: &event,
+				Identifier: state.PauseIdentifier{RunID: ulid.Make()},
+				Expires:    state.Time(time.Now().Add(time.Minute)),
+			}
+			second := first
+			second.ID = uuid.New()
+			second.Expires = state.Time(time.Now().Add(time.Hour))
+			for _, p := range []state.Pause{first, second} {
+				_, err := store.SavePause(ctx, p)
+				require.NoError(t, err)
+			}
+			// Past the deadline, but still inside the ten-minute grace.
+			r.FastForward(10 * time.Minute)
+			count, err := store.PauseLen(ctx, ws, event)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, count)
+			r.FastForward(2 * time.Minute)
+			_, err = store.PauseByID(ctx, first.ID, ws)
+			require.ErrorIs(t, err, state.ErrPauseNotFound)
+			count, err = store.PauseLen(ctx, ws, event)
+			require.NoError(t, err)
+			if enabled {
+				require.EqualValues(t, 1, count)
+			} else {
+				require.EqualValues(t, 2, count)
+			}
+			found, err := store.PauseByID(ctx, second.ID, ws)
+			require.NoError(t, err)
+			require.Equal(t, second.ID, found.ID)
+			require.NoError(t, store.DeletePause(ctx, second))
+			count, err = store.PauseLen(ctx, ws, event)
+			require.NoError(t, err)
+			if enabled {
+				require.Zero(t, count)
+			} else {
+				require.EqualValues(t, 1, count)
+			}
+		})
+	}
+}
+
 func TestNewRunMetadata(t *testing.T) {
 	byt, _ := json.Marshal(state.Identifier{})
 

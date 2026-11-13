@@ -15,6 +15,15 @@ var TerminalStatuses = schema.TerminalStatuses
 
 // DeltaColumns is the projection every delta for t returns: all of its
 // physical table's columns, in declared order.
+//
+// NOTE: runs/run_trace_spans' output is split into output and error at
+// write time (cqrs.SplitSpanOutputEnvelope), and a delta carries both, so a
+// DeltaStreamer over a buffer that stores the unsplit envelope must derive
+// them the same way: output is the envelope's "data" value (the whole value
+// for a step.waitForEvent-shaped or unrecognized output, NULL for an error
+// envelope w/o data), error its "error" value (else NULL). A buffer can
+// store the envelope w/ both halves (IE {"data": ..., "error": ...}) so it
+// splits back to exactly what the lake stores.
 func DeltaColumns(t Table) []Column {
 	phys := Physical[t]
 	cols := make([]Column, len(phys.Columns))
@@ -124,9 +133,12 @@ func deltaBoundColumns(t Table, allTenants bool) []string {
 // the streamer to, so a streamer bug can't leak another tenant's rows or
 // read a row twice. Runs skip the watermark there: a run still open can sit
 // in the delta whatever its bucket. The delta's columns are
-// cast to their lake types (JSON text to VARIANT, STRUCT lists), so the
-// union is the physical table's own shape and any macro over the table
-// reads it unchanged.
+// cast to their lake types (the JSON stream to the lake's VARCHAR text,
+// which is free, STRUCT lists), so the union is the physical table's own
+// shape and any macro over the table reads it unchanged. JSON text stays
+// VARCHAR here so filters and extractions read it w/o a JSON cast (a
+// validating parse per row); the lake's macros cast it to JSON only
+// where they return it.
 func sourceCTE(t Table, spec sourceSpec) (*parser.CTE, error) {
 	phys, ok := Physical[t]
 	if !ok {

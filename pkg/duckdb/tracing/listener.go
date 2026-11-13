@@ -18,6 +18,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -133,18 +134,28 @@ func addScheduledAtAttr(attrs *meta.SerializableAttrs, md sv2.Metadata) {
 // carries the triggering events. A nil evts (e.g. a cron-triggered run,
 // which has no triggering event at all) is substituted with an empty slice
 // first — json.Marshal(nil slice) writes the JSON literal null, not [],
-// which downstream VARIANT columns treat as an actual SQL NULL rather than
-// "zero events", and inngest.runs.inputs is NOT NULL.
+// and readers of inngest.runs.inputs (NOT NULL) expect an array of "zero
+// events".
 func addEventsInputAttr(ctx context.Context, attrs *meta.SerializableAttrs, evts []json.RawMessage) {
 	if evts == nil {
 		evts = []json.RawMessage{}
 	}
-	byt, err := json.Marshal(evts)
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("dualwrite: failed to marshal events for EventsInput attribute", "error", err)
-		return
+	// Joined by hand rather than json.Marshal'd, which would compact (and
+	// re-validate) each event's bytes: the events go in as stored.
+	var sb strings.Builder
+	sb.WriteByte('[')
+	for i, e := range evts {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		if len(e) == 0 {
+			sb.WriteString("null") // as json.Marshal writes an empty RawMessage
+			continue
+		}
+		sb.Write(e)
 	}
-	str := string(byt)
+	sb.WriteByte(']')
+	str := sb.String()
 	meta.AddAttr(attrs, meta.Attrs.EventsInput, &str)
 
 	addDeferParentAttrs(attrs, deferredScheduleMetadata(ctx, evts))

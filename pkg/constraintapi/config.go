@@ -111,3 +111,16 @@ type ConcurrencyConfig struct {
 	// on env or account level scopes.
 	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
 }
+
+// ManualReleaseSemaphores returns the semaphores in the slice that keep
+// their slot past the lease that acquired it.  only the start item of a run
+// with function concurrency carries one.
+func ManualReleaseSemaphores(sems []Semaphore) []Semaphore {
+	var result []Semaphore
+	for _, s := range sems {
+		if s.Release == SemaphoreReleaseManual {
+			result = append(result, s)
+		}
+	}
+	return result
+}

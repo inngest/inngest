@@ -12,12 +12,25 @@ import (
 // resolves to a knownColumn.arrayOfStructs column (e.g. runs.sessions)
 // into the equivalent JSONPath wildcard extraction col ->> '$[*].field'
 // (see knownColumn.arrayOfStructs). Mutates stmt in place.
+func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope) ([]Diagnostic, error) {
+	return rewriteScopedExprs(stmt, ctes, outerScope, (*exprRewriter).rewriteArrayOfStructIdent)
+}
+
+// exprHook is one scoped rewrite's per-node rule: rewriteScopedExprs calls
+// it on every expression after that expression's own children have been
+// rewritten, and uses whatever it returns (e itself, or a replacement) in
+// e's place.
+type exprHook func(r *exprRewriter, e parser.Expr) parser.Expr
+
+// rewriteScopedExprs applies hook to every expression in stmt, each with
+// r.scope set to the scope that expression resolves its column references
+// against. Mutates stmt in place.
 //
 // Mirrors remapTablesWithCTEs' CTE/SetOp/FROM-subquery recursion shape so
 // a match anywhere in the tree gets rewritten against its own lexically
 // correct scope — ctes and outerScope carry the same accumulation/
 // correlation semantics validateWithCTEs established them with.
-func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope) ([]Diagnostic, error) {
+func rewriteScopedExprs(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope, hook exprHook) ([]Diagnostic, error) {
 	var diagnostics []Diagnostic
 
 	mergedCTEs := ctes
@@ -27,7 +40,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 			merged[k] = v
 		}
 		for _, cte := range stmt.With.CTEs {
-			diags, err := rewriteArrayOfStructAccess(cte.Select, merged, nil)
+			diags, err := rewriteScopedExprs(cte.Select, merged, nil, hook)
 			diagnostics = append(diagnostics, diags...)
 			if err != nil {
 				return diagnostics, err
@@ -42,12 +55,12 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 	}
 
 	if stmt.SetOp != parser.SetOpNone {
-		diags, err := rewriteArrayOfStructAccess(stmt.SetLeft, mergedCTEs, outerScope)
+		diags, err := rewriteScopedExprs(stmt.SetLeft, mergedCTEs, outerScope, hook)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
 		}
-		diags, err = rewriteArrayOfStructAccess(stmt.SetRight, mergedCTEs, outerScope)
+		diags, err = rewriteScopedExprs(stmt.SetRight, mergedCTEs, outerScope, hook)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
@@ -60,7 +73,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 			return diagnostics, err
 		}
 		scope.outer = outerScope
-		r := &arrayOfStructRewriter{scope: scope, ctes: mergedCTEs}
+		r := &exprRewriter{scope: scope, ctes: mergedCTEs, hook: hook}
 		r.rewriteModifiers(stmt)
 		diagnostics = append(diagnostics, r.diagnostics...)
 		return diagnostics, r.err
@@ -74,7 +87,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 
 	if stmt.From != nil {
 		for i, ref := range stmt.From.Refs {
-			diags, err := rewriteArrayOfStructAccessInRef(ref, mergedCTEs, stmt.From.Refs[:i], outerScope)
+			diags, err := rewriteScopedExprsInRef(ref, mergedCTEs, stmt.From.Refs[:i], outerScope, hook)
 			diagnostics = append(diagnostics, diags...)
 			if err != nil {
 				return diagnostics, err
@@ -82,7 +95,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 		}
 	}
 
-	r := &arrayOfStructRewriter{scope: scope, ctes: mergedCTEs}
+	r := &exprRewriter{scope: scope, ctes: mergedCTEs, hook: hook}
 	if stmt.From != nil {
 		// A FROM-clause UNNEST's argument is validated against the whole
 		// FROM scope (collectRefExprs, validate.go), so it's rewritten
@@ -132,24 +145,24 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 	return diagnostics, nil
 }
 
-// rewriteArrayOfStructAccessInRef mirrors remapRef's FROM-tree recursion
+// rewriteScopedExprsInRef mirrors remapRef's FROM-tree recursion
 // shape, rewriting each nested SelectStatement it finds (a FROM-clause
 // subquery or either side of a JOIN) with its own scope. earlier is every
 // FROM item strictly before ref (a JOIN's left side included, for its
 // right side), which a LATERAL subquery correlates into, matching
 // addSubquery (scope.go); outer is the enclosing statement's own outer
 // scope.
-func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logicalTable, earlier []parser.TableRef, outer *tableScope) ([]Diagnostic, error) {
+func rewriteScopedExprsInRef(ref parser.TableRef, ctes map[string]logicalTable, earlier []parser.TableRef, outer *tableScope, hook exprHook) ([]Diagnostic, error) {
 	switch r := ref.(type) {
 	case *parser.JoinRef:
 		var diagnostics []Diagnostic
-		diags, err := rewriteArrayOfStructAccessInRef(r.Left, ctes, earlier, outer)
+		diags, err := rewriteScopedExprsInRef(r.Left, ctes, earlier, outer, hook)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
 		}
 		withLeft := append(append([]parser.TableRef(nil), earlier...), r.Left)
-		diags, err = rewriteArrayOfStructAccessInRef(r.Right, ctes, withLeft, outer)
+		diags, err = rewriteScopedExprsInRef(r.Right, ctes, withLeft, outer, hook)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
@@ -164,7 +177,7 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 			}
 			scope = scope.onScope(r)
 			scope.outer = outer
-			rw := &arrayOfStructRewriter{scope: scope, ctes: ctes}
+			rw := &exprRewriter{scope: scope, ctes: ctes, hook: hook}
 			r.On = rw.rewrite(r.On)
 			diagnostics = append(diagnostics, rw.diagnostics...)
 			if rw.err != nil {
@@ -174,20 +187,20 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 		return diagnostics, nil
 	case *parser.TableSubqueryRef:
 		if !r.Lateral {
-			return rewriteArrayOfStructAccess(r.Select, ctes, nil)
+			return rewriteScopedExprs(r.Select, ctes, nil, hook)
 		}
 		scope, err := resolveScope(&parser.FromClause{Refs: earlier}, ctes, nil)
 		if err != nil {
 			return nil, err
 		}
 		scope.outer = outer
-		return rewriteArrayOfStructAccess(r.Select, ctes, scope)
+		return rewriteScopedExprs(r.Select, ctes, scope, hook)
 	default:
 		return nil, nil
 	}
 }
 
-func (r *arrayOfStructRewriter) rewriteTableFunctionArgs(ref parser.TableRef) {
+func (r *exprRewriter) rewriteTableFunctionArgs(ref parser.TableRef) {
 	switch t := ref.(type) {
 	case *parser.JoinRef:
 		r.rewriteTableFunctionArgs(t.Left)
@@ -199,17 +212,17 @@ func (r *arrayOfStructRewriter) rewriteTableFunctionArgs(ref parser.TableRef) {
 	}
 }
 
-// arrayOfStructRewriter recursively rewrites one expression tree against a
-// fixed scope, replacing every col.field access into an arrayOfStructs
-// column and recursing into any nested SelectStatement via a fresh,
-// independently-scoped rewriteArrayOfStructAccess call correlated to this
-// scope — mirroring exprValidator's and subqueryRemapper's treatment of
-// the same node shape.
-type arrayOfStructRewriter struct {
+// exprRewriter recursively rewrites one expression tree against a
+// fixed scope, applying hook to every node bottom-up and recursing into any
+// nested SelectStatement via a fresh, independently-scoped
+// rewriteScopedExprs call correlated to this scope — mirroring
+// exprValidator's and subqueryRemapper's treatment of the same node shape.
+type exprRewriter struct {
 	scope *tableScope
 	// ctes is the CTE set visible at scope, handed to every nested
 	// subquery so it can still reference an enclosing WITH's names.
 	ctes        map[string]logicalTable
+	hook        exprHook
 	diagnostics []Diagnostic
 	err         error
 	// boundVars is the stack of list-comprehension variables in scope,
@@ -219,20 +232,17 @@ type arrayOfStructRewriter struct {
 	boundVars []string
 }
 
-func (r *arrayOfStructRewriter) isBound(name string) bool {
+func (r *exprRewriter) isBound(name string) bool {
 	return slices.ContainsFunc(r.boundVars, func(b string) bool { return strings.EqualFold(b, name) })
 }
 
-func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
+func (r *exprRewriter) rewrite(expr parser.Expr) parser.Expr {
 	if expr == nil || r.err != nil {
 		return expr
 	}
 
-	if id, ok := expr.(*parser.Ident); ok {
-		if replacement, ok := r.rewriteIdent(id); ok {
-			return replacement
-		}
-		return expr
+	if _, ok := expr.(*parser.Ident); ok {
+		return r.hook(r, expr)
 	}
 
 	switch e := expr.(type) {
@@ -262,7 +272,7 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 			e.List[i] = r.rewrite(item)
 		}
 		if e.Subquery != nil {
-			diags, err := rewriteArrayOfStructAccess(e.Subquery, r.ctes, r.scope)
+			diags, err := rewriteScopedExprs(e.Subquery, r.ctes, r.scope, r.hook)
 			r.diagnostics = append(r.diagnostics, diags...)
 			if err != nil {
 				r.err = err
@@ -279,7 +289,7 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 		}
 		e.Else = r.rewrite(e.Else)
 	case *parser.SubqueryExpr:
-		diags, err := rewriteArrayOfStructAccess(e.Select, r.ctes, r.scope)
+		diags, err := rewriteScopedExprs(e.Select, r.ctes, r.scope, r.hook)
 		r.diagnostics = append(r.diagnostics, diags...)
 		if err != nil {
 			r.err = err
@@ -329,12 +339,12 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 	case *parser.LambdaExpr:
 		e.Body = r.rewrite(e.Body)
 	}
-	return expr
+	return r.hook(r, expr)
 }
 
 // rewriteModifiers rewrites stmt's ORDER BY/LIMIT/OFFSET -- the clauses a
 // set-op node carries too, alongside its operands.
-func (r *arrayOfStructRewriter) rewriteModifiers(stmt *parser.SelectStatement) {
+func (r *exprRewriter) rewriteModifiers(stmt *parser.SelectStatement) {
 	if stmt.OrderBy != nil {
 		for _, item := range stmt.OrderBy.Items {
 			item.X = r.rewrite(item.X)
@@ -346,7 +356,7 @@ func (r *arrayOfStructRewriter) rewriteModifiers(stmt *parser.SelectStatement) {
 	}
 }
 
-func (r *arrayOfStructRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
+func (r *exprRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
 	if spec == nil {
 		return
 	}
@@ -363,7 +373,7 @@ func (r *arrayOfStructRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
 	}
 }
 
-func (r *arrayOfStructRewriter) rewriteOrderBy(o *parser.OrderByClause) {
+func (r *exprRewriter) rewriteOrderBy(o *parser.OrderByClause) {
 	if o == nil {
 		return
 	}
@@ -372,7 +382,7 @@ func (r *arrayOfStructRewriter) rewriteOrderBy(o *parser.OrderByClause) {
 	}
 }
 
-func (r *arrayOfStructRewriter) rewriteGroupByItem(item parser.GroupByItem) {
+func (r *exprRewriter) rewriteGroupByItem(item parser.GroupByItem) {
 	switch g := item.(type) {
 	case *parser.GroupByExprItem:
 		g.X = r.rewrite(g.X)
@@ -391,11 +401,24 @@ func (r *arrayOfStructRewriter) rewriteGroupByItem(item parser.GroupByItem) {
 	}
 }
 
+// rewriteArrayOfStructIdent is rewriteArrayOfStructAccess' exprHook: it
+// replaces e when it's a col.field access into an arrayOfStructs column.
+func (r *exprRewriter) rewriteArrayOfStructIdent(e parser.Expr) parser.Expr {
+	id, ok := e.(*parser.Ident)
+	if !ok {
+		return e
+	}
+	if replacement, ok := r.rewriteIdent(id); ok {
+		return replacement
+	}
+	return e
+}
+
 // rewriteIdent reports whether id is a col.field (or table.col.field)
 // reference into a knownColumn.arrayOfStructs column, returning its
 // col ->> '$[*].field' replacement when so — see this file's top doc
 // comment.
-func (r *arrayOfStructRewriter) rewriteIdent(id *parser.Ident) (parser.Expr, bool) {
+func (r *exprRewriter) rewriteIdent(id *parser.Ident) (parser.Expr, bool) {
 	if r.isBound(id.Parts[0]) {
 		return nil, false
 	}
@@ -430,7 +453,7 @@ func (r *arrayOfStructRewriter) rewriteIdent(id *parser.Ident) (parser.Expr, boo
 // recordArrayOfStructAccess builds id's col ->> '$[*].field' replacement
 // and records an info diagnostic at id's original position explaining the
 // rewrite — see knownColumn.arrayOfStructs' doc comment (tables.go).
-func (r *arrayOfStructRewriter) recordArrayOfStructAccess(id *parser.Ident, colParts []string, field string) parser.Expr {
+func (r *exprRewriter) recordArrayOfStructAccess(id *parser.Ident, colParts []string, field string) parser.Expr {
 	replacement := arrayOfStructAccess(colParts, field)
 	r.diagnostics = append(r.diagnostics, diagnosticAt(id, DiagnosticInfo, "array-of-struct-access-rewritten",
 		fmt.Sprintf("%s is an array of structs, not JSON -- rewrote %s to %s.",

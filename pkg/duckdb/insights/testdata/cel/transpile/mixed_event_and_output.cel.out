@@ -11,4 +11,4 @@ OUTPUT SQL
 ((output::JSON->>?) = ?)
 
 OUTPUT ARGS
-[$.data.ok true]
+[$.ok true]

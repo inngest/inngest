@@ -123,6 +123,11 @@ var (
 
 var ErrQueueShardNotFound = fmt.Errorf("could not find queue shard for the specified name")
 
+// ErrQueueShardUnavailable is returned for a queue shard that is configured
+// but not connected.  the shard connects again in the background, so the
+// caller must retry the work later and must not drop it.
+var ErrQueueShardUnavailable = fmt.Errorf("queue shard unavailable")
+
 func ShardLeaseRenewalRetryableError(err error) bool {
 	switch {
 	case errors.Is(err, ErrShardLeaseNotFound):

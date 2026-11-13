@@ -300,6 +300,15 @@ export function renderCell(
       );
     }
     case InsightsColumnType.Json:
+      // A JSON string scalar (e.g. a projected `data.user.id`) shows as its
+      // text, not JSON-encoded w/ quotes, same as a String column would.
+      if (typeof value === 'string') {
+        return (
+          <CopyableCell value={value}>
+            <TextCell>{value}</TextCell>
+          </CopyableCell>
+        );
+      }
       return (
         <CopyableCell value={JSON.stringify(value)}>
           <TextCell>{JSON.stringify(value)}</TextCell>

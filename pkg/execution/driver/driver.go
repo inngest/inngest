@@ -178,6 +178,7 @@ func MarshalV1(
 			Attempt:                   attempt,
 			MaxAttempts:               maxAttempts,
 			DisableImmediateExecution: md.Config.ForceStepPlan,
+			Capabilities:              []string{CapabilitySubscribe},
 		},
 		Version: md.Config.RequestVersion,
 		UseAPI:  true,

@@ -123,7 +123,12 @@ function CellValueDisplay({
     // useful content, so route them through the same JSON rendering a
     // Json-typed column gets (see InsightsQueryTab.tsx's renderCell for
     // the equivalent fix in the grid cell itself).
-    if (columnType === InsightsColumnType.Json || typeof value === 'object') {
+    // A JSON column's string scalar falls through to the plaintext case
+    // below, so it shows unquoted like the grid cell does.
+    if (
+      (columnType === InsightsColumnType.Json && typeof value !== 'string') ||
+      typeof value === 'object'
+    ) {
       const rendered = buildJsonCellRender(columnPathHints, value, pathCreator);
       return { ...rendered, language: 'json' };
     }

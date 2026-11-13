@@ -117,6 +117,7 @@ func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explici
 		kcs = append(kcs, knownColumn{
 			colType:   inferType(item.Expr, scope),
 			pathHints: rootHint(resolveItemHint(item.Expr, scope)),
+			json:      isJSONValue(item.Expr, scope),
 		})
 	}
 

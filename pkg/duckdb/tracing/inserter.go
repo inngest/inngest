@@ -34,8 +34,12 @@ type Span struct {
 
 	// Attributes is always set (a JSON object).
 	Attributes json.RawMessage
-	// Output and Input are nil when the span carries none (stored as NULL).
+	// Output and Error are the span's output envelope split
+	// (cqrs.SplitSpanOutputEnvelope): Output is its data value and Error its
+	// error value, nil unless the span failed. Output, Error and Input are
+	// nil when the span carries none (stored as NULL).
 	Output json.RawMessage
+	Error  json.RawMessage
 	Input  json.RawMessage
 }
 
@@ -110,7 +114,7 @@ func NewDuckDBInserter(db *sql.DB) *DuckDBInserter {
 var spanColumns = []string{
 	"account_id", "env_id", "app_id", "app_name", "function_id", "function_slug",
 	"run_id", "run_queued_at", "trace_id", "span_id", "parent_span_id", "name",
-	"start_time", "end_time", "attributes", "output", "input",
+	"start_time", "end_time", "attributes", "output", "error", "input",
 }
 
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
@@ -122,7 +126,7 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 		rows[i] = []any{
 			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
 			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
-			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
+			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input),
 		}
 	}
 	if err := d.insert(ctx, "inngest.run_trace_spans", spanColumns, rows); err != nil {

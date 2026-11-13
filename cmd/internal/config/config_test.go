@@ -796,3 +796,38 @@ invalid: yaml: content:
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error parsing config file")
 }
+
+func TestNonDefaultFlags(t *testing.T) {
+	setupTest()
+
+	t.Setenv("INNGEST_DUCKDB", "true")
+	require.NoError(t, loadEnvironmentVariables())
+
+	var got map[string]bool
+	cmd := &cli.Command{
+		Name: "dev",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "duckdb"},
+			&cli.BoolFlag{Name: "persist"},
+			&cli.IntFlag{Name: "port", Value: 8288},
+			&cli.IntFlag{Name: "tick", Value: 150},
+			&cli.StringFlag{Name: "host"},
+			&cli.StringSliceFlag{Name: "sdk-url"},
+			&cli.StringSliceFlag{Name: "unused-slice"},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			got = NonDefaultFlags(cmd)
+			return nil
+		},
+	}
+
+	// --port is explicitly set to its default, so it should not count.
+	err := cmd.Run(context.Background(), []string{"dev", "--port", "8288", "--tick", "10", "-sdk-url", "http://localhost:3000/api/inngest"})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]bool{
+		"duckdb":  true, // from env
+		"tick":    true,
+		"sdk-url": true,
+	}, got)
+}

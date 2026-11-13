@@ -7,6 +7,12 @@ local rv       = ARGV[2] -- request version
 local sat      = ARGV[3] -- started at
 local hasAI    = ARGV[4] -- has AI
 
+-- a finalized run has no metadata hash.  a write here makes a new hash for a
+-- run that no longer exists, and the caller believes the run is still there.
+if redis.call("HEXISTS", keyMetadata, "id") == 0 then
+  return 1
+end
+
 local function is_field_empty(field, emptyval)
   local val = redis.call("HGET", keyMetadata, field)
    -- 0.0 is for lua 5.4 and redis nil is lua false

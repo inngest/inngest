@@ -485,6 +485,13 @@ type SpanMetadata struct {
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
+type SpanTick struct {
+	ID      string     `json:"id"`
+	Sources []string   `json:"sources"`
+	At      time.Time  `json:"at"`
+	ReadAt  *time.Time `json:"readAt,omitempty"`
+}
+
 type StepError struct {
 	Message string      `json:"message"`
 	Name    *string     `json:"name,omitempty"`
@@ -1440,6 +1447,8 @@ const (
 	StepOpWaitForEvent  StepOp = "WAIT_FOR_EVENT"
 	StepOpAiGateway     StepOp = "AI_GATEWAY"
 	StepOpWaitForSignal StepOp = "WAIT_FOR_SIGNAL"
+	StepOpSubscribe     StepOp = "SUBSCRIBE"
+	StepOpInboxRead     StepOp = "INBOX_READ"
 )
 
 var AllStepOp = []StepOp{
@@ -1449,11 +1458,13 @@ var AllStepOp = []StepOp{
 	StepOpWaitForEvent,
 	StepOpAiGateway,
 	StepOpWaitForSignal,
+	StepOpSubscribe,
+	StepOpInboxRead,
 }
 
 func (e StepOp) IsValid() bool {
 	switch e {
-	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal:
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal, StepOpSubscribe, StepOpInboxRead:
 		return true
 	}
 	return false

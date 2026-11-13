@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -26,17 +24,25 @@ type Summary struct {
 }
 
 // Timings reports how much time GenerateAndInsert's two stages actually
-// spent working. Generate and Insert are each a sum across every goroutine
-// that did that kind of work — the single generator goroutine for Generate,
-// every parallel Appender worker for Insert — not wall-clock, since
-// GenerateAndInsert deliberately overlaps batch N+1's generation with batch
-// N's insert (see its own doc comment). Their sum can therefore exceed the
-// stage's real elapsed time; a caller wanting that overlap benefit
-// quantified should compare Generate+Insert against its own wall-clock
-// measurement around the call.
+// spent working. Generate is the generator goroutine's time and Insert the
+// sum across every table writer, not wall-clock: generation overlaps
+// inserts, and the tables (and writer sets) write concurrently, so their
+// sum can exceed the real elapsed time.
 type Timings struct {
 	Generate time.Duration
 	Insert   time.Duration
+	// Tables has one entry per lake table, in seedTables order.
+	Tables []TableTimings
+}
+
+// TableTimings is one table's writers' cumulative work.
+type TableTimings struct {
+	Table   string
+	Rows    int
+	Flushes int
+	// Busy is the summed time this table's writers spent building rows,
+	// sending them and committing.
+	Busy time.Duration
 }
 
 // Column kind lists mirror each table's column order exactly, as created by
@@ -53,8 +59,8 @@ var (
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, queued_at
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // scheduled_at, started_at, ended_at
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
-		duckdbdriver.QuackColumnVarchar,                                                          // status
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
+		duckdbdriver.QuackColumnVarchar,                                                                                                    // status
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, inputs, output, error
 		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
 		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
 		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
@@ -69,13 +75,13 @@ var (
 		duckdbdriver.QuackColumnVarchar,                                          // name
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // attributes, output, error, input
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, internal_id, received_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // source, source_id, event_id, event_name
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnVarchar, // event_data, event_v, event_ts, event_meta
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
@@ -90,7 +96,7 @@ var (
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 )
@@ -104,105 +110,70 @@ type indexedBatch struct {
 	rows  []GeneratedRun
 }
 
-// appenderSet holds one dedicated connection's three table Appenders,
-// created once and reused across every batch a worker processes — DuckDB
-// Appenders are not safe for concurrent use, so each parallel worker must
-// own its own connection (obtained via Connector.Connect directly, bypassing
-// *sql.DB's pool — see duckdbdriver.OpenConnector's doc comment for why) and its
-// own set.
-type appenderSet struct {
-	conn     driver.Conn
-	runs     *duckdbdriver.QuackAppender
-	spans    *duckdbdriver.QuackAppender
-	events   *duckdbdriver.QuackAppender
-	metadata *duckdbdriver.QuackAppender
+// seedTable is one lake table this tool writes, w/ how to pull its rows out
+// of a batch of generated runs.
+type seedTable struct {
+	name    string
+	columns []duckdbdriver.QuackColumnKind
+	// rows appends each row's values for this table to dst.
+	rows func(dst [][]any, batch []GeneratedRun) [][]any
 }
 
-func newAppenderSet(ctx context.Context, connector *duckdbdriver.Connector) (*appenderSet, error) {
-	conn, err := connector.Connect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbseed: opening appender connection: %w", err)
-	}
-
-	runs, err := duckdbdriver.NewQuackAppenderFromConn(ctx, conn, duckdbdriver.DuckLakeAlias, "main", "runs", runColumns)
-	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("duckdbseed: creating runs appender: %w", err)
-	}
-	spans, err := duckdbdriver.NewQuackAppenderFromConn(ctx, conn, duckdbdriver.DuckLakeAlias, "main", "run_trace_spans", spanColumns)
-	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("duckdbseed: creating run_trace_spans appender: %w", err)
-	}
-	events, err := duckdbdriver.NewQuackAppenderFromConn(ctx, conn, duckdbdriver.DuckLakeAlias, "main", "events", eventColumns)
-	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("duckdbseed: creating events appender: %w", err)
-	}
-	metadata, err := duckdbdriver.NewQuackAppenderFromConn(ctx, conn, duckdbdriver.DuckLakeAlias, "main", "run_metadata", metadataColumns)
-	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("duckdbseed: creating run_metadata appender: %w", err)
-	}
-
-	return &appenderSet{conn: conn, runs: runs, spans: spans, events: events, metadata: metadata}, nil
+// seedTables are written in this order, but each by its own writers (see
+// drainAndInsert), so they flush independently.
+var seedTables = []seedTable{
+	{name: "runs", columns: runColumns, rows: func(dst [][]any, batch []GeneratedRun) [][]any {
+		for _, g := range batch {
+			dst = append(dst, runRowValues(g.Run))
+		}
+		return dst
+	}},
+	{name: "run_trace_spans", columns: spanColumns, rows: func(dst [][]any, batch []GeneratedRun) [][]any {
+		for _, g := range batch {
+			for _, s := range g.Spans {
+				dst = append(dst, spanRowValues(s))
+			}
+		}
+		return dst
+	}},
+	{name: "events", columns: eventColumns, rows: func(dst [][]any, batch []GeneratedRun) [][]any {
+		for _, g := range batch {
+			for _, e := range g.Events {
+				dst = append(dst, eventRowValues(e))
+			}
+		}
+		return dst
+	}},
+	{name: "run_metadata", columns: metadataColumns, rows: func(dst [][]any, batch []GeneratedRun) [][]any {
+		for _, g := range batch {
+			for _, m := range g.Metadata {
+				dst = append(dst, metadataRowValues(m))
+			}
+		}
+		return dst
+	}},
 }
 
-func (a *appenderSet) close(ctx context.Context) error {
-	return errors.Join(a.runs.Close(ctx), a.spans.Close(ctx), a.events.Close(ctx), a.metadata.Close(ctx), a.conn.Close())
+// InsertOptions tunes how generated runs are written.
+type InsertOptions struct {
+	// BatchSize is how many runs (and their spans/events/metadata) go into
+	// one flush per table. Clamped to >= 1.
+	BatchSize int
+	// Parallelism is how many writer sets run, each w/ one writer (its own
+	// quack connection + appender) per table. Clamped to >= 1. Values > 1
+	// mean concurrent commits to the same table.
+	Parallelism int
+	// OnProgress, if non-nil, is called once each batch is flushed to every
+	// table, w/ that batch's own 1-based index and the total batch count
+	// (stable regardless of completion order), plus the cumulative number of
+	// runs written so far and the overall total. Calls are serialized.
+	OnProgress func(batchIndex, totalBatches, done, total int)
 }
 
-// insertBatch flattens one chunk of generated runs into its four tables'
-// rows and appends them — in the run/event/span/metadata order the tool
-// has always used (metadata appended last, after spans) — flushing each
-// appender once the batch is fully appended.
-func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Summary, error) {
-	var runs []RunRow
-	var spans []SpanRow
-	var events []EventRow
-	var metadataRows []MetadataRow
-	for _, g := range batch {
-		runs = append(runs, g.Run)
-		spans = append(spans, g.Spans...)
-		events = append(events, g.Events...)
-		metadataRows = append(metadataRows, g.Metadata...)
-	}
-
-	for _, r := range runs {
-		if err := a.runs.AppendRow(runRowValues(r)...); err != nil {
-			return Summary{}, fmt.Errorf("duckdbseed: appending run %s: %w", r.RunID, err)
-		}
-	}
-	for _, e := range events {
-		if err := a.events.AppendRow(eventRowValues(e)...); err != nil {
-			return Summary{}, fmt.Errorf("duckdbseed: appending event %s: %w", e.InternalID, err)
-		}
-	}
-	for _, s := range spans {
-		if err := a.spans.AppendRow(spanRowValues(s)...); err != nil {
-			return Summary{}, fmt.Errorf("duckdbseed: appending span %s: %w", s.SpanID, err)
-		}
-	}
-	for _, md := range metadataRows {
-		if err := a.metadata.AppendRow(metadataRowValues(md)...); err != nil {
-			return Summary{}, fmt.Errorf("duckdbseed: appending metadata for span %s: %w", md.SpanID, err)
-		}
-	}
-
-	if err := a.runs.Flush(ctx); err != nil {
-		return Summary{}, fmt.Errorf("duckdbseed: flushing runs appender: %w", err)
-	}
-	if err := a.events.Flush(ctx); err != nil {
-		return Summary{}, fmt.Errorf("duckdbseed: flushing events appender: %w", err)
-	}
-	if err := a.spans.Flush(ctx); err != nil {
-		return Summary{}, fmt.Errorf("duckdbseed: flushing spans appender: %w", err)
-	}
-	if err := a.metadata.Flush(ctx); err != nil {
-		return Summary{}, fmt.Errorf("duckdbseed: flushing metadata appender: %w", err)
-	}
-
-	return Summary{Runs: len(runs), Spans: len(spans), Events: len(events), Metadata: len(metadataRows)}, nil
+func (o InsertOptions) normalized() InsertOptions {
+	o.BatchSize = max(o.BatchSize, 1)
+	o.Parallelism = max(o.Parallelism, 1)
+	return o
 }
 
 // runRowValues matches runColumns' order exactly. event_ids (VARCHAR[]) is
@@ -224,7 +195,7 @@ func runRowValues(r RunRow) []any {
 		r.AccountID, r.EnvID, r.RunID, r.QueuedAt,
 		scheduledAt, nullableTime(r.StartedAt), nullableTime(r.EndedAt),
 		r.AppID, r.AppName, r.FunctionID, r.FunctionSlug, r.Status,
-		nonEmptyJSON(r.Attributes), r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
+		nonEmptyJSON(r.Attributes), r.Inputs, nullableJSON(r.Output), nullableJSON(r.Error), eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
 		"false", // is_deferred — this tool never generates deferred runs
 		nil,     // defer_parent_fn_slug
 		"[]",    // defer_parent_run_ids
@@ -241,7 +212,7 @@ func spanRowValues(s SpanRow) []any {
 	return []any{
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
 		s.AppID, s.AppName, s.FunctionID, s.FunctionSlug, s.Name, s.StartTime, s.EndTime,
-		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
+		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input),
 		s.EndTime, // bucket_at: a span is written when it ends
 	}
 }
@@ -303,13 +274,7 @@ func nullableTime(t *time.Time) any {
 	return *t
 }
 
-// nullableJSON substitutes SQL NULL for an empty JSON-column value --
-// jsonText (sample.go) returns "" for a sampled column that was itself SQL
-// NULL, and an empty string is not valid JSON, so writing it verbatim into
-// a JSON-typed column (output/input) fails at commit time ("Malformed
-// JSON... input length is 0") rather than faithfully reproducing "this
-// span/run had no output/input".
-// nonEmptyJSON supplies "{}" for a NOT NULL VARIANT column with no value.
+// nonEmptyJSON supplies "{}" for a NOT NULL JSON column with no value.
 func nonEmptyJSON(s string) string {
 	if s == "" {
 		return `{}`
@@ -317,6 +282,12 @@ func nonEmptyJSON(s string) string {
 	return s
 }
 
+// nullableJSON substitutes SQL NULL for an empty JSON-column value --
+// jsonText (sample.go) returns "" for a sampled column that was itself SQL
+// NULL, and an empty string is not valid JSON, so writing it verbatim into
+// a JSON text column (output/error/input) would leave readers an unparseable
+// value rather than faithfully reproducing "this span/run had no
+// output/input".
 func nullableJSON(s string) any {
 	if s == "" {
 		return nil
@@ -361,22 +332,17 @@ func sessionsLiteral(pairs []SessionPair) any {
 	return string(b)
 }
 
-// InsertGeneratedRuns writes every generated run, its span tree, and its
-// trigger events via parallelism concurrent Appenders (each its own
-// connection to connector's embedded database), batchSize runs per flush.
-//
-// onProgress, if non-nil, is called once after each batch is flushed, with
-// that batch's own 1-based index and the total batch count (its real
-// identity — stable regardless of completion order), plus the cumulative
-// number of runs written so far and the overall total. Calls are serialized
-// regardless of parallelism. Safe to leave nil.
-func InsertGeneratedRuns(ctx context.Context, connector *duckdbdriver.Connector, generated []GeneratedRun, batchSize, parallelism int, onProgress func(batchIndex, totalBatches, done, total int)) (Summary, error) {
-	batchSize = max(batchSize, 1)
-	parallelism = max(parallelism, 1)
+// InsertGeneratedRuns writes every generated run, its span tree, its
+// trigger events and its metadata, opts.BatchSize runs per flush (see
+// InsertOptions).
+func InsertGeneratedRuns(ctx context.Context, connector *duckdbdriver.Connector, generated []GeneratedRun, opts InsertOptions) (Summary, error) {
+	opts = opts.normalized()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var chunks [][]GeneratedRun
-	for start := 0; start < len(generated); start += batchSize {
-		chunks = append(chunks, generated[start:min(start+batchSize, len(generated))])
+	for start := 0; start < len(generated); start += opts.BatchSize {
+		chunks = append(chunks, generated[start:min(start+opts.BatchSize, len(generated))])
 	}
 
 	work := make(chan indexedBatch)
@@ -391,121 +357,182 @@ func InsertGeneratedRuns(ctx context.Context, connector *duckdbdriver.Connector,
 		}
 	}()
 
-	summary, _, err := drainAndInsert(ctx, connector, work, parallelism, len(generated), len(chunks), onProgress, nil)
+	summary, _, err := drainAndInsert(ctx, connector, work, opts, len(generated), len(chunks))
 	return summary, err
 }
 
-// GenerateAndInsert generates cfg.RunCount runs in batchSize-sized chunks
-// and inserts each chunk as soon as it's generated, instead of building the
-// entire run set in memory before any insert begins. Generation runs on a
-// single dedicated goroutine — math/rand.Rand is not safe for concurrent
-// use — feeding the same worker pool InsertGeneratedRuns uses, so batch N+1
-// can be generated while batch N is still being appended.
-//
-// batchSize, parallelism, and onProgress mean exactly what they do on
-// InsertGeneratedRuns. The returned Timings' Generate/Insert are cumulative
-// across the generator goroutine and every insert worker respectively — see
-// Timings' doc comment for why that isn't the same as wall-clock.
-func GenerateAndInsert(ctx context.Context, connector *duckdbdriver.Connector, rng *rand.Rand, tmpl Templates, cfg GenerateConfig, batchSize, parallelism int, onProgress func(batchIndex, totalBatches, done, total int)) (Summary, Timings, error) {
-	batchSize = max(batchSize, 1)
-	parallelism = max(parallelism, 1)
+// GenerateAndInsert generates cfg.RunCount runs in opts.BatchSize-sized
+// chunks and inserts each chunk as soon as it's generated, instead of
+// building the entire run set in memory before any insert begins.
+// Generation runs on a single dedicated goroutine (math/rand.Rand is not
+// safe for concurrent use) feeding the same writers InsertGeneratedRuns
+// uses, so batch N+1 can be generated while batch N is still being written.
+func GenerateAndInsert(ctx context.Context, connector *duckdbdriver.Connector, rng *rand.Rand, tmpl Templates, cfg GenerateConfig, opts InsertOptions) (Summary, Timings, error) {
+	opts = opts.normalized()
 	total := cfg.RunCount
-	totalBatches := (total + batchSize - 1) / batchSize
+	totalBatches := (total + opts.BatchSize - 1) / opts.BatchSize
+
+	// Cancelled once the writers are done, so a write error can't leave the
+	// generator blocked on work forever.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	var genNanos atomic.Int64
 	work := make(chan indexedBatch)
-	var genErr error
+	genDone := make(chan error, 1)
 	go func() {
 		defer close(work)
 		remaining := total
 		for i := 0; remaining > 0; i++ {
-			n := min(batchSize, remaining)
+			n := min(opts.BatchSize, remaining)
 			start := time.Now()
 			rows, err := GenerateRuns(rng, tmpl, GenerateConfig{RunCount: n, Window: cfg.Window, Now: cfg.Now})
 			genNanos.Add(int64(time.Since(start)))
 			if err != nil {
-				genErr = err
+				genDone <- err
 				return
 			}
 			select {
 			case work <- indexedBatch{index: i + 1, rows: rows}:
 			case <-ctx.Done():
+				genDone <- nil
 				return
 			}
 			remaining -= n
 		}
+		genDone <- nil
 	}()
 
-	summary, insertNanos, err := drainAndInsert(ctx, connector, work, parallelism, total, totalBatches, onProgress, new(atomic.Int64))
-	timings := Timings{Generate: time.Duration(genNanos.Load()), Insert: time.Duration(insertNanos)}
+	summary, timings, err := drainAndInsert(ctx, connector, work, opts, total, totalBatches)
+	cancel()
+	genErr := <-genDone
+	timings.Generate = time.Duration(genNanos.Load())
 	if err != nil {
 		return summary, timings, err
 	}
-	if genErr != nil {
-		return summary, timings, genErr
-	}
-	return summary, timings, nil
+	return summary, timings, genErr
 }
 
-// drainAndInsert runs exactly parallelism persistent worker goroutines,
-// each with its own appenderSet, draining work until the channel closes.
-// Shared by InsertGeneratedRuns (work is a pre-chunked slice) and
-// GenerateAndInsert (work is generated just-in-time) so both get identical
-// batching/parallelism/progress semantics from one implementation.
+// batchState tracks one batch across its per-table writers.
+type batchState struct {
+	index int
+	runs  int
+	// remaining counts tables that haven't flushed this batch yet.
+	remaining atomic.Int32
+}
+
+type tableWork struct {
+	batch *batchState
+	rows  []GeneratedRun
+}
+
+// drainAndInsert writes every batch from work until it closes, w/
+// opts.Parallelism writers per table, each its own quack connection and
+// appender. A dispatcher hands each batch to every table's queue, so the
+// tables flush in parallel and a slow table (spans) only holds back its own
+// writers until its queue fills.
 //
-// insertNanos, if non-nil, accumulates every worker's own insertBatch
-// timing (see Timings' doc comment); InsertGeneratedRuns has no use for it
-// and passes nil. The second return value is always insertNanos' final
-// total (0 when insertNanos was nil), returned by value since the caller's
-// own accumulator may go out of scope before it can be read otherwise.
-func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work <-chan indexedBatch, parallelism, total, totalBatches int, onProgress func(batchIndex, totalBatches, done, total int), insertNanos *atomic.Int64) (Summary, int64, error) {
+// A batch is reported to opts.OnProgress once its last table has flushed.
+func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work <-chan indexedBatch, opts InsertOptions, total, totalBatches int) (Summary, Timings, error) {
 	var (
-		mu      sync.Mutex
-		summary Summary
+		mu       sync.Mutex
+		summary  Summary
+		timings  Timings
+		runsDone int
 	)
+	timings.Tables = make([]TableTimings, len(seedTables))
+	for i, t := range seedTables {
+		timings.Tables[i].Table = t.name
+	}
 
 	g, gctx := errgroup.WithContext(ctx)
-	for range parallelism {
-		g.Go(func() error {
-			appenders, err := newAppenderSet(gctx, connector)
-			if err != nil {
-				return err
-			}
-			defer appenders.close(gctx)
 
-			for b := range work {
-				start := time.Now()
-				batchSummary, err := appenders.insertBatch(gctx, b.rows)
-				if insertNanos != nil {
-					insertNanos.Add(int64(time.Since(start)))
+	queues := make([]chan tableWork, len(seedTables))
+	for i := range queues {
+		queues[i] = make(chan tableWork, 1)
+	}
+	g.Go(func() error {
+		defer func() {
+			for _, q := range queues {
+				close(q)
+			}
+		}()
+		for {
+			var b indexedBatch
+			var ok bool
+			select {
+			case b, ok = <-work:
+			case <-gctx.Done():
+				return nil
+			}
+			if !ok {
+				return nil
+			}
+			st := &batchState{index: b.index, runs: len(b.rows)}
+			st.remaining.Store(int32(len(seedTables)))
+			for _, q := range queues {
+				select {
+				case q <- tableWork{batch: st, rows: b.rows}:
+				case <-gctx.Done():
+					return nil
 				}
+			}
+		}
+	})
+
+	for ti, table := range seedTables {
+		for range opts.Parallelism {
+			g.Go(func() error {
+				conn, err := connector.Connect(gctx)
 				if err != nil {
-					return err
+					return fmt.Errorf("duckdbseed: opening %s connection: %w", table.name, err)
 				}
-
-				mu.Lock()
-				summary.Runs += batchSummary.Runs
-				summary.Spans += batchSummary.Spans
-				summary.Events += batchSummary.Events
-				summary.Metadata += batchSummary.Metadata
-				if onProgress != nil {
-					onProgress(b.index, totalBatches, summary.Runs, total)
+				defer conn.Close()
+				appender, err := duckdbdriver.NewQuackAppenderFromConn(gctx, conn, duckdbdriver.DuckLakeAlias, "main", table.name, table.columns)
+				if err != nil {
+					return fmt.Errorf("duckdbseed: creating %s appender: %w", table.name, err)
 				}
-				mu.Unlock()
-			}
-			return nil
-		})
+				defer appender.Close(gctx)
+
+				var rows [][]any
+				for w := range queues[ti] {
+					start := time.Now()
+					rows = table.rows(rows[:0], w.rows)
+					for _, r := range rows {
+						if err := appender.AppendRow(r...); err != nil {
+							return fmt.Errorf("duckdbseed: appending %s row: %w", table.name, err)
+						}
+					}
+					if err := appender.Flush(gctx); err != nil {
+						return fmt.Errorf("duckdbseed: flushing %s batch %d: %w", table.name, w.batch.index, err)
+					}
+					busy := time.Since(start)
+
+					mu.Lock()
+					tt := &timings.Tables[ti]
+					tt.Rows += len(rows)
+					tt.Flushes++
+					tt.Busy += busy
+					timings.Insert += busy
+					if w.batch.remaining.Add(-1) == 0 {
+						runsDone += w.batch.runs
+						if opts.OnProgress != nil {
+							opts.OnProgress(w.batch.index, totalBatches, runsDone, total)
+						}
+					}
+					mu.Unlock()
+				}
+				return nil
+			})
+		}
 	}
 
-	waitErr := g.Wait()
-	var total64 int64
-	if insertNanos != nil {
-		total64 = insertNanos.Load()
-	}
-	if waitErr != nil {
-		return summary, total64, waitErr
-	}
-	return summary, total64, nil
+	err := g.Wait()
+	summary.Runs = timings.Tables[0].Rows
+	summary.Spans = timings.Tables[1].Rows
+	summary.Events = timings.Tables[2].Rows
+	summary.Metadata = timings.Tables[3].Rows
+	return summary, timings, err
 }
 
 // sortRuns, sortSpans, and sortEvents sort a batch's rows in place to match

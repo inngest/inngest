@@ -274,6 +274,12 @@ func testMetadata(t *testing.T) sv2.Metadata {
 // multi-column read is unreliable. Reads are explicitly out of scope for this
 // phase of the POC (the query-layer spec owns them), so these tests work by
 // name instead of expanding scope here.
+// jsonColumns are the lake's JSON text columns (schema.TypeJSON).
+var jsonColumns = map[string]bool{
+	"attributes": true, "inputs": true, "input": true, "output": true, "error": true,
+	"values": true, "event_data": true, "event_meta": true,
+}
+
 func selectRows(t *testing.T, db *sql.DB, query string, args ...any) []map[string]any {
 	t.Helper()
 
@@ -294,7 +300,15 @@ func selectRows(t *testing.T, db *sql.DB, query string, args ...any) []map[strin
 
 		row := make(map[string]any, len(cols))
 		for i, col := range cols {
-			row[col] = *(dest[i].(*any))
+			v := *(dest[i].(*any))
+			// The lake stores JSON columns as text: decode it the way the
+			// readers' JSON casts would.
+			if s, ok := v.(string); ok && jsonColumns[col] {
+				var decoded any
+				require.NoError(t, json.Unmarshal([]byte(s), &decoded), "column %q", col)
+				v = decoded
+			}
+			row[col] = v
 		}
 		out = append(out, row)
 	}

@@ -191,7 +191,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			RequestVersion: input.Metadata.Config.RequestVersion,
 			StartedAt:      input.Metadata.Config.StartedAt,
 			HasAI:          input.Metadata.Config.HasAI,
-		}); err != nil {
+		}); err != nil && !state.IsRunNotFound(err) {
 			return fmt.Errorf("updating metadata to force step plan: %w", err)
 		}
 		// Update the local metadata so subsequent operations see the change
@@ -424,6 +424,13 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				)
 			}
 
+		case enums.OpcodeSubscribeRead:
+			// A lazy op that only draws a read of an inbox. It never moves the
+			// run to async, and a failure to draw it never fails the run.
+			if err := tracing.InboxRead(ctx, c.TracerProvider, input.Metadata, op, time.Now()); err != nil {
+				l.Warn("error drawing an inbox read in checkpoint", "error", err, "step_id", sanitizeLogValue(op.ID))
+			}
+
 		case enums.OpcodeDeferAbort:
 			// Sync listeners: see the OpcodeDeferAdd case above.
 			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, input.Metadata, op); err != nil {
@@ -650,6 +657,11 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", md.ID.RunID.String(),
 				)
+			}
+
+		case enums.OpcodeSubscribeRead:
+			if err := tracing.InboxRead(ctx, c.TracerProvider, &md, op, time.Now()); err != nil {
+				l.Warn("error drawing an inbox read in checkpoint", "error", err, "step_id", sanitizeLogValue(op.ID))
 			}
 
 		case enums.OpcodeDeferAbort:

@@ -53,10 +53,16 @@ func generateRun(rng *rand.Rand, tmpl Templates, cfg GenerateConfig) GeneratedRu
 		endedAt = &t
 	}
 
+	// Picked in the order the RunRow literal used to draw them from rng, so
+	// a seed still generates the same runs.
+	runID := newULID(rng, queuedAt)
+	status := pickString(rng, tmpl.Statuses, "Completed")
+	inputs := pickString(rng, tmpl.Inputs, `{}`)
+	output := pickRunOutput(rng, tmpl.Outputs)
 	run := RunRow{
 		AccountID:    tenant.AccountID,
 		EnvID:        tenant.EnvID,
-		RunID:        newULID(rng, queuedAt),
+		RunID:        runID,
 		QueuedAt:     queuedAt,
 		StartedAt:    startedAt,
 		EndedAt:      endedAt,
@@ -64,10 +70,11 @@ func generateRun(rng *rand.Rand, tmpl Templates, cfg GenerateConfig) GeneratedRu
 		AppName:      tenant.AppName,
 		FunctionID:   tenant.FunctionID,
 		FunctionSlug: tenant.FunctionSlug,
-		Status:       pickString(rng, tmpl.Statuses, "Completed"),
+		Status:       status,
 		Attributes:   rootSpanAttributes(trace),
-		Inputs:       pickString(rng, tmpl.Inputs, `{}`),
-		Output:       pickString(rng, tmpl.Outputs, `{}`),
+		Inputs:       inputs,
+		Output:       output.Output,
+		Error:        output.Error,
 		EventIDs:     eventIDs,
 		TraceID:      trace.TraceID,
 	}
@@ -136,6 +143,7 @@ func generateSpanTree(trace TraceTemplate, run RunRow) []SpanRow {
 			ParentSpanID: s.ParentSpanID,
 			Attributes:   s.Attributes,
 			Output:       s.Output,
+			Error:        s.Error,
 			Input:        s.Input,
 		}
 	}
@@ -252,6 +260,13 @@ func randomTimeInWindow(rng *rand.Rand, cfg GenerateConfig) time.Time {
 	}
 	offset := time.Duration(rng.Int63n(int64(cfg.Window)))
 	return cfg.Now.Add(-offset)
+}
+
+func pickRunOutput(rng *rand.Rand, options []RunOutput) RunOutput {
+	if len(options) == 0 {
+		return RunOutput{Output: `{}`}
+	}
+	return options[rng.Intn(len(options))]
 }
 
 func pickString(rng *rand.Rand, options []string, fallback string) string {

@@ -1934,6 +1934,27 @@ func TestCapacityReleaseRequestConversion(t *testing.T) {
 			},
 		},
 		{
+			name: "forced semaphore release",
+			input: &CapacityReleaseRequest{
+				IdempotencyKey:         "requeue-key",
+				AccountID:              accountID,
+				LeaseID:                leaseID,
+				ForceReleaseSemaphores: true,
+			},
+			expected: &pb.CapacityReleaseRequest{
+				IdempotencyKey:         "requeue-key",
+				AccountId:              accountID.String(),
+				LeaseId:                leaseID.String(),
+				LeaseIssuedAt:          nil,
+				ForceReleaseSemaphores: true,
+				Source: &pb.LeaseSource{
+					Service:           pb.ConstraintApiLeaseService_CONSTRAINT_API_LEASE_SERVICE_UNSPECIFIED,
+					Location:          pb.ConstraintApiCallerLocation_CONSTRAINT_API_CALLER_LOCATION_UNSPECIFIED,
+					RunProcessingMode: pb.ConstraintApiRunProcessingMode_CONSTRAINT_API_RUN_PROCESSING_MODE_BACKGROUND,
+				},
+			},
+		},
+		{
 			name:     "nil request",
 			input:    nil,
 			expected: nil,

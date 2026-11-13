@@ -243,6 +243,68 @@ func TestSemaphoreManualRelease(t *testing.T) {
 	require.Equal(t, "1", val, "usage should still be 1 after manual release (not decremented)")
 }
 
+// a requeued start item asks for its lease release to decrement the manual
+// semaphore.  the second release of the same lease is a no-op, so a forced
+// release after the scavenger or a concurrent release cannot double count.
+func TestSemaphoreForcedReleaseDecrementsManual(t *testing.T) {
+	cm, r, _, clock := newSemaphoreTestEnv(t)
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	sem := SemaphoreConstraint{
+		ID:      "fn:" + fnID.String(),
+		Weight:  1,
+		Release: SemaphoreReleaseManual,
+	}
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+
+	constraints := []ConstraintItem{
+		{Kind: ConstraintKindSemaphore, Semaphore: &sem},
+	}
+
+	_ = r.Set(sem.CapacityKey(accountID), "1")
+
+	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "acq-forced")
+	require.Len(t, resp.Leases, 1)
+	firstLease := resp.Leases[0].LeaseID
+
+	usageKey := sem.UsageKey(accountID)
+	val, _ := r.Get(usageKey)
+	require.Equal(t, "1", val)
+
+	_, err := cm.Release(context.Background(), &CapacityReleaseRequest{
+		AccountID:              accountID,
+		IdempotencyKey:         "release-forced",
+		LeaseID:                firstLease,
+		LeaseIssuedAt:          clock.Now(),
+		ForceReleaseSemaphores: true,
+	})
+	require.NoError(t, err)
+
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "0", val, "forced release must decrement the manual semaphore")
+
+	// the first lease is gone, so forcing it again does nothing.  a new
+	// holder's slot is not stolen.
+	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "acq-forced-2")
+	require.Len(t, resp.Leases, 1)
+
+	_, err = cm.Release(context.Background(), &CapacityReleaseRequest{
+		AccountID:              accountID,
+		IdempotencyKey:         "release-forced-again",
+		LeaseID:                firstLease,
+		LeaseIssuedAt:          clock.Now(),
+		ForceReleaseSemaphores: true,
+	})
+	require.NoError(t, err)
+
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "1", val, "the new holder keeps its slot")
+}
+
 func TestSemaphoreWeight(t *testing.T) {
 	cm, r, _, clock := newSemaphoreTestEnv(t)
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()

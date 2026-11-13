@@ -287,7 +287,7 @@ func TestGetSpansByRunIDSetsOutputIDWhenSpanHasOutputOrInput(t *testing.T) {
 		 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, parent_span_id, attributes, output)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step', ?, ?, 'trace-1', 'output-span', 'root-span', '{}', ?);`,
 		uuid.New().String(), uuid.New().String(), runID.String(), now, appID.String(), "test-app", functionID.String(), "test-fn",
-		now.Add(time.Millisecond), now.Add(500*time.Millisecond), json.RawMessage(`{"data":"done"}`),
+		now.Add(time.Millisecond), now.Add(500*time.Millisecond), json.RawMessage(`"done"`),
 	)
 	require.NoError(t, err)
 
@@ -321,7 +321,10 @@ func TestGetSpansByRunIDErrorsWhenNoSpansFound(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestGetSpanOutputUnwrapsDataEnvelope(t *testing.T) {
+// TestGetSpanOutputReadsSplitColumns checks GetSpanOutput takes a span's
+// already split output/error columns as stored, w/o unwrapping anything: an
+// output that itself looks like an envelope stays as is.
+func TestGetSpanOutputReadsSplitColumns(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 	ctx := t.Context()
@@ -329,20 +332,56 @@ func TestGetSpanOutputUnwrapsDataEnvelope(t *testing.T) {
 
 	runID := ulid.MustNew(ulid.Now(), nil)
 	now := time.Now().UTC()
+	insert := func(spanID string, output, errVal any) {
+		_, err := m.db.ExecContext(ctx,
+			`INSERT INTO inngest.run_trace_spans
+			 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, error, input)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step', ?, ?, 'trace-1', ?, '{}', ?, ?, ?);`,
+			uuid.New().String(), uuid.New().String(), runID.String(), now, uuid.New().String(), "test-app", uuid.New().String(), "test-fn",
+			now, now, spanID, output, errVal, json.RawMessage(`{"input":true}`),
+		)
+		require.NoError(t, err)
+	}
+	insert("ok", json.RawMessage(`{"data":"my-result"}`), nil)
+	insert("failed", nil, json.RawMessage(`{"name":"Error","message":"boom"}`))
+
+	out, err := m.GetSpanOutput(ctx, cqrs.SpanIdentifier{RunID: runID.String(), SpanID: "ok"})
+	require.NoError(t, err)
+	require.False(t, out.IsError)
+	require.Equal(t, `{"data":"my-result"}`, string(out.Data))
+	require.JSONEq(t, `{"input":true}`, string(out.Input))
+
+	out, err = m.GetSpanOutput(ctx, cqrs.SpanIdentifier{RunID: runID.String(), SpanID: "failed"})
+	require.NoError(t, err)
+	require.True(t, out.IsError)
+	require.Equal(t, `{"name":"Error","message":"boom"}`, string(out.Data))
+}
+
+// TestGetSpanOutputKeepsStoredJSON checks a span's output and input come
+// back as the exact text written (key order, big ints), since the lake
+// stores JSON as text.
+func TestGetSpanOutputKeepsStoredJSON(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC()
+	input := `{"z":1,"a":{"n":18446744073709551615,"f":1.50}}`
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.run_trace_spans
 		 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, input)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step', ?, ?, 'trace-1', 'span-1', '{}', ?, ?);`,
 		uuid.New().String(), uuid.New().String(), runID.String(), now, uuid.New().String(), "test-app", uuid.New().String(), "test-fn",
-		now, now, json.RawMessage(`{"data":"my-result"}`), json.RawMessage(`{"input":true}`),
+		now, now, json.RawMessage(`{"b":2,"a":[1,{"x":null},1.50]}`), json.RawMessage(input),
 	)
 	require.NoError(t, err)
 
 	out, err := m.GetSpanOutput(ctx, cqrs.SpanIdentifier{RunID: runID.String(), SpanID: "span-1"})
 	require.NoError(t, err)
-	require.False(t, out.IsError)
-	require.Equal(t, `"my-result"`, string(out.Data))
-	require.JSONEq(t, `{"input":true}`, string(out.Input))
+	require.Equal(t, `{"b":2,"a":[1,{"x":null},1.50]}`, string(out.Data))
+	require.Equal(t, input, string(out.Input))
 }
 
 func TestGetSpanOutputRequiresRunIDAndSpanID(t *testing.T) {

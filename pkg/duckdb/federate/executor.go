@@ -125,8 +125,8 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 		return nil, err
 	}
 	// The federated sources UNION ALL the lake with the delta; keeping
-	// insertion order runs that union, and the delta's casts to VARIANT,
-	// on one thread (about 10x slower on JSON-heavy deltas). Results carry
+	// insertion order runs that union, and the delta's casts, on one thread
+	// (about 10x slower on JSON-heavy deltas). Results carry
 	// no order beyond the query's own ORDER BY, so drop it for this
 	// connection; releaseConn resets it before the connection is pooled.
 	if _, err := conn.ExecContext(ctx, "SET preserve_insertion_order = false;"); err != nil {

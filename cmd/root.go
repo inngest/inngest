@@ -9,9 +9,9 @@ import (
 
 	"github.com/inngest/inngest/cmd/apiv2cli"
 	authcmd "github.com/inngest/inngest/cmd/auth"
+	computecmd "github.com/inngest/inngest/cmd/compute"
 	"github.com/inngest/inngest/cmd/devserver"
 	"github.com/inngest/inngest/cmd/duckdb"
-	imagecmd "github.com/inngest/inngest/cmd/image"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
 	"github.com/inngest/inngest/pkg/api/tel"
@@ -30,7 +30,27 @@ func init() {
 	cli.HelpPrinter = func(w io.Writer, templ string, data interface{}) {
 		defaultHelp(w, templ, data)
 		update.Notify(os.Stderr, inngestversion.Version)
+		sendHelpTelemetry(data)
 	}
+}
+
+// sendHelpEvent is swapped out in tests.
+var sendHelpEvent = func(ctx context.Context, command string, eventContext map[string]any) {
+	tel.SendCommandExecutedEvent(ctx, command, eventContext)
+}
+
+// sendHelpTelemetry reports `inngest dev` help views. Help short-circuits
+// before any Before/Action runs for `dev --help`, `dev -h`, and `dev help`, so
+// this is the only path that sees all of them. Events are flushed by the
+// tel.Wait() after app.Run in execute().
+func sendHelpTelemetry(data any) {
+	cmd, ok := data.(*cli.Command)
+	if !ok || cmd.FullName() != "inngest dev" {
+		return
+	}
+	sendHelpEvent(context.Background(), "inngest dev", map[string]any{
+		"flags": map[string]bool{"help": true},
+	})
 }
 
 // globalFlags are the flags that should be available on all commands
@@ -79,7 +99,9 @@ func execute() {
 				}
 			}
 
-			if cmd.Args().Len() == 0 || cmd.Args().Get(0) != "api" {
+			// `api` and `dev` send their own events w/ flag context (`dev`
+			// help views are sent from the HelpPrinter wrapper).
+			if cmd.Args().Len() == 0 || (cmd.Args().Get(0) != "api" && cmd.Args().Get(0) != "dev") {
 				tel.SendCmdExecutedEvent(ctx, cmd)
 			}
 
@@ -101,7 +123,8 @@ func execute() {
 			authcmd.LoginCommand(),
 			authcmd.LogoutCommand(),
 			authcmd.AuthCommand(),
-			imagecmd.Command(),
+			computecmd.Command(),
+			computecmd.DeployCommand(),
 			apiv2cli.Command(),
 			devserver.Command(),
 			duckdb.Command(),
@@ -116,7 +139,10 @@ func execute() {
 		os.Setenv("LOG_HANDLER", "json")
 	}
 
-	if err := app.Run(context.Background(), os.Args); err != nil {
+	err := app.Run(context.Background(), os.Args)
+	// Flush telemetry sent from paths that skip the root After hook (IE help).
+	tel.Wait()
+	if err != nil {
 		var reported *authcmd.ReportedError
 		if errors.As(err, &reported) {
 			os.Exit(1)

@@ -25,7 +25,7 @@ func numLit(n int64) parser.Expr {
 	return &parser.Literal{Kind: parser.LitNumber, Text: strconv.FormatInt(n, 10)}
 }
 
-// typeName parses one of the schema's own type names (VARIANT, UUID,
+// typeName parses one of the schema's own type names (VARCHAR, UUID,
 // STRUCT(...)[]); failing to is a bug in the schema, not the query.
 func typeName(s string) *parser.TypeName {
 	t, err := parser.ParseType(s)

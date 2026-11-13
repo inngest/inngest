@@ -45,12 +45,11 @@ type runConfig struct {
 	// BatchSize is the number of runs grouped into one Appender flush (see
 	// InsertGeneratedRuns). Defaults to 10000 in run when left <= 0.
 	BatchSize int
-	// Parallelism is how many Appenders (each its own quack connection to
-	// the same subprocess) write concurrently. Defaults to 1 in run when
-	// left <= 0. Values > 1 require the target's connection to have been
-	// opened with more than one quack connection available — see
-	// openDuckDB, which always does this.
+	// Parallelism is how many writer sets write concurrently, each w/ one
+	// writer (its own quack connection + Appender) per table (see
+	// InsertOptions). Defaults to 1 in run when left <= 0.
 	Parallelism int
+
 	// DryRun, when true, samples and generates exactly as a real run would
 	// and returns the Summary it would have written, but never opens,
 	// creates, or writes to TargetDir.
@@ -78,7 +77,7 @@ func main() {
 	sampleLimit := flag.Int("sample-limit", 200, "max distinct runs to sample from -source as generation templates")
 	seed := flag.Int64("seed", time.Now().UnixNano(), "RNG seed; pass a fixed value for reproducible output")
 	batchSize := flag.Int("batch-size", 10_000, "number of runs (and their spans/events) grouped into one Appender flush")
-	parallelism := flag.Int("parallelism", 1, "number of Appenders (quack connections) writing concurrently")
+	parallelism := flag.Int("parallelism", 1, "number of writer sets writing concurrently, each w/ one quack connection per table")
 	dryRun := flag.Bool("dry-run", false, "sample and generate as usual, but report counts without writing to -target")
 	flag.Parse()
 
@@ -193,16 +192,23 @@ func run(ctx context.Context, cfg runConfig) (Summary, error) {
 
 	cfg.logf("generating and inserting %d run(s) (seed=%d, window=%s, batch size %d, parallelism %d)",
 		cfg.RunCount, cfg.Seed, cfg.Window, cfg.BatchSize, cfg.Parallelism)
-	onProgress := progressLogger(cfg.logf)
 	wallStart := time.Now()
-	summary, timings, err := GenerateAndInsert(ctx, targetConnector, rng, tmpl, genCfg, cfg.BatchSize, cfg.Parallelism, onProgress)
+	summary, timings, err := GenerateAndInsert(ctx, targetConnector, rng, tmpl, genCfg, InsertOptions{
+		BatchSize:   cfg.BatchSize,
+		Parallelism: cfg.Parallelism,
+		OnProgress:  progressLogger(cfg.logf),
+	})
 	wall := time.Since(wallStart)
 	totalRows := summary.Runs + summary.Spans + summary.Events + summary.Metadata
-	cfg.logf("sampling %s, generation %s (cumulative, %s runs/sec), insertion %s (cumulative, %s rows/sec), wall %s (%s runs/sec overall)",
+	for _, t := range timings.Tables {
+		cfg.logf("%s: %d rows in %d flushes, busy %s (cumulative, %s rows/sec), %s rows/sec wall",
+			t.Table, t.Rows, t.Flushes, t.Busy, formatRate(t.Rows, t.Busy), formatRate(t.Rows, wall))
+	}
+	cfg.logf("sampling %s, generation %s (cumulative, %s runs/sec), insertion %s (cumulative across tables, %s rows/sec), wall %s (%s runs/sec, %s rows/sec overall)",
 		sampleDur,
 		timings.Generate, formatRate(cfg.RunCount, timings.Generate),
 		timings.Insert, formatRate(totalRows, timings.Insert),
-		wall, formatRate(cfg.RunCount, wall))
+		wall, formatRate(cfg.RunCount, wall), formatRate(totalRows, wall))
 	return summary, err
 }
 
@@ -240,11 +246,10 @@ func progressLogger(logf func(format string, args ...any)) func(batchIndex, tota
 // (<dir>/main.duckdb, <dir>/catalog.duckdb, <dir>/data/) so this tool reads
 // and writes the same catalog `inngest dev --duckdb` does.
 //
-// parallelism is passed straight through as Options.QuackConns: values > 1
-// let InsertGeneratedRuns's worker pool open that many additional,
-// genuinely independent quack connections directly against the returned
-// *driver.Connector (see newAppenderSet), on top of the one *sql.DB uses
-// for ordinary querying (sampling, schema checks).
+// parallelism sizes Options.QuackConns for parallelism writer sets of one
+// connection per table (see drainAndInsert), each genuinely independent and
+// opened directly against the returned *driver.Connector, on top of the one
+// *sql.DB uses for ordinary querying (sampling, schema checks).
 func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Connector, *sql.DB, error) {
 	binPath, err := lookDuckDBBinary()
 	if err != nil {
@@ -264,7 +269,7 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 			DataPath:    filepath.Join(dir, "data"),
 		},
 		QuackAddr:  &addr,
-		QuackConns: parallelism,
+		QuackConns: parallelism*len(seedTables) + 1,
 	})
 	if err != nil {
 		return nil, nil, err

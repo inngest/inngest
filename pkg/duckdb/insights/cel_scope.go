@@ -37,17 +37,17 @@ type celFieldScope = trie.Trie[[]string, string, celFieldHandler]
 // field is just another JSON path into it — no join to inngest.events
 // needed.
 //
-// output.*/error.* target the "output" column, which holds the same
+// output.*/error.* target the "output"/"error" columns: the
 // {"data":T}/{"error":T} envelope DriverResponse.GetTraceFunctionOutput
-// always produces.
+// always produces, split at write time (cqrs.SplitSpanOutputEnvelope).
 var runsInputsCELScope = trie.New[[]string, string, celFieldHandler]().
 	Add([]string{"event", "id"}, celEventStringFieldHandler(celNullableSQL("(x::JSON->>?)", "$.id"))).
 	Add([]string{"event", "name"}, celEventStringFieldHandler(celNullableSQL("(x::JSON->>?)", "$.name"))).
 	Add([]string{"event", "v"}, celEventVersionHandler(celNullableSQL("(x::JSON->>?)", "$.v"))).
 	Add([]string{"event", "ts"}, celEventTimestampHandler(celNullableSQL("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.ts"))).
 	AddWild([]string{"event", "data"}, celEventDataHandler(celWildJSONFieldHandler("x", "event.data", "data"))).
-	AddWild([]string{"output"}, celWildJSONFieldHandler("output", "output", "data")).
-	AddWild([]string{"error"}, celWildJSONFieldHandler("output", "error", "error"))
+	AddWild([]string{"output"}, celWildJSONFieldHandler("output", "output", "")).
+	AddWild([]string{"error"}, celWildJSONFieldHandler("error", "error", ""))
 
 // runsInputsMatchSQL is the inputs-array match CELOutputFilters wraps an
 // event.* fragment in itself, for an event.* part of a conjunct that also

@@ -30,6 +30,10 @@ const KindPrefixInngestWarning = "inngest.warning."
 
 const (
 	KindInngestExperiment Kind = "inngest.experiment"
+
+	// KindInngestInbox is the kind of an inbox read's row. Its `messages`
+	// value lists the ids of the messages the read took.
+	KindInngestInbox Kind = "inngest.inbox"
 )
 
 func (k Kind) String() string {
