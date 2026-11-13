@@ -57,7 +57,7 @@ func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
 	require.Equal(t, int64(1), dropped)
 }
 
-// runRow reads back the single inngest.runs row tracing.go's materializeRuns
+// runRow reads back the single inngest.runs row tracing.go's runsInsertSQL
 // produced for the given run/status, waiting for the listener's async batch
 // flush to land it first.
 func runRow(t *testing.T, db *sql.DB, runID string, status enums.StepStatus) map[string]any {
@@ -92,7 +92,7 @@ func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
 
 // TestListenerOnFunctionScheduledSetsEventIDsFromMetadataConfig proves the
 // run.queued span's event.ids attribute (and so inngest.runs' event_ids
-// column, via materializeRuns) sources from md.Config.EventIDs — the run's
+// column, via runsInsertSQL) sources from md.Config.EventIDs — the run's
 // own persisted trigger event ID list (set once at Schedule time in
 // pkg/execution/executor/executor.go, round-tripped through state on every
 // subsequent load).
