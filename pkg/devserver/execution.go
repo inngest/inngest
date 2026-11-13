@@ -172,15 +172,25 @@ func newDualWrite(
 		dw.data = query.Wrap(primary, readDB)
 	}
 
-	lifecycle.Append(fx.StopHook(func(stopCtx context.Context) {
-		ctx, cancel := context.WithTimeout(stopCtx, dualWriteStopTimeout)
-		defer cancel()
-		// Before stopDualWrite, which closes the write handle and with it
-		// the subprocess readDB's connections run against.
-		_ = readDB.Close()
-		stopDualWrite(ctx, listener)
-	}))
+	lifecycle.Append(fx.StopHook(dw.close))
 	return dw
+}
+
+// close flushes dual-write and stops the duckdb subprocess.  the subprocess
+// does not stop when the context of New is cancelled, so it keeps running
+// until close runs.
+func (dw *dualWrite) close(ctx context.Context) {
+	if dw.readDB == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, dualWriteStopTimeout)
+	defer cancel()
+	// Before stopDualWrite, which closes the write handle and with it
+	// the subprocess readDB's connections run against.
+	_ = dw.readDB.Close()
+	for _, l := range dw.listeners {
+		stopDualWrite(ctx, l)
+	}
 }
 
 // limitOverrides are the step and state size limits of single functions.  the

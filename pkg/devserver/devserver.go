@@ -150,12 +150,23 @@ func New(ctx context.Context, opts StartOpts) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var services *servicefx.Runner
+	// Fx runs stop hooks only after the app starts.  dw is populated before
+	// options builds the tasks, so New can stop the duckdb subprocess when a
+	// later constructor fails.  without this, the subprocess keeps running
+	// after New returns.
+	var (
+		dw       *dualWrite
+		services *servicefx.Runner
+	)
 	app := fx.New(
+		fx.Populate(&dw),
 		options(ctx, opts, exp),
 		fx.Populate(&services),
 	)
 	if err := app.Err(); err != nil {
+		if dw != nil {
+			dw.close(context.WithoutCancel(ctx))
+		}
 		return err
 	}
 	shutdown := app.Wait()
