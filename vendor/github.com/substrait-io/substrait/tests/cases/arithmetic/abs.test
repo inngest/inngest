@@ -1,0 +1,18 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+abs(25::i8) = 25::i8
+abs(-200::i16) = 200::i16
+abs(30000::i32) = 30000::i32
+abs(-9223372036854775800::i64) = 9223372036854775800::i64
+abs(2.55::fp32) = 2.55::fp32
+abs(-2.0000007152557373046875::fp64) = 2.0000007152557373046875::fp64
+
+# null_input: Examples with null as input
+abs(null::i8?) = null::i8?
+
+# overflow: Examples demonstrating overflow behavior
+abs(-128::i8) [overflow:ERROR] = <!ERROR>
+abs(-128::i8) [overflow:SATURATE] = 127::i8
+abs(-128::i8) [overflow:SILENT] = <!UNDEFINED>

@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding_decimal.yaml'
+
+# basic: Basic examples without any special cases
+round(2.0::dec<2,1>, 2::i32) = 2::dec?<3,1>
+round(2.75::dec<3,2>, 1::i32) = 2.8::dec?<4,2>
+
+# negative_rounding: Examples with negative rounding
+round(2.0::dec<2,1>, -2::i32) = 0::dec?<3,1>
+round(123::dec<3,0>, -2::i32) = 100::dec?<4,0>
+round(8793.5::dec<5,1>, -2::i32) = 8800::dec?<6,1>

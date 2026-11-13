@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_list.yaml'
+### SUBSTRAIT_DEPENDENCY: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic list transforming examples
+transform([1, 2, 3]::list<i32>, (x -> multiply(x, 2::i32))::func<i32 -> i32>) = [2, 4, 6]::list<i32>
+transform([5, 10, 15]::list<i32>, (x -> add(x, 1::i32))::func<i32 -> i32>) = [6, 11, 16]::list<i32>
+transform([]::list<i32>, (x -> multiply(x, 2::i32))::func<i32 -> i32>) = []::list<i32>
+
+# nullable_elements: Handling nullable elements
+transform([1, Null, 3]::list<i32?>, (x -> multiply(x, 2::i32))::func<i32? -> i32?>) = [2, Null, 6]::list<i32?>

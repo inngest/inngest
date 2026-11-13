@@ -1,0 +1,10 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+is_not_null(25::i16) = true::bool
+is_not_null(true::bool) = true::bool
+is_not_null(7.25::fp32) = true::bool
+is_not_null(7.25::dec<38, 3>) = true::bool
+is_not_null(null::i8?) = false::bool
+is_not_null(null::dec?<38, 3>) = false::bool
