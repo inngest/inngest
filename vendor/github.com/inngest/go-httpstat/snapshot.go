@@ -20,14 +20,5 @@ func (r *Result) Snapshot() Snapshot {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	return Snapshot{
-		DNSLookup:       r.DNSLookup,
-		TCPConnection:   r.TCPConnection,
-		TLSHandshake:    r.TLSHandshake,
-		TimeToFirstByte: r.StartTransfer,
-		TLSStarted:      r.isTLS,
-		TLSCompleted:    r.tlsCompleted,
-		RequestWritten:  r.requestWritten,
-		FirstByte:       !r.serverDone.IsZero(),
-	}
+	return r.progress
 }

@@ -40,7 +40,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
-	github.com/inngest/go-httpstat v0.0.0-20261113151916-8c890b67ab88
+	github.com/inngest/go-httpstat v0.0.0-20261113152601-9e471d3bc56d
 	github.com/inngest/inngestgo v0.16.5
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jinzhu/copier v0.3.5

@@ -128,7 +128,11 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	}
 
 	tracking := &httpstat.Result{}
-	req = req.WithContext(httpstat.WithHTTPStat(ctx, tracking))
+	if e.resetTrace {
+		req = req.WithContext(httpstat.WithHTTPStatProgress(ctx, tracking))
+	} else {
+		req = req.WithContext(httpstat.WithHTTPStat(ctx, tracking))
+	}
 	resp, err := e.Do(req)
 	tracking.End(time.Now())
 

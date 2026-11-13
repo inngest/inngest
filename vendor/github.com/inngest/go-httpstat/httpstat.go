@@ -53,9 +53,10 @@ type Result struct {
 	transferDone  time.Time // need to be provided from outside
 
 	// isTLS is true when connection seems to use TLS
-	isTLS          bool
-	tlsCompleted   bool
-	requestWritten bool
+	isTLS bool
+
+	captureProgress bool
+	progress        Snapshot
 
 	// isReused is true when connection is reused (keep-alive)
 	isReused bool
@@ -146,5 +147,12 @@ func (r *Result) Format(s fmt.State, verb rune) {
 // WithHTTPStat is a wrapper of httptrace.WithClientTrace. It records the
 // time of each httptrace hooks.
 func WithHTTPStat(ctx context.Context, r *Result) context.Context {
+	return withClientTrace(ctx, r)
+}
+
+// WithHTTPStatProgress enables snapshots of the current HTTP request, including
+// when the transport follows redirects or retries a connection.
+func WithHTTPStatProgress(ctx context.Context, r *Result) context.Context {
+	r.captureProgress = true
 	return withClientTrace(ctx, r)
 }
