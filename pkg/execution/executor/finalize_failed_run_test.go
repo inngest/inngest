@@ -339,7 +339,7 @@ func TestHandleQueueItemFinalizesPermanentlyFailedRuns(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			exec := &failingJobExecutor{resp: &state.DriverResponse{StatusCode: 206}, err: tc.err, finalizeErr: tc.finalizeErr}
-			s := &svc{exec: exec}
+			s := &Service{exec: exec}
 			item := queue.Item{
 				Attempt:     tc.attempt,
 				MaxAttempts: maxAttempts(tc.maxAttempts),

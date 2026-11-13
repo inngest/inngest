@@ -33,41 +33,59 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/update"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/mattn/go-isatty"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
+	"go.uber.org/fx"
 )
 
-func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, snso *SingleNodeServiceOpts) *devserver {
+type devserverParams struct {
+	fx.In
+
+	Opts       StartOpts
+	Log        logger.Logger
+	Runner     runner.Runner
+	CQRS       cqrs.Manager
+	Publisher  pubsub.Publisher
+	Limits     *limitOverrides
+	Clients    *redisClients
+	History    history.Driver
+	DualWrite  *dualWrite
+	State      state.Manager
+	Executor   execution.Executor
+	Semaphores constraintapi.SemaphoreManager
+	Croner     cron.CronManager
+}
+
+// newDevserver creates the service that syncs apps and handles events.  the
+// API task serves its HTTP routes.
+func newDevserver(p devserverParams) *devserver {
+	opts := p.Opts
 	// If the polling interval is 0, reset it to a sensible value to avoid
 	// hammering the SDKs and burning CPU.
 	if opts.PollInterval == 0 {
 		opts.PollInterval = DefaultPollInterval
 	}
 
-	// Fill in some defaults in they're not set
-	if snso != nil {
-		if snso.snapshotLock == nil {
-			snso.snapshotLock = &sync.Mutex{}
-		}
-	}
-
 	return &devserver{
-		Data:                    data,
-		Runner:                  runner,
 		Opts:                    opts,
+		Data:                    p.CQRS,
+		DuckDB:                  p.DualWrite.readDB,
+		stepLimitOverrides:      p.Limits.steps,
+		stateSizeLimitOverrides: p.Limits.stateSize,
+		Runner:                  p.Runner,
+		State:                   p.State,
+		Executor:                p.Executor,
+		SemaphoreManager:        p.Semaphores,
+		publisher:               p.Publisher,
+		CronSyncer:              p.Croner,
+		redisClient:             p.Clients.unsharded,
+		historyWriter:           p.History,
 		handlerLock:             &sync.Mutex{},
-		publisher:               pb,
-		stepLimitOverrides:      stepLimitOverrides,
-		stateSizeLimitOverrides: stateSizeLimitOverrides,
-		redisClient:             rc,
-		historyWriter:           hw,
-		singleNodeServiceOpts:   snso,
-		log:                     logger.StdlibLogger(context.Background()),
+		log:                     p.Log,
 	}
 }
 
@@ -99,8 +117,6 @@ type devserver struct {
 	publisher        pubsub.Publisher
 	CronSyncer       cron.CronSyncer
 	redisClient      rueidis.Client
-
-	Apiservice service.Service
 
 	historyWriter history.Driver
 
@@ -162,7 +178,9 @@ func (d *devserver) HasEventKeys() bool {
 	return len(d.Opts.EventKeys) > 0
 }
 
-func (d *devserver) Pre(ctx context.Context) error {
+// Run syncs apps, and prints the server URLs to a terminal, until ctx is
+// done.
+func (d *devserver) Run(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
 	if d.HasRedisSnapshotsEnabled() {
 		_, _ = d.importRedisSnapshot(ctx)
@@ -173,10 +191,6 @@ func (d *devserver) Pre(ctx context.Context) error {
 		go d.runDiscovery(ctx)
 	}
 
-	return nil
-}
-
-func (d *devserver) Run(ctx context.Context) error {
 	// Start persisting Redis data if we have an interval present.
 	go d.startPersistenceRoutine(ctx)
 
@@ -238,6 +252,8 @@ func (d *devserver) Run(ctx context.Context) error {
 	return nil
 }
 
+// Stop exports a Redis snapshot when snapshots are enabled.  call it after
+// Run returns.
 func (d *devserver) Stop(ctx context.Context) error {
 	if d.HasRedisSnapshotsEnabled() {
 		return d.exportRedisSnapshot(ctx)

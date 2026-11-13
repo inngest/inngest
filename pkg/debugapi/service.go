@@ -14,22 +14,22 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/service"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc"
 )
 
 const DefaultDebugAPIPort = 7777
 
-func NewDebugAPI(o Opts) service.Service {
+// NewDebugAPI creates the gRPC server of the debug API.  it listens on
+// o.Port, or on DefaultDebugAPIPort when o.Port is 0.
+func NewDebugAPI(o Opts) *Server {
 	port := DefaultDebugAPIPort
 	if o.Port != 0 {
 		port = o.Port
 	}
 
-	return &debugAPI{
-		rpc:           grpc.NewServer(),
-		port:          port,
+	rpc := grpc.NewServer()
+	pb.RegisterDebugServer(rpc, &debugAPI{
 		log:           o.Log,
 		db:            o.DB,
 		runReader:     o.RunReader,
@@ -44,6 +44,11 @@ func NewDebugAPI(o Opts) service.Service {
 		sm:            o.SemaphoreManager,
 		batchManager:  o.BatchManager,
 		debouncer:     o.Debouncer,
+	})
+	return &Server{
+		rpc:  rpc,
+		port: port,
+		log:  o.Log,
 	}
 }
 
@@ -69,11 +74,16 @@ type Opts struct {
 	Port int
 }
 
+// Server serves the debug API over gRPC.
+type Server struct {
+	rpc  *grpc.Server
+	port int
+	log  logger.Logger
+}
+
 type debugAPI struct {
 	pb.DebugServer
-	port int
 
-	rpc    *grpc.Server
 	log    logger.Logger
 	shards queue.ShardRegistry
 
@@ -93,36 +103,32 @@ type debugAPI struct {
 	debouncer    debounce.Debouncer
 }
 
-func (d *debugAPI) Name() string {
-	return "debug-api-dev"
-}
-
-func (d *debugAPI) Pre(ctx context.Context) error {
-	pb.RegisterDebugServer(d.rpc, d)
-
-	return nil
-}
-
-func (d *debugAPI) Run(ctx context.Context) error {
-	addr := fmt.Sprintf(":%d", d.port)
+// Run serves the debug API until ctx is done.
+func (s *Server) Run(ctx context.Context) error {
+	addr := fmt.Sprintf(":%d", s.port)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		d.log.Error("could not listen on port for debug api", "error", err, "addr", addr)
+		s.log.Error("could not listen on port for debug api", "error", err, "addr", addr)
 		return err
 	}
 
-	d.log.Info("starting debug api", "addr", addr)
-	err = d.rpc.Serve(l)
-	if err != nil {
-		d.log.Error("error serving debug api", "error", err, "addr", addr)
+	// Serve returns when the server stops.  without this, Run does not
+	// return when ctx is done, and the stop of the app waits for it.
+	stopped := make(chan struct{})
+	defer close(stopped)
+	go func() {
+		select {
+		case <-ctx.Done():
+			s.rpc.GracefulStop()
+		case <-stopped:
+		}
+	}()
+
+	s.log.Info("starting debug api", "addr", addr)
+	if err := s.rpc.Serve(l); err != nil {
+		s.log.Error("error serving debug api", "error", err, "addr", addr)
 		return err
 	}
-
-	return nil
-}
-
-func (d *debugAPI) Stop(ctx context.Context) error {
-	d.rpc.GracefulStop() // stop rpc server
 	return nil
 }
