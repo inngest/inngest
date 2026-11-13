@@ -34,6 +34,11 @@ const (
 	// HeaderKeyJobID is the stable queue item identifier for the current job.
 	HeaderKeyJobID = "x-inngest-job-id"
 
+	// HeaderKeyConnectInstanceID is the connect worker instance that sends a
+	// checkpoint request.  checkpointed step spans store it as
+	// _inngest.connect.instance_id.
+	HeaderKeyConnectInstanceID = "x-inngest-instance-id"
+
 	// HeaderRequestVersion represents the request version header.
 	// XXX: This is exctracted from httpdriver and needs documenting.
 	HeaderKeyRequestVersion = "x-inngest-req-version"
