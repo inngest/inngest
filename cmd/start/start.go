@@ -2,131 +2,61 @@ package start
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
-	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/cmd/internal/server"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
-	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
-	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/urfave/cli/v3"
 )
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	// TODO Likely need a `Start()`
 	conf, err := config.Dev(ctx)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	if err = localconfig.InitStartConfig(ctx, cmd); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return err
 	}
 
-	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
-	conf.EventAPI.Port = port
-	conf.CoreAPI.Port = port
-
-	host := localconfig.GetValue(cmd, "host", "")
-	if host != "" {
-		conf.EventAPI.Addr = host
-		conf.CoreAPI.Addr = host
-	}
-
-	traceEndpoint := fmt.Sprintf("localhost:%d", port)
-	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseUserTracer(ctx)
-	}()
-
-	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing-system",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces/system",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseSystemTracer(ctx)
-	}()
-
-	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
+	server.SetAddress(cmd, conf)
+	conf.ServerKind = headers.ServerKindCloud
 
 	signingKey := localconfig.GetValue(cmd, "signing-key", "")
-	if signingKey == "" {
-		fmt.Println("Error: signing-key is required")
-		os.Exit(1)
-	}
-	// Check if the signing key has an even number of characters (required for hex decoding)
-	if len(signingKey)%2 != 0 {
-		fmt.Printf("Error: signing-key must be hex string with even number of chars\n")
-		os.Exit(1)
-	}
-	_, err = authn.HashedSigningKey(signingKey)
-	if err != nil {
-		fmt.Printf("Error: signing-key must be valid hex string: %v\n", err)
-		os.Exit(1)
+	if err := validateSigningKey(signingKey); err != nil {
+		return err
 	}
 
 	eventKeys := localconfig.GetStringSlice(cmd, "event-key")
 	if len(eventKeys) == 0 {
-		fmt.Println("Error: at least one event-key is required")
-		os.Exit(1)
+		return errors.New("at least one event-key is required")
 	}
 
-	// Validate PostgreSQL connection pool settings. Read through localconfig so
-	// env vars (INNGEST_POSTGRES_*) and config files are honored, not just flags.
+	// Read through localconfig so env vars (INNGEST_POSTGRES_*) and config
+	// files are honored, not just flags.
 	postgresMaxIdleConns := localconfig.GetIntValue(cmd, "postgres-max-idle-conns", 10)
 	postgresMaxOpenConns := localconfig.GetIntValue(cmd, "postgres-max-open-conns", 100)
-	if postgresMaxOpenConns <= 1 {
-		fmt.Printf("Error: postgres-max-open-conns (%d) must be greater than 1\n", postgresMaxOpenConns)
-		os.Exit(1)
-	}
-	if postgresMaxIdleConns > postgresMaxOpenConns {
-		fmt.Printf("Error: postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)\n",
-			postgresMaxIdleConns, postgresMaxOpenConns)
-		os.Exit(1)
-	}
-
-	conf.ServerKind = headers.ServerKindCloud
-
-	// Handle configuration options with simplified koanf-based approach
-	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "")
-	redisURI := localconfig.GetValue(cmd, "redis-uri", "")
-	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
-	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url")
-
-	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
-	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
-	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
-	connectGatewayGRPCIP := localconfig.GetValue(cmd, "connect-gateway-grpc-ip", connectgrpc.DefaultConnectGRPCIP)
-	connectExecutorGRPCIP := localconfig.GetValue(cmd, "connect-executor-grpc-ip", connectgrpc.DefaultConnectGRPCIP)
-	if err := localconfig.ValidateConnectGRPCIPs(connectGatewayGRPCIP, connectExecutorGRPCIP); err != nil {
+	if err := validatePostgresPool(postgresMaxIdleConns, postgresMaxOpenConns); err != nil {
 		return err
 	}
 
+	connectGRPCConfig, err := server.ConnectGRPCConfig(ctx, cmd)
+	if err != nil {
+		return err
+	}
+
+	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
 	opts := devserver.StartOpts{
 		Config:                  *conf,
 		ConnectGatewayHost:      conf.CoreAPI.Addr,
-		ConnectGatewayPort:      connectGatewayPort,
+		ConnectGatewayPort:      localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort),
+		ConnectGRPCConfig:       connectGRPCConfig,
 		EventKeys:               eventKeys,
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
 		EnableDuckDB:            localconfig.GetBoolValue(cmd, "duckdb", false),
@@ -137,25 +67,53 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PostgresConnMaxLifetime: localconfig.GetIntValue(cmd, "postgres-conn-max-lifetime", 30),
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,
-		PostgresURI:             postgresURI,
+		PostgresURI:             localconfig.GetValue(cmd, "postgres-uri", ""),
 		QueueWorkers:            localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
-		RedisURI:                redisURI,
+		RedisURI:                localconfig.GetValue(cmd, "redis-uri", ""),
 		RequireKeys:             true,
 		RetryInterval:           localconfig.GetIntValue(cmd, "retry-interval", 0),
 		SigningKey:              &signingKey,
-		SQLiteDir:               sqliteDir,
+		SQLiteDir:               localconfig.GetValue(cmd, "sqlite-dir", ""),
 		Tick:                    time.Duration(tick) * time.Millisecond,
-		URLs:                    sdkURLs,
-		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
-			ctx,
-			connectGatewayGRPCIP, connectGatewayGRPCPort,
-			connectExecutorGRPCIP, connectExecutorGRPCPort,
-		),
+		URLs:                    localconfig.GetStringSlice(cmd, "sdk-url"),
 	}
 
-	err = devserver.New(ctx, opts)
+	closeTracers, err := server.SetupTracers(ctx, conf.EventAPI.Port, "", "")
 	if err != nil {
 		return err
+	}
+	defer closeTracers()
+
+	// the first signal stops the server gracefully.  a second signal exits at
+	// once.
+	server.ExitAfterSignals(2)
+
+	return devserver.New(ctx, opts)
+}
+
+// validateSigningKey checks that the signing key is set and is hex with an
+// even number of characters.
+func validateSigningKey(signingKey string) error {
+	if signingKey == "" {
+		return errors.New("signing-key is required")
+	}
+	// Check if the signing key has an even number of characters (required for hex decoding)
+	if len(signingKey)%2 != 0 {
+		return errors.New("signing-key must be hex string with even number of chars")
+	}
+	if _, err := authn.HashedSigningKey(signingKey); err != nil {
+		return fmt.Errorf("signing-key must be valid hex string: %w", err)
+	}
+	return nil
+}
+
+// validatePostgresPool checks the Postgres connection pool settings.
+func validatePostgresPool(maxIdleConns, maxOpenConns int) error {
+	if maxOpenConns <= 1 {
+		return fmt.Errorf("postgres-max-open-conns (%d) must be greater than 1", maxOpenConns)
+	}
+	if maxIdleConns > maxOpenConns {
+		return fmt.Errorf("postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)", maxIdleConns, maxOpenConns)
 	}
 	return nil
 }

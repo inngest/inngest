@@ -1,37 +1,10 @@
 package start
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-// validatePostgreSQLConnectionPool extracts the validation logic from the action function
-// to make it testable in isolation
-func validatePostgreSQLConnectionPool(maxIdleConns, maxOpenConns int) error {
-	if maxOpenConns <= 1 {
-		return &PostgreSQLValidationError{
-			message: fmt.Sprintf("postgres-max-open-conns (%d) must be greater than 1", maxOpenConns),
-		}
-	}
-	if maxIdleConns > maxOpenConns {
-		return &PostgreSQLValidationError{
-			message: fmt.Sprintf("postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)",
-				maxIdleConns, maxOpenConns),
-		}
-	}
-	return nil
-}
-
-// PostgreSQLValidationError represents a PostgreSQL connection pool validation error
-type PostgreSQLValidationError struct {
-	message string
-}
-
-func (e *PostgreSQLValidationError) Error() string {
-	return e.message
-}
 
 func TestValidatePostgreSQLConnectionPool(t *testing.T) {
 	tests := []struct {
@@ -96,7 +69,7 @@ func TestValidatePostgreSQLConnectionPool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePostgreSQLConnectionPool(tt.postgresMaxIdleConns, tt.postgresMaxOpenConns)
+			err := validatePostgresPool(tt.postgresMaxIdleConns, tt.postgresMaxOpenConns)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -106,6 +79,44 @@ func TestValidatePostgreSQLConnectionPool(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+func TestValidateSigningKey(t *testing.T) {
+	tests := []struct {
+		name        string
+		signingKey  string
+		errContains string
+	}{
+		{
+			name:       "valid hex",
+			signingKey: "deadbeef",
+		},
+		{
+			name:        "empty",
+			signingKey:  "",
+			errContains: "signing-key is required",
+		},
+		{
+			name:        "odd length",
+			signingKey:  "abc",
+			errContains: "even number of chars",
+		},
+		{
+			name:        "not hex",
+			signingKey:  "zz",
+			errContains: "must be valid hex string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSigningKey(tt.signingKey)
+			if tt.errContains == "" {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, tt.errContains)
 		})
 	}
 }

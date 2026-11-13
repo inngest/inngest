@@ -33,7 +33,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/update"
 	"github.com/inngest/inngest/pkg/util"
@@ -99,8 +98,6 @@ type devserver struct {
 	publisher        pubsub.Publisher
 	CronSyncer       cron.CronSyncer
 	redisClient      rueidis.Client
-
-	Apiservice service.Service
 
 	historyWriter history.Driver
 
