@@ -1946,15 +1946,15 @@ func (e *executor) schedule(
 		}
 		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 
-	case errors.Is(err, queue.ErrQueueShardNotFound):
-		if stateCreated {
-			deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
-			if deleteErr != nil && !errors.Is(deleteErr, state.ErrRunNotFound) {
-				l.ReportError(deleteErr, "error deleting function state after permanent queue routing failure")
-				return nil, nil, fmt.Errorf("error deleting function state after queue routing failure: %w", deleteErr)
-			}
+	case errors.Is(err, queue.ErrQueueShardNotFound), errors.Is(err, queue.ErrQueueShardUnavailable):
+		// the run state stays.  the caller decides if the run is retried or
+		// dropped, so only the caller can delete the state.
+		return nil, nil, &ScheduleQueueRoutingError{
+			ID:              sv2.IDFromV1(stv1ID),
+			StateExisted:    !stateCreated,
+			EventInternalID: firstEventInternalID(req.Events),
+			Err:             fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err),
 		}
-		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)

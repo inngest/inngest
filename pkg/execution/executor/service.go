@@ -525,6 +525,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 					continue
 				}
+				s.deleteStateOnFinalRoutingError(ctx, item, err)
 				return err
 			}
 
@@ -1158,6 +1159,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			!errors.Is(err, state.ErrIdentifierExists) &&
 			!errors.Is(err, ErrFunctionSkippedIdempotency) {
 			l.ReportError(err, "error scheduling cron function execution")
+			s.deleteStateOnFinalRoutingError(ctx, item, err)
 			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
 		l.Trace("cron function run already scheduled")
