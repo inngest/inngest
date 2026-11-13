@@ -185,14 +185,12 @@ github.com/VividCortex/ewma
 # github.com/agnivade/levenshtein v1.1.1
 ## explicit; go 1.13
 github.com/agnivade/levenshtein
-# github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302
-## explicit
-github.com/alicebob/gopher-json
-# github.com/alicebob/miniredis/v2 v2.34.0
+# github.com/alicebob/miniredis/v2 v2.40.0
 ## explicit; go 1.17
 github.com/alicebob/miniredis/v2
 github.com/alicebob/miniredis/v2/fpconv
 github.com/alicebob/miniredis/v2/geohash
+github.com/alicebob/miniredis/v2/gopher-json
 github.com/alicebob/miniredis/v2/hyperloglog
 github.com/alicebob/miniredis/v2/metro
 github.com/alicebob/miniredis/v2/proto

@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"math/rand"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,25 +38,28 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master        *Miniredis               // pointer to the lock in Miniredis
-	id            int                      // db id
-	keys          map[string]string        // Master map of keys with their type
-	stringKeys    map[string]string        // GET/SET &c. keys
-	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
-	listKeys      map[string]listKey       // LPUSH &c. keys
-	setKeys       map[string]setKey        // SADD &c. keys
-	hllKeys       map[string]*hll          // PFADD &c. keys
-	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
-	streamKeys    map[string]*streamKey    // XADD &c. keys
-	ttl           map[string]time.Duration // effective TTL values
-	lru           map[string]time.Time     // last recently used ( read or written to )
-	keyVersion    map[string]uint          // used to watch values
+	master        *Miniredis                          // pointer to the lock in Miniredis
+	id            int                                 // db id
+	keys          map[string]string                   // Master map of keys with their type
+	stringKeys    map[string]string                   // GET/SET &c. keys
+	hashKeys      map[string]hashKey                  // MGET/MSET &c. keys
+	listKeys      map[string]listKey                  // LPUSH &c. keys
+	setKeys       map[string]setKey                   // SADD &c. keys
+	hllKeys       map[string]*hll                     // PFADD &c. keys
+	sortedsetKeys map[string]sortedSet                // ZADD &c. keys
+	streamKeys    map[string]*streamKey               // XADD &c. keys
+	ttl           map[string]time.Duration            // effective TTL values
+	hashTTLs      map[string]map[string]time.Duration // Hash TTL values
+	lru           map[string]time.Time                // last recently used ( read or written to )
+	keyVersion    map[string]uint                     // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
 	srv         *server.Server
+	nextPreHook server.Hook
+	ip          string
 	port        int
 	passwords   map[string]string // username password
 	dbs         map[int]*RedisDB
@@ -63,6 +67,8 @@ type Miniredis struct {
 	scripts     map[string]string // sha1 -> lua src
 	signal      *sync.Cond
 	now         time.Time // time.Now() if not set.
+	clockTTL    bool      // decrease TTLs as the clock advances
+	lastTick    time.Time // last time TTLs were advanced, if clockTTL is set
 	subscribers map[*Subscriber]struct{}
 	rand        *rand.Rand
 	Ctx         context.Context
@@ -116,6 +122,7 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		sortedsetKeys: map[string]sortedSet{},
 		streamKeys:    map[string]*streamKey{},
 		ttl:           map[string]time.Duration{},
+		hashTTLs:      make(map[string]map[string]time.Duration),
 		keyVersion:    map[string]uint{},
 	}
 }
@@ -207,8 +214,17 @@ func (m *Miniredis) StartAddrTLS(addr string, cfg *tls.Config) error {
 func (m *Miniredis) start(s *server.Server) error {
 	m.Lock()
 	defer m.Unlock()
+	return m.startLocked(s)
+}
+
+func (m *Miniredis) startLocked(s *server.Server) error {
 	m.srv = s
-	m.port = s.Addr().Port
+	s.SetPreHook(m.nextPreHook)
+	m.nextPreHook = nil
+	if a := s.Addr(); a != nil {
+		m.ip = a.IP.String()
+		m.port = a.Port
+	}
 
 	commandsConnection(m)
 	commandsGeneric(m)
@@ -229,6 +245,36 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsObject(m)
 
 	return nil
+}
+
+// Dial returns an in-memory client connection to the server, served on a
+// net.Pipe: no listener or port is involved. A non-started Miniredis is
+// started without a listener, so NewMiniRedis() + Dial() gives a working
+// server which never touches the network. Note that Addr() has no address to
+// return in that case.
+//
+// Dial fits the Dialer option of most redis clients, and makes miniredis
+// usable inside a testing/synctest bubble, where real sockets can't be used:
+//
+//	client := redis.NewClient(&redis.Options{
+//		Dialer: func(ctx context.Context, _, _ string) (net.Conn, error) {
+//			return m.Dial()
+//		},
+//	})
+func (m *Miniredis) Dial() (net.Conn, error) {
+	m.Lock()
+	if m.srv == nil {
+		if err := m.startLocked(server.NewServerConn()); err != nil {
+			m.Unlock()
+			return nil, err
+		}
+	}
+	srv := m.srv
+	m.Unlock()
+
+	c, s := net.Pipe()
+	srv.ServeConn(s)
+	return c, nil
 }
 
 // Restart restarts a Close()d server on the same port. Values will be
@@ -252,7 +298,6 @@ func (m *Miniredis) Close() {
 
 	// the OnDisconnect callbacks can lock m, so run Close() outside the lock.
 	srv.Close()
-
 }
 
 // RequireAuth makes every connection need to AUTH first. This is the old 'AUTH [password] command.
@@ -286,6 +331,7 @@ func (m *Miniredis) DB(i int) *RedisDB {
 
 // get DB. No locks!
 func (m *Miniredis) db(i int) *RedisDB {
+	m.tickLocked()
 	if db, ok := m.dbs[i]; ok {
 		return db
 	}
@@ -320,7 +366,11 @@ func (m *Miniredis) swapDB(i, j int) bool {
 func (m *Miniredis) Addr() string {
 	m.Lock()
 	defer m.Unlock()
-	return m.srv.Addr().String()
+	a := m.srv.Addr()
+	if a == nil {
+		return ""
+	}
+	return a.String()
 }
 
 // Host returns the host part of Addr().
@@ -373,6 +423,14 @@ func (m *Miniredis) Server() *server.Server {
 	return m.srv
 }
 
+// IsReadOnlyCommand checks if a command is marked as read-only
+func (m *Miniredis) IsReadOnlyCommand(cmd string) bool {
+	if m.srv == nil {
+		return false
+	}
+	return m.srv.IsReadOnlyCommand(cmd)
+}
+
 // Dump returns a text version of the selected DB, usable for debugging.
 //
 // Dump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
@@ -404,25 +462,25 @@ func (m *Miniredis) Dump() string {
 		r += fmt.Sprintf("- %s\n", k)
 		t := db.t(k)
 		switch t {
-		case "string":
+		case keyTypeString:
 			r += fmt.Sprintf("%s%s\n", indent, v(db.stringKeys[k]))
-		case "hash":
+		case keyTypeHash:
 			for _, hk := range db.hashFields(k) {
 				r += fmt.Sprintf("%s%s: %s\n", indent, hk, v(db.hashGet(k, hk)))
 			}
-		case "list":
+		case keyTypeList:
 			for _, lk := range db.listKeys[k] {
 				r += fmt.Sprintf("%s%s\n", indent, v(lk))
 			}
-		case "set":
+		case keyTypeSet:
 			for _, mk := range db.setMembers(k) {
 				r += fmt.Sprintf("%s%s\n", indent, v(mk))
 			}
-		case "zset":
+		case keyTypeSortedSet:
 			for _, el := range db.ssetElements(k) {
 				r += fmt.Sprintf("%s%f: %s\n", indent, el.score, v(el.member))
 			}
-		case "stream":
+		case keyTypeStream:
 			for _, entry := range db.streamKeys[k].entries {
 				r += fmt.Sprintf("%s%s\n", indent, entry.ID)
 				ev := entry.Values
@@ -430,7 +488,7 @@ func (m *Miniredis) Dump() string {
 					r += fmt.Sprintf("%s%s%s: %s\n", indent, indent, v(ev[2*i]), v(ev[2*i+1]))
 				}
 			}
-		case "hll":
+		case keyTypeHll:
 			for _, entry := range db.hllKeys {
 				r += fmt.Sprintf("%s%s\n", indent, v(string(entry.Bytes())))
 			}
@@ -447,6 +505,50 @@ func (m *Miniredis) SetTime(t time.Time) {
 	m.Lock()
 	defer m.Unlock()
 	m.now = t
+	// keep the ClockTTL baseline sane when the clock jumps backwards; a
+	// forward jump stays pending until the next tick.
+	if m.clockTTL && t.Before(m.lastTick) {
+		m.lastTick = t
+	}
+}
+
+// ClockTTL makes TTLs (both key and hash field TTLs) decrease as the clock
+// advances, instead of only via FastForward(). The clock is time.Now(), or
+// the value set with SetTime(). Expired keys are removed lazily, whenever a
+// command or a Miniredis-level accessor touches a database; a *RedisDB held
+// directly does not trigger expiry.
+//
+// With SetTime() this gives deterministic clock-driven expiry: moving the
+// clock forward expires keys, and unlike FastForward() the expiry stays
+// coherent with TIME and (P)EXPIREAT, which follow SetTime() as well.
+//
+// It also makes miniredis work inside a testing/synctest bubble, where
+// time.Now() is the bubble's deterministic fake clock: a plain time.Sleep()
+// there expires keys. Without SetTime() and outside a bubble, TTLs run
+// against the wall clock, which makes expiry depend on test execution
+// speed — usually not what you want in a unittest.
+func (m *Miniredis) ClockTTL(enabled bool) {
+	m.Lock()
+	defer m.Unlock()
+	m.clockTTL = enabled
+	m.lastTick = m.effectiveNow()
+}
+
+// advance TTLs by the clock time elapsed since the last tick. Called with the
+// lock held on every database access, when ClockTTL is enabled.
+func (m *Miniredis) tickLocked() {
+	if !m.clockTTL {
+		return
+	}
+	now := m.effectiveNow()
+	elapsed := now.Sub(m.lastTick)
+	if elapsed <= 0 {
+		return
+	}
+	m.lastTick = now
+	for _, db := range m.dbs {
+		db.fastForward(elapsed)
+	}
 }
 
 // make every command return this message. For example:
@@ -463,11 +565,41 @@ func (m *Miniredis) SetError(msg string) {
 			return true
 		}
 	}
+
+	m.Lock()
+	defer m.Unlock()
+	if m.srv == nil {
+		m.nextPreHook = cb
+		return
+	}
 	m.srv.SetPreHook(cb)
 }
 
+type argRequirements struct {
+	minimum int
+	maximum *int
+}
+
+func atLeast(n int) argRequirements {
+	return argRequirements{n, nil}
+}
+
+func between(a int, b int) argRequirements {
+	return argRequirements{a, &b}
+}
+
+func exactly(n int) argRequirements {
+	return argRequirements{n, &n}
+}
+
 // isValidCMD returns true if command is valid and can be executed.
-func (m *Miniredis) isValidCMD(c *server.Peer, cmd string) bool {
+func (m *Miniredis) isValidCMD(c *server.Peer, cmd string, args []string, argReqs argRequirements) bool {
+	if len(args) < argReqs.minimum || (argReqs.maximum != nil && len(args) > *argReqs.maximum) {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return false
+	}
+
 	if !m.handleAuth(c) {
 		return false
 	}
@@ -703,19 +835,19 @@ func (m *Miniredis) copy(
 	}
 
 	switch srcDB.t(src) {
-	case "string":
+	case keyTypeString:
 		destDB.stringKeys[dst] = srcDB.stringKeys[src]
-	case "hash":
+	case keyTypeHash:
 		destDB.hashKeys[dst] = copyHashKey(srcDB.hashKeys[src])
-	case "list":
+	case keyTypeList:
 		destDB.listKeys[dst] = copyListKey(srcDB.listKeys[src])
-	case "set":
+	case keyTypeSet:
 		destDB.setKeys[dst] = copySetKey(srcDB.setKeys[src])
-	case "zset":
+	case keyTypeSortedSet:
 		destDB.sortedsetKeys[dst] = copySortedSet(srcDB.sortedsetKeys[src])
-	case "stream":
+	case keyTypeStream:
 		destDB.streamKeys[dst] = srcDB.streamKeys[src].copy()
-	case "hll":
+	case keyTypeHll:
 		destDB.hllKeys[dst] = srcDB.hllKeys[src].copy()
 	default:
 		panic("missing case")
