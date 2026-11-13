@@ -165,7 +165,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 }
 
 func (r CheckpointNewRunRequest) FnConfig(envID uuid.UUID) string {
-	fn := r.Fn(envID)
+	fn := r.Fn(r.AppID(envID))
 	byt, _ := json.Marshal(fn)
 	return string(byt)
 }
