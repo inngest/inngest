@@ -20,5 +20,8 @@ func (r *Result) Snapshot() Snapshot {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	return r.progress
+	if r.progress == nil {
+		return Snapshot{}
+	}
+	return *r.progress
 }

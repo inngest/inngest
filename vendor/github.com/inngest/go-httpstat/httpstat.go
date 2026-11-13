@@ -55,8 +55,8 @@ type Result struct {
 	// isTLS is true when connection seems to use TLS
 	isTLS bool
 
-	captureProgress bool
-	progress        Snapshot
+	progress      *Snapshot
+	progressStart time.Time
 
 	// isReused is true when connection is reused (keep-alive)
 	isReused bool
@@ -153,6 +153,6 @@ func WithHTTPStat(ctx context.Context, r *Result) context.Context {
 // WithHTTPStatProgress enables snapshots of the current HTTP request, including
 // when the transport follows redirects or retries a connection.
 func WithHTTPStatProgress(ctx context.Context, r *Result) context.Context {
-	r.captureProgress = true
+	r.progress = new(Snapshot)
 	return withClientTrace(ctx, r)
 }
