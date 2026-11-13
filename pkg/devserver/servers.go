@@ -35,7 +35,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
-	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -45,7 +44,6 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/metrics"
-	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/service/servicefx"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -54,37 +52,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"go.uber.org/fx"
 )
-
-type devserverParams struct {
-	fx.In
-
-	Opts       StartOpts
-	Runner     runner.Runner
-	CQRS       cqrs.Manager
-	Publisher  pubsub.Publisher
-	Limits     *limitOverrides
-	Clients    *redisClients
-	History    history.Driver
-	DualWrite  *dualWrite
-	State      state.Manager
-	Executor   execution.Executor
-	Semaphores constraintapi.SemaphoreManager
-	Croner     cron.CronManager
-}
-
-// newDevserver creates the service that syncs apps and handles events.  the
-// API service serves its HTTP routes.
-func newDevserver(p devserverParams) *devserver {
-	ds := NewService(p.Opts, p.Runner, p.CQRS, p.Publisher, p.Limits.steps, p.Limits.stateSize, p.Clients.unsharded, p.History, nil)
-	// devapi.Info reports the "duckdb-insights" feature flag from it.  nil
-	// means insights would return an error.
-	ds.DuckDB = p.DualWrite.readDB
-	ds.State = p.State
-	ds.Executor = p.Executor
-	ds.SemaphoreManager = p.Semaphores
-	ds.CronSyncer = p.Croner
-	return ds
-}
 
 // newDevserverTask syncs apps until the app stops.
 func newDevserverTask(ds *devserver) servicefx.Task {
