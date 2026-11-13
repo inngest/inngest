@@ -38,7 +38,7 @@ type Documents = {
     "\n  mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {\n    updateAccountAddonQuantity(addonName: $addonName, quantity: $quantity) {\n      purchaseCount\n    }\n  }\n": typeof types.UpdateAccountAddonQuantityDocument,
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": typeof types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": typeof types.UpdatePaymentMethodDocument,
-    "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": typeof types.GetPaymentIntentsDocument,
+    "\n  query GetInvoices {\n    account {\n      invoices {\n        number\n        status\n        createdAt\n        amountLabel\n        invoiceURL\n      }\n    }\n  }\n": typeof types.GetInvoicesDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n": typeof types.CreateStripeSubscriptionDocument,
     "\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n": typeof types.ConfirmSubscriptionUpgradeDocument,
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": typeof types.UpdatePlanDocument,
@@ -223,7 +223,7 @@ const documents: Documents = {
     "\n  mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {\n    updateAccountAddonQuantity(addonName: $addonName, quantity: $quantity) {\n      purchaseCount\n    }\n  }\n": types.UpdateAccountAddonQuantityDocument,
     "\n  mutation UpdateAccount($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      billingEmail\n      name\n    }\n  }\n": types.UpdateAccountDocument,
     "\n  mutation UpdatePaymentMethod($token: String!) {\n    updatePaymentMethod(token: $token) {\n      brand\n      last4\n      expMonth\n      expYear\n      createdAt\n      default\n    }\n  }\n": types.UpdatePaymentMethodDocument,
-    "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n": types.GetPaymentIntentsDocument,
+    "\n  query GetInvoices {\n    account {\n      invoices {\n        number\n        status\n        createdAt\n        amountLabel\n        invoiceURL\n      }\n    }\n  }\n": types.GetInvoicesDocument,
     "\n  mutation CreateStripeSubscription($input: StripeSubscriptionInput!) {\n    createStripeSubscription(input: $input) {\n      clientSecret\n      message\n      subscriptionId\n    }\n  }\n": types.CreateStripeSubscriptionDocument,
     "\n  mutation ConfirmSubscriptionUpgrade($subscriptionId: String!) {\n    confirmSubscriptionUpgrade(subscriptionId: $subscriptionId) {\n      success\n      message\n      account {\n        id\n      }\n    }\n  }\n": types.ConfirmSubscriptionUpgradeDocument,
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
@@ -497,7 +497,7 @@ export function graphql(source: "\n  mutation UpdatePaymentMethod($token: String
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetPaymentIntents {\n    account {\n      paymentIntents {\n        status\n        createdAt\n        amountLabel\n        description\n        invoiceURL\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetInvoices {\n    account {\n      invoices {\n        number\n        status\n        createdAt\n        amountLabel\n        invoiceURL\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetInvoices {\n    account {\n      invoices {\n        number\n        status\n        createdAt\n        amountLabel\n        invoiceURL\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
