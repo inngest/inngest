@@ -286,6 +286,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	now := time.Now().UTC()
 	finishedAt := now.Add(2 * time.Second)
 
+	workspaceID := uuid.New()
 	require.NoError(t, q.InsertFunctionRun(ctx, db.InsertFunctionRunParams{
 		RunID:           runID,
 		RunStartedAt:    now,
@@ -294,7 +295,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 		TriggerType:     "event",
 		EventID:         eventID,
 		Cron:            sql.NullString{},
-		WorkspaceID:     uuid.New(),
+		WorkspaceID:     workspaceID,
 	}))
 
 	require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
@@ -310,6 +311,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 
 	assert.Equal(t, runID, got.FunctionRun.RunID)
 	assert.Equal(t, eventID, got.FunctionRun.EventID)
+	assert.Equal(t, workspaceID, got.FunctionRun.WorkspaceID)
 	assert.Equal(t, int64(3), got.FunctionRun.FunctionVersion)
 	assert.Equal(t, "completed", got.FunctionFinish.Status.String)
 	assert.JSONEq(t, `{"ok":true}`, got.FunctionFinish.Output.String)
@@ -2447,9 +2449,6 @@ func toLogicalSchema(schema map[string][]schemaColumn) map[string][]logicalColum
 			continue
 		}
 		for _, column := range columns {
-			if tableName == "function_runs" && column.Name == "workspace_id" {
-				continue
-			}
 			result[tableName] = append(result[tableName], logicalColumn{
 				Name: column.Name,
 				Type: logicalType(column.Name, column.Type),
