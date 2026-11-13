@@ -103,3 +103,44 @@ func TestTableLocationOf(t *testing.T) {
 		require.Equal(t, want != "", ok, in)
 	}
 }
+
+func TestReadOnly(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	wh := filepath.Join(dir, "warehouse")
+	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	require.NoError(t, err)
+	rw := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	t.Cleanup(rw.Close)
+	ro := httptest.NewServer(New(cat, Options{Warehouse: wh, ReadOnly: true}))
+	t.Cleanup(ro.Close)
+
+	status, _ := do(t, rw, "POST", "/v1/namespaces", `{"namespace":["app"]}`)
+	require.Equal(t, 200, status)
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+	status, _ = do(t, rw, "POST", "/v1/namespaces/app/tables", `{"name":"t","schema":`+schema+`}`)
+	require.Equal(t, 200, status)
+
+	for _, c := range []struct{ method, path, body string }{
+		{"GET", "/v1/namespaces/app/tables/t", ""},
+		{"HEAD", "/v1/namespaces/app/tables/t", ""},
+		{"GET", "/v1/namespaces", ""},
+		{"POST", "/v1/namespaces/app/tables/t/metrics", `{}`},
+	} {
+		status, _ := do(t, ro, c.method, c.path, c.body)
+		require.NotEqual(t, 403, status, "%s %s", c.method, c.path)
+	}
+	for _, c := range []struct{ method, path, body string }{
+		{"POST", "/v1/namespaces", `{"namespace":["x"]}`},
+		{"POST", "/v1/namespaces/app/tables", `{"name":"u","schema":` + schema + `}`},
+		{"POST", "/v1/namespaces/app/tables/t", `{"requirements":[],"updates":[]}`},
+		{"DELETE", "/v1/namespaces/app/tables/t", ""},
+		{"POST", "/v1/tables/rename", `{}`},
+		{"POST", "/v1/namespaces/app/properties", `{}`},
+	} {
+		status, body := do(t, ro, c.method, c.path, c.body)
+		require.Equal(t, 403, status, "%s %s: %v", c.method, c.path, body)
+	}
+}

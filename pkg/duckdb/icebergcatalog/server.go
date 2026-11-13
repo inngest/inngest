@@ -85,6 +85,10 @@ type Options struct {
 	// Credentials, when non-nil, vends storage credentials to clients that
 	// ask for them (see CredentialVendor). W/o it, clients need their own.
 	Credentials CredentialVendor
+	// ReadOnly rejects every request that could change the catalog (all
+	// but GET/HEAD and metrics reports), IE for a reader whose duckdb
+	// holds the token but should never commit.
+	ReadOnly bool
 }
 
 // Server is an Iceberg REST catalog backed by a catalog.Catalog.
@@ -198,7 +202,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(rec, http.StatusUnauthorized, "NotAuthorizedException", "missing or invalid bearer token")
 		return
 	}
+	if s.opts.ReadOnly && !readOnlyRequest(r) {
+		writeError(rec, http.StatusForbidden, "ForbiddenException", "this catalog is read-only")
+		return
+	}
 	s.mux.ServeHTTP(rec, r)
+}
+
+// readOnlyRequest reports whether r can't change the catalog. A metrics
+// report is a POST but only gets logged.
+func readOnlyRequest(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		return true
+	case http.MethodPost:
+		return strings.HasSuffix(r.URL.Path, "/metrics")
+	}
+	return false
 }
 
 // Start serves s on l until ctx is done, then shuts down. Pass a listener
