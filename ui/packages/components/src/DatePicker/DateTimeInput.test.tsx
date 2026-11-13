@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DateTimeInput } from './DateTimeInput';
 import { DateTimePicker } from './DateTimePicker';
+import { RangePicker } from './RangePicker';
 
 const initial = new Date(2024, 0, 31, 13, 20, 30, 400);
 function setup(date = initial, is24HourFormat = true) {
@@ -122,4 +123,90 @@ it('does not move the real DateTimePicker selection to a normalized date', () =>
   expect(screen.getByRole('status').textContent).toBe('false');
   change('Day', '29');
   expect(onChange).toHaveBeenLastCalledWith(new Date(2024, 1, 29, 13, 20, 30, 400));
+});
+
+describe('RangePicker incomplete calendar fields', () => {
+  // jsdom has no ResizeObserver; the real Radix popover uses it for positioning.
+  beforeAll(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+  afterAll(() => vi.unstubAllGlobals());
+  const end = new Date(2024, 1, 2, 13, 20, 30, 400);
+  const cases = [
+    ['Month', '00', '01', '02'],
+    ['Day', '00', '31', '02'],
+    ['Year', '0000', '2024', '2024'],
+  ];
+
+  it.each(cases)('keeps Next disabled for zero %s after a time edit', (field, zero, repair) => {
+    const onChange = vi.fn();
+    render(
+      <>
+        <div id="modals" />
+        <RangePicker defaultValue={{ type: 'absolute', start: initial, end }} onChange={onChange} />
+      </>
+    );
+    fireEvent.click(screen.getAllByRole('button')[0]!);
+    const next = screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement;
+    expect(next.disabled).toBe(false);
+    change(field!, zero!);
+    expect(next.disabled).toBe(true);
+    change('Point in time (Minutes)', '21');
+    expect(next.disabled).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    change(field!, repair!);
+    expect(next.disabled).toBe(false);
+  });
+
+  it.each(cases)(
+    'keeps Apply disabled for zero %s after a time edit',
+    (field, zero, _startRepair, repair) => {
+      const onChange = vi.fn();
+      render(
+        <>
+          <div id="modals" />
+          <RangePicker
+            defaultValue={{ type: 'absolute', start: initial, end }}
+            onChange={onChange}
+          />
+        </>
+      );
+      fireEvent.click(screen.getAllByRole('button')[0]!);
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+      const apply = screen.getByRole('button', { name: 'Apply' }) as HTMLButtonElement;
+      expect(apply.disabled).toBe(false);
+      change(field!, zero!);
+      expect(apply.disabled).toBe(true);
+      change('Point in time (Minutes)', '21');
+      expect(apply.disabled).toBe(true);
+      fireEvent.click(apply);
+      expect(onChange).not.toHaveBeenCalled();
+      change(field!, repair!);
+      expect(apply.disabled).toBe(false);
+      fireEvent.click(apply);
+      expect(onChange).toHaveBeenLastCalledWith({
+        type: 'absolute',
+        start: initial,
+        end: new Date(2024, 1, 2, 13, 21, 30, 400),
+      });
+    }
+  );
+
+  it.each(['Month', 'Day', 'Year'])(
+    'keeps a cleared %s invalid after another field changes',
+    (field) => {
+      const onSelect = setup();
+      change(field, '');
+      change('Point in time (Minutes)', '21');
+      expect(screen.getByRole('status').textContent).toBe('false');
+      expect(onSelect).not.toHaveBeenCalled();
+    }
+  );
 });

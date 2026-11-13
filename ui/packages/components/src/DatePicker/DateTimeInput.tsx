@@ -78,6 +78,7 @@ export function DateTimeInput({
 
   useEffect(() => {
     if (yearInput === '0000' || monthInput === '00' || dayInput == '00') {
+      setValid(false);
       onSelect(undefined);
       return;
     }
@@ -123,6 +124,7 @@ export function DateTimeInput({
       setValid(false);
       return;
     }
+    setValid(true);
     onSelect(newDate);
   }, [
     monthInput,
