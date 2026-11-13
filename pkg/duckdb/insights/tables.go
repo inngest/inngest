@@ -92,7 +92,7 @@ func (t logicalTable) column(name string) (knownColumn, bool) {
 type catalog struct {
 	tables map[string]logicalTable
 	// raw marks the internal raw mode: the physical tables themselves,
-	// unscoped (every tenant), through their inngest.raw_* macros.
+	// unscoped (every tenant), through their inngest_local.raw_* macros.
 	raw bool
 }
 
@@ -103,7 +103,7 @@ var (
 
 // rawTables exposes each physical table (schema.Runs, schema.Spans) under its
 // own name and columns, through its raw macro: runs collapsed to one row per
-// run (inngest.raw_runs), spans as stored.
+// run (inngest_local.raw_runs), spans as stored.
 func rawTables() map[string]logicalTable {
 	out := map[string]logicalTable{}
 	for _, t := range []struct {
@@ -238,7 +238,7 @@ var logicalTables = map[string]logicalTable{
 	},
 	// extended_trace_spans doesn't reuse traceSpanTable: unlike
 	// steps/step_attempts, insights_extended_trace_spans (migrations/
-	// 000002_insights_views.sql) never selects output/input — otherwise
+	// pkg/db/duckdb/views.sql) never selects output/input — otherwise
 	// identical column order to traceSpanTable's shared shape.
 	"extended_trace_spans": {
 		name:        "extended_trace_spans",
@@ -392,7 +392,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		cols[extraCol] = extra[extraCol]
 	}
 	// Both insights_steps and insights_step_attempts (migrations/
-	// 000002_insights_views.sql) LEFT JOIN the metadata rollup, exposing
+	// pkg/db/duckdb/views.sql) LEFT JOIN the metadata rollup, exposing
 	// the same run-scoped metadata/inngest columns insights_runs does.
 	order = append(order, "metadata", "inngest")
 	cols["metadata"] = knownColumn{colType: ColumnTypeJSON, json: true, pathHints: nil, description: "Custom metadata your code recorded during the run."}

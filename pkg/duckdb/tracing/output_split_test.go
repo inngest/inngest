@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/enums"
@@ -29,7 +29,7 @@ import (
 const stepPayload = `{"b":1,"a":1.10,"n":12345678901234567890123}`
 
 // TestOutputSplitEndToEnd drives a successful step, a failed step and a
-// failed run through the listener's hooks -> the lake -> the UI/GQL
+// failed run through the listener's hooks -> the Iceberg lake -> the UI/GQL
 // read path and Insights, checking output/error are split once at write
 // time and read back as stored.
 func TestOutputSplitEndToEnd(t *testing.T) {
@@ -109,11 +109,7 @@ func openOutputSplitLake(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
-	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", DuckLake: &driver.DuckLakeOptions{
-		CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-		DataPath:    filepath.Join(dir, "data"),
-	}})
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", Iceberg: icebergtest.Start(t)})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake))

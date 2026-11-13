@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/inngest/inngest/pkg/duckdb/schema"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +18,7 @@ func TestTranspileHappyPath(t *testing.T) {
 	require.Equal(t, []string{"runs"}, tr.Tables)
 	require.True(t, tr.Limited)
 	require.Equal(t, [][]PathHint{{{Hint: HintRunID}}, {{Hint: HintAppID}}}, tr.ColumnPathHints)
-	require.Contains(t, tr.SQL, "inngest.insights_runs")
+	require.Contains(t, tr.SQL, "inngest_local.insights_runs")
 	require.Contains(t, tr.SQL, "LIMIT 1000")
 
 	require.Len(t, tr.Diagnostics, 1)
@@ -93,7 +94,7 @@ func requireSingleMacroScopedTable(t *testing.T, sql string) {
 			continue
 		}
 		table := strings.TrimPrefix(c.Name, TableCTEPrefix)
-		require.Equal(t, "SELECT * FROM inngest."+logicalTables[table].view+"(?, ?)", parser.String(c.Select),
+		require.Equal(t, "SELECT * FROM "+schema.MacroSchema+"."+logicalTables[table].view+"(?, ?)", parser.String(c.Select),
 			"reserved CTE %s isn't a scoped macro call in %q", c.Name, sql)
 		reserved[c.Name] = true
 	}

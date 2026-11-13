@@ -11,6 +11,13 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
+// MacroSchema is the schema the views and table macros over the lake tables
+// (raw_runs, insights_*, run_metadata_rollup) live in. It's in duckdb's own
+// database, not the lake (an Iceberg catalog can't hold them), so it's
+// distinct from the lake tables' "inngest" catalog. See pkg/db/duckdb's
+// views.sql.
+const MacroSchema = "inngest_local"
+
 // Type is a column's value kind on the wire between a buffer and DuckDB.
 type Type int
 
@@ -84,7 +91,7 @@ func (c Column) PhysicalType() string {
 }
 
 // LogicalType is the type readers see the column as: JSON for JSON text
-// (the lake's VARCHAR, which the lake's macros return cast to JSON),
+// (the lake's VARCHAR, which the views.sql macros return cast to JSON),
 // else PhysicalType.
 func (c Column) LogicalType() string {
 	if c.Type == TypeJSON && c.DuckDB == jsonText {
@@ -107,6 +114,16 @@ func (c Column) IsStringKey(key string) bool {
 type Table struct {
 	Name    string
 	Columns []Column
+	// SortKey is the column order the table's data files should be sorted
+	// by (after the partition, account + month) for min/max pruning.
+	//
+	// It's not declared on the lake table (no SORTED BY in pkg/db/duckdb's
+	// migration), so duckdb appends rows unsorted: a small append's file
+	// spans the whole key range so sorting it doesn't help pruning, and it
+	// costs a bunch of insert throughput. Compaction owns sorting, rewriting
+	// small files into ones sorted by this. TODO(maintenance): compaction
+	// isn't built yet.
+	SortKey []string
 }
 
 // Column returns the named column.
@@ -119,10 +136,10 @@ func (t Table) Column(name string) (Column, bool) {
 	return Column{}, false
 }
 
-// jsonText is a JSON column's lake type: the JSON text as is, in a VARCHAR
-// rather than JSON so an Iceberg lake (which rejects duckdb's JSON type, and
-// duckdb doesn't keep the alias on a string column) can use the same types.
-// The raw_*/insights_* macros in pkg/db/duckdb's migrations return it as JSON
+// jsonText is a JSON column's lake type: the JSON text as is, in a VARCHAR,
+// since Iceberg rejects duckdb's JSON type ("Type JSON is not a valid
+// Iceberg Type") and duckdb doesn't keep the alias on a string column.
+// The inngest_local macros in pkg/db/duckdb's views.sql return it as JSON
 // (LogicalType), casting only where a whole value is returned or embedded:
 // the cast is a validating parse per row, so filters and key extractions
 // read the text directly.
@@ -167,7 +184,7 @@ var Runs = Table{Name: "runs", Columns: []Column{
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
-}}
+}, SortKey: []string{"account_id", "env_id", "run_id", "queued_at"}}
 
 // Spans is inngest.run_trace_spans: one row per span emission, never
 // collapsed, so a filter is safe on any column (input is array-valued, so
@@ -198,7 +215,7 @@ var Spans = Table{Name: "run_trace_spans", Columns: []Column{
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
-}}
+}, SortKey: []string{"account_id", "env_id", "run_id", "start_time", "end_time"}}
 
 // Events is inngest.events: one row per received event, never re-written or
 // collapsed, so a filter is safe on any column.
@@ -218,11 +235,11 @@ var Events = Table{Name: "events", Columns: []Column{
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
-}}
+}, SortKey: []string{"account_id", "env_id", "internal_id", "received_at"}}
 
 // RunMetadata is inngest.run_metadata: one row per metadata emission, never
 // re-written. Readers roll a span's emissions up to the latest per kind
-// (inngest.run_metadata_rollup), so only a filter on the rollup's group key
+// (inngest_local.run_metadata_rollup), so only a filter on the rollup's group key
 // (or a column constant within it) is safe to push.
 var RunMetadata = Table{Name: "run_metadata", Columns: []Column{
 	{Name: "account_id", Type: TypeUUID},
@@ -241,4 +258,4 @@ var RunMetadata = Table{Name: "run_metadata", Columns: []Column{
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
-}}
+}, SortKey: []string{"account_id", "env_id", "run_id", "scope", "step_id", "step_index", "step_attempt", "span_id", "kind"}}

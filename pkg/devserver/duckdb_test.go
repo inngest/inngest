@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 	"github.com/inngest/inngest/pkg/duckdb/tracing"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -22,29 +24,28 @@ func TestSetupDualWriteReturnsNilListenerWhenBinaryMissing(t *testing.T) {
 	require.Nil(t, db)
 }
 
-// TestDuckLakeOptionsForUsesFileCatalogWhenURIEmpty pins today's behavior:
-// with no Postgres catalog URI, dual-write's persisted DuckLake catalog stays
-// a local file under duckdbDir.
-func TestDuckLakeOptionsForUsesFileCatalogWhenURIEmpty(t *testing.T) {
+// TestIcebergConfigForUsesSQLiteWhenURIEmpty: w/o a Postgres URI the
+// persisted lake's catalog is a sqlite file under duckdbDir.
+func TestIcebergConfigForUsesSQLiteWhenURIEmpty(t *testing.T) {
 	dir := t.TempDir()
-	opts := duckLakeOptionsFor(dir, "")
+	cfg := icebergConfigFor(dir, "")
 
-	require.Equal(t, filepath.Join(dir, "catalog.duckdb"), opts.CatalogPath)
-	require.Empty(t, opts.PostgresCatalogURI)
-	require.Equal(t, filepath.Join(dir, "data"), opts.DataPath)
+	require.Equal(t, filepath.Join(dir, "catalog.sqlite"), cfg.SQLitePath)
+	require.Empty(t, cfg.PostgresURI)
+	require.Equal(t, filepath.Join(dir, "warehouse"), cfg.Warehouse)
 }
 
-// TestDuckLakeOptionsForUsesPostgresCatalogWhenURIProvided pins the new mode:
-// a non-empty postgresURI moves the catalog to Postgres instead of a local
-// file, while Parquet data still lands under duckdbDir/data either way.
-func TestDuckLakeOptionsForUsesPostgresCatalogWhenURIProvided(t *testing.T) {
+// TestIcebergConfigForUsesPostgresWhenURIProvided: a non-empty postgresURI
+// moves the catalog to Postgres, while data still lands under
+// duckdbDir/warehouse either way.
+func TestIcebergConfigForUsesPostgresWhenURIProvided(t *testing.T) {
 	dir := t.TempDir()
 	const uri = "postgres://user:pass@localhost:5432/inngest"
-	opts := duckLakeOptionsFor(dir, uri)
+	cfg := icebergConfigFor(dir, uri)
 
-	require.Equal(t, uri, opts.PostgresCatalogURI)
-	require.Empty(t, opts.CatalogPath)
-	require.Equal(t, filepath.Join(dir, "data"), opts.DataPath)
+	require.Equal(t, uri, cfg.PostgresURI)
+	require.Empty(t, cfg.SQLitePath)
+	require.Equal(t, filepath.Join(dir, "warehouse"), cfg.Warehouse)
 }
 
 func TestSetupDualWriteReturnsListenerWhenBinaryPresent(t *testing.T) {
@@ -98,9 +99,9 @@ func TestSetupDualWriteIsOptInAndOffByDefault(t *testing.T) {
 }
 
 // TestSetupDualWriteInMemoryWhenNotPersisting proves persist=false skips
-// DuckLake entirely: dual-write still starts successfully (a plain
-// in-memory duckdb needs no on-disk catalog/data), but neither the DuckLake
-// catalog nor its data directory ever gets created — --persist=false already
+// the lake entirely: dual-write still starts successfully (a plain
+// in-memory duckdb needs no on-disk catalog/data), but neither the Iceberg
+// catalog nor its warehouse ever gets created — --persist=false already
 // means "in-memory databases" for SQLite/Redis, and this is the same
 // contract extended to DuckDB.
 func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
@@ -116,10 +117,10 @@ func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.NoFileExists(t, filepath.Join(stateDir, "duckdb", "catalog.duckdb"),
-		"persist=false must not create a DuckLake catalog file")
-	require.NoDirExists(t, filepath.Join(stateDir, "duckdb", "data"),
-		"persist=false must not create a DuckLake data directory")
+	require.NoFileExists(t, filepath.Join(stateDir, "duckdb", "catalog.sqlite"),
+		"persist=false must not create an Iceberg catalog file")
+	require.NoDirExists(t, filepath.Join(stateDir, "duckdb", "warehouse"),
+		"persist=false must not create an Iceberg warehouse")
 }
 
 // TestSetupDualWriteResolvesRelativeStateDir pins the catalog to
@@ -141,7 +142,7 @@ func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
 	require.NotNil(t, l)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.FileExists(t, filepath.Join(wd, "relative-state", "duckdb", "catalog.duckdb"))
+	require.FileExists(t, filepath.Join(wd, "relative-state", "duckdb", "catalog.sqlite"))
 }
 
 // TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty proves that an
@@ -199,7 +200,7 @@ func TestSetupDualWriteReturnsDBHandleOnSuccess(t *testing.T) {
 
 // TestSetupDualWriteSandboxesExternalAccess pins that the handle Insights
 // runs user SQL on can't read the environment or arbitrary files, in both
-// the persisted (DuckLake) and in-memory modes, while migrations (run after
+// the persisted (Iceberg) and in-memory modes, while migrations (run after
 // the sandbox is applied) still succeed.
 func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
 	binPath, err := exec.LookPath("duckdb")
@@ -217,6 +218,43 @@ func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
 		_, err = db.ExecContext(t.Context(), "SELECT content FROM read_text('/etc/hosts');")
 		require.ErrorContains(t, err, "disabled by configuration", "persist=%v", persist)
 	}
+}
+
+// TestSetupDualWritePersistedLakeSurvivesRestart is the persisted mode end
+// to end: rows written through setupDualWrite's listener land in the Iceberg
+// lake (after lakeFlushInterval), and a second setupDualWrite on the same
+// state dir (IE restarting the dev server) still reads them.
+func TestSetupDualWritePersistedLakeSurvivesRestart(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	stateDir := t.TempDir()
+	ctx := t.Context()
+
+	count := func(readDB *sql.DB) int {
+		var n int
+		if err := readDB.QueryRowContext(ctx, "SELECT count(*) FROM inngest.events;").Scan(&n); err != nil {
+			return -1
+		}
+		return n
+	}
+
+	l, _, readDB := setupDualWrite(ctx, true, true, binPath, stateDir, "")
+	require.NotNil(t, l)
+	l.OnEventReceived(ctx, event.NewBaseTrackedEvent(event.Event{Name: "e2e/persisted"}, nil))
+	require.Eventually(t, func() bool { return count(readDB) == 1 }, 3*lakeFlushInterval, 100*time.Millisecond)
+	_ = readDB.Close()
+	stopDualWrite(context.Background(), l)
+
+	l, _, readDB = setupDualWrite(ctx, true, true, binPath, stateDir, "")
+	require.NotNil(t, l)
+	t.Cleanup(func() {
+		_ = readDB.Close()
+		stopDualWrite(context.Background(), l)
+	})
+	require.Equal(t, 1, count(readDB))
+	require.DirExists(t, filepath.Join(stateDir, "duckdb", "warehouse", "main.db", "events"))
 }
 
 func TestStopDualWriteIsSafeWithNilListener(t *testing.T) {
@@ -249,8 +287,8 @@ func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "smoke/test"}, nil)
 	l.OnEventReceived(ctx, evt)
 
-	dbFile := filepath.Join(stateDir, "duckdb", "catalog.duckdb")
-	require.FileExists(t, dbFile, "driver.Open should have created the catalog file")
+	require.FileExists(t, filepath.Join(stateDir, "duckdb", "catalog.sqlite"), "the embedded catalog should have created its sqlite file")
+	require.FileExists(t, filepath.Join(stateDir, "duckdb", "main.duckdb"), "driver.Open should have created the main db file")
 
 	stopDualWrite(context.Background(), l)
 }
@@ -273,10 +311,7 @@ func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
 	db, err := driver.Open(ctx, driver.Options{
 		BinaryPath: binPath,
 		DBFile:     filepath.Join(dir, "catalog.duckdb"),
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "lake-catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 	})
 	require.NoError(t, err)
 	require.NoError(t, duckdb.Migrate(ctx, db, duckdb.ModeRawLake))
@@ -302,7 +337,7 @@ func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
 // TestDualWriteEndToEndRowsLandInDuckDBInMemory mirrors
 // TestDualWriteEndToEndRowsLandInDuckDB for persist=false: the same
 // migrations, tracing.NewListener, and batch-flush path, but against a
-// bare in-memory catalog with no DuckLake ATTACH at all.
+// bare in-memory catalog with no lake ATTACH at all.
 func TestDualWriteEndToEndRowsLandInDuckDBInMemory(t *testing.T) {
 	binPath, err := exec.LookPath("duckdb")
 	if err != nil {

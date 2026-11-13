@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -19,11 +18,10 @@ func openQuackForStreams(t *testing.T, conns int) *sql.DB {
 	t.Helper()
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath, DBFile: ":memory:",
-		DuckLake:  &DuckLakeOptions{CatalogPath: filepath.Join(dir, "catalog.ducklake"), DataPath: filepath.Join(dir, "data")},
+		Iceberg:   testIceberg(t),
 		QuackAddr: &addr, QuackConns: conns,
 	})
 	require.NoError(t, err)
