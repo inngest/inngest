@@ -2,6 +2,8 @@ package apiv1
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
@@ -40,6 +42,10 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		auth.WorkspaceID(),
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+			return
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
 	}
@@ -106,6 +112,10 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 
 	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+			return
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
 	}
