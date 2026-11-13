@@ -53,7 +53,9 @@ type Result struct {
 	transferDone  time.Time // need to be provided from outside
 
 	// isTLS is true when connection seems to use TLS
-	isTLS bool
+	isTLS          bool
+	tlsCompleted   bool
+	requestWritten bool
 
 	// isReused is true when connection is reused (keep-alive)
 	isReused bool

@@ -90,10 +90,11 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 			r.tlsStart = time.Now()
 		},
 
-		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			r.tlsDone = time.Now()
+			r.tlsCompleted = err == nil
 
 			r.TLSHandshake = r.tlsDone.Sub(r.tlsStart)
 			r.Pretransfer = r.tlsDone.Sub(r.dnsStart)
@@ -133,6 +134,7 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			r.serverStart = time.Now()
+			r.requestWritten = info.Err == nil
 
 			// When client doesn't use DialContext or using old (before go1.7) `net`
 			// pakcage, DNS/TCP/TLS hook is not called.
