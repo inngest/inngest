@@ -69,7 +69,7 @@ func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
 	if before := r.FormValue("received_before"); before != "" {
 		parsed, err := dateutil.Parse(before)
 		if err != nil {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid received_after query parameter"))
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid received_before query parameter"))
 			return
 		}
 		opts.Newest = parsed

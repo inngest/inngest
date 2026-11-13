@@ -62,3 +62,21 @@ func TestGetEventRunsReturnsInternalServerErrorWhenRunStatusQueryFails(t *testin
 	require.Equal(t, "Unable to query run status", response.Message)
 	require.Equal(t, http.StatusInternalServerError, response.Status)
 }
+
+func TestGetEventsInvalidTimeFilterNamesParameter(t *testing.T) {
+	for _, parameter := range []string{"received_before", "received_after"} {
+		t.Run(parameter, func(t *testing.T) {
+			router := router{API: &API{opts: Opts{RateLimited: noopRateChecker}}}
+			req := httptest.NewRequest(http.MethodGet, "/v1/events?"+parameter+"=not-a-date", nil)
+			rec := httptest.NewRecorder()
+
+			router.getEvents(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var response publicerr.Error
+			require.NoError(t, json.NewDecoder(rec.Body).Decode(&response))
+			require.Equal(t, "Invalid "+parameter+" query parameter", response.Message)
+			require.Equal(t, http.StatusBadRequest, response.Status)
+		})
+	}
+}
