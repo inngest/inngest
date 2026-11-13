@@ -47,6 +47,37 @@ describe('scoreRows', () => {
     expect(rows).toEqual([{ name: 'relevance', value: 0.9, updatedAt: '2026-06-23T00:00:09Z' }]);
   });
 
+  it.each([
+    // [earlier, later]: the API omits trailing zeros in fractional seconds
+    ['2026-06-23T00:00:09Z', '2026-06-23T00:00:09.5Z'],
+    ['2026-06-23T00:00:09.5Z', '2026-06-23T00:00:09.51Z'],
+    ['2026-06-23T00:00:09.123Z', '2026-06-23T00:00:09.123456Z'],
+    ['2026-06-23T00:00:09.1234569Z', '2026-06-23T00:00:09.123457Z'],
+    ['2026-06-23T00:00:09.999999999Z', '2026-06-23T00:00:10Z'],
+    // the same instant written with a different offset
+    ['2026-06-23T00:00:09Z', '2026-06-23T05:30:10+05:30'],
+  ])('compares write times as instants, not as text: %s is before %s', (earlier, later) => {
+    const older = {
+      kind: 'inngest.score',
+      updatedAt: earlier,
+      values: { relevance: { value: 1 } },
+    };
+    const newer = { kind: 'inngest.score', updatedAt: later, values: { relevance: { value: 2 } } };
+    const expected = [{ name: 'relevance', value: 2, updatedAt: later }];
+
+    expect(scoreRows([older, newer])).toEqual(expected);
+    expect(scoreRows([newer, older])).toEqual(expected);
+  });
+
+  it('lets the later entry win when two writes have the same time', () => {
+    const rows = scoreRows([
+      { kind: 'inngest.score', updatedAt: '2026-06-23T00:00:09Z', values: { a: { value: 1 } } },
+      { kind: 'inngest.score', updatedAt: '2026-06-23T00:00:09.000Z', values: { a: { value: 2 } } },
+    ]);
+
+    expect(rows).toEqual([{ name: 'a', value: 2, updatedAt: '2026-06-23T00:00:09.000Z' }]);
+  });
+
   it('reads per name score kinds, w/ the name taken from the kind', () => {
     const rows = scoreRows([
       { kind: 'inngest.score.accuracy', updatedAt: 't', values: { value: 0.95 } },
