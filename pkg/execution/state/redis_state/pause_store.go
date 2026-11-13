@@ -117,9 +117,9 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 		replaceSignalOnConflict = "1"
 	}
 
-	eventBodyExpiresAt := int64(0)
+	expireEventBodies := "0"
 	if pause.expireEventBodies {
-		eventBodyExpiresAt = p.Expires.Time().Add(10 * time.Minute).UnixMilli()
+		expireEventBodies = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -133,7 +133,7 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 		int(extendedExpiry),
 		nowUnixSeconds,
 		replaceSignalOnConflict,
-		eventBodyExpiresAt,
+		expireEventBodies,
 	})
 	if err != nil {
 		return 0, err

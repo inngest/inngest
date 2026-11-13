@@ -90,7 +90,7 @@ func (db *RedisDB) Get(k string) (string, error) {
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
-	if db.t(k) != "string" {
+	if db.t(k) != keyTypeString {
 		return "", ErrWrongType
 	}
 	return db.stringGet(k), nil
@@ -108,7 +108,7 @@ func (db *RedisDB) Set(k, v string) error {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "string" {
+	if db.exists(k) && db.t(k) != keyTypeString {
 		return ErrWrongType
 	}
 	db.del(k, true) // Remove expire
@@ -127,7 +127,7 @@ func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "string" {
+	if db.exists(k) && db.t(k) != keyTypeString {
 		return 0, ErrWrongType
 	}
 
@@ -151,7 +151,7 @@ func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "string" {
+	if db.exists(k) && db.t(k) != keyTypeString {
 		return 0, ErrWrongType
 	}
 
@@ -180,7 +180,7 @@ func (db *RedisDB) List(k string) ([]string, error) {
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(k) != "list" {
+	if db.t(k) != keyTypeList {
 		return nil, ErrWrongType
 	}
 	return db.listKeys[k], nil
@@ -197,7 +197,7 @@ func (db *RedisDB) Lpush(k, v string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "list" {
+	if db.exists(k) && db.t(k) != keyTypeList {
 		return 0, ErrWrongType
 	}
 	return db.listLpush(k, v), nil
@@ -217,7 +217,7 @@ func (db *RedisDB) Lpop(k string) (string, error) {
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
-	if db.t(k) != "list" {
+	if db.t(k) != keyTypeList {
 		return "", ErrWrongType
 	}
 	return db.listLpop(k), nil
@@ -240,7 +240,7 @@ func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "list" {
+	if db.exists(k) && db.t(k) != keyTypeList {
 		return 0, ErrWrongType
 	}
 	return db.listPush(k, v...), nil
@@ -265,7 +265,7 @@ func (db *RedisDB) Pop(k string) (string, error) {
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
-	if db.t(k) != "list" {
+	if db.t(k) != keyTypeList {
 		return "", ErrWrongType
 	}
 
@@ -289,7 +289,7 @@ func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "set" {
+	if db.exists(k) && db.t(k) != keyTypeSet {
 		return 0, ErrWrongType
 	}
 	return db.setAdd(k, elems...), nil
@@ -314,7 +314,7 @@ func (db *RedisDB) Members(k string) ([]string, error) {
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(k) != "set" {
+	if db.t(k) != keyTypeSet {
 		return nil, ErrWrongType
 	}
 	return db.setMembers(k), nil
@@ -339,7 +339,7 @@ func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
-	if db.t(k) != "set" {
+	if db.t(k) != keyTypeSet {
 		return false, ErrWrongType
 	}
 	return db.setIsMember(k, v), nil
@@ -358,7 +358,7 @@ func (db *RedisDB) HKeys(key string) ([]string, error) {
 	if !db.exists(key) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(key) != "hash" {
+	if db.t(key) != keyTypeHash {
 		return nil, ErrWrongType
 	}
 	return db.hashFields(key), nil
@@ -490,6 +490,89 @@ func (db *RedisDB) HSet(k string, fv ...string) {
 	db.hashSet(k, fv...)
 }
 
+// HExpire sets a TTL on a hash field. Returns true if the field exists.
+func (m *Miniredis) HExpire(key, field string, ttl time.Duration) bool {
+	return m.DB(m.selectedDB).HExpire(key, field, ttl)
+}
+
+// HExpire sets a TTL on a hash field. Returns true if the field exists.
+func (db *RedisDB) HExpire(key, field string, ttl time.Duration) bool {
+	db.master.Lock()
+	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
+	if !db.exists(key) || db.t(key) != keyTypeHash {
+		return false
+	}
+	if _, ok := db.hashKeys[key][field]; !ok {
+		return false
+	}
+	if db.hashTTLs[key] == nil {
+		db.hashTTLs[key] = map[string]time.Duration{}
+	}
+	db.hashTTLs[key][field] = ttl
+	return true
+}
+
+// HPersist removes a TTL from a hash field. Returns true if there was a TTL.
+func (m *Miniredis) HPersist(key, field string) bool {
+	return m.DB(m.selectedDB).HPersist(key, field)
+}
+
+// HPersist removes a TTL from a hash field. Returns true if there was a TTL.
+func (db *RedisDB) HPersist(key, field string) bool {
+	db.master.Lock()
+	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
+	fieldTTLs := db.hashTTLs[key]
+	if fieldTTLs == nil {
+		return false
+	}
+	if _, ok := fieldTTLs[field]; !ok {
+		return false
+	}
+	delete(fieldTTLs, field)
+	return true
+}
+
+// HTTL returns the remaining TTL of a hash field. Returns 0 if no TTL.
+func (m *Miniredis) HTTL(key, field string) time.Duration {
+	return m.DB(m.selectedDB).HTTL(key, field)
+}
+
+// HTTL returns the remaining TTL of a hash field. Returns 0 if no TTL.
+func (db *RedisDB) HTTL(key, field string) time.Duration {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	fieldTTLs := db.hashTTLs[key]
+	if fieldTTLs == nil {
+		return 0
+	}
+	return fieldTTLs[field]
+}
+
+// HSetEX sets hash fields with a TTL.
+func (m *Miniredis) HSetEX(key string, ttl time.Duration, fv ...string) {
+	m.DB(m.selectedDB).HSetEX(key, ttl, fv...)
+}
+
+// HSetEX sets hash fields with a TTL.
+func (db *RedisDB) HSetEX(key string, ttl time.Duration, fv ...string) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
+	db.hashSet(key, fv...)
+	if db.hashTTLs[key] == nil {
+		db.hashTTLs[key] = map[string]time.Duration{}
+	}
+	for i := 0; i < len(fv); i += 2 {
+		db.hashTTLs[key][fv[i]] = ttl
+	}
+}
+
 // HDel deletes a hash key.
 func (m *Miniredis) HDel(k, f string) {
 	m.DB(m.selectedDB).HDel(k, f)
@@ -569,7 +652,7 @@ func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
-	if db.t(k) != "set" {
+	if db.t(k) != keyTypeSet {
 		return 0, ErrWrongType
 	}
 	return db.setRem(k, fields...), nil
@@ -586,7 +669,7 @@ func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "zset" {
+	if db.exists(k) && db.t(k) != keyTypeSortedSet {
 		return false, ErrWrongType
 	}
 	return db.ssetAdd(k, score, member), nil
@@ -605,7 +688,7 @@ func (db *RedisDB) ZMembers(k string) ([]string, error) {
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(k) != "zset" {
+	if db.t(k) != keyTypeSortedSet {
 		return nil, ErrWrongType
 	}
 	return db.ssetMembers(k), nil
@@ -624,7 +707,7 @@ func (db *RedisDB) SortedSet(k string) (map[string]float64, error) {
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(k) != "zset" {
+	if db.t(k) != keyTypeSortedSet {
 		return nil, ErrWrongType
 	}
 	return db.sortedSet(k), nil
@@ -644,7 +727,7 @@ func (db *RedisDB) ZRem(k, member string) (bool, error) {
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
-	if db.t(k) != "zset" {
+	if db.t(k) != keyTypeSortedSet {
 		return false, ErrWrongType
 	}
 	return db.ssetRem(k, member), nil
@@ -663,7 +746,7 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
-	if db.t(k) != "zset" {
+	if db.t(k) != keyTypeSortedSet {
 		return 0, ErrWrongType
 	}
 	return db.ssetScore(k, member), nil
@@ -681,7 +764,7 @@ func (db *RedisDB) ZMScore(k string, members []string) ([]float64, error) {
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if db.t(k) != "zset" {
+	if db.t(k) != keyTypeSortedSet {
 		return nil, ErrWrongType
 	}
 	return db.ssetMScore(k, members), nil
@@ -783,7 +866,7 @@ func (db *RedisDB) HllAdd(k string, elems ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
-	if db.exists(k) && db.t(k) != "hll" {
+	if db.exists(k) && db.t(k) != keyTypeHll {
 		return 0, ErrWrongType
 	}
 	return db.hllAdd(k, elems...), nil
@@ -821,4 +904,42 @@ func (db *RedisDB) HllMerge(destKey string, sourceKeys ...string) error {
 // Overwrites dest if it already exists (unlike the redis command, which needs a flag to allow that).
 func (m *Miniredis) Copy(srcDB int, src string, destDB int, dest string) error {
 	return m.copy(m.DB(srcDB), src, m.DB(destDB), dest)
+}
+
+func (m *Miniredis) SCard(key string) (int, error) {
+	return m.DB(m.selectedDB).SCard(key)
+}
+
+func (db *RedisDB) SCard(key string) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(key) {
+		return 0, nil
+	}
+	if db.t(key) != "set" {
+		return 0, ErrWrongType
+	}
+	return len(db.setMembers(key)), nil
+}
+
+// return "" if there were no members
+func (m *Miniredis) SRandMember(key string) (string, error) {
+	return m.DB(m.selectedDB).SRandMember(key)
+}
+
+func (db *RedisDB) SRandMember(key string) (string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(key) {
+		return "", nil
+	}
+	if db.t(key) != "set" {
+		return "", ErrWrongType
+	}
+	members := db.setMembers(key)
+	if len(members) == 0 {
+		return "", nil
+	}
+	db.master.shuffle(members)
+	return members[0], nil
 }
