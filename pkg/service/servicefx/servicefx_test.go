@@ -168,3 +168,105 @@ func TestRunnerPreError(t *testing.T) {
 		"dependency closed",
 	}, svc.events.get())
 }
+
+func TestRunnerTask(t *testing.T) {
+	tests := []struct {
+		name string
+		// run is the Run of the task.  nil blocks until the context is
+		// cancelled.
+		run          func(context.Context) error
+		wantShutdown bool
+		wantErr      string
+		wantEvents   []string
+	}{
+		{
+			name: "runs until the app stops",
+			wantEvents: []string{
+				"start",
+				"run",
+				"stop",
+				"app context cancelled",
+				"dependency closed",
+			},
+		},
+		{
+			name: "error before the app stops",
+			run: func(context.Context) error {
+				return errors.New("subscription closed")
+			},
+			wantShutdown: true,
+			wantErr:      "service task errored: subscription closed",
+			wantEvents: []string{
+				"start",
+				"run",
+				"stop",
+				"app context cancelled",
+				"dependency closed",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ev := &events{}
+			var runner *Runner
+			app := fx.New(
+				fx.NopLogger,
+				fx.Provide(func(ctx context.Context, lifecycle fx.Lifecycle) *dependency {
+					lifecycle.Append(fx.StopHook(func() {
+						if ctx.Err() != nil {
+							ev.add("app context cancelled")
+						}
+						ev.add("dependency closed")
+					}))
+					return &dependency{}
+				}),
+				ProvideTasks(func(*dependency) Task {
+					return Task{
+						Name: "task",
+						Start: func(context.Context) error {
+							ev.add("start")
+							return nil
+						},
+						Run: func(ctx context.Context) error {
+							ev.add("run")
+							if tt.run != nil {
+								return tt.run(ctx)
+							}
+							<-ctx.Done()
+							return nil
+						},
+						Stop: func(context.Context) error {
+							ev.add("stop")
+							return nil
+						},
+					}
+				}),
+				Module(t.Context()),
+				fx.Populate(&runner),
+			)
+			require.NoError(t, app.Err())
+			shutdown := app.Wait()
+			require.NoError(t, app.Start(t.Context()))
+
+			if tt.wantShutdown {
+				select {
+				case <-shutdown:
+				case <-time.After(5 * time.Second):
+					t.Fatal("the task did not stop the app")
+				}
+			} else {
+				require.Eventually(t, func() bool {
+					return len(ev.get()) == 2
+				}, time.Second, time.Millisecond)
+			}
+			require.NoError(t, app.Stop(t.Context()))
+
+			require.Equal(t, tt.wantEvents, ev.get())
+			if tt.wantErr == "" {
+				require.NoError(t, runner.Err())
+				return
+			}
+			require.EqualError(t, runner.Err(), tt.wantErr)
+		})
+	}
+}

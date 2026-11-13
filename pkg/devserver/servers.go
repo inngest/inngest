@@ -47,6 +47,7 @@ import (
 	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/service/servicefx"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -85,8 +86,13 @@ func newDevserver(p devserverParams) *devserver {
 	return ds
 }
 
-func devserverService(ds *devserver) service.Service {
-	return ds
+// newDevserverTask syncs apps until the app stops.
+func newDevserverTask(ds *devserver) servicefx.Task {
+	return servicefx.Task{
+		Name: ds.Name(),
+		Run:  ds.Run,
+		Stop: ds.Stop,
+	}
 }
 
 type apiParams struct {
@@ -115,10 +121,10 @@ type apiParams struct {
 	ConnectTracer  itrace.ConditionalTracer
 }
 
-// newAPIService serves the dev server UI, the event API, and the REST,
-// GraphQL, and MCP APIs on one port.  this keeps the CLI flags and the SDK
-// config to one URL.
-func newAPIService(p apiParams) (service.Service, error) {
+// newAPITask serves the dev server UI, the event API, and the REST, GraphQL,
+// and MCP APIs on one port.  this keeps the CLI flags and the SDK config to
+// one URL.
+func newAPITask(p apiParams) (servicefx.Task, error) {
 	authMiddleware := authn.SigningKeyMiddleware(p.Opts.SigningKey)
 
 	// Create a new API endpoint which hosts SDK-related functionality for
@@ -155,7 +161,7 @@ func newAPIService(p apiParams) (service.Service, error) {
 		},
 	})
 	if err != nil {
-		return nil, err
+		return servicefx.Task{}, err
 	}
 
 	devAPI.Route("/v1", func(r chi.Router) {
@@ -168,14 +174,14 @@ func newAPIService(p apiParams) (service.Service, error) {
 		QueueManager: p.Shard,
 	})
 	if err != nil {
-		return nil, err
+		return servicefx.Task{}, err
 	}
 
 	apiv2Handler, err := apiv2.NewHTTPHandler(p.Context, p.v2ServiceOptions(), apiv2.HTTPHandlerOptions{
 		AuthnMiddleware: authMiddleware,
 	}, apiv2base.NewBase())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create v2 handler: %w", err)
+		return servicefx.Task{}, fmt.Errorf("failed to create v2 handler: %w", err)
 	}
 
 	mcpHandler := newMCPHandler(p.Devserver.HandleEvent, p.CQRS, p.Opts.Tick, apiv2Handler)
@@ -210,12 +216,20 @@ func newAPIService(p apiParams) (service.Service, error) {
 		})})
 	}
 
-	return api.NewService(api.APIServiceOptions{
+	server, err := api.NewServer(p.Context, api.APIServiceOptions{
 		Config:         p.Opts.Config,
 		Mounts:         mounts,
 		LocalEventKeys: p.Opts.EventKeys,
 		Logger:         p.Log,
-	}), nil
+	})
+	if err != nil {
+		return servicefx.Task{}, err
+	}
+	return servicefx.Task{
+		Name: "api",
+		Run:  server.Run,
+		Stop: server.Stop,
+	}, nil
 }
 
 // addV1Routes adds the REST API v1 to r.
@@ -342,10 +356,10 @@ type debugAPIParams struct {
 	Debouncer  debounce.Debouncer
 }
 
-// newDebugAPI serves the debug API on StartOpts.DebugAPIPort.  options adds
-// it only when the DEBUG environment variable is set.
-func newDebugAPI(p debugAPIParams) service.Service {
-	return debugapi.NewDebugAPI(debugapi.Opts{
+// newDebugAPITask serves the debug API on StartOpts.DebugAPIPort.  options
+// adds it only when the DEBUG environment variable is set.
+func newDebugAPITask(p debugAPIParams) servicefx.Task {
+	server := debugapi.NewDebugAPI(debugapi.Opts{
 		Log:              p.Log,
 		DB:               p.CQRS,
 		RunReader:        p.Queue,
@@ -363,4 +377,8 @@ func newDebugAPI(p debugAPIParams) service.Service {
 		BatchManager: p.Batcher,
 		Debouncer:    p.Debouncer,
 	})
+	return servicefx.Task{
+		Name: "debug-api-dev",
+		Run:  server.Run,
+	}
 }

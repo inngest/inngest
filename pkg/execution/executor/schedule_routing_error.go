@@ -51,7 +51,7 @@ func firstEventInternalID(evts []event.TrackedEvent) ulid.ULID {
 // Schedule call left in the state store when the queue drops item after this
 // attempt.  without this delete, the run state of a dropped cron or debounce
 // job stays in the state store with no queue item to finish or remove it.
-func (s *svc) deleteStateOnFinalRoutingError(ctx context.Context, item queue.Item, err error) {
+func (s *Service) deleteStateOnFinalRoutingError(ctx context.Context, item queue.Item, err error) {
 	var routingErr *ScheduleQueueRoutingError
 	if !errors.As(err, &routingErr) || queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
 		return

@@ -108,7 +108,7 @@ func TestEagerBulkCancellationQueuedTime(t *testing.T) {
 			}
 			require.NoError(t, cancellation.NewRedisWriter(rc, producer, "").CreateCancellation(ctx, c))
 			recorder := &bulkCancellationRecorder{}
-			s := &svc{
+			s := &Service{
 				shards: registry,
 				exec:   recorder,
 				log:    logger.VoidLogger(),
@@ -149,7 +149,7 @@ func newBulkCancellationQueue(t *testing.T) (rueidis.Client, queue.ShardRegistry
 
 func TestEagerBulkCancellationNoPartition(t *testing.T) {
 	_, registry := newBulkCancellationQueue(t)
-	s := &svc{
+	s := &Service{
 		shards: registry,
 		log:    logger.VoidLogger(),
 	}
@@ -212,7 +212,7 @@ func TestEagerBulkCancellationContinuesAfterItemError(t *testing.T) {
 			} else {
 				recorder.failRun = runs[0]
 			}
-			s := &svc{
+			s := &Service{
 				shards: registry,
 				state:  loader,
 				exec:   recorder,

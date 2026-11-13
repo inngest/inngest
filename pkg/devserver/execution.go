@@ -39,7 +39,7 @@ import (
 	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
-	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/service/servicefx"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
@@ -339,9 +339,9 @@ type executorServiceParams struct {
 	Publisher pubsub.Publisher
 }
 
-// newExecutorService runs the steps that the queue holds.
-func newExecutorService(p executorServiceParams) service.Service {
-	return executor.NewService(
+// newExecutorTask runs the jobs on the queue, such as steps and crons.
+func newExecutorTask(p executorServiceParams) (servicefx.Task, error) {
+	svc, err := executor.NewService(
 		p.Opts.Config,
 		executor.WithExecutionManager(p.CQRS),
 		executor.WithState(p.State),
@@ -354,11 +354,20 @@ func newExecutorService(p executorServiceParams) service.Service {
 		executor.WithServiceShardRegistry(p.Registry),
 		executor.WithServicePublisher(p.Publisher),
 	)
+	if err != nil {
+		return servicefx.Task{}, err
+	}
+	return servicefx.Task{
+		Name: "executor",
+		Run:  svc.Run,
+		Stop: svc.Stop,
+	}, nil
 }
 
 type runnerParams struct {
 	fx.In
 
+	Context   context.Context
 	Opts      StartOpts
 	Log       logger.Logger
 	CQRS      cqrs.Manager
@@ -373,8 +382,9 @@ type runnerParams struct {
 
 // newRunner creates the runner, which starts the function runs that events
 // trigger.
-func newRunner(p runnerParams) runner.Runner {
+func newRunner(p runnerParams) (runner.Runner, error) {
 	return runner.NewService(
+		p.Context,
 		p.Opts.Config,
 		runner.WithCQRS(p.CQRS),
 		runner.WithExecutor(p.Executor),
@@ -389,6 +399,11 @@ func newRunner(p runnerParams) runner.Runner {
 	)
 }
 
-func runnerService(r runner.Runner) service.Service {
-	return r
+// newRunnerTask handles the events on the event stream.
+func newRunnerTask(r runner.Runner) servicefx.Task {
+	return servicefx.Task{
+		Name: "runner",
+		Run:  r.Run,
+		Stop: r.Stop,
+	}
 }

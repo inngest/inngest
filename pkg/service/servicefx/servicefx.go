@@ -1,7 +1,6 @@
-// Package servicefx runs service.Service values in an Fx app, with the
-// lifecycle of service.StartAll.  a constructor adds a service with Provide.
-// Module starts every provided service when the app starts and stops them
-// when the app stops.
+// Package servicefx runs the long-running parts of an Fx app: the tasks that
+// ProvideTasks adds, and the service.Service values that Provide adds.
+// Module starts them when the app starts and stops them when the app stops.
 package servicefx
 
 import (
@@ -16,14 +15,41 @@ import (
 	"go.uber.org/fx"
 )
 
-// defaultTimeout is the time Pre and Stop get when a service does not set
-// one.  it is equal to the default of package service.
+// defaultTimeout is the time Pre and Stop of a service.Service get when the
+// service does not set one.  it is equal to the default of package service.
 const defaultTimeout = 30 * time.Second
 
+// Task is a part of an app that runs from app start to app stop, such as a
+// queue consumer or a server.  every function is optional.
+type Task struct {
+	Name string
+
+	// Start runs when the app starts.  an error stops the start of the app.
+	Start func(ctx context.Context) error
+
+	// Run runs in a new goroutine after every Start returns.  stopping the
+	// app cancels ctx.  if Run returns before the app stops, the app stops.
+	Run func(ctx context.Context) error
+
+	// Stop runs when the app stops, after Run returns.
+	Stop func(ctx context.Context) error
+}
+
+// ProvideTasks adds the Task that each constructor returns to the tasks that
+// Module runs.
+func ProvideTasks(constructors ...any) fx.Option {
+	annotated := make([]any, 0, len(constructors))
+	for _, constructor := range constructors {
+		annotated = append(annotated, fx.Annotate(constructor, fx.ResultTags(`group:"tasks"`)))
+	}
+	return fx.Provide(annotated...)
+}
+
 // Provide adds the service.Service that each constructor returns to the
-// services that Module runs.  the app fails to build when a result does not
-// implement service.Service.  the result is not provided as its own type, so
-// a service that other constructors use needs its own provider.
+// services that Module runs, with the lifecycle of service.StartAll.  the app
+// fails to build when a result does not implement service.Service.  the
+// result is not provided as its own type, so a service that other
+// constructors use needs its own provider.
 func Provide(constructors ...any) fx.Option {
 	annotated := make([]any, 0, len(constructors))
 	for _, constructor := range constructors {
@@ -36,14 +62,14 @@ func Provide(constructors ...any) fx.Option {
 	return fx.Provide(annotated...)
 }
 
-// Module runs every service that Provide adds.  it also provides the
-// context.Context of the app.  stopping the app stops the services, then
-// cancels the context and waits for the goroutines started with service.Go,
-// then closes the dependencies.  without this order, goroutines that use the
+// Module runs every task and service.  it also provides the context.Context
+// of the app.  stopping the app stops the tasks and services, then cancels
+// the context and waits for the goroutines started with service.Go, then
+// closes the dependencies.  without this order, goroutines that use the
 // context of the app see closed clients.
 //
 // Module adds an invoke.  Fx runs invokes in the order of the options, so an
-// invoke that must run before any service is built goes before Module.
+// invoke that must run before any task is built goes before Module.
 func Module(parent context.Context) fx.Option {
 	ctx, cancel := context.WithCancel(parent)
 	return fx.Options(
@@ -59,13 +85,13 @@ func Module(parent context.Context) fx.Option {
 	)
 }
 
-// Runner starts and stops the services of the app.
+// Runner starts and stops the tasks of the app.
 type Runner struct {
-	services   []service.Service
+	tasks      []Task
 	shutdowner fx.Shutdowner
 	// cancelApp cancels the context that Module provides.
 	cancelApp context.CancelFunc
-	// ctx is the context of Pre and Run.  stop cancels it first.
+	// ctx is the context of Start and Run.  stop cancels it first.
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -81,21 +107,27 @@ type runnerParams struct {
 	Context    context.Context
 	Lifecycle  fx.Lifecycle
 	Shutdowner fx.Shutdowner
+	Tasks      []Task            `group:"tasks"`
 	Services   []service.Service `group:"services"`
 }
 
 func newRunner(params runnerParams, cancelApp context.CancelFunc) *Runner {
 	ctx, cancel := context.WithCancel(params.Context)
+	tasks := append([]Task(nil), params.Tasks...)
+	for _, svc := range params.Services {
+		tasks = append(tasks, serviceTask(svc))
+	}
+
 	r := &Runner{
-		services:   params.Services,
+		tasks:      tasks,
 		shutdowner: params.Shutdowner,
 		cancelApp:  cancelApp,
 		ctx:        ctx,
 		cancel:     cancel,
 	}
-	// the dependencies of the services are built before this hook is added.
-	// Fx stops hooks in reverse order, so the services stop before the
-	// dependencies close.
+	// the dependencies of the tasks are built before this hook is added.  Fx
+	// stops hooks in reverse order, so the tasks stop before the dependencies
+	// close.
 	params.Lifecycle.Append(fx.Hook{
 		OnStart: r.start,
 		OnStop:  r.stop,
@@ -103,23 +135,28 @@ func newRunner(params runnerParams, cancelApp context.CancelFunc) *Runner {
 	return r
 }
 
-// Err returns the error of the first service whose Run returned an error
-// before the app stopped.
+// Err returns the error of the first task whose Run returned an error before
+// the app stopped.
 func (r *Runner) Err() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.err
 }
 
-// start calls Pre on every service at the same time, then calls Run on every
-// service in a new goroutine.  Pre and Run get a context that lives until the
-// app stops, because some services start goroutines in Pre.
+// start calls Start on every task at the same time, then calls Run on every
+// task in a new goroutine.  Start and Run get a context that lives until the
+// app stops, because a service.Service can start goroutines in Pre.
 func (r *Runner) start(context.Context) error {
-	errs := make([]error, len(r.services))
+	errs := make([]error, len(r.tasks))
 	var wg sync.WaitGroup
-	for i, svc := range r.services {
+	for i, task := range r.tasks {
+		if task.Start == nil {
+			continue
+		}
 		wg.Go(func() {
-			errs[i] = pre(r.serviceContext(svc), svc)
+			if err := task.Start(r.taskContext(task)); err != nil {
+				errs[i] = fmt.Errorf("service %s: %w", task.Name, err)
+			}
 		})
 	}
 	wg.Wait()
@@ -129,26 +166,30 @@ func (r *Runner) start(context.Context) error {
 		return err
 	}
 
-	for _, svc := range r.services {
-		ctx := r.serviceContext(svc)
+	for _, task := range r.tasks {
+		if task.Run == nil {
+			continue
+		}
+		ctx := r.taskContext(task)
 		r.runs.Go(func() {
-			logger.StdlibLogger(ctx).Info("service starting", "service", svc.Name())
-			err := svc.Run(ctx)
+			log := logger.StdlibLogger(ctx)
+			log.Info("service starting", "service", task.Name)
+			err := task.Run(ctx)
 			if r.ctx.Err() != nil {
 				if err != nil && !errors.Is(err, context.Canceled) {
-					logger.StdlibLogger(ctx).Error("service run errored", "error", err)
+					log.Error("service run errored", "error", err)
 				}
-				logger.StdlibLogger(ctx).Info("service run finished", "service", svc.Name())
+				log.Info("service run finished", "service", task.Name)
 				return
 			}
-			// a service that returns stops the app, as in service.StartAll.
+			// a task that returns stops the app, as in service.StartAll.
 			exitCode := 0
 			if err != nil && !errors.Is(err, context.Canceled) {
-				r.setErr(fmt.Errorf("service %s errored: %w", svc.Name(), err))
+				r.setErr(fmt.Errorf("service %s errored: %w", task.Name, err))
 				exitCode = 1
 			}
 			if err := r.shutdowner.Shutdown(fx.ExitCode(exitCode)); err != nil {
-				logger.StdlibLogger(ctx).Error("could not stop the app", "error", err)
+				log.Error("could not stop the app", "error", err)
 			}
 		})
 	}
@@ -156,7 +197,7 @@ func (r *Runner) start(context.Context) error {
 }
 
 // stop cancels the context of every Run and waits for every Run to return.
-// then it calls Stop on every service at the same time.  last, it cancels the
+// then it calls Stop on every task at the same time.  last, it cancels the
 // context of the app and waits for the goroutines started with service.Go.
 func (r *Runner) stop(stopCtx context.Context) error {
 	r.cancel()
@@ -165,11 +206,18 @@ func (r *Runner) stop(stopCtx context.Context) error {
 		return fmt.Errorf("services did not finish running: %w", err)
 	}
 
-	errs := make([]error, len(r.services))
+	errs := make([]error, len(r.tasks))
 	var wg sync.WaitGroup
-	for i, svc := range r.services {
+	for i, task := range r.tasks {
+		if task.Stop == nil {
+			continue
+		}
 		wg.Go(func() {
-			errs[i] = stop(r.serviceContext(svc), svc)
+			ctx := logger.WithStdlib(stopCtx, logger.StdlibLogger(r.taskContext(task)))
+			logger.StdlibLogger(ctx).Info("service cleaning up", "service", task.Name)
+			if err := task.Stop(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				errs[i] = fmt.Errorf("service %s: %w", task.Name, err)
+			}
 		})
 	}
 	wg.Wait()
@@ -189,9 +237,24 @@ func (r *Runner) setErr(err error) {
 	}
 }
 
-// serviceContext adds the caller field to the log lines of one service.
-func (r *Runner) serviceContext(svc service.Service) context.Context {
-	return logger.WithStdlib(r.ctx, logger.StdlibLogger(r.ctx).With("caller", svc.Name()))
+// taskContext adds the caller field to the log lines of one task.
+func (r *Runner) taskContext(task Task) context.Context {
+	return logger.WithStdlib(r.ctx, logger.StdlibLogger(r.ctx).With("caller", task.Name))
+}
+
+// serviceTask runs a service.Service as a Task.  Pre and Stop keep the
+// timeouts of package service.
+func serviceTask(svc service.Service) Task {
+	return Task{
+		Name: svc.Name(),
+		Start: func(ctx context.Context) error {
+			return pre(ctx, svc)
+		},
+		Run: svc.Run,
+		Stop: func(ctx context.Context) error {
+			return stop(ctx, svc)
+		},
+	}
 }
 
 // pre calls Pre and waits for the start timeout of the service.  Pre keeps
@@ -208,12 +271,9 @@ func pre(ctx context.Context, svc service.Service) error {
 	}()
 	select {
 	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("service %s: %w", svc.Name(), err)
-		}
-		return nil
+		return err
 	case <-time.After(timeout):
-		return fmt.Errorf("service %s: %w", svc.Name(), service.ErrPreTimeout)
+		return service.ErrPreTimeout
 	}
 }
 
@@ -225,19 +285,15 @@ func stop(ctx context.Context, svc service.Service) error {
 		timeout = t.StopTimeout()
 	}
 
-	logger.StdlibLogger(ctx).Info("service cleaning up", "service", svc.Name())
 	done := make(chan error, 1)
 	go func() {
 		done <- svc.Stop(context.WithoutCancel(ctx))
 	}()
 	select {
 	case err := <-done:
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return fmt.Errorf("service %s: %w", svc.Name(), err)
-		}
-		return nil
+		return err
 	case <-time.After(timeout):
-		return fmt.Errorf("service %s did not clean up within %s", svc.Name(), timeout)
+		return fmt.Errorf("did not clean up within %s", timeout)
 	}
 }
 

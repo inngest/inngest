@@ -84,7 +84,7 @@ func TestHandleScheduledBatch(t *testing.T) {
 			}
 
 			exec := &scheduledBatchExecutor{}
-			s := &svc{
+			s := &Service{
 				data:    scheduledBatchData{fn: fn},
 				exec:    exec,
 				batcher: bm,

@@ -159,7 +159,9 @@ func (d *devserver) HasEventKeys() bool {
 	return len(d.Opts.EventKeys) > 0
 }
 
-func (d *devserver) Pre(ctx context.Context) error {
+// Run syncs apps, and prints the server URLs to a terminal, until ctx is
+// done.
+func (d *devserver) Run(ctx context.Context) error {
 	// Import Redis if we can and have persistence enabled
 	if d.HasRedisSnapshotsEnabled() {
 		_, _ = d.importRedisSnapshot(ctx)
@@ -170,10 +172,6 @@ func (d *devserver) Pre(ctx context.Context) error {
 		go d.runDiscovery(ctx)
 	}
 
-	return nil
-}
-
-func (d *devserver) Run(ctx context.Context) error {
 	// Start persisting Redis data if we have an interval present.
 	go d.startPersistenceRoutine(ctx)
 
@@ -235,6 +233,8 @@ func (d *devserver) Run(ctx context.Context) error {
 	return nil
 }
 
+// Stop exports a Redis snapshot when snapshots are enabled.  call it after
+// Run returns.
 func (d *devserver) Stop(ctx context.Context) error {
 	if d.HasRedisSnapshotsEnabled() {
 		return d.exportRedisSnapshot(ctx)

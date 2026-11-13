@@ -171,7 +171,7 @@ func TestDeleteStateOnFinalRoutingError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &routingDeleteStateManager{}
-			s := &svc{state: mgr}
+			s := &Service{state: mgr}
 			item := queue.Item{
 				Attempt:     tt.attempt,
 				MaxAttempts: &maxAttempts,

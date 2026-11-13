@@ -69,17 +69,21 @@ func options(ctx context.Context, opts StartOpts, exp experiments) fx.Option {
 				newDevserver,
 			),
 		),
+		servicefx.ProvideTasks(
+			newExecutorTask,
+			newRunnerTask,
+			newDevserverTask,
+			newAPITask,
+		),
+		// the cloud runs these two with service.StartAll too, so they keep the
+		// lifecycle of service.Service.
 		servicefx.Provide(
 			newLeaseScavenger,
-			newExecutorService,
-			runnerService,
-			devserverService,
-			newAPIService,
 			newConnectGateway,
 		),
 	}
 	if exp.debugAPI {
-		options = append(options, servicefx.Provide(newDebugAPI))
+		options = append(options, servicefx.ProvideTasks(newDebugAPITask))
 	}
 	return fx.Options(append(
 		options,
