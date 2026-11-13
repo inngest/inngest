@@ -729,7 +729,7 @@ func (q *Queries) GetFunctionBySlug(ctx context.Context, slug string) (*Function
 }
 
 const getFunctionRun = `-- name: GetFunctionRun :one
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id,
     COALESCE(function_finishes.status, '') AS finish_status,
     COALESCE(function_finishes.output, '') AS finish_output,
     COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
@@ -760,6 +760,7 @@ func (q *Queries) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*GetFunc
 		&i.FunctionRun.BatchID,
 		&i.FunctionRun.OriginalRunID,
 		&i.FunctionRun.Cron,
+		&i.FunctionRun.WorkspaceID,
 		&i.FinishStatus,
 		&i.FinishOutput,
 		&i.FinishCompletedStepCount,
@@ -854,7 +855,7 @@ func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([
 }
 
 const getFunctionRuns = `-- name: GetFunctionRuns :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id,
     COALESCE(function_finishes.status, '') AS finish_status,
     COALESCE(function_finishes.output, '') AS finish_output,
     COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
@@ -890,6 +891,7 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FinishStatus,
 			&i.FinishOutput,
 			&i.FinishCompletedStepCount,
@@ -909,7 +911,7 @@ func (q *Queries) GetFunctionRuns(ctx context.Context) ([]*GetFunctionRunsRow, e
 }
 
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id,
     COALESCE(function_finishes.status, '') AS finish_status,
     COALESCE(function_finishes.output, '') AS finish_output,
     COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
@@ -946,6 +948,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds [][]by
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FinishStatus,
 			&i.FinishOutput,
 			&i.FinishCompletedStepCount,
@@ -965,7 +968,7 @@ func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds [][]by
 }
 
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron,
+SELECT function_runs.run_id, function_runs.run_started_at, function_runs.function_id, function_runs.function_version, function_runs.trigger_type, function_runs.event_id, function_runs.batch_id, function_runs.original_run_id, function_runs.cron, function_runs.workspace_id,
     COALESCE(function_finishes.status, '') AS finish_status,
     COALESCE(function_finishes.output, '') AS finish_output,
     COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
@@ -1010,6 +1013,7 @@ func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionR
 			&i.FunctionRun.BatchID,
 			&i.FunctionRun.OriginalRunID,
 			&i.FunctionRun.Cron,
+			&i.FunctionRun.WorkspaceID,
 			&i.FinishStatus,
 			&i.FinishOutput,
 			&i.FinishCompletedStepCount,
@@ -2051,8 +2055,8 @@ const insertFunctionRun = `-- name: InsertFunctionRun :exec
 
 
 INSERT INTO function_runs
-    (run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    (run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type InsertFunctionRunParams struct {
@@ -2065,6 +2069,7 @@ type InsertFunctionRunParams struct {
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
 	Cron            sql.NullString
+	WorkspaceID     uuid.UUID
 }
 
 // function runs
@@ -2079,6 +2084,7 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 		arg.BatchID,
 		arg.OriginalRunID,
 		arg.Cron,
+		arg.WorkspaceID,
 	)
 	return err
 }

@@ -344,8 +344,7 @@ func (pq *pgQuerier) InsertFunctionRun(ctx context.Context, arg db.InsertFunctio
 		FunctionID: arg.FunctionID, FunctionVersion: int32(arg.FunctionVersion),
 		TriggerType: arg.TriggerType, EventID: arg.EventID,
 		BatchID: arg.BatchID, OriginalRunID: arg.OriginalRunID,
-		Cron: arg.Cron,
-		// Postgres InsertFunctionRunParams doesn't have WorkspaceID.
+		Cron: arg.Cron, WorkspaceID: arg.WorkspaceID,
 	})
 }
 
