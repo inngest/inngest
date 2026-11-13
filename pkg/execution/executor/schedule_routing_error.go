@@ -1,8 +1,14 @@
 package executor
 
 import (
+	"context"
+	"errors"
+
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -39,4 +45,31 @@ func firstEventInternalID(evts []event.TrackedEvent) ulid.ULID {
 		return ulid.ULID{}
 	}
 	return evts[0].GetInternalID()
+}
+
+// deleteStateOnFinalRoutingError deletes the run state that a failed
+// Schedule call left in the state store when the queue drops item after this
+// attempt.  without this delete, the run state of a dropped cron or debounce
+// job stays in the state store with no queue item to finish or remove it.
+func (s *svc) deleteStateOnFinalRoutingError(ctx context.Context, item queue.Item, err error) {
+	var routingErr *ScheduleQueueRoutingError
+	if !errors.As(err, &routingErr) || queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
+		return
+	}
+
+	id := state.Identifier{
+		RunID:       routingErr.ID.RunID,
+		WorkflowID:  routingErr.ID.FunctionID,
+		WorkspaceID: routingErr.ID.Tenant.EnvID,
+		AccountID:   routingErr.ID.Tenant.AccountID,
+		AppID:       routingErr.ID.Tenant.AppID,
+	}
+	if derr := s.state.Delete(context.WithoutCancel(ctx), id); derr != nil && !errors.Is(derr, state.ErrRunNotFound) {
+		logger.StdlibLogger(ctx).ReportError(derr, "error deleting run state after final queue routing failure",
+			logger.WithErrorReportTags(map[string]string{
+				"run_id":     id.RunID.String(),
+				"account_id": id.AccountID.String(),
+			}),
+		)
+	}
 }

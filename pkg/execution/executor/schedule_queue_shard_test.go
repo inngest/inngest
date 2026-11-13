@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -125,5 +126,75 @@ func (r *queueRoutingRunService) Create(_ context.Context, s sv2.CreateState) (s
 
 func (r *queueRoutingRunService) Delete(_ context.Context, id sv2.ID, _ ...sv2.DeleteOption) error {
 	r.deleted = append(r.deleted, id)
+	return nil
+}
+
+func TestDeleteStateOnFinalRoutingError(t *testing.T) {
+	maxAttempts := 3
+	routingErr := &ScheduleQueueRoutingError{
+		ID: sv2.ID{
+			RunID:      ulid.Make(),
+			FunctionID: uuid.New(),
+			Tenant: sv2.Tenant{
+				AppID:     uuid.New(),
+				EnvID:     uuid.New(),
+				AccountID: uuid.New(),
+			},
+		},
+		Err: queue.ErrQueueShardNotFound,
+	}
+
+	tests := []struct {
+		name       string
+		attempt    int
+		err        error
+		wantDelete bool
+	}{
+		{
+			name:    "keeps state when the queue retries the job",
+			attempt: 0,
+			err:     routingErr,
+		},
+		{
+			name:       "deletes state on the last attempt",
+			attempt:    maxAttempts - 1,
+			err:        routingErr,
+			wantDelete: true,
+		},
+		{
+			name:    "keeps state for other errors on the last attempt",
+			attempt: maxAttempts - 1,
+			err:     queue.ErrQueueShardNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := &routingDeleteStateManager{}
+			s := &svc{state: mgr}
+			item := queue.Item{
+				Attempt:     tt.attempt,
+				MaxAttempts: &maxAttempts,
+			}
+
+			s.deleteStateOnFinalRoutingError(context.Background(), item, fmt.Errorf("wrapped: %w", tt.err))
+
+			if !tt.wantDelete {
+				require.Empty(t, mgr.deleted)
+				return
+			}
+			require.Len(t, mgr.deleted, 1)
+			require.Equal(t, routingErr.ID, sv2.IDFromV1(mgr.deleted[0]))
+		})
+	}
+}
+
+type routingDeleteStateManager struct {
+	state.Manager
+	deleted []state.Identifier
+}
+
+func (m *routingDeleteStateManager) Delete(_ context.Context, i state.Identifier, _ ...state.DeleteOption) error {
+	m.deleted = append(m.deleted, i)
 	return nil
 }
