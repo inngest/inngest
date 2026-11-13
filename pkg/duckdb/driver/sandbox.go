@@ -59,7 +59,10 @@ func sandboxStmts(iceberg *IcebergOptions) ([]string, error) {
 	var dirs []string
 	if iceberg != nil {
 		dirs = append(dirs, strings.TrimSuffix(iceberg.URI, "/")+"/")
-		if iceberg.DataPath != "" {
+		if strings.Contains(iceberg.DataPath, "://") {
+			// An object store prefix is allowed as-is.
+			dirs = append(dirs, strings.TrimSuffix(iceberg.DataPath, "/")+"/")
+		} else if iceberg.DataPath != "" {
 			abs, err := filepath.Abs(iceberg.DataPath)
 			if err != nil {
 				return nil, fmt.Errorf("duckdb: resolving Iceberg data path %q: %w", iceberg.DataPath, err)
