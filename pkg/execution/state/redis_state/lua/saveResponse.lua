@@ -4,6 +4,7 @@ Saves a response for a step.  This automatically creates history entries
 depending on the response being saved.
 
 Output:
+ -3: run not found
  -1: duplicate response
   0: Successfully saved response; no pending steps
   1: Successfully saved response; at least one pending step remains
@@ -19,6 +20,12 @@ local keyStepsPending = KEYS[5]
 local stepID = ARGV[1]
 local outputData = ARGV[2]
 local metadataSizeDelta = tonumber(ARGV[3]) or 0
+
+-- a finalized run has no metadata hash.  a write here makes new step and
+-- metadata keys for a run that no longer exists, and nothing deletes them.
+if redis.call("HEXISTS", keyMetadata, "id") == 0 then
+	return { -3 }
+end
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
 	-- If the data is exactly the same, return -2, indicating an idempotent save req.

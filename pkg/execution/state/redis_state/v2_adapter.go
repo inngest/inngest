@@ -956,6 +956,9 @@ func (v v2) retryableError(err error) bool {
 		return false
 	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull), errors.Is(err, state.ErrInboxClosed):
 		return false
+	case errors.Is(err, statev1.ErrRunNotFound):
+		// the run is deleted, so a retry gets the same result.
+		return false
 	}
 
 	return true

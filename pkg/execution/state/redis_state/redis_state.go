@@ -1106,6 +1106,8 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		return false, fmt.Errorf("error saving response: %w (response: %v)", err, indexes)
 	}
 	switch indexes[0] {
+	case -3:
+		return false, state.ErrRunNotFound
 	case -1:
 		// This is a duplicate response, so we don't need to do anything.
 		return false, state.ErrDuplicateResponse
