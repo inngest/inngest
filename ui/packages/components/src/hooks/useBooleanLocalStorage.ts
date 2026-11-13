@@ -20,6 +20,7 @@ export function useBooleanLocalStorage(
 
   // Read from localStorage.
   useEffect(() => {
+    let storedValue = defaultValue;
     try {
       const item = window.localStorage.getItem(key);
 
@@ -29,11 +30,12 @@ export function useBooleanLocalStorage(
         if (typeof parsed !== 'boolean') {
           throw new Error('value is not a boolean');
         }
-        setValue(parsed);
+        storedValue = parsed;
       }
     } catch (error) {
       console.warn(`error reading localStorage key "${key}":`, error);
     } finally {
+      setValue(storedValue);
       setIsReady(true);
     }
   }, [key, defaultValue]);
