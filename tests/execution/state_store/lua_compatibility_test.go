@@ -274,7 +274,7 @@ func TestStateStoreLuaCompatibility(t *testing.T) {
 		key := kg.RunMetadata(ctx, true, runID)
 
 		client.Do(ctx, client.B().Hset().Key(key).FieldValue().
-			FieldValue("die", "0").FieldValue("rv", "1").FieldValue("sat", "0").Build())
+			FieldValue("id", "{}").FieldValue("die", "0").FieldValue("rv", "1").FieldValue("sat", "0").Build())
 
 		newStartTime := time.Now()
 		err = mgr.UpdateMetadata(ctx, accountID, runID, state.MetadataUpdate{

@@ -275,6 +275,13 @@ type CapacityReleaseRequest struct {
 	// LeaseIssuedAt represents the time the initial lease was issued.
 	// This can be used for routing the lease release request to the same shard.
 	LeaseIssuedAt time.Time
+
+	// ForceReleaseSemaphores decrements manual-release semaphores on this
+	// lease as if they were auto-release.  the queue sets it when a start
+	// item exits and its run has not started.  Finalize releases only for a
+	// run that has StartedAt in run metadata, so without it the slot stays
+	// taken.
+	ForceReleaseSemaphores bool
 }
 
 type CapacityReleaseResponse struct {

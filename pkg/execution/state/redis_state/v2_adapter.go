@@ -723,7 +723,10 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 			return false, err
 		},
-		v.retryPolicy(),
+		// a run that is gone stays gone, so a retry cannot succeed.
+		v.retryPolicy(util.WithRetryConfRetryableErrors(func(err error) bool {
+			return !errors.Is(err, statev1.ErrRunNotFound)
+		})),
 	)
 
 	return err
@@ -952,6 +955,9 @@ func (v v2) retryableError(err error) bool {
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
 	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull), errors.Is(err, state.ErrInboxClosed):
+		return false
+	case errors.Is(err, statev1.ErrRunNotFound):
+		// the run is deleted, so a retry gets the same result.
 		return false
 	}
 

@@ -327,7 +327,7 @@ func TestV2Adapter(t *testing.T) {
 			assert.False(t, exists)
 		})
 
-		t.Run("UpdateMetadata with non-existent ID succeeds (no-op)", func(t *testing.T) {
+		t.Run("UpdateMetadata with non-existent ID returns run not found", func(t *testing.T) {
 			config := statev2.MutableConfig{
 				StartedAt:      time.Now(),
 				RequestVersion: 2,
@@ -335,15 +335,21 @@ func TestV2Adapter(t *testing.T) {
 			}
 
 			err := v2svc.UpdateMetadata(ctx, nonExistentID, config)
-			assert.NoError(t, err) // Should be no-op, not error
+			require.ErrorIs(t, err, state.ErrRunNotFound)
+
+			exists, err := v2svc.Exists(ctx, nonExistentID)
+			require.NoError(t, err)
+			assert.False(t, exists, "the update must not make metadata for a run that does not exist")
 		})
 
-		t.Run("SaveStep with non-existent ID succeeds (no-op)", func(t *testing.T) {
+		t.Run("SaveStep with non-existent ID returns run not found", func(t *testing.T) {
 			stepData := json.RawMessage(`{"result": "test"}`)
+			keysBefore := mr.Keys()
 
 			result, err := v2svc.SaveStep(ctx, nonExistentID, "test-step", stepData)
-			assert.NoError(t, err) // Should be no-op, not error
+			require.ErrorIs(t, err, state.ErrRunNotFound)
 			assert.False(t, result)
+			assert.Equal(t, keysBefore, mr.Keys(), "the save must not make keys for a run that does not exist")
 		})
 
 		t.Run("SavePending with non-existent ID succeeds (no-op)", func(t *testing.T) {

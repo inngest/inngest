@@ -145,6 +145,21 @@ type CapacityLease struct {
 	// release is a handle to invoke the Constraint API.
 	// This is passed during item processing.
 	release func() error
+
+	// keepManualSemaphores is the handle behind KeepManualSemaphores.
+	// This is passed during item processing.
+	keepManualSemaphores func()
+}
+
+// KeepManualSemaphores tells the queue to leave the manual-release semaphores
+// of this item taken, because the run now has StartedAt in run metadata and
+// Finalize releases them.  the queue gives them back with the capacity lease
+// on every exit without this call.  after this call a retry of the item no
+// longer carries them.
+func (c *CapacityLease) KeepManualSemaphores() {
+	if c.keepManualSemaphores != nil {
+		c.keepManualSemaphores()
+	}
 }
 
 // Release frees up all acquired capacity that is not time-bound (i.e. concurrency capacity).

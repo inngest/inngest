@@ -2305,19 +2305,45 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			md.Config.RequestVersion = consts.RequestVersionUnknown
 		}
 
-		// Only just starting:  run lifecycles on first attempt.
-		if item.Attempt == 0 {
+		// the run has its function concurrency slot from the moment
+		// StartedAt is in run metadata, and Finalize releases it.  a start
+		// item that took a slot writes StartedAt on every attempt, and then
+		// tells the queue to leave the slot taken when the item exits.
+		takesSlot := takesFnConcurrencySlot(item)
+
+		if item.Attempt == 0 || takesSlot {
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
-			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
+			err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
 				StartedAt:      md.Config.StartedAt,
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
-			}); err != nil {
+			})
+			switch {
+			case sv2.IsRunNotFound(err):
+				// the run is gone, and the queue gives the slot back.
+			case err != nil && takesSlot:
+				// we need the metadata update to succeed for fn-level concurrency/
+				// manual semaphores, as releasing these uses the `StartedAt` field.
+				//
+				// in this case, we're not calling
+				//   item.RunInfo.CapacityLease.KeepManualSemaphores()
+				// so function-level semaphores aren't going to be claimed by
+				// the run when we return the error.
+				return nil, fmt.Errorf("error writing run start to metadata: %w", err)
+			case err != nil:
 				l.ReportError(err, "error updating metadata on function start")
+			case takesSlot:
+				// this ensures that fn run semaphores are kept locked
+				// while the run ends.  without this, the queue and constraint api is
+				// going to release the semaphore when the queue item finishes
+				item.RunInfo.CapacityLease.KeepManualSemaphores()
 			}
+		}
 
+		// Only just starting:  run lifecycles on first attempt.
+		if item.Attempt == 0 {
 			// Set some run span details to be explicit that this has been
 			// kicked off
 			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
@@ -4026,7 +4052,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 			update.HasAI = true
 		}
 		if update != nil {
-			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil {
+			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil && !sv2.IsRunNotFound(err) {
 				return fmt.Errorf("error updating function metadata: %w", err)
 			}
 		}

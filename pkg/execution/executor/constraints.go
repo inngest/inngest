@@ -278,6 +278,53 @@ func stepSemaphores(md sv2.Metadata) []constraintapi.Semaphore {
 	return constraintapi.AutoReleaseSemaphores(md.Config.Semaphores)
 }
 
+// takesFnConcurrencySlot reports whether the queue took a function
+// concurrency slot for the item when it leased it.  only a start item that
+// still carries its manual-release semaphores takes one.
+func takesFnConcurrencySlot(item queue.Item) bool {
+	if item.Kind != queue.KindStart || item.RunInfo == nil || item.RunInfo.CapacityLease == nil {
+		return false
+	}
+	return len(constraintapi.ManualReleaseSemaphores(item.Semaphores)) > 0
+}
+
+// semaphoresToRelease returns the function concurrency semaphores of a run
+// that has StartedAt in run metadata, for Finalize to release.  it loads
+// metadata again, because the copy from the caller can be older than the
+// start of the run.  it returns nothing when the run is gone, because the
+// Finalize that deleted it released them.
+func (e *executor) semaphoresToRelease(ctx context.Context, md sv2.Metadata) []constraintapi.Semaphore {
+	sems := constraintapi.ManualReleaseSemaphores(md.Config.Semaphores)
+	if len(sems) == 0 {
+		return nil
+	}
+
+	loaded, err := util.WithRetry(ctx, "state.LoadMetadata", func(ctx context.Context) (sv2.Metadata, error) {
+		return e.smv2.LoadMetadata(ctx, md.ID)
+	}, util.NewRetryConf(util.WithRetryConfRetryableErrors(func(err error) bool {
+		return !sv2.IsRunNotFound(err)
+	})))
+
+	startedAt := loaded.Config.StartedAt
+	switch {
+	case sv2.IsRunNotFound(err):
+		return nil
+	case err != nil:
+		// a slot that is not released blocks its key, so use the copy from
+		// the caller when metadata cannot be loaded.
+		logger.StdlibLogger(ctx).Error(
+			"error loading run metadata to release semaphores on finalize, using the metadata from the caller",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+		startedAt = md.Config.StartedAt
+	}
+	if startedAt.IsZero() {
+		return nil
+	}
+	return sems
+}
+
 // evaluateFnConcurrency evaluates function concurrency limits against event data
 // and returns the corresponding semaphore entries to store in run metadata.
 func (e *executor) evaluateFnConcurrency(

@@ -14,10 +14,14 @@ func (e *executor) maybeResetForceStepPlan(ctx context.Context, md *sv2.Metadata
 		return nil
 	}
 
-	return e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
+	err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
 		ForceStepPlan:  false,
 		RequestVersion: md.Config.RequestVersion,
 		StartedAt:      md.Config.StartedAt,
 		HasAI:          md.Config.HasAI,
 	})
+	if sv2.IsRunNotFound(err) {
+		return nil
+	}
+	return err
 }

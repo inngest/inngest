@@ -734,6 +734,17 @@ func hasNonAppSemaphore(semaphores []constraintapi.Semaphore) bool {
 	return false
 }
 
+// hasManualSemaphore reports whether the item holds a function concurrency
+// slot.  only the start item of a run carries one.
+func hasManualSemaphore(semaphores []constraintapi.Semaphore) bool {
+	for _, semaphore := range semaphores {
+		if semaphore.Release == constraintapi.SemaphoreReleaseManual {
+			return true
+		}
+	}
+	return false
+}
+
 func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
 	constraints := []constraintapi.ConstraintItem{}
 

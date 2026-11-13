@@ -478,10 +478,14 @@ func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, run
 	if err != nil {
 		return err
 	}
-	if status != 0 {
-		return fmt.Errorf("unknown response updating metadata: %w", err)
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrRunNotFound
+	default:
+		return fmt.Errorf("unknown response updating metadata: %d", status)
 	}
-	return nil
 }
 
 func (m shardedMgr) Exists(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) (bool, error) {
@@ -1102,6 +1106,8 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 		return false, fmt.Errorf("error saving response: %w (response: %v)", err, indexes)
 	}
 	switch indexes[0] {
+	case -3:
+		return false, state.ErrRunNotFound
 	case -1:
 		// This is a duplicate response, so we don't need to do anything.
 		return false, state.ErrDuplicateResponse

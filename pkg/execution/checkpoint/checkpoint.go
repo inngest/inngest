@@ -191,7 +191,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			RequestVersion: input.Metadata.Config.RequestVersion,
 			StartedAt:      input.Metadata.Config.StartedAt,
 			HasAI:          input.Metadata.Config.HasAI,
-		}); err != nil {
+		}); err != nil && !state.IsRunNotFound(err) {
 			return fmt.Errorf("updating metadata to force step plan: %w", err)
 		}
 		// Update the local metadata so subsequent operations see the change
