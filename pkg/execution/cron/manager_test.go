@@ -2,6 +2,7 @@ package cron
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -151,13 +152,21 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, 0, opt.healthCheckLeadTimeSeconds)
 	})
 
-	t.Run("WithSplitCronPartitionByWorkspace sets callback", func(t *testing.T) {
+	t.Run("WithSplitGlobalCronPartition sets callback", func(t *testing.T) {
 		opt := managerOpt{}
-		WithSplitCronPartitionByWorkspace(func(context.Context, uuid.UUID) bool {
+		WithSplitGlobalCronPartition(func(context.Context, uuid.UUID) bool {
 			return true
 		})(&opt)
 
-		require.NotNil(t, opt.splitCronPartitionByWorkspace)
+		require.NotNil(t, opt.splitGlobalCronPartition)
+		require.True(t, opt.splitGlobalCronPartition(context.Background(), uuid.New()))
+	})
+
+	t.Run("WithCronPartitionBuckets sets bucket count", func(t *testing.T) {
+		opt := managerOpt{}
+		WithCronPartitionBuckets(100)(&opt)
+
+		require.Equal(t, 100, opt.cronPartitionBuckets)
 	})
 
 	t.Run("validate options", func(t *testing.T) {
@@ -709,34 +718,66 @@ func TestScheduleNextQueueName(t *testing.T) {
 	accountID := uuid.New()
 	workspaceID := uuid.New()
 	appID := uuid.New()
-	functionID := uuid.New()
+	// Fixed so bucket numbers are stable: fnv64a(functionID) % 100 == 90, % 4 == 2.
+	functionID := uuid.MustParse("8b41eb40-d8bc-4df1-9e4e-e124c18f5f88")
+
+	enabled := func(context.Context, uuid.UUID) bool { return true }
+	disabled := func(context.Context, uuid.UUID) bool { return false }
 
 	tests := []struct {
-		name      string
-		gate      func(context.Context, uuid.UUID) bool
-		queueName string
+		name              string
+		gate              func(context.Context, uuid.UUID) bool
+		buckets           int
+		prod              bool
+		expectedQueueName string
 	}{
 		{
-			name:      "flag gate unset",
-			queueName: queue.KindCron,
-		}, {
-			name:      "flag gate nil",
-			gate:      nil,
-			queueName: queue.KindCron,
+			name:              "gate unset",
+			buckets:           100,
+			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "workspace scoped cron partition disabled",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return false
-			},
-			queueName: queue.KindCron,
+			name:              "gate disabled",
+			gate:              disabled,
+			buckets:           100,
+			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "workspace scoped cron partition enabled",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return true
-			},
-			queueName: queue.KindCron + ":" + workspaceID.String(),
+			name:              "gate enabled, buckets unset",
+			gate:              enabled,
+			expectedQueueName: queue.KindCron,
+		},
+		{
+			name:              "gate enabled, negative buckets",
+			gate:              enabled,
+			buckets:           -1,
+			expectedQueueName: queue.KindCron,
+		},
+		{
+			name:              "gate enabled, production workspace",
+			gate:              enabled,
+			buckets:           100,
+			prod:              true,
+			expectedQueueName: "cron:prod:90",
+		},
+		{
+			name:              "gate enabled, non-production workspace",
+			gate:              enabled,
+			buckets:           100,
+			expectedQueueName: "cron:nonprod:90",
+		},
+		{
+			name:              "gate enabled, different bucket count",
+			gate:              enabled,
+			buckets:           4,
+			prod:              true,
+			expectedQueueName: "cron:prod:2",
+		},
+		{
+			name:              "gate enabled, single bucket",
+			gate:              enabled,
+			buckets:           1,
+			expectedQueueName: "cron:nonprod:0",
 		},
 	}
 
@@ -745,26 +786,159 @@ func TestScheduleNextQueueName(t *testing.T) {
 			producer := &captureProducer{}
 			opts := []ManagerOpt{
 				WithJitterRange(0, 0),
+				WithCronPartitionBuckets(tt.buckets),
 			}
 			if tt.gate != nil {
-				opts = append(opts, WithSplitCronPartitionByWorkspace(tt.gate))
+				opts = append(opts, WithSplitGlobalCronPartition(tt.gate))
 			}
 			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx), opts...)
 
 			_, err := mgr.ScheduleNext(ctx, CronItem{
-				ID:              ulid.Make(),
-				AccountID:       accountID,
-				WorkspaceID:     workspaceID,
-				AppID:           appID,
-				FunctionID:      functionID,
-				FunctionVersion: 1,
-				Expression:      "* * * * *",
-				Op:              enums.CronOpProcess,
+				ID:                    ulid.Make(),
+				AccountID:             accountID,
+				WorkspaceID:           workspaceID,
+				AppID:                 appID,
+				FunctionID:            functionID,
+				FunctionVersion:       1,
+				IsProductionWorkspace: tt.prod,
+				Expression:            "* * * * *",
+				Op:                    enums.CronOpProcess,
 			})
 			require.NoError(t, err)
 			require.NotNil(t, producer.item.QueueName)
-			require.Equal(t, tt.queueName, *producer.item.QueueName)
+			require.Equal(t, tt.expectedQueueName, *producer.item.QueueName)
 			require.Equal(t, queue.KindCron, producer.item.Kind)
+		})
+	}
+}
+
+func TestCronPartitionQueueName(t *testing.T) {
+	const buckets = 100
+
+	t.Run("same function maps to the same bucket regardless of workspace", func(t *testing.T) {
+		functionID := uuid.New()
+		first := cronPartitionQueueName(CronItem{FunctionID: functionID, WorkspaceID: uuid.New()}, buckets)
+		second := cronPartitionQueueName(CronItem{FunctionID: functionID, WorkspaceID: uuid.New()}, buckets)
+		require.Equal(t, first, second)
+	})
+
+	t.Run("buckets stay within range and spread across partitions", func(t *testing.T) {
+		seen := map[string]struct{}{}
+		for i := 0; i < 10_000; i++ {
+			name := cronPartitionQueueName(CronItem{FunctionID: uuid.New(), IsProductionWorkspace: true}, buckets)
+
+			var n int
+			_, err := fmt.Sscanf(name, "cron:prod:%d", &n)
+			require.NoError(t, err, name)
+			require.GreaterOrEqual(t, n, 0)
+			require.Less(t, n, buckets)
+			seen[name] = struct{}{}
+		}
+		require.Len(t, seen, buckets)
+	})
+}
+
+// TestScheduleNextRoutingChangeKeepsSingleJob covers the rollout guarantee for
+// cron partition routing: changing the split gate or the bucket count between
+// schedules of the same cron item must not create a second job. The job stays
+// in the partition it was first enqueued to, and HealthCheck still finds it.
+func TestScheduleNextRoutingChangeKeepsSingleJob(t *testing.T) {
+	ctx := context.Background()
+	// Fixed so bucket numbers are stable: fnv64a(functionID) % 100 == 90, % 4 == 2.
+	functionID := uuid.MustParse("8b41eb40-d8bc-4df1-9e4e-e124c18f5f88")
+
+	type route struct {
+		gate      bool
+		buckets   int
+		queueName string
+	}
+	shared := route{gate: false, buckets: 100, queueName: queue.KindCron}
+	bucketsUnset := route{gate: true, buckets: 0, queueName: queue.KindCron}
+
+	buckets100 := route{gate: true, buckets: 100, queueName: "cron:prod:90"}
+	buckets4 := route{gate: true, buckets: 4, queueName: "cron:prod:2"}
+
+	tests := []struct {
+		name   string
+		routes []route
+	}{
+		{
+			name:   "shared, then bucketed, then bucket count changes, then shared",
+			routes: []route{shared, buckets100, buckets4, shared},
+		},
+		{
+			name:   "bucketed, then bucket count changes, then shared",
+			routes: []route{buckets100, buckets4, shared},
+		},
+		{
+			name:   "bucketed, then buckets unset",
+			routes: []route{buckets4, bucketsUnset},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, rc := initRedis(t)
+			defer rc.Close()
+
+			qc := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+			shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, qc)
+			shardRegistry, err := queue.NewSingleShardRegistry(shard)
+			require.NoError(t, err)
+			q, err := queue.New(ctx, "test-queue", shardRegistry)
+			require.NoError(t, err)
+
+			// The ID timestamp is "now" so ScheduleNext and HealthCheck (which
+			// uses time.Now) resolve the same next run of this yearly cron.
+			item := CronItem{
+				ID:                    ulid.MustNew(ulid.Timestamp(time.Now()), ulid.DefaultEntropy()),
+				AccountID:             uuid.New(),
+				WorkspaceID:           uuid.New(),
+				AppID:                 uuid.New(),
+				FunctionID:            functionID,
+				FunctionVersion:       1,
+				IsProductionWorkspace: true,
+				Expression:            "0 0 1 1 *",
+				Op:                    enums.CronOpProcess,
+			}
+
+			var mgr CronManager
+			for _, rt := range tt.routes {
+				gate := rt.gate
+				mgr = NewManager(shard, q, logger.StdlibLogger(ctx),
+					WithSplitGlobalCronPartition(func(context.Context, uuid.UUID) bool { return gate }),
+					WithCronPartitionBuckets(rt.buckets),
+				)
+				_, err := mgr.ScheduleNext(ctx, item)
+				require.NoError(t, err)
+			}
+
+			hc, err := mgr.HealthCheck(ctx, item.AccountID, item.WorkspaceID, item.FunctionID, item.Expression, item.FunctionVersion)
+			require.NoError(t, err)
+			require.True(t, hc.Scheduled)
+
+			// Exactly one stored job, under the health check's job ID.
+			kg := qc.KeyGenerator()
+			jobIDs, err := r.HKeys(kg.QueueItem())
+			require.NoError(t, err)
+			require.Equal(t, []string{hc.JobID}, jobIDs)
+
+			// The job keeps the partition it was first enqueued to.
+			want := tt.routes[0].queueName
+			var stored queue.QueueItem
+			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.QueueItem(), hc.JobID)), &stored))
+			require.NotNil(t, stored.QueueName)
+			require.Equal(t, want, *stored.QueueName)
+
+			for _, rt := range tt.routes {
+				key := kg.PartitionQueueSet(enums.PartitionTypeDefault, rt.queueName, "")
+				members, _ := r.ZMembers(key)
+				if rt.queueName == want {
+					require.Equal(t, []string{hc.JobID}, members, "partition %q", rt.queueName)
+				} else {
+					require.NotContains(t, members, hc.JobID, "partition %q", rt.queueName)
+				}
+			}
 		})
 	}
 }
