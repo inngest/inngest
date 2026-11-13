@@ -197,3 +197,106 @@ func TestExecutionProcessorStepStartWhenQueued(t *testing.T) {
 		assert.Equal(t, sdkStartedAt.UnixMilli(), ev.StartedAt.UnixMilli())
 	})
 }
+
+func TestExecutionProcessorConnectInstanceID(t *testing.T) {
+	exp := tracetest.NewInMemoryExporter()
+	tp := NewOtelTracerProvider(exp, time.Millisecond)
+
+	requestID := "request-id"
+	base := WithExecutionContext(t.Context(), ExecutionContext{
+		QueueKind: queue.KindEdge,
+		RequestID: &requestID,
+	})
+	wrapped := WithConnectInstanceID(base, "worker-1")
+
+	parent := RunSpanRefFromMetadata(&statev2.Metadata{ID: statev2.ID{RunID: ulid.Make()}})
+
+	// extract returns the typed attributes of the most recently exported span.
+	extract := func(t *testing.T) *meta.ExtractedValues {
+		t.Helper()
+
+		spans := exp.GetSpans()
+		require.NotEmpty(t, spans)
+
+		raw := map[string]any{}
+		for _, kv := range spans[len(spans)-1].Attributes {
+			raw[string(kv.Key)] = kv.Value.AsInterface()
+		}
+
+		ev, err := meta.ExtractTypedValues(t.Context(), raw)
+		require.NoError(t, err)
+		return ev
+	}
+
+	t.Run("step span without the instance ID has no attribute", func(t *testing.T) {
+		_, err := tp.CreateSpan(base, meta.SpanNameStep, &CreateSpanOptions{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+
+		ev := extract(t)
+		assert.Nil(t, ev.ConnectInstanceID)
+		require.NotNil(t, ev.RequestID)
+		assert.Equal(t, requestID, *ev.RequestID)
+	})
+
+	t.Run("step span with the instance ID has the attribute", func(t *testing.T) {
+		_, err := tp.CreateSpan(wrapped, meta.SpanNameStep, &CreateSpanOptions{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+
+		spans := exp.GetSpans()
+		found := false
+		for _, kv := range spans[len(spans)-1].Attributes {
+			if string(kv.Key) == "_inngest.connect.instance_id" {
+				found = true
+				assert.Equal(t, "worker-1", kv.Value.AsString())
+			}
+		}
+		assert.True(t, found)
+
+		ev := extract(t)
+		require.NotNil(t, ev.ConnectInstanceID)
+		assert.Equal(t, "worker-1", *ev.ConnectInstanceID)
+		require.NotNil(t, ev.RequestID)
+		assert.Equal(t, requestID, *ev.RequestID)
+	})
+
+	t.Run("extension span from UpdateSpan has the attribute", func(t *testing.T) {
+		ref, err := tp.CreateSpan(base, meta.SpanNameExecution, &CreateSpanOptions{
+			Parent: parent,
+		})
+		require.NoError(t, err)
+
+		err = tp.UpdateSpan(wrapped, &UpdateSpanOptions{
+			TargetSpan: ref,
+			Status:     enums.StepStatusCompleted,
+		})
+		require.NoError(t, err)
+
+		ev := extract(t)
+		require.NotNil(t, ev.ConnectInstanceID)
+		assert.Equal(t, "worker-1", *ev.ConnectInstanceID)
+	})
+
+	t.Run("the original execution context is not changed", func(t *testing.T) {
+		ec := getExecutionContext(base)
+		require.NotNil(t, ec)
+		assert.Empty(t, ec.InstanceID)
+
+		wrappedEC := getExecutionContext(wrapped)
+		require.NotNil(t, wrappedEC)
+		assert.NotSame(t, ec, wrappedEC)
+		assert.Equal(t, "worker-1", wrappedEC.InstanceID)
+		assert.Equal(t, ec.RequestID, wrappedEC.RequestID)
+	})
+
+	t.Run("empty ID or no execution context returns ctx unchanged", func(t *testing.T) {
+		assert.Equal(t, base, WithConnectInstanceID(base, ""))
+
+		plain := t.Context()
+		assert.Equal(t, plain, WithConnectInstanceID(plain, "worker-1"))
+		assert.Nil(t, getExecutionContext(WithConnectInstanceID(plain, "worker-1")))
+	})
+}

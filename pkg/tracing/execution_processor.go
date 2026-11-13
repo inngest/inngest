@@ -27,11 +27,33 @@ type ExecutionContext struct {
 	RequestID *string
 	GroupID   *string
 	JobID     *string
+
+	// InstanceID is the connect worker instance that served the request.  it
+	// is empty for requests that did not go through connect.
+	InstanceID string
 }
 
 // WithExecutionContext stores data for spans in context.
 func WithExecutionContext(ctx context.Context, e ExecutionContext) context.Context {
 	return context.WithValue(ctx, _spanCtxKeyV, &e)
+}
+
+// WithConnectInstanceID returns a ctx whose spans carry the connect worker
+// instance ID.  it stores a copy of the execution context.  a write to the
+// stored one puts the ID on spans of parent contexts and parallel opcode
+// handlers.  ctx is returned unchanged when id is empty or has no execution
+// context.
+func WithConnectInstanceID(ctx context.Context, id string) context.Context {
+	if id == "" {
+		return ctx
+	}
+	ec := getExecutionContext(ctx)
+	if ec == nil {
+		return ctx
+	}
+	copied := *ec
+	copied.InstanceID = id
+	return WithExecutionContext(ctx, copied)
 }
 
 func mixinExecutonContext(input context.Context, with context.Context) context.Context {
@@ -126,6 +148,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 		if ec.JobID != nil {
 			meta.AddAttr(rawAttrs, meta.Attrs.JobID, ec.JobID)
+		}
+
+		if ec.InstanceID != "" {
+			meta.AddAttr(rawAttrs, meta.Attrs.ConnectInstanceID, &ec.InstanceID)
 		}
 	}
 

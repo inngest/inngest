@@ -554,6 +554,139 @@ func TestExtendRequestLeaseReplayOwnershipClearedOnReassignment(t *testing.T) {
 	require.NotNil(t, newOwnerLeaseID)
 }
 
+func TestExtendRequestLeaseUnlimitedWorkerMapping(t *testing.T) {
+	ctx := context.Background()
+	duration := consts.ConnectWorkerRequestLeaseDuration
+	executorIP := net.IPv4(1, 1, 1, 1)
+
+	setup := func(t *testing.T) (*miniredis.Miniredis, *redisConnectionStateManager, func(time.Duration)) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		t.Cleanup(rc.Close)
+
+		fakeClock := clockwork.NewFakeClock()
+		connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+			Clock: fakeClock,
+		})
+		advance := func(d time.Duration) {
+			fakeClock.Advance(d)
+			r.FastForward(d)
+		}
+		return r, connManager, advance
+	}
+
+	t.Run("extension refreshes mapping TTL", func(t *testing.T) {
+		r, connManager, advance := setup(t)
+		envID := uuid.New()
+		instanceID := "unlimited-instance"
+		requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		mappingKey := connManager.requestWorkerKey(envID, requestID)
+
+		leaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+		require.NoError(t, err)
+		require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+		require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, r.TTL(mappingKey))
+
+		advance(consts.ConnectWorkerRequestExtendLeaseInterval)
+		require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL-consts.ConnectWorkerRequestExtendLeaseInterval, r.TTL(mappingKey))
+
+		leaseID, err = connManager.ExtendRequestLease(ctx, envID, instanceID, requestID, *leaseID, duration, true)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, r.TTL(mappingKey))
+
+		assigned, err := connManager.GetAssignedWorkerID(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, instanceID, assigned)
+	})
+
+	t.Run("dropping lease deletes mapping", func(t *testing.T) {
+		r, connManager, _ := setup(t)
+		envID := uuid.New()
+		instanceID := "unlimited-instance"
+		requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		leaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+		require.NoError(t, err)
+		require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+		dropped, err := connManager.ExtendRequestLease(ctx, envID, instanceID, requestID, *leaseID, 0, true)
+		require.NoError(t, err)
+		require.Nil(t, dropped)
+		require.False(t, r.Exists(connManager.requestWorkerKey(envID, requestID)))
+	})
+
+	t.Run("dropping lease keeps mapping of a different instance", func(t *testing.T) {
+		_, connManager, _ := setup(t)
+		envID := uuid.New()
+		instanceID := "unlimited-instance"
+		requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		leaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+		require.NoError(t, err)
+		require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+		dropped, err := connManager.ExtendRequestLease(ctx, envID, "other-instance", requestID, *leaseID, 0, true)
+		require.NoError(t, err)
+		require.Nil(t, dropped)
+
+		assigned, err := connManager.GetAssignedWorkerID(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, instanceID, assigned)
+	})
+
+	t.Run("extension succeeds without mapping", func(t *testing.T) {
+		r, connManager, advance := setup(t)
+		envID := uuid.New()
+		instanceID := "unlimited-instance"
+		requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		mappingKey := connManager.requestWorkerKey(envID, requestID)
+
+		// the request has a lease but no request-to-worker key.
+		leaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+		require.NoError(t, err)
+
+		for range 3 {
+			advance(consts.ConnectWorkerRequestExtendLeaseInterval)
+			leaseID, err = connManager.ExtendRequestLease(ctx, envID, instanceID, requestID, *leaseID, duration, true)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+			require.False(t, r.Exists(mappingKey))
+		}
+
+		dropped, err := connManager.ExtendRequestLease(ctx, envID, instanceID, requestID, *leaseID, 0, true)
+		require.NoError(t, err)
+		require.Nil(t, dropped)
+		require.False(t, r.Exists(mappingKey))
+	})
+
+	t.Run("mapping does not grant replay of a lease another worker extended", func(t *testing.T) {
+		_, connManager, _ := setup(t)
+		envID := uuid.New()
+		requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+		initialLeaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+		require.NoError(t, err)
+		require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, "routed-instance", requestID))
+
+		extendedLeaseID, err := connManager.ExtendRequestLease(ctx, envID, "extending-instance", requestID, *initialLeaseID, duration, true)
+		require.NoError(t, err)
+		require.NotNil(t, extendedLeaseID)
+
+		replayedLeaseID, err := connManager.ExtendRequestLease(ctx, envID, "routed-instance", requestID, *initialLeaseID, duration, true)
+		require.ErrorIs(t, err, ErrRequestLeased)
+		require.Nil(t, replayedLeaseID)
+
+		replayedLeaseID, err = connManager.ExtendRequestLease(ctx, envID, "extending-instance", requestID, *initialLeaseID, duration, true)
+		require.NoError(t, err)
+		require.Equal(t, *extendedLeaseID, *replayedLeaseID)
+	})
+}
+
 func TestExtendRequestLeaseWorkerCapacityExpiresWithoutCleanup(t *testing.T) {
 	for _, tt := range []struct {
 		name     string

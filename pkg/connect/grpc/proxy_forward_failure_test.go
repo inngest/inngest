@@ -214,7 +214,7 @@ func TestProxyGRPCForwardFailsAfterDelivery(t *testing.T) {
 			}))
 
 			afterResponse := counterTotal(t, "inngest_connect_proxy.forward_failed_after_response_total")
-			resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+			resp, servedID, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 				AccountID: accID,
 				EnvID:     envID,
 				AppID:     appID,
@@ -239,11 +239,13 @@ func TestProxyGRPCForwardFailsAfterDelivery(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 				require.Equal(t, "reqid-test", resp.RequestId)
+				require.Equal(t, "test-worker", servedID)
 				require.Equal(t, afterResponse+1, counterTotal(t, "inngest_connect_proxy.forward_failed_after_response_total"))
 				return
 			}
 
 			require.Nil(t, resp)
+			require.Empty(t, servedID, "a forward that failed must not report a worker")
 			var sysErr syscode.Error
 			require.True(t, errors.As(err, &sysErr), "expected syscode error, got %v", err)
 			require.Equal(t, tc.expectCode, sysErr.Code)

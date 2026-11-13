@@ -167,6 +167,10 @@ func DriverResponseAttrs(
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
 
+	if resp.InstanceID != "" {
+		meta.AddAttr(rawAttrs, meta.Attrs.ConnectInstanceID, &resp.InstanceID)
+	}
+
 	// If we have a single op to process, also add any generator data to the
 	// span and overwrite any clashes
 	if op := resp.TraceVisibleStepExecution(); op != nil {

@@ -84,8 +84,9 @@ func TestProxyRetriesUnsentRequestWithoutWaitingForLeaseExpiry(t *testing.T) {
 					EnvId: envID.String(), AppId: appID.String(), FunctionId: fnID.String(), FunctionSlug: "test-fn",
 				}}
 
-			response, err := connector.Proxy(ctx, context.Background(), opts)
+			response, servedID, err := connector.Proxy(ctx, context.Background(), opts)
 			require.Nil(t, response)
+			require.Empty(t, servedID, "a request that no worker got must not report a worker")
 			var routeErr syscode.Error
 			require.ErrorAs(t, err, &routeErr)
 			require.Equal(t, tt.errorCode, routeErr.Code)
@@ -104,12 +105,17 @@ func TestProxyRetriesUnsentRequestWithoutWaitingForLeaseExpiry(t *testing.T) {
 			// would still be live. It must forward as soon as a worker is ready.
 			type result struct {
 				response *connectpb.SDKResponse
+				servedID string
 				err      error
 			}
 			results := make(chan result, 1)
 			go func() {
-				response, err := connector.Proxy(ctx, context.Background(), opts)
-				results <- result{response, err}
+				response, servedID, err := connector.Proxy(ctx, context.Background(), opts)
+				results <- result{
+					response: response,
+					servedID: servedID,
+					err:      err,
+				}
 			}()
 			require.Eventually(t, func() bool { return len(gateway.getForwardCalls()) == 1 }, time.Second, time.Millisecond,
 				"retry waited on an unsent request lease despite available capacity")
@@ -120,6 +126,7 @@ func TestProxyRetriesUnsentRequestWithoutWaitingForLeaseExpiry(t *testing.T) {
 			case res := <-results:
 				require.NoError(t, res.err)
 				require.Equal(t, expected.Status, res.response.Status)
+				require.Equal(t, instanceID, res.servedID)
 			case <-ctx.Done():
 				t.Fatal("retry did not receive the SDK response")
 			}
