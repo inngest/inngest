@@ -146,8 +146,8 @@ func (e Event) Validate(ctx context.Context) error {
 	}
 
 	if e.Timestamp != 0 {
-		// Convert milliseconds to nanosecond precision
-		t := time.Unix(0, e.Timestamp*1_000_000)
+		// Don't convert to nanoseconds: that overflows int64 for large values.
+		t := time.UnixMilli(e.Timestamp)
 		if t.Before(startTimestamp) {
 			return errors.New("timestamp is before Jan 1, 1980")
 		}
