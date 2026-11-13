@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/stretchr/testify/require"
@@ -123,4 +124,108 @@ func TestIsConnectWorkerAtCapacityError_EdgeCases(t *testing.T) {
 		// Since customError doesn't implement Unwrap(), errors.Is() will return false
 		require.False(t, IsConnectWorkerAtCapacityError(customErr))
 	})
+}
+
+func TestIsConnectNoHealthyConnectionCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		code     string
+		expected bool
+	}{
+		{
+			name:     "CodeConnectNoHealthyConnection returns true",
+			code:     syscode.CodeConnectNoHealthyConnection,
+			expected: true,
+		},
+		{
+			name:     "CodeConnectWorkerStoppedResponding returns false",
+			code:     syscode.CodeConnectWorkerStoppedResponding,
+			expected: false,
+		},
+		{
+			name:     "capacity code returns false",
+			code:     syscode.CodeConnectAllWorkersAtCapacity,
+			expected: false,
+		},
+		{
+			name:     "empty string returns false",
+			code:     "",
+			expected: false,
+		},
+		{
+			name:     "partial match returns false",
+			code:     "connect_no_healthy",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsConnectNoHealthyConnectionCode(tt.code)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsConnectNoHealthyConnectionError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error returns false",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "ErrConnectNoHealthyConnection returns true",
+			err:      ErrConnectNoHealthyConnection,
+			expected: true,
+		},
+		{
+			name:     "wrapped ErrConnectNoHealthyConnection returns true",
+			err:      fmt.Errorf("wrapped error: %w", ErrConnectNoHealthyConnection),
+			expected: true,
+		},
+		{
+			name:     "error with CodeConnectNoHealthyConnection message returns true",
+			err:      errors.New(syscode.CodeConnectNoHealthyConnection),
+			expected: true,
+		},
+		{
+			name:     "error with CodeConnectWorkerStoppedResponding message returns false",
+			err:      errors.New(syscode.CodeConnectWorkerStoppedResponding),
+			expected: false,
+		},
+		{
+			name:     "ErrConnectWorkerCapacity returns false",
+			err:      ErrConnectWorkerCapacity,
+			expected: false,
+		},
+		{
+			name:     "unrelated error returns false",
+			err:      errors.New("some other error"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsConnectNoHealthyConnectionError(tt.err)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConnectNoHealthyConnectionRetryAt(t *testing.T) {
+	now := time.Now()
+	minAt := now.Add(ConnectNoHealthyConnectionRetryDelay)
+	maxAt := minAt.Add(ConnectNoHealthyConnectionRetryJitter)
+
+	for range 1000 {
+		at := ConnectNoHealthyConnectionRetryAt(now)
+		require.False(t, at.Before(minAt), "retry at %s is before the fixed delay", at)
+		require.True(t, at.Before(maxAt), "retry at %s exceeds the jitter window", at)
+	}
 }

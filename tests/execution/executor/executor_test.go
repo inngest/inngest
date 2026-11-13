@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -1296,6 +1297,241 @@ func TestCapacityErrorRetriesWhenAttemptsExhausted(t *testing.T) {
 	require.NotNil(t, resp)
 	require.True(t, resp.Retryable(),
 		"response should be retryable for capacity errors even when attempts are exhausted")
+}
+
+// TestConnectNoHealthyConnectionHaltsRun asserts that a Connect dispatch finding
+// no healthy connection at routing (nothing forwarded) halts the run: the item
+// is requeued through the real queue without advancing its attempt, at the fixed
+// no-healthy-connection delay rather than the attempt backoff, and the run is not
+// finalized even on what would be its last attempt.  Failures after a request may
+// have reached a worker (gateway forward failure, worker stopped responding)
+// still consume an attempt, so a step that crashes its worker cannot retry forever.
+func TestConnectNoHealthyConnectionHaltsRun(t *testing.T) {
+	retries := 3
+	lastAttempt := retries
+
+	tests := []struct {
+		name    string
+		err     error
+		attempt int
+		halts   bool
+	}{
+		{
+			name:    "no healthy connection",
+			err:     syscode.Error{Code: syscode.CodeConnectNoHealthyConnection, Message: "Could not find a healthy connection"},
+			attempt: lastAttempt,
+			halts:   true,
+		},
+		{
+			name:    "worker stopped responding",
+			err:     syscode.Error{Code: syscode.CodeConnectWorkerStoppedResponding, Message: "The worker stopped responding to the request."},
+			attempt: 0,
+			halts:   false,
+		},
+		{
+			// The proxy returns this plain error when forwarding fails; the worker
+			// may have received the request before failing to ACK it.
+			name:    "gateway forward failed",
+			err:     fmt.Errorf("failed to route request to gateway: %w", errors.New("worker did not ACK request")),
+			attempt: 0,
+			halts:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = db.Close() })
+
+			dbcqrs := cqrsmanager.New(dbsqlite.New(db))
+			loader := dbcqrs.(state.FunctionLoader)
+
+			fnID, wsID, appID, aID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+			fn := inngest.Function{
+				ID:              fnID,
+				FunctionVersion: 1,
+				Name:            "test-fn",
+				Slug:            "test-fn",
+				Steps: []inngest.Step{
+					{
+						ID:      "step",
+						Name:    "step",
+						URI:     "/step",
+						Retries: &retries,
+					},
+				},
+			}
+
+			config, err := json.Marshal(fn)
+			require.NoError(t, err)
+
+			_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{
+				ID:   appID,
+				Name: "test-app",
+			})
+			require.NoError(t, err)
+
+			_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+				ID:     fnID,
+				AppID:  appID,
+				Name:   fn.Name,
+				Slug:   fn.Slug,
+				Config: string(config),
+			})
+			require.NoError(t, err)
+
+			_, shardedRc, err := createInmemoryRedis(t)
+			require.NoError(t, err)
+			defer shardedRc.Close()
+
+			_, unshardedRc, err := createInmemoryRedis(t)
+			require.NoError(t, err)
+			defer unshardedRc.Close()
+
+			unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+			shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
+				UnshardedClient:        unshardedClient,
+				FunctionRunStateClient: shardedRc,
+				StateDefaultKey:        redis_state.StateDefaultKey,
+				FnRunIsSharded:         redis_state.AlwaysShardOnRun,
+				BatchClient:            shardedRc,
+				QueueDefaultKey:        redis_state.QueueDefaultKey,
+			})
+
+			queueOpts := []queue.QueueOpt{
+				queue.WithIdempotencyTTL(time.Hour),
+			}
+			queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
+
+			shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
+			require.NoError(t, err)
+
+			pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
+
+			var sm state.Manager
+			sm, err = redis_state.New(ctx,
+				redis_state.WithShardedClient(shardedClient),
+				redis_state.WithPauseDeleter(pauseMgr),
+			)
+			require.NoError(t, err)
+			smv2 := redis_state.MustRunServiceV2(sm)
+
+			rq, err := queue.New(
+				context.Background(),
+				"test-queue",
+				shardRegistry,
+				queueOpts...,
+			)
+			require.NoError(t, err)
+
+			// Mock driver that returns the Connect proxy's error for this case.
+			connectDriver := &mockDriverV1{
+				t:   t,
+				err: tc.err,
+			}
+
+			exec, err := executor.NewExecutor(
+				executor.WithStateManager(smv2),
+				executor.WithPauseManager(pauseMgr),
+				executor.WithQueue(rq),
+				executor.WithLogger(logger.StdlibLogger(ctx)),
+				executor.WithFunctionLoader(loader),
+				executor.WithShardRegistry(shardRegistry),
+				executor.WithTracerProvider(tracing.NewOtelTracerProvider(nil, time.Millisecond)),
+				executor.WithDriverV1(connectDriver),
+			)
+			require.NoError(t, err)
+
+			now := time.Now()
+			evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+
+			_, run, err := exec.Schedule(ctx, execution.ScheduleRequest{
+				Function:    fn,
+				At:          &now,
+				AccountID:   aID,
+				WorkspaceID: wsID,
+				AppID:       appID,
+				Events: []event.TrackedEvent{
+					event.NewBaseTrackedEventWithID(event.Event{
+						Name: "test/event",
+					}, evtID),
+				},
+			})
+			require.NoError(t, err)
+
+			jobsAfterSchedule, err := rq.RunJobs(
+				ctx,
+				queueShard.Name(),
+				queue.Scope{
+					AccountID:  run.ID.Tenant.AccountID,
+					EnvID:      run.ID.Tenant.EnvID,
+					FunctionID: run.ID.FunctionID,
+				},
+				run.ID.RunID,
+				1000,
+				0,
+			)
+			require.NoError(t, err)
+			require.NotEmpty(t, jobsAfterSchedule)
+
+			qi, ok := jobsAfterSchedule[0].Raw.(*queue.QueueItem)
+			require.True(t, ok, "expected *queue.QueueItem, got %T", jobsAfterSchedule[0].Raw)
+
+			maxAttempts := retries + 1
+			item := *qi
+			item.Data.Attempt = tc.attempt
+			item.Data.MaxAttempts = &maxAttempts
+
+			leaseID, err := queueShard.Lease(ctx, item, queue.QueueLeaseDuration, time.Now())
+			require.NoError(t, err)
+			item.LeaseID = leaseID
+
+			var (
+				execResp *state.DriverResponse
+				execErr  error
+			)
+			processStart := time.Now()
+			_, err = rq.ProcessItem(ctx, queue.ProcessItem{I: item}, func(ctx context.Context, _ queue.RunInfo, i queue.Item) (queue.RunResult, error) {
+				payload, err := queue.GetEdge(i)
+				require.NoError(t, err)
+				execResp, execErr = exec.Execute(ctx, i.Identifier, i, payload.Edge)
+				return queue.RunResult{}, execErr
+			})
+			require.NoError(t, err)
+			require.Error(t, execErr)
+			require.NotNil(t, execResp)
+
+			requeued, err := queueShard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err, "queue item should be requeued, not dequeued as permanently failed")
+
+			if !tc.halts {
+				require.False(t, queue.IsAlwaysRetryable(execErr), "%s must consume attempts, got: %v", tc.name, execErr)
+				require.Equal(t, tc.attempt+1, requeued.Data.Attempt, "%s must consume an attempt", tc.name)
+				return
+			}
+
+			require.True(t, queue.IsAlwaysRetryable(execErr), "%s should be AlwaysRetryable, got: %v", tc.name, execErr)
+			require.True(t, queue.ShouldRetry(execErr, tc.attempt, maxAttempts),
+				"%s should retry even when attempts are exhausted", tc.name)
+			require.NotNil(t, queue.AsRetryAtError(execErr), "%s should carry a retry-at time", tc.name)
+			require.True(t, execResp.Retryable(),
+				"response should be retryable with no healthy connection even when attempts are exhausted")
+			require.Equal(t, tc.attempt, requeued.Data.Attempt, "halting must not consume an attempt")
+
+			// Scheduled at the fixed no-healthy-connection delay (plus jitter), not the attempt backoff.
+			delay := time.UnixMilli(requeued.AtMS).Sub(processStart)
+			require.GreaterOrEqual(t, delay, state.ConnectNoHealthyConnectionRetryDelay-time.Second, "requeued %s out", delay)
+			require.LessOrEqual(t, delay, state.ConnectNoHealthyConnectionRetryDelay+state.ConnectNoHealthyConnectionRetryJitter+time.Second, "requeued %s out", delay)
+
+			// The run is not finalized: its state still exists.
+			_, err = smv2.LoadState(ctx, run.ID)
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestExecutorScheduleRateLimit(t *testing.T) {
