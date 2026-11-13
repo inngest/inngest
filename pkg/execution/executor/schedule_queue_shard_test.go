@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -20,40 +19,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestScheduleQueueShardNotFoundCleansFreshState(t *testing.T) {
-	deleteErr := errors.New("state store unavailable")
+func TestScheduleQueueRoutingErrorKeepsState(t *testing.T) {
 	tests := []struct {
 		name             string
-		deleteErr        error
-		wantRoutingError bool
+		enqueueErr       error
+		createErr        error
+		wantStateExisted bool
 	}{
 		{
-			name:             "deletes state and returns routing error",
-			wantRoutingError: true,
+			name:             "shard not found keeps state created by this call",
+			enqueueErr:       queue.ErrQueueShardNotFound,
+			wantStateExisted: false,
 		},
 		{
-			name:             "already missing state returns routing error",
-			deleteErr:        state.ErrRunNotFound,
-			wantRoutingError: true,
+			name:             "shard not found keeps state that already existed",
+			enqueueErr:       queue.ErrQueueShardNotFound,
+			createErr:        state.ErrIdentifierExists,
+			wantStateExisted: true,
 		},
 		{
-			name:      "state cleanup failure remains retryable",
-			deleteErr: deleteErr,
+			name:             "shard unavailable keeps state created by this call",
+			enqueueErr:       queue.ErrQueueShardUnavailable,
+			wantStateExisted: false,
+		},
+		{
+			name:             "shard unavailable keeps state that already existed",
+			enqueueErr:       queue.ErrQueueShardUnavailable,
+			createErr:        state.ErrIdentifierExists,
+			wantStateExisted: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runService := &queueRoutingRunService{deleteErr: tt.deleteErr}
+			runService := &queueRoutingRunService{createErr: tt.createErr}
 			e := &executor{
-				log:               logger.VoidLogger(),
-				queue:             queueRoutingErrorQueue{},
+				log: logger.VoidLogger(),
+				queue: queueRoutingErrorQueue{
+					err: tt.enqueueErr,
+				},
 				smv2:              runService,
 				tracerProvider:    tracing.NewNoopTracerProvider(),
 				conditionalTracer: telemetrytrace.NoopConditionalTracer(),
 			}
 
 			eventID := ulid.Make()
+			runID := ulid.Make()
 			req := execution.ScheduleRequest{
 				AccountID:   uuid.New(),
 				WorkspaceID: uuid.New(),
@@ -76,36 +87,43 @@ func TestScheduleQueueShardNotFoundCleansFreshState(t *testing.T) {
 				},
 			}
 
-			_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+			_, _, err := e.schedule(context.Background(), req, runID, "test-key", false, nil)
 			require.Error(t, err)
-			require.Equal(t, tt.wantRoutingError, errors.Is(err, queue.ErrQueueShardNotFound))
-			if tt.deleteErr != nil && !errors.Is(tt.deleteErr, state.ErrRunNotFound) {
-				require.ErrorIs(t, err, tt.deleteErr)
-			}
-			require.Len(t, runService.deleted, 1)
+			require.ErrorIs(t, err, tt.enqueueErr)
+
+			var routingErr *ScheduleQueueRoutingError
+			require.ErrorAs(t, err, &routingErr)
+			require.Equal(t, tt.wantStateExisted, routingErr.StateExisted)
+			require.Equal(t, eventID, routingErr.EventInternalID)
+			require.Equal(t, runID, routingErr.ID.RunID)
+			require.Equal(t, req.Function.ID, routingErr.ID.FunctionID)
+			require.Equal(t, req.AccountID, routingErr.ID.Tenant.AccountID)
+
+			require.Empty(t, runService.deleted)
 		})
 	}
 }
 
 type queueRoutingErrorQueue struct {
 	queue.Queue
+	err error
 }
 
-func (queueRoutingErrorQueue) Enqueue(context.Context, queue.Item, time.Time, queue.EnqueueOpts) error {
-	return queue.ErrQueueShardNotFound
+func (q queueRoutingErrorQueue) Enqueue(context.Context, queue.Item, time.Time, queue.EnqueueOpts) error {
+	return q.err
 }
 
 type queueRoutingRunService struct {
 	sv2.RunService
-	deleteErr error
+	createErr error
 	deleted   []sv2.ID
 }
 
 func (r *queueRoutingRunService) Create(_ context.Context, s sv2.CreateState) (sv2.State, error) {
-	return sv2.State{Metadata: s.Metadata}, nil
+	return sv2.State{Metadata: s.Metadata}, r.createErr
 }
 
 func (r *queueRoutingRunService) Delete(_ context.Context, id sv2.ID, _ ...sv2.DeleteOption) error {
 	r.deleted = append(r.deleted, id)
-	return r.deleteErr
+	return nil
 }
