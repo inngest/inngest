@@ -13,9 +13,10 @@
 // same one we put in the DuckDB iceberg SECRET). No /v1/oauth/tokens, no
 // scoping. Fine for 127.0.0.1, not for anything exposed.
 //
-// TODO(creds): no credential vending (storage-credentials / config in
-// LoadTable). Not needed for local disk; for S3 the DuckDB process needs its
-// own S3 secret, or we vend static creds here via the `config` map.
+// Credentials: w/ Options.Credentials set, create/load vend storage creds to
+// a client that sends `X-Iceberg-Access-Delegation: vended-credentials`, and
+// GET .../credentials refreshes them. W/o it (local disk), clients bring
+// their own.
 //
 // TODO(maintenance): no orphan file cleanup or compaction. Commits expire
 // old snapshots and delete metadata.json files that fell out of the
@@ -81,6 +82,9 @@ type Options struct {
 	// was created on. It turns on the load/commit fast path (see
 	// fastPath), which skips re-reading metadata.json on every request.
 	CatalogDB *CatalogDB
+	// Credentials, when non-nil, vends storage credentials to clients that
+	// ask for them (see CredentialVendor). W/o it, clients need their own.
+	Credentials CredentialVendor
 }
 
 // Server is an Iceberg REST catalog backed by a catalog.Catalog.
@@ -118,6 +122,7 @@ var endpoints = []string{
 	"DELETE /v1/{prefix}/namespaces/{namespace}/tables/{table}",
 	"POST /v1/{prefix}/tables/rename",
 	"POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/metrics",
+	"GET /v1/{prefix}/namespaces/{namespace}/tables/{table}/credentials",
 }
 
 // handle registers h behind validation of the `{ns}`/`{table}` path params,
@@ -162,6 +167,7 @@ func (s *Server) routes() {
 	s.handle("POST /v1/namespaces/{ns}/tables/{table}", s.commitTable)
 	s.handle("DELETE /v1/namespaces/{ns}/tables/{table}", s.dropTable)
 	s.handle("POST /v1/namespaces/{ns}/tables/{table}/metrics", s.reportMetrics)
+	s.handle("GET /v1/namespaces/{ns}/tables/{table}/credentials", s.loadCredentials)
 	s.mux.HandleFunc("POST /v1/tables/rename", s.renameTable)
 
 	s.mux.HandleFunc("POST /v1/transactions/commit", func(w http.ResponseWriter, r *http.Request) {
@@ -270,8 +276,9 @@ type loadTableResponse struct {
 	MetadataLocation string `json:"metadata-location,omitempty"`
 	// Metadata is a table.Metadata, or its cached encoding
 	// (json.RawMessage) on the load path.
-	Metadata any                `json:"metadata"`
-	Config   iceberg.Properties `json:"config,omitempty"`
+	Metadata           any                 `json:"metadata"`
+	Config             iceberg.Properties  `json:"config,omitempty"`
+	StorageCredentials []storageCredential `json:"storage-credentials,omitempty"`
 }
 
 type commitTableRequest struct {
@@ -471,10 +478,16 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
+	cfg, creds, err := s.tableCredentials(r, ident, tbl.Location())
+	if err != nil {
+		writeVendError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, loadTableResponse{
-		MetadataLocation: tbl.MetadataLocation(),
-		Metadata:         tbl.Metadata(),
-		Config:           iceberg.Properties{},
+		MetadataLocation:   tbl.MetadataLocation(),
+		Metadata:           tbl.Metadata(),
+		Config:             cfg,
+		StorageCredentials: creds,
 	})
 }
 
@@ -517,7 +530,12 @@ func (s *Server) stageCreate(w http.ResponseWriter, r *http.Request, ident table
 		writeError(w, http.StatusBadRequest, "BadRequestException", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, loadTableResponse{Metadata: md, Config: iceberg.Properties{}})
+	cfg, creds, err := s.tableCredentials(r, ident, loc)
+	if err != nil {
+		writeVendError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, loadTableResponse{Metadata: md, Config: cfg, StorageCredentials: creds})
 }
 
 // defaultLocation mirrors iceberg-go's internal getDefaultWarehouseLocation
@@ -545,16 +563,23 @@ func (s *Server) defaultLocation(ctx context.Context, ns table.Identifier, name 
 }
 
 func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
-	// `snapshots=refs` and X-Iceberg-Access-Delegation are ignored, we
-	// always return all snapshots and never vend creds.
+	// `snapshots=refs` is ignored, we always return all snapshots.
 	ident := pathTable(r)
 	if c, ok := s.cachedCurrent(r.Context(), ident); ok {
-		writeJSON(w, http.StatusOK, loadTableResponse{
-			MetadataLocation: c.loc,
-			Metadata:         c.body,
-			Config:           iceberg.Properties{},
-		})
-		return
+		if loc, ok := tableLocationOf(c.loc); ok {
+			cfg, creds, err := s.tableCredentials(r, ident, loc)
+			if err != nil {
+				writeVendError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, loadTableResponse{
+				MetadataLocation:   c.loc,
+				Metadata:           c.body,
+				Config:             cfg,
+				StorageCredentials: creds,
+			})
+			return
+		}
 	}
 	tbl, err := s.cat.LoadTable(r.Context(), ident)
 	if err != nil {
@@ -566,10 +591,16 @@ func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
+	cfg, creds, err := s.tableCredentials(r, ident, tbl.Location())
+	if err != nil {
+		writeVendError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, loadTableResponse{
-		MetadataLocation: tbl.MetadataLocation(),
-		Metadata:         body,
-		Config:           iceberg.Properties{},
+		MetadataLocation:   tbl.MetadataLocation(),
+		Metadata:           body,
+		Config:             cfg,
+		StorageCredentials: creds,
 	})
 }
 
