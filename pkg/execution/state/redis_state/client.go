@@ -126,10 +126,11 @@ func (s *ShardedClient) BatchNext() *BatchClient {
 }
 
 type PauseClient struct {
-	kg              PauseKeyGenerator
-	unshardedRc     rueidis.Client
-	stateDefaultKey string
-	workspaceScoped bool
+	kg                PauseKeyGenerator
+	unshardedRc       rueidis.Client
+	stateDefaultKey   string
+	workspaceScoped   bool
+	expireEventBodies bool
 }
 
 // KeyPrefix is the hash tag shared by a workspace's pause records and indexes.
@@ -270,6 +271,12 @@ type UnshardedClientOpt func(*UnshardedClient)
 // Other users of the unsharded client retain their existing key layout.
 func WithWorkspaceScopedPauseKeys() UnshardedClientOpt {
 	return func(u *UnshardedClient) { u.pauses.workspaceScoped = true }
+}
+
+// WithPauseEventBodyExpiry expires event-hash bodies at the pause deadline plus
+// ten minutes. Enable only on stores supporting Valkey 9 hash-field expiration.
+func WithPauseEventBodyExpiry() UnshardedClientOpt {
+	return func(u *UnshardedClient) { u.pauses.expireEventBodies = true }
 }
 
 func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string, opts ...UnshardedClientOpt) *UnshardedClient {

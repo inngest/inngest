@@ -22,6 +22,7 @@ local signalCorrelationID = ARGV[5]
 local extendedExpiry = tonumber(ARGV[6])
 local nowUnixSeconds = tonumber(ARGV[7])
 local canReplaceSignal = tonumber(ARGV[8])
+local expireEventBodies = tonumber(ARGV[9]) == 1
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -44,6 +45,10 @@ redis.call("SADD", keyRunPauses, pauseID)
 
 if event ~= false and event ~= "" and event ~= nil then
 	redis.call("HSET", pauseEvtKey, pauseID, pause)
+	if expireEventBodies then
+		-- HEXPIRE is available in Valkey 9.0.0+; disabled for legacy MemoryDB.
+		redis.call("HEXPIRE", pauseEvtKey, extendedExpiry, "FIELDS", 1, pauseID)
+	end
 end
 
 if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelationID ~= nil then

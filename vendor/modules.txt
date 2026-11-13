@@ -185,14 +185,12 @@ github.com/VividCortex/ewma
 # github.com/agnivade/levenshtein v1.1.1
 ## explicit; go 1.13
 github.com/agnivade/levenshtein
-# github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302
-## explicit
-github.com/alicebob/gopher-json
-# github.com/alicebob/miniredis/v2 v2.34.0
+# github.com/alicebob/miniredis/v2 v2.40.0
 ## explicit; go 1.17
 github.com/alicebob/miniredis/v2
 github.com/alicebob/miniredis/v2/fpconv
 github.com/alicebob/miniredis/v2/geohash
+github.com/alicebob/miniredis/v2/gopher-json
 github.com/alicebob/miniredis/v2/hyperloglog
 github.com/alicebob/miniredis/v2/metro
 github.com/alicebob/miniredis/v2/proto
@@ -757,7 +755,7 @@ github.com/hashicorp/hcl/json/token
 # github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
 ## explicit; go 1.24
 github.com/inngest/expr
-# github.com/inngest/go-httpstat v0.0.0-20261019161010-8683e00144e3
+# github.com/inngest/go-httpstat v0.0.0-20261113154221-ce1920315a8d
 ## explicit; go 1.23.2
 github.com/inngest/go-httpstat
 # github.com/inngest/inngestgo v0.16.5

@@ -22,14 +22,15 @@ func commandsList(m *Miniredis) {
 	m.srv.Register("BLPOP", m.cmdBlpop)
 	m.srv.Register("BRPOP", m.cmdBrpop)
 	m.srv.Register("BRPOPLPUSH", m.cmdBrpoplpush)
-	m.srv.Register("LINDEX", m.cmdLindex)
-	m.srv.Register("LPOS", m.cmdLpos)
+	m.srv.Register("LINDEX", m.cmdLindex, server.ReadOnlyOption())
+	m.srv.Register("LPOS", m.cmdLpos, server.ReadOnlyOption())
 	m.srv.Register("LINSERT", m.cmdLinsert)
-	m.srv.Register("LLEN", m.cmdLlen)
+	m.srv.Register("LLEN", m.cmdLlen, server.ReadOnlyOption())
+	m.srv.Register("LMPOP", m.cmdLmpop)
 	m.srv.Register("LPOP", m.cmdLpop)
 	m.srv.Register("LPUSH", m.cmdLpush)
 	m.srv.Register("LPUSHX", m.cmdLpushx)
-	m.srv.Register("LRANGE", m.cmdLrange)
+	m.srv.Register("LRANGE", m.cmdLrange, server.ReadOnlyOption())
 	m.srv.Register("LREM", m.cmdLrem)
 	m.srv.Register("LSET", m.cmdLset)
 	m.srv.Register("LTRIM", m.cmdLtrim)
@@ -52,15 +53,7 @@ func (m *Miniredis) cmdBrpop(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -84,7 +77,7 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 				if !db.exists(key) {
 					continue
 				}
-				if db.t(key) != "list" {
+				if db.t(key) != keyTypeList {
 					c.WriteError(msgWrongType)
 					return true
 				}
@@ -115,15 +108,7 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 
 // LINDEX
 func (m *Miniredis) cmdLindex(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -145,7 +130,7 @@ func (m *Miniredis) cmdLindex(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		if t != "list" {
+		if t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -164,16 +149,7 @@ func (m *Miniredis) cmdLindex(c *server.Peer, cmd string, args []string) {
 
 // LPOS key element [RANK rank] [COUNT num-matches] [MAXLEN len]
 func (m *Miniredis) cmdLpos(c *server.Peer, cmd string, args []string) {
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
-
-	if len(args) == 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -236,10 +212,14 @@ func (m *Miniredis) cmdLpos(c *server.Peer, cmd string, args []string) {
 		t, ok := db.keys[key]
 		if !ok {
 			// No such key
+			if countSpecified {
+				c.WriteLen(0)
+				return
+			}
 			c.WriteNull()
 			return
 		}
-		if t != "list" {
+		if t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -311,15 +291,7 @@ func (m *Miniredis) cmdLpos(c *server.Peer, cmd string, args []string) {
 
 // LINSERT
 func (m *Miniredis) cmdLinsert(c *server.Peer, cmd string, args []string) {
-	if len(args) != 4 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(4)) {
 		return
 	}
 
@@ -347,7 +319,7 @@ func (m *Miniredis) cmdLinsert(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		if t != "list" {
+		if t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -378,15 +350,7 @@ func (m *Miniredis) cmdLinsert(c *server.Peer, cmd string, args []string) {
 
 // LLEN
 func (m *Miniredis) cmdLlen(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -401,13 +365,118 @@ func (m *Miniredis) cmdLlen(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		if t != "list" {
+		if t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
 
 		c.WriteInt(len(db.listKeys[key]))
 	})
+}
+
+// LMPOP
+func (m *Miniredis) cmdLmpop(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
+		return
+	}
+
+	keys, lr, count, ok := parseLmpop(c, args)
+	if !ok {
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if !m.lmpop(c, ctx, keys, lr, count) {
+			if c.Resp3 {
+				c.WriteNull()
+			} else {
+				c.WriteLen(-1)
+			}
+		}
+	})
+}
+
+func parseLmpop(c *server.Peer, args []string) ([]string, leftright, int, bool) {
+	numkeys, err := strconv.Atoi(args[0])
+	if err != nil || numkeys < 1 {
+		setDirty(c)
+		c.WriteError("ERR numkeys should be greater than 0")
+		return nil, left, 0, false
+	}
+
+	args = args[1:]
+	if len(args) <= numkeys {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return nil, left, 0, false
+	}
+	keys := args[:numkeys]
+
+	var lr leftright
+	switch strings.ToUpper(args[numkeys]) {
+	case "LEFT":
+		lr = left
+	case "RIGHT":
+		lr = right
+	default:
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return nil, left, 0, false
+	}
+
+	count := 0
+	args = args[numkeys+1:]
+	for len(args) > 0 {
+		if count != 0 || len(args) < 2 || strings.ToUpper(args[0]) != "COUNT" {
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return nil, left, 0, false
+		}
+		count, err = strconv.Atoi(args[1])
+		if err != nil || count < 1 {
+			setDirty(c)
+			c.WriteError("ERR count should be greater than 0")
+			return nil, left, 0, false
+		}
+		args = args[2:]
+	}
+	if count == 0 {
+		count = 1
+	}
+	return keys, lr, count, true
+}
+
+// lmpop pops up to count elements from the first non-empty list. Returns
+// false if there was nothing to pop, in which case nothing has been written.
+func (m *Miniredis) lmpop(c *server.Peer, ctx *connCtx, keys []string, lr leftright, count int) bool {
+	db := m.db(ctx.selectedDB)
+	for _, key := range keys {
+		if !db.exists(key) {
+			continue
+		}
+		if db.t(key) != keyTypeList {
+			c.WriteError(msgWrongType)
+			return true
+		}
+		if len(db.listKeys[key]) == 0 {
+			continue
+		}
+
+		var popped []string
+		for len(popped) < count && len(db.listKeys[key]) > 0 {
+			switch lr {
+			case left:
+				popped = append(popped, db.listLpop(key))
+			case right:
+				popped = append(popped, db.listPop(key))
+			}
+		}
+		c.WriteLen(2)
+		c.WriteBulk(key)
+		c.WriteStrings(popped)
+		return true
+	}
+	return false
 }
 
 // LPOP
@@ -421,15 +490,7 @@ func (m *Miniredis) cmdRpop(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -471,7 +532,7 @@ func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftri
 			c.WriteNull()
 			return
 		}
-		if db.t(opts.key) != "list" {
+		if db.t(opts.key) != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -513,15 +574,7 @@ func (m *Miniredis) cmdRpush(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdXpush(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -530,7 +583,7 @@ func (m *Miniredis) cmdXpush(c *server.Peer, cmd string, args []string, lr leftr
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if db.exists(key) && db.t(key) != "list" {
+		if db.exists(key) && db.t(key) != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -559,15 +612,7 @@ func (m *Miniredis) cmdRpushx(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -580,7 +625,7 @@ func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr left
 			c.WriteInt(0)
 			return
 		}
-		if db.t(key) != "list" {
+		if db.t(key) != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -600,15 +645,7 @@ func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr left
 
 // LRANGE
 func (m *Miniredis) cmdLrange(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -629,7 +666,7 @@ func (m *Miniredis) cmdLrange(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "list" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -650,15 +687,7 @@ func (m *Miniredis) cmdLrange(c *server.Peer, cmd string, args []string) {
 
 // LREM
 func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -680,7 +709,7 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		if db.t(opts.key) != "list" {
+		if db.t(opts.key) != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -724,15 +753,7 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 
 // LSET
 func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -754,7 +775,7 @@ func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
 			c.WriteError(msgKeyNotFound)
 			return
 		}
-		if db.t(opts.key) != "list" {
+		if db.t(opts.key) != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -777,15 +798,7 @@ func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
 
 // LTRIM
 func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -811,7 +824,7 @@ func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
 			c.WriteOK()
 			return
 		}
-		if t != "list" {
+		if t != keyTypeList {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -831,15 +844,7 @@ func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
 
 // RPOPLPUSH
 func (m *Miniredis) cmdRpoplpush(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -852,7 +857,7 @@ func (m *Miniredis) cmdRpoplpush(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+		if db.t(src) != keyTypeList || (db.exists(dst) && db.t(dst) != keyTypeList) {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -864,15 +869,7 @@ func (m *Miniredis) cmdRpoplpush(c *server.Peer, cmd string, args []string) {
 
 // BRPOPLPUSH
 func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -897,7 +894,7 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 			if !db.exists(opts.src) {
 				return false
 			}
-			if db.t(opts.src) != "list" || (db.exists(opts.dst) && db.t(opts.dst) != "list") {
+			if db.t(opts.src) != keyTypeList || (db.exists(opts.dst) && db.t(opts.dst) != keyTypeList) {
 				c.WriteError(msgWrongType)
 				return true
 			}
@@ -918,15 +915,7 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 
 // LMOVE
 func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
-	if len(args) != 4 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(4)) {
 		return
 	}
 
@@ -949,7 +938,7 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		if db.t(opts.src) != "list" || (db.exists(opts.dst) && db.t(opts.dst) != "list") {
+		if db.t(opts.src) != keyTypeList || (db.exists(opts.dst) && db.t(opts.dst) != keyTypeList) {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -979,15 +968,7 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 
 // BLMOVE
 func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
-	if len(args) != 5 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(5)) {
 		return
 	}
 
@@ -1017,12 +998,15 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 			if !db.exists(opts.src) {
 				return false
 			}
-			if db.t(opts.src) != "list" || (db.exists(opts.dst) && db.t(opts.dst) != "list") {
+			if db.t(opts.src) != keyTypeList || (db.exists(opts.dst) && db.t(opts.dst) != keyTypeList) {
 				c.WriteError(msgWrongType)
 				return true
 			}
 
-			var elem string
+			var (
+				elem string
+				ttl  = db.ttl[opts.src] // in case we empty the array (deletes the entry)
+			)
 			switch opts.srcDir {
 			case "left":
 				elem = db.listLpop(opts.src)
@@ -1041,6 +1025,9 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 			default:
 				c.WriteError(msgSyntaxError)
 				return true
+			}
+			if ttl > 0 {
+				db.ttl[opts.dst] = ttl
 			}
 
 			c.WriteBulk(elem)

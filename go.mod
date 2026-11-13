@@ -8,7 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.27
 	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 	github.com/VividCortex/ewma v1.2.0
-	github.com/alicebob/miniredis/v2 v2.34.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/andybalholm/brotli v1.2.3
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/smithy-go v1.28.1
@@ -40,7 +40,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
-	github.com/inngest/go-httpstat v0.0.0-20261019161010-8683e00144e3
+	github.com/inngest/go-httpstat v0.0.0-20261113154221-ce1920315a8d
 	github.com/inngest/inngestgo v0.16.5
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jinzhu/copier v0.3.5
@@ -132,7 +132,6 @@ require (
 	github.com/RaduBerinde/btreemap v0.0.0-20250419174037-3d62b7205d54 // indirect
 	github.com/Songmu/gotesplit v0.4.0 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
-	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.46.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.33.3 // indirect

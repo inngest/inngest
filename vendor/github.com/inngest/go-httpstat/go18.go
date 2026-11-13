@@ -39,7 +39,7 @@ func (r *Result) ContentTransfer(t time.Time) time.Duration {
 }
 
 func withClientTrace(ctx context.Context, r *Result) context.Context {
-	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+	trace := &httptrace.ClientTrace{
 		DNSStart: func(i httptrace.DNSStartInfo) {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
@@ -53,6 +53,9 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 
 			r.DNSLookup = r.dnsDone.Sub(r.dnsStart)
 			r.NameLookup = r.dnsDone.Sub(r.dnsStart)
+			if r.progress != nil {
+				r.progress.DNSLookup = r.DNSLookup
+			}
 
 			for _, ip := range i.Addrs {
 				if IsIPv6(ip.IP.String()) {
@@ -81,21 +84,33 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 
 			r.TCPConnection = r.tcpDone.Sub(r.tcpStart)
 			r.Connect = r.tcpDone.Sub(r.dnsStart)
+			if r.progress != nil {
+				r.progress.TCPConnection = r.TCPConnection
+			}
 		},
 
 		TLSHandshakeStart: func() {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			r.isTLS = true
+			if r.progress != nil {
+				r.progress.TLSStarted = true
+			}
 			r.tlsStart = time.Now()
 		},
 
-		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			r.tlsDone = time.Now()
+			if r.progress != nil {
+				r.progress.TLSCompleted = err == nil
+			}
 
 			r.TLSHandshake = r.tlsDone.Sub(r.tlsStart)
+			if r.progress != nil {
+				r.progress.TLSHandshake = r.TLSHandshake
+			}
 			r.Pretransfer = r.tlsDone.Sub(r.dnsStart)
 		},
 
@@ -133,6 +148,9 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 			r.mutex.Lock()
 			defer r.mutex.Unlock()
 			r.serverStart = time.Now()
+			if r.progress != nil {
+				r.progress.RequestWritten = info.Err == nil
+			}
 
 			// When client doesn't use DialContext or using old (before go1.7) `net`
 			// pakcage, DNS/TCP/TLS hook is not called.
@@ -172,10 +190,25 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 
 			r.ServerProcessing = r.serverDone.Sub(r.serverStart)
 			r.StartTransfer = r.serverDone.Sub(r.dnsStart)
+			if r.progress != nil {
+				r.progress.FirstByte = true
+				if !r.progressStart.IsZero() {
+					r.progress.TimeToFirstByte = r.serverDone.Sub(r.progressStart)
+				}
+			}
 
 			r.transferStart = r.serverDone
 		},
-	})
+	}
+	if r.progress != nil {
+		trace.GetConn = func(_ string) {
+			r.mutex.Lock()
+			defer r.mutex.Unlock()
+			*r.progress = Snapshot{}
+			r.progressStart = time.Now()
+		}
+	}
+	return httptrace.WithClientTrace(ctx, trace)
 }
 
 func IsIPv4(address string) bool {
