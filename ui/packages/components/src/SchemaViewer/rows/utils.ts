@@ -32,25 +32,41 @@ export function getTypeLabel(node: TypedNode, override?: string): string {
   return override ?? (Array.isArray(type) ? type.join(' | ') : type);
 }
 
+// The path is formatted as "eventName.field.subfield...", and the event name
+// can contain dots itself. To drop the event name we look for the standard
+// event field that starts the earliest path segment and keep everything from
+// there. Taking the earliest one matters: a property under data can be named
+// like a standard field ("data.name"), and that must not win over "data".
+export function getRelativePath(path: string): string {
+  let start = -1;
+
+  for (const field of STANDARD_EVENT_FIELDS) {
+    const pattern = `.${field}`;
+    let index = path.indexOf(pattern);
+
+    while (index !== -1) {
+      // Only accept a whole segment, so that ".id" doesn't match ".ids"
+      const next = path[index + pattern.length];
+      if (next === undefined || next === '.' || next === '[') {
+        break;
+      }
+      index = path.indexOf(pattern, index + 1);
+    }
+
+    if (index !== -1 && (start === -1 || index < start)) {
+      start = index;
+    }
+  }
+
+  // Skip the leading dot
+  return start === -1 ? path : path.substring(start + 1);
+}
+
 export const handleCopyValue = (node: SchemaNode) => {
   return async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      // The path is formatted as "eventName.field.subfield..."
-      // We need to remove the event name prefix (which can contain dots)
-      // We do this by finding the first occurrence of a standard field after the event name
-      // Strategy: The path after the event name will always start with a dot followed by a field
-      let relativePath = node.path;
-
-      for (const field of STANDARD_EVENT_FIELDS) {
-        const pattern = `.${field}`;
-        const index = node.path.indexOf(pattern);
-        if (index !== -1) {
-          // Found a standard field, extract from this point (excluding the leading dot)
-          relativePath = node.path.substring(index + 1);
-          break;
-        }
-      }
+      const relativePath = getRelativePath(node.path);
 
       await navigator.clipboard.writeText(relativePath);
       toast.success('Path copied to clipboard');
