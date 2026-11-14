@@ -9,6 +9,7 @@
   1 - Partition not found
   2 - Garbage collected (but backlog still exists): Partition pointers removed
   3 - Garbage collected (all metadata dropped): Partition metadata deleted
+  4 - Pause pushback skipped because another worker holds a live lease
 
 ]]
 
@@ -27,10 +28,12 @@ local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
 local forceAt                 = tonumber(ARGV[3])
 local accountID               = ARGV[4]
+local protectLeaseAtMS        = tonumber(ARGV[5])
 
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
 -- $include(get_partition_item.lua)
+-- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -46,6 +49,9 @@ end
 -- forced backoff; the next lease consumes the flag and asks the Constraint API.
 -- Unleased pushbacks (paused or migrating functions) keep their force.
 local leased = existing.leaseID ~= nil and existing.leaseID ~= cjson.null
+if protectLeaseAtMS ~= nil and leased and decode_ulid_time(existing.leaseID) > protectLeaseAtMS then
+    return 4
+end
 if forceAt == 1 and leased and existing.capacityReleased == true then
     forceAt = 0
 end
