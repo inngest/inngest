@@ -47,6 +47,10 @@ const (
 	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
 	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
 
+	// MaxLoopStateSize is the largest loop state a LoopReturn can commit.
+	// a larger state fails the run without retry and commits nothing.
+	MaxLoopStateSize = 512 * 1024
+
 	// MaxMetadataSpanSize is the maximum size of a single metadata span in bytes (64 KB).
 	MaxMetadataSpanSize = 64 * 1024
 
