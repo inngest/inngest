@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 func (h *connectHandler) setState(state ConnectionState, reason string, attrs ...any) {
 	previous, valid := h.setStateLocked(state)

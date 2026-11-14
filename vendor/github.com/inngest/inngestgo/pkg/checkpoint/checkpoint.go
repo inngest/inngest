@@ -7,7 +7,7 @@ import (
 
 // Config specifies the configuration for checkpointing.
 //
-// The zero config is the safest checkpoitning configuration (and is the same as ConfigSage).
+// The zero config is the safest checkpoitning configuration (and is the same as ConfigSafe).
 // This checkpoints after every step.Run, ensuring that step data is saved as quickly as possible
 // so that data is not lost.
 //
@@ -18,6 +18,10 @@ import (
 // You should ALWAYS start with the zero config and only tweak these parameters
 // to further improve latency if necessary.
 type Config struct {
+	// Disable stops checkpoint API calls for this function.  step results use
+	// the normal response path instead.
+	Disable bool `json:"-"`
+
 	// BatchSteps represents the maximum number of steps to execute before checkpointing. When this
 	// limit is hit, checkpointing will occur and the SDK will block until checkpointing completes.
 	//

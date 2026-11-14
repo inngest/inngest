@@ -142,6 +142,11 @@ func Run[T any](
 		Timing:   interval.New(pre, post),
 		Userland: op.Userland(),
 	})
+	if mgr.StepMode() == sdkrequest.StepModeCheckpoint {
+		if manager, ok := mw.(*middleware.MiddlewareManager); ok {
+			manager.NextExecution(ctx, mgr.CallContext())
+		}
+	}
 
 	return result, nil
 }
