@@ -2214,7 +2214,7 @@ type traceRunCursorFilter struct {
 }
 
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
-	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
+	run, err := w.getTraceRunForIngestion(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
 	if err == nil {
 		return run, nil
 	}
@@ -2235,19 +2235,32 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 }
 
 func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
-	// convert db.TraceRun{} to cqrs.TraceRun{}
-	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
-	if err != nil {
-		return nil, err
-	}
-	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	for i, run := range sqlcTraceRuns {
-		cqrsTraceRuns[i] = traceRunToCQRS(run)
-	}
-	return cqrsTraceRuns, nil
+	return w.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter:         cqrs.GetTraceRunFilter{EventID: []ulid.ULID{triggerID}},
+		IncludeSkipped: true,
+		IncludeOutput:  true,
+		Preview:        true,
+	})
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+	runs, err := w.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter:         cqrs.GetTraceRunFilter{RunID: []ulid.ULID{id.RunID}},
+		Items:          1,
+		IncludeSkipped: true,
+		IncludeOutput:  true,
+		Preview:        true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(runs) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return runs[0], nil
+}
+
+func (w wrapper) getTraceRunForIngestion(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
@@ -2658,7 +2671,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	opt.Cursor = ""
 	opt.Items = 0
-	if opt.Preview && !canReadEndedAtFromTraceRuns(opt) {
+	if opt.Preview {
 		return w.getSpanRunsCount(ctx, opt)
 	}
 	if opt.Filter.CEL == "" {
@@ -2674,16 +2687,56 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
-	if opt.Preview && !canReadEndedAtFromTraceRuns(opt) {
-		return w.GetRuns(ctx, opt)
+	if opt.Preview {
+		runs, err := w.GetRuns(ctx, opt)
+		if err != nil || len(runs) == 0 {
+			return runs, err
+		}
+		runIDs := make([]any, len(runs))
+		byID := make(map[ulid.ULID]*cqrs.TraceRun, len(runs))
+		for i, run := range runs {
+			id, err := ulid.Parse(run.RunID)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing runID as ULID: %w", err)
+			}
+			byID[id] = run
+			runIDs[i] = run.RunID
+			if w.dialect() == "sqlite3" {
+				runIDs[i] = id
+			}
+			var output cqrs.SpanOutput
+			cqrs.UnwrapSpanOutputEnvelope(&output, run.Output, nil)
+			run.Output = output.Data
+		}
+		// Legacy IDs are binary in SQLite and text in Postgres, unlike spans' text IDs.
+		query, args, err := sq.Dialect(w.dialect()).From("trace_runs").
+			Select("run_id", "source_id", "has_ai").Where(sq.C("run_id").In(runIDs)).ToSQL()
+		if err != nil {
+			return nil, err
+		}
+		rows, err := w.adapter.Conn().QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id ulid.ULID
+			var sourceID string
+			var hasAI bool
+			if err := rows.Scan(&id, &sourceID, &hasAI); err != nil {
+				return nil, err
+			}
+			run := byID[id]
+			run.SourceID = sourceID
+			run.HasAI = hasAI
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return runs, nil
 	}
 
 	return w.getTraceRunsFromTable(ctx, opt)
-}
-
-// trace_runs is complete for ended runs and avoids span aggregation.
-func canReadEndedAtFromTraceRuns(opt cqrs.GetTraceRunOpt) bool {
-	return opt.Filter.TimeField == enums.TraceRunTimeEndedAt && opt.Filter.CEL == ""
 }
 
 func (w wrapper) countTraceRunsFromTable(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
@@ -2892,12 +2945,6 @@ func (w wrapper) getTraceRunsFromTable(ctx context.Context, opt cqrs.GetTraceRun
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
-	}
-
-	if opt.Preview && canReadEndedAtFromTraceRuns(opt) {
-		if err := w.applySpanDetailsToTraceRuns(ctx, res); err != nil {
-			return nil, err
-		}
 	}
 
 	return res, nil
@@ -3939,7 +3986,8 @@ func spanRunCELFilters(
 }
 
 func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers) []sq.Expression {
-	// the root subquery is bounded by Until (an executor.run always exists,
+	identifierSelected := len(opt.Filter.RunID) > 0 || len(opt.Filter.EventID) > 0
+	// List windows bound the root subquery by Until (an executor.run always exists,
 	// before any EXTEND that adds finalization, etc.)
 	//
 	// for start_time-based windows we also apply the From rnage so the
@@ -3956,7 +4004,9 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers)
 	preds := []sq.Expression{
 		sq.I("spans.name").Eq(meta.SpanNameRun),
 		sq.I("spans.debug_run_id").IsNull(),
-		sq.I("spans.start_time").Lte(opt.Filter.Until.UTC()),
+	}
+	if !identifierSelected || !opt.Filter.Until.IsZero() {
+		preds = append(preds, sq.I("spans.start_time").Lte(opt.Filter.Until.UTC()))
 	}
 	if !opt.IncludeSkipped {
 		preds = append(preds, sq.Or(
@@ -3982,6 +4032,13 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers)
 	if len(opt.Filter.FunctionSlug) > 0 {
 		preds = append(preds, h.RunFunctionSlugExpr().In(opt.Filter.FunctionSlug))
 	}
+	if len(opt.Filter.RunID) > 0 {
+		runIDs := make([]string, len(opt.Filter.RunID))
+		for i, id := range opt.Filter.RunID {
+			runIDs[i] = id.String()
+		}
+		preds = append(preds, sq.I("spans.run_id").In(runIDs))
+	}
 	if len(opt.Filter.EventID) > 0 {
 		eventIDs := make([]string, len(opt.Filter.EventID))
 		for i, id := range opt.Filter.EventID {
@@ -3996,7 +4053,7 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers)
 			preds = append(preds, sq.I("spans.is_deferred").IsNull())
 		}
 	}
-	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
+	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt && (!identifierSelected || !opt.Filter.From.IsZero()) {
 		preds = append(preds, sq.I("spans.start_time").Gte(opt.Filter.From.UTC()))
 	}
 
@@ -4036,6 +4093,7 @@ func spanRunRootQuery(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers) *sq.
 }
 
 func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageCursor) []sq.Expression {
+	identifierSelected := len(opt.Filter.RunID) > 0 || len(opt.Filter.EventID) > 0
 	fieldName := "start_time"
 	aggregate := sq.L("MIN(spans.start_time)")
 	preds := []sq.Expression{}
@@ -4044,10 +4102,12 @@ func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageC
 		aggregate = sq.L("MAX(spans.end_time)")
 		//
 		// UTC preserves the SQLite timestamp ordering described in spanRunRootPredicates.
-		preds = append(preds,
-			aggregate.Gte(opt.Filter.From.UTC()),
-			aggregate.Lte(opt.Filter.Until.UTC()),
-		)
+		if !identifierSelected || !opt.Filter.From.IsZero() {
+			preds = append(preds, aggregate.Gte(opt.Filter.From.UTC()))
+		}
+		if !identifierSelected || !opt.Filter.Until.IsZero() {
+			preds = append(preds, aggregate.Lte(opt.Filter.Until.UTC()))
+		}
 	}
 	if cursor == nil {
 		return preds
@@ -4398,6 +4458,13 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 	}
 	if len(opt.Filter.FunctionID) > 0 {
 		filter = append(filter, sq.I("spans.function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.RunID) > 0 {
+		runIDs := make([]string, len(opt.Filter.RunID))
+		for i, id := range opt.Filter.RunID {
+			runIDs[i] = id.String()
+		}
+		filter = append(filter, sq.I("spans.run_id").In(runIDs))
 	}
 	// Status filters use final run status; this only excludes skipped span rows.
 	// Replay selection may opt into skipped runs; ordinary run lists omit them.
