@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -526,4 +527,287 @@ func TestDuplicateCronExpressionRejected(t *testing.T) {
 	err := triggers.Validate(ctx)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "duplicate cron expression")
+}
+
+func TestLoopJSON(t *testing.T) {
+	t.Run("round trip stores durations as strings", func(t *testing.T) {
+		in := Loop{
+			Kind:    "loop",
+			Key:     "event.data.id",
+			Tick:    30 * time.Second,
+			IdleTTL: 90 * time.Minute,
+		}
+
+		byt, err := json.Marshal(in)
+		require.NoError(t, err)
+		require.Contains(t, string(byt), `"tick":"30s"`)
+		require.Contains(t, string(byt), `"idle_ttl":"1h30m"`)
+		require.NotContains(t, string(byt), "30000000000")
+
+		out := Loop{}
+		require.NoError(t, json.Unmarshal(byt, &out))
+		require.Equal(t, in, out)
+	})
+
+	t.Run("zero durations are omitted and read back as zero", func(t *testing.T) {
+		in := Loop{
+			Kind: "fsm",
+			Key:  "event.data.id",
+		}
+		byt, err := json.Marshal(in)
+		require.NoError(t, err)
+		require.NotContains(t, string(byt), "tick")
+		require.NotContains(t, string(byt), "idle_ttl")
+
+		out := Loop{}
+		require.NoError(t, json.Unmarshal([]byte(`{"kind":"fsm","key":"event.data.id","tick":"","idle_ttl":""}`), &out))
+		require.Equal(t, in, out)
+	})
+
+	t.Run("round trips inside a function", func(t *testing.T) {
+		fn := Function{
+			Name: "loop",
+			Loop: &Loop{
+				Kind: "agent",
+				Key:  "event.data.id",
+				Tick: time.Minute,
+			},
+		}
+		byt, err := json.Marshal(fn)
+		require.NoError(t, err)
+		require.Contains(t, string(byt), `"loop":{"kind":"agent","key":"event.data.id","tick":"1m"}`)
+
+		out := Function{}
+		require.NoError(t, json.Unmarshal(byt, &out))
+		require.Equal(t, fn.Loop, out.Loop)
+	})
+
+	t.Run("invalid duration errors", func(t *testing.T) {
+		out := Loop{}
+		err := json.Unmarshal([]byte(`{"kind":"loop","key":"event.data.id","tick":"soon"}`), &out)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "loop tick")
+	})
+
+	t.Run("invalid idle_ttl errors", func(t *testing.T) {
+		out := Loop{}
+		err := json.Unmarshal([]byte(`{"kind":"loop","key":"event.data.id","idle_ttl":"later"}`), &out)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "loop idle_ttl")
+	})
+
+	t.Run("numeric tick errors", func(t *testing.T) {
+		out := Loop{}
+		err := json.Unmarshal([]byte(`{"kind":"loop","key":"event.data.id","tick":30}`), &out)
+		require.Error(t, err)
+	})
+
+	t.Run("null loop decodes to nil", func(t *testing.T) {
+		out := Function{}
+		require.NoError(t, json.Unmarshal([]byte(`{"name":"fn","loop":null}`), &out))
+		require.Nil(t, out.Loop)
+	})
+}
+
+func TestValidateLoop(t *testing.T) {
+	ctx := context.Background()
+
+	// base returns a valid loop function.  each case changes one thing.
+	base := func() Function {
+		return Function{
+			Name: "loop",
+			Triggers: []Trigger{
+				{
+					EventTrigger: &EventTrigger{
+						Event: "loop/start",
+					},
+				},
+			},
+			Steps: []Step{
+				{
+					ID:   "step",
+					Name: "Function body",
+					URI:  "http://example.com/api/inngest",
+				},
+			},
+			Loop: &Loop{
+				Kind:    "loop",
+				Key:     "event.data.id",
+				Tick:    30 * time.Second,
+				IdleTTL: time.Hour,
+			},
+		}
+	}
+
+	t.Run("valid loop passes", func(t *testing.T) {
+		f := base()
+		require.NoError(t, f.Validate(ctx))
+	})
+
+	t.Run("every kind passes", func(t *testing.T) {
+		for _, kind := range []string{"loop", "fsm", "agent"} {
+			f := base()
+			f.Loop.Kind = kind
+			require.NoError(t, f.Validate(ctx), kind)
+		}
+	})
+
+	t.Run("unkeyed step concurrency passes", func(t *testing.T) {
+		f := base()
+		f.Concurrency = &ConcurrencyLimits{
+			Step: []StepConcurrency{
+				{
+					Limit: 5,
+					Scope: enums.ConcurrencyScopeFn,
+				},
+			},
+		}
+		require.NoError(t, f.Validate(ctx))
+	})
+
+	t.Run("cancel passes", func(t *testing.T) {
+		f := base()
+		f.Cancel = []Cancel{
+			{
+				Event: "loop/stop",
+			},
+		}
+		require.NoError(t, f.Validate(ctx))
+	})
+
+	t.Run("missing key", func(t *testing.T) {
+		f := base()
+		f.Loop.Key = ""
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "A loop key is required")
+	})
+
+	t.Run("invalid key expression", func(t *testing.T) {
+		f := base()
+		f.Loop.Key = "event.data.id ==="
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loop key expression is invalid")
+	})
+
+	t.Run("bad kind", func(t *testing.T) {
+		f := base()
+		f.Loop.Kind = "workflow"
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "The loop kind of 'workflow' is invalid")
+	})
+
+	t.Run("negative tick and idle ttl", func(t *testing.T) {
+		f := base()
+		f.Loop.Tick = -time.Second
+		f.Loop.IdleTTL = -time.Second
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "loop tick")
+		require.Contains(t, err.Error(), "loop idle_ttl")
+	})
+
+	t.Run("sync endpoint rejected", func(t *testing.T) {
+		f := base()
+		f.Driver = FunctionDriver{
+			URI: "https://example.com/api/inngest",
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "A loop cannot run on a sync endpoint")
+	})
+
+	t.Run("async endpoint with driver metadata passes", func(t *testing.T) {
+		f := base()
+		f.Driver = FunctionDriver{
+			URI: "https://example.com/api/inngest",
+			Metadata: map[string]any{
+				"type": "async",
+			},
+		}
+		require.NoError(t, f.Validate(ctx))
+	})
+
+	t.Run("singleton rejected", func(t *testing.T) {
+		f := base()
+		f.Singleton = &Singleton{
+			Key:  new("event.data.id"),
+			Mode: enums.SingletonModeSkip,
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loops and singletons are mutually exclusive")
+	})
+
+	t.Run("batching rejected", func(t *testing.T) {
+		f := base()
+		f.EventBatch = &EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "10s",
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loops and batching are mutually exclusive")
+	})
+
+	t.Run("debounce rejected", func(t *testing.T) {
+		f := base()
+		f.Debounce = &Debounce{
+			Period: "10s",
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loops and debouncing are mutually exclusive")
+	})
+
+	t.Run("function concurrency rejected", func(t *testing.T) {
+		f := base()
+		f.Concurrency = &ConcurrencyLimits{
+			Fn: []FnConcurrency{
+				{
+					Limit: 5,
+				},
+			},
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "A loop cannot set function concurrency")
+	})
+
+	t.Run("keyed step concurrency rejected", func(t *testing.T) {
+		f := base()
+		f.Concurrency = &ConcurrencyLimits{
+			Step: []StepConcurrency{
+				{
+					Limit: 5,
+					Key:   new("event.data.id"),
+					Scope: enums.ConcurrencyScopeFn,
+				},
+			},
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loops and keyed step concurrency limits are mutually exclusive")
+	})
+
+	t.Run("keyed legacy concurrency rejected", func(t *testing.T) {
+		f := base()
+		f.Concurrency = &ConcurrencyLimits{
+			Limits: []StepConcurrency{
+				{
+					Limit: 5,
+					Key:   new("event.data.id"),
+					Scope: enums.ConcurrencyScopeFn,
+				},
+			},
+		}
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Loops and keyed step concurrency limits are mutually exclusive")
+	})
 }
