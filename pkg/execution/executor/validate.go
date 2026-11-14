@@ -153,9 +153,17 @@ func (r *runValidator) overflow(ctx context.Context, err state.StandardError, re
 }
 
 func (r *runValidator) checkStartTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Start != nil {
+	// The duration is nil if the timeout is empty or unparseable, which functions
+	// synced before these were validated may still have.  Treat those as unset, as
+	// panicking here would retry the queue item forever.
+	var timeout *time.Duration
+	if r.f.Timeouts != nil {
+		timeout = r.f.Timeouts.StartDuration()
+	}
+
+	if timeout != nil && *timeout > 0 {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
-		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
+		if since > *timeout && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err
@@ -169,10 +177,16 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 }
 
 func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Finish != nil && *r.f.Timeouts.FinishDuration() > 0 {
+	// As with the start timeout, empty or unparseable values are treated as unset.
+	var timeout *time.Duration
+	if r.f.Timeouts != nil {
+		timeout = r.f.Timeouts.FinishDuration()
+	}
+
+	if timeout != nil && *timeout > 0 {
 		started := r.md.Config.StartedAt
 
-		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *r.f.Timeouts.FinishDuration() {
+		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *timeout {
 			return nil
 		}
 		logger.StdlibLogger(ctx).Info(
