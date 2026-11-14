@@ -2255,6 +2255,71 @@ func TestCQRSGetTraceRunsPreviewEndedAtUsesSpans(t *testing.T) {
 	assert.False(t, secondPage[0].HasAI)
 }
 
+func TestCQRSGetTraceRunsPreviewEndedAtPaginationUsesOrder(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	runIDs := []string{"01J00000000000000000000001", "01J00000000000000000000002", "01J00000000000000000000003"}
+	for i, runID := range runIDs {
+		root := testSpanFields{
+			RunID: runID, TraceID: runID, DynamicSpanID: runID, Name: meta.SpanNameRun,
+			Status: enums.StepStatusRunning.String(), StartTime: baseTime.Add(time.Duration(i/2) * time.Second),
+			AccountID: accountID.String(), EnvID: workspaceID.String(),
+			AppID: appID.String(), FunctionID: functionID.String(),
+		}
+		insertTestSpan(t, cm, root)
+		root.Name = meta.SpanNameDynamicExtension
+		root.Status = enums.StepStatusCompleted.String()
+		root.StartTime = baseTime.Add(time.Duration(12-i) * time.Second)
+		insertTestSpan(t, cm, root)
+	}
+	insertTestSpan(t, cm, testSpanFields{
+		RunID: ulid.Make().String(), DynamicSpanID: "outside-ended-window", Name: meta.SpanNameRun,
+		Status: enums.StepStatusCompleted.String(), StartTime: baseTime.Add(2 * time.Second),
+		AccountID: accountID.String(), EnvID: workspaceID.String(),
+		AppID: appID.String(), FunctionID: functionID.String(),
+	})
+
+	for _, test := range []struct {
+		name  string
+		order []cqrs.GetTraceRunOrder
+		want  []string
+	}{
+		{"queued/asc", []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeQueuedAt, Direction: enums.TraceRunOrderAsc}}, runIDs},
+		{"queued/desc", []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeQueuedAt, Direction: enums.TraceRunOrderDesc}}, []string{runIDs[2], runIDs[0], runIDs[1]}},
+		{"started/asc", []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderAsc}}, runIDs},
+		{"started/desc", []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc}}, []string{runIDs[2], runIDs[0], runIDs[1]}},
+		{"queued-then-ended/asc", []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeQueuedAt, Direction: enums.TraceRunOrderAsc},
+			{Field: enums.TraceRunTimeEndedAt, Direction: enums.TraceRunOrderAsc},
+		}, []string{runIDs[1], runIDs[0], runIDs[2]}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			opt := cqrs.GetTraceRunOpt{
+				Filter: cqrs.GetTraceRunFilter{
+					AccountID: accountID, WorkspaceID: workspaceID, FunctionID: []uuid.UUID{functionID},
+					TimeField: enums.TraceRunTimeEndedAt,
+					From:      baseTime.Add(10 * time.Second), Until: baseTime.Add(13 * time.Second),
+				},
+				Order: test.order, Items: 1, Preview: true,
+			}
+			for _, runID := range test.want {
+				runs, err := cm.GetTraceRuns(t.Context(), opt)
+				require.NoError(t, err)
+				require.Len(t, runs, 1)
+				require.Equal(t, runID, runs[0].RunID)
+				require.NotEmpty(t, runs[0].Cursor)
+				opt.Cursor = runs[0].Cursor
+			}
+			runs, err := cm.GetTraceRuns(t.Context(), opt)
+			require.NoError(t, err)
+			require.Empty(t, runs, "pagination must terminate without repeats or out-of-window runs")
+		})
+	}
+}
+
 func TestCQRSGetSpanRunsCELJoinQualifiesTenantFilters(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()

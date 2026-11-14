@@ -4094,13 +4094,9 @@ func spanRunRootQuery(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers) *sq.
 
 func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageCursor) []sq.Expression {
 	identifierSelected := len(opt.Filter.RunID) > 0 || len(opt.Filter.EventID) > 0
-	fieldName := "start_time"
-	aggregate := sq.L("MIN(spans.start_time)")
 	preds := []sq.Expression{}
 	if opt.Filter.TimeField == enums.TraceRunTimeEndedAt {
-		fieldName = "end_time"
-		aggregate = sq.L("MAX(spans.end_time)")
-		//
+		aggregate := sq.L("MAX(spans.end_time)")
 		// UTC preserves the SQLite timestamp ordering described in spanRunRootPredicates.
 		if !identifierSelected || !opt.Filter.From.IsZero() {
 			preds = append(preds, aggregate.Gte(opt.Filter.From.UTC()))
@@ -4112,31 +4108,38 @@ func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageC
 	if cursor == nil {
 		return preds
 	}
-	fieldCursor := cursor.Find(fieldName)
-	if fieldCursor == nil {
-		return preds
+	orders := opt.Order
+	if len(orders) == 0 {
+		orders = []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc}}
 	}
 
-	cursorTime := spanRunCursorTime(fieldCursor)
-	direction := enums.TraceRunOrderDesc
-	for _, order := range opt.Order {
-		if (fieldName == "end_time" && order.Field == enums.TraceRunTimeEndedAt) ||
-			(fieldName == "start_time" && order.Field != enums.TraceRunTimeEndedAt) {
-			direction = order.Direction
-			break
-		}
-	}
 	var after sq.Expression
-	if direction == enums.TraceRunOrderAsc {
-		after = aggregate.Gt(cursorTime)
-	} else {
-		after = aggregate.Lt(cursorTime)
-	}
 	if cursor.ID != "" {
-		after = sq.Or(
-			after,
-			sq.And(aggregate.Eq(cursorTime), sq.C("run_id").Gt(cursor.ID)),
-		)
+		after = sq.C("run_id").Gt(cursor.ID)
+	}
+	for i := len(orders) - 1; i >= 0; i-- {
+		fieldName := "start_time"
+		aggregate := sq.L("MIN(spans.start_time)")
+		if orders[i].Field == enums.TraceRunTimeEndedAt {
+			fieldName = "end_time"
+			aggregate = sq.L("MAX(spans.end_time)")
+		}
+		fieldCursor := cursor.Find(fieldName)
+		if fieldCursor == nil {
+			return preds
+		}
+		cursorTime := spanRunCursorTime(fieldCursor)
+		var compare sq.Expression
+		if orders[i].Direction == enums.TraceRunOrderAsc {
+			compare = aggregate.Gt(cursorTime)
+		} else {
+			compare = aggregate.Lt(cursorTime)
+		}
+		if after != nil {
+			after = sq.Or(compare, sq.And(aggregate.Eq(cursorTime), after))
+		} else {
+			after = compare
+		}
 	}
 	return append(preds, after)
 }
