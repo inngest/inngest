@@ -515,6 +515,17 @@ export const GET_RUN_LINKAGE = gql`
           status
         }
       }
+      invokedFrom {
+        runID
+        function {
+          name
+          slug
+        }
+        run {
+          id
+          status
+        }
+      }
     }
   }
 `;

@@ -379,6 +379,7 @@ export const RunDetailsV4 = ({
               defers={linkageData?.defers}
               siblingDefers={linkageData?.siblingDefers ?? []}
               deferredFrom={linkageData?.deferredFrom}
+              invokedFrom={linkageData?.invokedFrom}
             />
           )}
         </div>
