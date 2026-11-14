@@ -14,6 +14,28 @@ import (
 
 const maxConcurrencyTraceKeyChars = 512
 
+// concurrencyTraceEventInput provides a read-only view of event data for
+// concurrency evaluation. It reuses decoded data when available and otherwise
+// decodes raw JSON lazily, at most once.
+type concurrencyTraceEventInput struct {
+	decoded map[string]any
+	raw     json.RawMessage
+	loaded  bool
+}
+
+func (i *concurrencyTraceEventInput) load() map[string]any {
+	if i.decoded != nil || i.loaded {
+		return i.decoded
+	}
+	i.loaded = true
+
+	var evt event.Event
+	if json.Unmarshal(i.raw, &evt) == nil {
+		i.decoded = evt.Map()
+	}
+	return i.decoded
+}
+
 func truncateConcurrencyTraceKey(value string) (string, bool) {
 	chars := 0
 	for i := range value {
@@ -27,14 +49,12 @@ func truncateConcurrencyTraceKey(value string) (string, bool) {
 
 // customConcurrencyTraceKeys only pairs an expression with a queue key when
 // both hashes agree. A function may have changed since the item was queued.
-func customConcurrencyTraceKeys(ctx context.Context, fn *inngest.Function, keys []state.CustomConcurrency, rawEvent json.RawMessage) []meta.CustomConcurrencyKey {
+func customConcurrencyTraceKeys(ctx context.Context, fn *inngest.Function, keys []state.CustomConcurrency, eventInput concurrencyTraceEventInput) []meta.CustomConcurrencyKey {
 	if fn == nil || fn.Concurrency == nil || len(keys) == 0 {
 		return nil
 	}
 
 	var result []meta.CustomConcurrencyKey
-	var input map[string]any
-	inputLoaded := false
 	for _, key := range keys {
 		if key.Validate() != nil {
 			continue
@@ -50,13 +70,7 @@ func customConcurrencyTraceKeys(ctx context.Context, fn *inngest.Function, keys 
 			}
 			value := key.UnhashedEvaluatedKeyValue
 			if util.XXHash(value) != valueHash {
-				if !inputLoaded {
-					inputLoaded = true
-					var evt event.Event
-					if json.Unmarshal(rawEvent, &evt) == nil {
-						input = evt.Map()
-					}
-				}
+				input := eventInput.load()
 				if input == nil {
 					continue
 				}
