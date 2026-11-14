@@ -96,6 +96,14 @@ type RunDeferredFrom struct {
 	FnSlug string    `json:"-"`
 }
 
+// RunInvokedFrom carries the ID of the run that started a run with
+// step.invoke, along with the invoking function's internal ID. Function and
+// Run are resolved lazily.
+type RunInvokedFrom struct {
+	RunID      ulid.ULID `json:"runID"`
+	FunctionID uuid.UUID `json:"-"`
+}
+
 // RunDefer is a single defer attached to a parent run. Function and Run are
 // resolved lazily — FnSlug (always set) drives the function lookup, RunID
 // drives the run lookup when the child has been scheduled.

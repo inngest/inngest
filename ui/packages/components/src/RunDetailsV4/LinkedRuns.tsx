@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
 
-import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
+import type {
+  RunDeferSummary,
+  RunDeferredFromSummary,
+  RunInvokedFromSummary,
+} from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, LinkCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
@@ -9,14 +13,28 @@ type Props = {
   defers?: RunDeferSummary[];
   siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
+  invokedFrom?: RunInvokedFromSummary | null;
 };
 
-export const LinkedRuns = ({ defers, siblingDefers, deferredFrom }: Props) => {
+export const LinkedRuns = ({ defers, siblingDefers, deferredFrom, invokedFrom }: Props) => {
   const parents = deferredFrom ?? [];
 
   return (
     <div className="h-full overflow-y-auto">
-      {parents.length > 0 && <ParentRunsSection parents={parents} />}
+      {invokedFrom && (
+        <ParentRunsSection
+          title="Invoked by"
+          parents={[invokedFrom]}
+          functionUnavailableTooltip="Invoking function unavailable"
+        />
+      )}
+      {parents.length > 0 && (
+        <ParentRunsSection
+          title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
+          parents={parents}
+          functionUnavailableTooltip="Parent function unavailable"
+        />
+      )}
       <DefersSection title="Parallel defers" defers={siblingDefers ?? []} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
@@ -66,11 +84,19 @@ const SectionTable = ({
 
 const MutedDash = () => <span className="text-muted">-</span>;
 
-const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => {
+const ParentRunsSection = ({
+  title,
+  parents,
+  functionUnavailableTooltip,
+}: {
+  title: string;
+  parents: (RunDeferredFromSummary | RunInvokedFromSummary)[];
+  functionUnavailableTooltip: string;
+}) => {
   const { pathCreator } = usePathCreator();
   return (
     <SectionTable
-      title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
+      title={title}
       columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
     >
       {parents.map((p) => (
@@ -92,7 +118,7 @@ const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) =
                 {p.function.name || p.function.slug}
               </PillCell>
             ) : (
-              <OptionalTooltip tooltip="Parent function unavailable">
+              <OptionalTooltip tooltip={functionUnavailableTooltip}>
                 <MutedDash />
               </OptionalTooltip>
             )}

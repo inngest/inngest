@@ -29,6 +29,7 @@ export function useGetRunLinkage() {
           defers: run.defers,
           siblingDefers: run.siblingDefers,
           deferredFrom: run.deferredFrom,
+          invokedFrom: run.invokedFrom,
         },
       };
     },
