@@ -549,7 +549,7 @@ func TestLoopJSON(t *testing.T) {
 		require.Equal(t, in, out)
 	})
 
-	t.Run("zero durations are omitted and read back as zero", func(t *testing.T) {
+	t.Run("zero durations are omitted and empty strings read back as defaults", func(t *testing.T) {
 		in := Loop{
 			Kind: "fsm",
 			Key:  "event.data.id",
@@ -561,21 +561,39 @@ func TestLoopJSON(t *testing.T) {
 
 		out := Loop{}
 		require.NoError(t, json.Unmarshal([]byte(`{"kind":"fsm","key":"event.data.id","tick":"","idle_ttl":""}`), &out))
-		require.Equal(t, in, out)
+		require.Equal(t, Loop{
+			Kind:    "fsm",
+			Key:     "event.data.id",
+			IdleTTL: consts.DefaultLoopIdleTTL,
+		}, out)
+	})
+
+	t.Run("missing idle_ttl reads back as the default", func(t *testing.T) {
+		out := Loop{
+			IdleTTL: time.Hour,
+		}
+		require.NoError(t, json.Unmarshal([]byte(`{"kind":"loop","key":"event.data.id","tick":"30s"}`), &out))
+		require.Equal(t, Loop{
+			Kind:    "loop",
+			Key:     "event.data.id",
+			Tick:    30 * time.Second,
+			IdleTTL: consts.DefaultLoopIdleTTL,
+		}, out)
 	})
 
 	t.Run("round trips inside a function", func(t *testing.T) {
 		fn := Function{
 			Name: "loop",
 			Loop: &Loop{
-				Kind: "agent",
-				Key:  "event.data.id",
-				Tick: time.Minute,
+				Kind:    "agent",
+				Key:     "event.data.id",
+				Tick:    time.Minute,
+				IdleTTL: time.Hour,
 			},
 		}
 		byt, err := json.Marshal(fn)
 		require.NoError(t, err)
-		require.Contains(t, string(byt), `"loop":{"kind":"agent","key":"event.data.id","tick":"1m"}`)
+		require.Contains(t, string(byt), `"loop":{"kind":"agent","key":"event.data.id","tick":"1m","idle_ttl":"1h"}`)
 
 		out := Function{}
 		require.NoError(t, json.Unmarshal(byt, &out))
@@ -707,6 +725,59 @@ func TestValidateLoop(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "loop tick")
 		require.Contains(t, err.Error(), "loop idle_ttl")
+	})
+
+	t.Run("idle ttl range", func(t *testing.T) {
+		tests := []struct {
+			ttl time.Duration
+			ok  bool
+		}{
+			{
+				ttl: 0,
+				ok:  false,
+			},
+			{
+				ttl: 59 * time.Second,
+				ok:  false,
+			},
+			{
+				ttl: time.Minute,
+				ok:  true,
+			},
+			{
+				ttl: 7 * 24 * time.Hour,
+				ok:  true,
+			},
+			{
+				ttl: 7*24*time.Hour + time.Second,
+				ok:  false,
+			},
+		}
+		for _, tt := range tests {
+			f := base()
+			f.Loop.IdleTTL = tt.ttl
+			err := f.Validate(ctx)
+			if tt.ok {
+				require.NoError(t, err, tt.ttl)
+				continue
+			}
+			require.Error(t, err, tt.ttl)
+			require.Contains(t, err.Error(), "The loop idle_ttl of", tt.ttl)
+		}
+	})
+
+	t.Run("tick at the idle ttl rejected", func(t *testing.T) {
+		f := base()
+		f.Loop.Tick = f.Loop.IdleTTL
+		err := f.Validate(ctx)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "must be less than the idle_ttl")
+	})
+
+	t.Run("tick below the idle ttl passes", func(t *testing.T) {
+		f := base()
+		f.Loop.Tick = f.Loop.IdleTTL - time.Second
+		require.NoError(t, f.Validate(ctx))
 	})
 
 	t.Run("sync endpoint rejected", func(t *testing.T) {

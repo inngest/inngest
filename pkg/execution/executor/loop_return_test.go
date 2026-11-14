@@ -261,7 +261,8 @@ func TestLoopReturnCommit(t *testing.T) {
 	require.JSONEq(t, `{"n":1}`, string(snap.State))
 	require.NotNil(t, snap.LastRunID)
 	require.Equal(t, id.RunID, *snap.LastRunID)
-	require.True(t, snap.ExpiresAt.IsZero())
+	// the harness function has no idle_ttl, so the commit uses the default.
+	require.WithinDuration(t, time.Now().Add(consts.DefaultLoopIdleTTL), snap.ExpiresAt, 10*time.Second)
 
 	h.requireRunGone(t, id)
 	require.JSONEq(t, `{"n":1}`, h.finishedResult(t))
@@ -315,6 +316,67 @@ func TestLoopReturnIdleTTL(t *testing.T) {
 	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 	require.NoError(t, err)
 	require.WithinDuration(t, time.Now().Add(time.Hour), snap.ExpiresAt, 10*time.Second)
+}
+
+func TestLoopReturnWakeIdleTTL(t *testing.T) {
+	// commit returns a driver whose LoopReturn commits version 0 and wakes
+	// after the duration.
+	commit := func(after string) *loopReturnDriver {
+		return &loopReturnDriver{
+			ops: []*state.GeneratorOpcode{
+				loopReturnOp(t, state.LoopReturn{
+					State:   json.RawMessage(`{}`),
+					Version: 0,
+					Wake: &state.LoopWake{
+						ID:    "w1",
+						After: after,
+					},
+				}),
+			},
+		}
+	}
+	harness := func(t *testing.T, ttl time.Duration) *loopHarness {
+		h := newLoopHarness(t)
+		h.req.Function.Loop.IdleTTL = ttl
+		fn := h.req.Function
+		h.e.fl = singletonRetryFunctionLoader{fn: &fn}
+		return h
+	}
+
+	t.Run("wake past the idle ttl rejected", func(t *testing.T) {
+		h := harness(t, time.Hour)
+		id, resp, err := h.runLoop(t, commit("61m"), nil)
+		h.requireLoopFailed(t, id, resp, err, "the limit is the idle_ttl of 1h0m0s")
+
+		_, err = h.loadWake(t, "w1")
+		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+	})
+
+	t.Run("wake at the idle ttl expires one hour after the wake", func(t *testing.T) {
+		h := harness(t, time.Hour)
+		_, resp, err := h.runLoop(t, commit("1h"), nil)
+		require.NoError(t, err)
+		require.Nil(t, resp.Err)
+
+		item, err := h.loadWake(t, "w1")
+		require.NoError(t, err)
+		requireWithin(t, time.Now().Add(time.Hour), item.AtMS, 5*time.Second)
+
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		require.WithinDuration(t, time.Now().Add(2*time.Hour), snap.ExpiresAt, 10*time.Second)
+	})
+
+	t.Run("short wake expires one idle ttl after the commit", func(t *testing.T) {
+		h := harness(t, 3*time.Hour)
+		_, resp, err := h.runLoop(t, commit("30m"), nil)
+		require.NoError(t, err)
+		require.Nil(t, resp.Err)
+
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		require.WithinDuration(t, time.Now().Add(3*time.Hour), snap.ExpiresAt, 10*time.Second)
+	})
 }
 
 func TestLoopReturnVersionMismatch(t *testing.T) {
@@ -1156,12 +1218,12 @@ func TestLoopReturnValidation(t *testing.T) {
 						Version: 0,
 						Wake: &state.LoopWake{
 							ID:    "w1",
-							After: "8785h",
+							After: "169h",
 						},
 					}),
 				},
 			},
-			want: "the limit is",
+			want: "the limit is the idle_ttl of 168h0m0s",
 		},
 		{
 			name: "wake with a bad duration",

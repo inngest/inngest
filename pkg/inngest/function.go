@@ -250,7 +250,9 @@ func (l *Loop) UnmarshalJSON(in []byte) error {
 	l.Kind = input.Kind
 	l.Key = input.Key
 	l.Tick = 0
-	l.IdleTTL = 0
+	// a loop synced without idle_ttl gets the default here, so the stored
+	// config always names the TTL that commits use.
+	l.IdleTTL = consts.DefaultLoopIdleTTL
 
 	var err error
 	if input.Tick != "" {
@@ -638,8 +640,14 @@ func (f Function) validateLoop(ctx context.Context) error {
 	if f.Loop.Tick < 0 {
 		err = multierror.Append(err, fmt.Errorf("The loop tick of '%s' must not be negative", f.Loop.Tick))
 	}
-	if f.Loop.IdleTTL < 0 {
-		err = multierror.Append(err, fmt.Errorf("The loop idle_ttl of '%s' must not be negative", f.Loop.IdleTTL))
+	if f.Loop.IdleTTL < consts.MinLoopIdleTTL || f.Loop.IdleTTL > consts.MaxLoopIdleTTL {
+		err = multierror.Append(err, fmt.Errorf("The loop idle_ttl of '%s' must be between %s and %s", f.Loop.IdleTTL, consts.MinLoopIdleTTL, consts.MaxLoopIdleTTL))
+	}
+	// each tick run commits and moves the expiry.  a tick at or past the
+	// TTL fires after the instance expired, finds nothing, and the loop
+	// stops.
+	if f.Loop.Tick > 0 && f.Loop.Tick >= f.Loop.IdleTTL {
+		err = multierror.Append(err, fmt.Errorf("The loop tick of '%s' must be less than the idle_ttl of '%s'", f.Loop.Tick, f.Loop.IdleTTL))
 	}
 
 	// a driver metadata type of "sync" selects the httpv2 sync driver.  a
