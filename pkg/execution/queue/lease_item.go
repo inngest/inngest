@@ -406,6 +406,11 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		// already hold the semaphore carry none, so keep scanning.
 		return result, nil
 	case errors.Is(cause, ErrQueueItemNotFound):
+		// The item went away (cancelled, or finished by another lease) between
+		// the capacity acquire and the item lease. Release capacity acquired
+		// for this attempt, or it holds the item's constraints until it
+		// expires (QueueLeaseDuration) with no release to wake waiting work.
+		q.releaseCapacityForMissingItem(ctx, item, constraintRes)
 		// This is an okay error.  Move to the next job item.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
@@ -469,4 +474,54 @@ func itemEnvIDPtr(envID uuid.UUID) *uuid.UUID {
 		return nil
 	}
 	return &envID
+}
+
+// releaseCapacityForMissingItem releases a capacity lease acquired for an item
+// that was gone by the time of its item lease. Only a lease granted by this
+// attempt's Acquire is released: a lease reused from the item, or replayed
+// from operation idempotency (shared with another attempt for the same item,
+// which may be running), is left alone.
+func (q *queueProcessor) releaseCapacityForMissingItem(ctx context.Context, item *QueueItem, res ItemLeaseConstraintCheckResult) {
+	if !q.ReleaseCapacityOnItemGone || res.CapacityLease == nil || q.CapacityManager == nil {
+		return
+	}
+	outcome := "released"
+	defer func() {
+		metrics.IncrQueueItemNotFoundCapacityCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"outcome": outcome, "queue_shard": q.Shard().Name()},
+		})
+	}()
+	if !res.CapacityLeaseAcquired {
+		outcome = "skipped_shared"
+		return
+	}
+	for _, sem := range item.Data.Semaphores {
+		if sem.Release == constraintapi.SemaphoreReleaseManual {
+			// Ordinary Release removes lease/scavenger records but deliberately
+			// keeps manual permits held. Cancellation may have already released
+			// the run before this stale scanner acquired its new permit, leaving
+			// nobody to return it. Preserve expiry recovery instead.
+			outcome = "skipped_manual"
+			return
+		}
+	}
+	lease := *res.CapacityLease
+	_, err := q.CapacityManager.Release(context.WithoutCancel(ctx), &constraintapi.CapacityReleaseRequest{
+		AccountID: item.Data.Identifier.AccountID,
+		// Distinct from the run's own release (keyed by item ID), so neither
+		// replays the other.
+		IdempotencyKey: item.ID + ":not-found:" + lease.LeaseID.String(),
+		LeaseID:        lease.LeaseID,
+		Source: constraintapi.LeaseSource{
+			Location:          constraintapi.CallerLocationItemLease,
+			Service:           constraintapi.ServiceExecutor,
+			RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		},
+		LeaseIssuedAt: time.UnixMilli(lease.IssuedAtMS),
+	})
+	if err != nil {
+		outcome = "error"
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity for missing queue item")
+	}
 }
