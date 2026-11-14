@@ -64,6 +64,7 @@ func TestGetFunctionRunUnknownRunReturnsNotFound(t *testing.T) {
 	var response publicerr.Error
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&response))
 	require.Equal(t, http.StatusNotFound, response.Status)
+	require.Equal(t, "Function run not found", response.Message)
 }
 
 func TestGetFunctionRunLoadFailureReturnsInternalServerError(t *testing.T) {
@@ -92,6 +93,7 @@ func TestGetFunctionRunJobsUnknownRunReturnsNotFound(t *testing.T) {
 	var response publicerr.Error
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&response))
 	require.Equal(t, http.StatusNotFound, response.Status)
+	require.Equal(t, "Function run not found", response.Message)
 }
 
 func TestGetFunctionRunJobsLoadFailureReturnsInternalServerError(t *testing.T) {

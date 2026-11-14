@@ -43,7 +43,7 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "Function run not found"))
 			return
 		}
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
@@ -113,7 +113,7 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "Function run not found"))
 			return
 		}
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
