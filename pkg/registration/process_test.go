@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -223,8 +224,9 @@ func TestProcessFunctionsLoopCapability(t *testing.T) {
 				},
 			},
 			Loop: &inngest.Loop{
-				Kind: "loop",
-				Key:  "event.data.id",
+				Kind:    "loop",
+				Key:     "event.data.id",
+				IdleTTL: time.Hour,
 			},
 			Steps: map[string]sdk.SDKStep{
 				"step": {
