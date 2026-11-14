@@ -2,8 +2,10 @@ package step
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/enums"
+	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
@@ -54,7 +56,29 @@ func preflight(ctx context.Context, op enums.Opcode) sdkrequest.InvocationManage
 	if !ok && enums.OpcodeIsAsync(op) {
 		panic(ErrNotInFunction)
 	}
+	if ok {
+		rejectInLoop(ctx, mgr, op)
+	}
 	return mgr
+}
+
+// loopRejected maps the step tools a loop handler cannot call to the name
+// in the error text.
+var loopRejected = map[enums.Opcode]string{
+	enums.OpcodeSleep:         "step.Sleep",
+	enums.OpcodeWaitForEvent:  "step.WaitForEvent",
+	enums.OpcodeWaitForSignal: "step.WaitForSignal",
+}
+
+// rejectInLoop fails the run without retry when a loop handler calls a
+// step tool that waits.  a loop waits with loop.Wake or loop.Subscribe.
+func rejectInLoop(ctx context.Context, mgr sdkrequest.InvocationManager, op enums.Opcode) {
+	name, ok := loopRejected[op]
+	if !ok || !mgr.IsLoop() {
+		return
+	}
+	mgr.SetErr(sdkerrors.NoRetryError(fmt.Errorf("%s is not allowed in a loop handler.  return loop.Wake or loop.Subscribe instead", name)))
+	panic(sdkrequest.ControlHijack{})
 }
 
 func IsWithinStep(ctx context.Context) bool {

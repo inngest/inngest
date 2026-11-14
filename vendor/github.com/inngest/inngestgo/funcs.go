@@ -2,6 +2,8 @@ package inngestgo
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 )
 
 // Slugify converts a string to a slug. This is only useful for replicating the
@@ -66,10 +69,16 @@ func CreateFunction[T any](
 	if err != nil {
 		return nil, err
 	}
+	if fc.Loop != nil {
+		return nil, errors.New("loop is set, use CreateLoop or CreateFSM")
+	}
 
 	if fc.Checkpoint == nil {
 		if v, ok := c.(*apiClient); ok {
 			fc.Checkpoint = v.Checkpoint
+		}
+		if fc.Checkpoint == nil {
+			fc.Checkpoint = &checkpoint.Config{}
 		}
 	}
 
@@ -139,11 +148,160 @@ func CronTriggerWithJitter(cron string, jitter time.Duration) fn.Trigger {
 //	}
 type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 
+// LoopOpts configures a loop or fsm.  Key is a CEL expression over the
+// event that names the instance.  Initial is the state an instance has
+// before its first commit.
+type LoopOpts[STATE any] struct {
+	FunctionOpts
+	Key     string
+	Tick    time.Duration
+	IdleTTL time.Duration
+	Initial STATE
+}
+
+// LoopFunction is a loop or fsm handler.  the handler mutates the state
+// through the pointer.  a nil return commits that state.  an error return
+// commits nothing.  a new pointer assigned to the parameter is lost.
+type LoopFunction[STATE any, EVENT any] func(ctx context.Context, input LoopInput[EVENT], state *STATE) error
+
+// CreateLoop creates a loop function which can be registered within a handler.
+// opts.Key picks the instance.  each run gets the instance state as the
+// handler's third argument and the handler mutates it through the pointer.
+// a nil return commits that state.  an error return commits nothing.  a
+// new pointer assigned to the parameter is lost.
+func CreateLoop[STATE any, EVENT any](
+	c Client,
+	opts LoopOpts[STATE],
+	trigger fn.Triggerable,
+	f LoopFunction[STATE, EVENT],
+) (ServableFunction, error) {
+	return createLoop(c, fn.LoopKindLoop, opts, trigger, f)
+}
+
+// CreateFSM creates an fsm function which can be registered within a
+// handler.  an fsm is a loop that cannot subscribe to events.  the handler
+// mutates the state through the pointer.  a nil return commits that state.
+// an error return commits nothing.  a new pointer assigned to the
+// parameter is lost.
+func CreateFSM[STATE any, EVENT any](
+	c Client,
+	opts LoopOpts[STATE],
+	trigger fn.Triggerable,
+	f LoopFunction[STATE, EVENT],
+) (ServableFunction, error) {
+	return createLoop(c, fn.LoopKindFSM, opts, trigger, f)
+}
+
+func createLoop[STATE any, EVENT any](
+	c Client,
+	kind string,
+	opts LoopOpts[STATE],
+	trigger fn.Triggerable,
+	f LoopFunction[STATE, EVENT],
+) (ServableFunction, error) {
+	fc := opts.FunctionOpts
+	if err := fc.Validate(); err != nil {
+		return nil, err
+	}
+	if fc.Loop != nil {
+		return nil, errors.New("loop is set on FunctionOpts, set Key, Tick, and IdleTTL on LoopOpts")
+	}
+	if opts.Key == "" {
+		return nil, errors.New("loop key is required")
+	}
+	if opts.Tick < 0 {
+		return nil, errors.New("loop tick must not be negative")
+	}
+	if opts.IdleTTL < 0 {
+		return nil, errors.New("loop idle ttl must not be negative")
+	}
+	if fc.Singleton != nil {
+		return nil, errors.New("loops and singletons are mutually exclusive")
+	}
+	if fc.BatchEvents != nil {
+		return nil, errors.New("loops and batching are mutually exclusive")
+	}
+	if fc.Debounce != nil {
+		return nil, errors.New("loops and debouncing are mutually exclusive")
+	}
+	if fc.Concurrency != nil && len(fc.Concurrency.Fn) > 0 {
+		return nil, errors.New("loops cannot set function concurrency, a loop always runs one input per key")
+	}
+	if fc.Concurrency != nil {
+		for _, limit := range fc.Concurrency.Step {
+			if limit.Key != nil {
+				return nil, errors.New("loops and keyed step concurrency limits are mutually exclusive")
+			}
+		}
+	}
+
+	fc.Loop = &fn.Loop{
+		Kind:    kind,
+		Key:     opts.Key,
+		Tick:    opts.Tick,
+		IdleTTL: opts.IdleTTL,
+	}
+
+	if fc.Checkpoint == nil {
+		if v, ok := c.(*apiClient); ok {
+			fc.Checkpoint = v.Checkpoint
+		}
+		if fc.Checkpoint == nil {
+			fc.Checkpoint = &checkpoint.Config{}
+		}
+	}
+
+	// the handler gets a *STATE.  a pointer STATE would give it a double
+	// pointer and a nil Initial that marshals to null.
+	if reflect.TypeFor[STATE]().Kind() == reflect.Pointer {
+		return nil, errors.New("STATE must not be a pointer type, use CreateLoop[State, Event] with the value type")
+	}
+
+	// marshal the pointer so a pointer receiver MarshalJSON on STATE is
+	// used, which matches the form the handler returns from *STATE.
+	initial, err := json.Marshal(&opts.Initial)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling initial loop state: %w", err)
+	}
+	if string(initial) == "null" {
+		return nil, errors.New("Initial marshals to null, set a non-nil Initial value")
+	}
+
+	sf := servableFunc{
+		appID:        c.AppID(),
+		fc:           fc,
+		trigger:      trigger,
+		f:            f,
+		initialState: initial,
+	}
+
+	zt := sf.ZeroType()
+	eventDataField := zt.FieldByName("Data")
+	if err := event.ValidateEventDataType(eventDataField.Interface()); err != nil {
+		return nil, err
+	}
+
+	if v, ok := c.(*apiClient); ok {
+		v.h.Register(sf)
+	}
+
+	return sf, nil
+}
+
 type servableFunc struct {
 	appID   string
 	fc      FunctionOpts
 	trigger fn.Triggerable
 	f       any
+	// initialState is the marshalled LoopOpts.Initial.  nil for functions
+	// made with CreateFunction.
+	initialState json.RawMessage
+}
+
+// InitialState returns the state a loop instance has before its first
+// commit.  it is nil for functions made with CreateFunction.
+func (s servableFunc) InitialState() json.RawMessage {
+	return s.initialState
 }
 
 func (s servableFunc) Config() FunctionOpts {

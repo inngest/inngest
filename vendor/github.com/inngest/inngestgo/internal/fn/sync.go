@@ -8,6 +8,10 @@ import (
 
 func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 	config := fn.Config()
+	checkpointConfig := config.Checkpoint
+	if checkpointConfig != nil && checkpointConfig.Disable {
+		checkpointConfig = nil
+	}
 
 	return &SyncConfig{
 		Name:        fn.Name(),
@@ -20,11 +24,12 @@ func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 		RateLimit:   config.RateLimit,
 		Throttle:    config.Throttle,
 		Debounce:    config.Debounce,
-		Checkpoint:  config.Checkpoint,
+		Checkpoint:  checkpointConfig,
 		Timeouts:    config.Timeouts,
 		Cancel:      config.Cancel,
 		Retries:     config.Retries,
 		Singleton:   config.Singleton,
+		Loop:        config.Loop,
 	}
 }
 
@@ -84,6 +89,10 @@ type SyncConfig struct {
 	// be ignored or cause the current instance to be canceled and replaced, depending on
 	// the specified mode.
 	Singleton *Singleton
+
+	// Loop is set for loops, fsms, and agents.  the server rejects it when
+	// the sync did not send capabilities.loop.
+	Loop *Loop `json:"loop,omitempty"`
 
 	Steps map[string]SDKStep `json:"steps"`
 }

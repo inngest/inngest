@@ -10,14 +10,23 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngestgo/pkg/env"
 	"github.com/inngest/inngestgo/pkg/version"
 )
+
+// headerKeyInstanceID matches inngestgo.HeaderKeyInstanceID.  this package
+// cannot import the root package.
+const headerKeyInstanceID = "x-inngest-instance-id"
 
 type Client struct {
 	primaryKey  string
 	fallbackKey string
 	apiBaseURL  string
 	environment string
+	// instanceID is the connect worker's instance ID, or the
+	// INNGEST_CONNECT_INSTANCE_ID env var outside connect.  when it is empty,
+	// requests do not send the x-inngest-instance-id header.
+	instanceID  string
 	httpClient  *http.Client
 	useFallback *atomic.Bool
 }
@@ -27,6 +36,7 @@ func NewClient(apiURL, primaryKey, fallbackKey string) *Client {
 		primaryKey:  primaryKey,
 		fallbackKey: fallbackKey,
 		apiBaseURL:  apiURL,
+		instanceID:  env.ConnectInstanceID(),
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		useFallback: &atomic.Bool{},
 	}
@@ -60,6 +70,9 @@ func (c *Client) do(ctx context.Context, req AsyncRequest) error {
 	hr.Header.Set("X-Inngest-SDK", fmt.Sprintf("go:v%s", version.SDKVersion))
 	if c.environment != "" {
 		hr.Header.Set("X-Inngest-Env", c.environment)
+	}
+	if c.instanceID != "" {
+		hr.Header.Set(headerKeyInstanceID, c.instanceID)
 	}
 
 	resp, err := c.httpClient.Do(hr)

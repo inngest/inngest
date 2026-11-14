@@ -36,6 +36,15 @@ func (m *MiddlewareManager) Add(mw ...func() Middleware) *MiddlewareManager {
 	return m
 }
 
+// NextExecution starts new middleware hooks after a step in checkpoint mode so
+// the next step and the function result receive separate output hooks.
+func (m *MiddlewareManager) NextExecution(ctx context.Context, call CallContext) {
+	m.idempotentHooks.Remove("BeforeExecution")
+	m.idempotentHooks.Remove("AfterExecution")
+	m.idempotentHooks.Remove("TransformOutput")
+	m.BeforeExecution(ctx, call)
+}
+
 func (m *MiddlewareManager) BeforeExecution(ctx context.Context, call CallContext) {
 	// Only allow BeforeExecution to be called once. This simplifies code since
 	// execution can start at the function or step level.

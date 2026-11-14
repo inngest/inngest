@@ -82,6 +82,33 @@ type UserError struct {
 	Cause *UserError `json:"cause,omitempty"`
 }
 
+// LoopReturn is the data of an OpcodeLoopReturn.  durations in Wake.After
+// and Subscribe[].TTL are str2duration strings such as "30s".
+type LoopReturn struct {
+	// State is the loop state to commit.  it is always present.
+	State json.RawMessage `json:"state"`
+	// Version is copied unchanged from the request's loop block.
+	Version     int64           `json:"version"`
+	Wake        *LoopWake       `json:"wake,omitempty"`
+	End         bool            `json:"end"`
+	Subscribe   []LoopSubscribe `json:"subscribe,omitempty"`
+	Unsubscribe []string        `json:"unsubscribe,omitempty"`
+}
+
+// LoopWake schedules a wake of the run after the given duration.
+type LoopWake struct {
+	ID    string `json:"id"`
+	After string `json:"after"`
+}
+
+// LoopSubscribe waits for an event that matches If, for at most TTL.
+type LoopSubscribe struct {
+	ID    string `json:"id"`
+	Event string `json:"event"`
+	If    string `json:"if,omitempty"`
+	TTL   string `json:"ttl,omitempty"`
+}
+
 // HasAsyncOps is a utility that checks whether the slice of GeneratorOpcdodes
 // has at least one async op.
 //

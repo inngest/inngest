@@ -20,7 +20,9 @@ type ConnectOpts struct {
 	// InstanceID represents a stable identifier to be used for identifying connected SDKs.
 	// This can be a hostname or other identifier that remains stable across restarts.
 	//
-	// If nil, this defaults to the current machine's hostname.
+	// If nil, this defaults to the INNGEST_CONNECT_INSTANCE_ID env var, and then to
+	// the current machine's hostname.  Checkpoint requests for runs on this worker
+	// send the same ID.
 	InstanceID *string
 
 	RewriteGatewayEndpoint func(endpoint url.URL) (url.URL, error)
@@ -160,6 +162,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	resp, ops, err := invoke(
 		context.Background(),
 		h.client,
+		h.GetAPIBaseURL(),
 		mw,
 		fn,
 		h.GetSigningKey(),
