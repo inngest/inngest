@@ -27,6 +27,7 @@ import (
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
@@ -69,6 +70,9 @@ func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueO
 		QueueOptions: *options,
 		RedisClient:  queueClient,
 	}
+	if options.ConcurrentPartitionPauseChecks > 0 {
+		q.pauseCheckSlots = semaphore.NewWeighted(int64(options.ConcurrentPartitionPauseChecks))
+	}
 
 	return q
 }
@@ -79,6 +83,9 @@ type queue struct {
 	name string
 
 	RedisClient *QueueClient
+
+	pauseCheckSlots     *semaphore.Weighted
+	pauseChecksInFlight sync.Map
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
@@ -1159,13 +1166,12 @@ func (q *queue) PartitionLease(
 		kg.AccountPartitionIndex(p.AccountID),
 	}
 
-	args, err := StrSlice([]any{
-		p.Queue(),
-		leaseID.String(),
-		now.UnixMilli(),
-		leaseExpires.Unix(),
-		p.AccountID.String(),
-	})
+	values := []any{p.Queue(), leaseID.String(), now.UnixMilli(), leaseExpires.Unix(), p.AccountID.String()}
+	if p.FunctionID != nil && !o.RecheckEligibilityUntil.IsZero() {
+		keys = append(keys, kg.QueueMigrationLock(*p.FunctionID))
+		values = append(values, o.RecheckEligibilityUntil.UnixMilli())
+	}
+	args, err := StrSlice(values)
 	if err != nil {
 		return nil, err
 	}
@@ -1195,6 +1201,8 @@ func (q *queue) PartitionLease(
 		return nil, osqueue.ErrPartitionNotFound
 	case -2:
 		return nil, osqueue.ErrPartitionAlreadyLeased
+	case -3:
+		return nil, osqueue.ErrPartitionNoLongerEligible
 	default:
 		// Update the partition's last indicator.
 		if result[0] > p.Last {
@@ -1214,19 +1222,47 @@ func (q *queue) PartitionLease(
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*osqueue.QueuePartition, error) {
-	partitionKey := q.RedisClient.kg.GlobalPartitionIndex()
+	return q.timedPartitionPeek(ctx, nil, sequential, until, limit, false)
+}
 
-	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-	partitions, err := osqueue.DurationWithTags(ctx, q.name, "partition_peek", q.Clock.Now(), func(ctx context.Context) ([]*osqueue.QueuePartition, error) {
-		return q.partitionPeek(ctx, partitionKey, sequential, until, limit, nil)
-	}, map[string]any{
-		"is_global_partition_peek": true,
-	})
-	if err != nil {
-		return nil, err
+type partitionPauseTimings struct {
+	count     int
+	total     time.Duration
+	cachePath time.Duration
+	postgres  time.Duration
+}
+
+func (p partitionPauseTimings) logFields() []any {
+	return []any{
+		"pause_check_count", p.count,
+		"pause_check_ms", p.total.Milliseconds(),
+		"pause_cache_path_ms", p.cachePath.Milliseconds(),
+		"pause_postgres_ms", p.postgres.Milliseconds(),
 	}
+}
 
-	return partitions, nil
+func (q *queue) timedPartitionPeek(ctx context.Context, accountID *uuid.UUID, sequential bool, until time.Time, limit int64, deferPause bool) ([]*osqueue.QueuePartition, error) {
+	var pause partitionPauseTimings
+	timing := &pause
+	if deferPause {
+		timing = nil
+	}
+	global := accountID == nil
+	partitionKey := q.RedisClient.kg.GlobalPartitionIndex()
+	if !global {
+		partitionKey = q.RedisClient.kg.AccountPartitionIndex(*accountID)
+	}
+	return osqueue.DurationWithTags(ctx, q.name, "partition_peek", q.Clock.Now(), func(ctx context.Context) ([]*osqueue.QueuePartition, error) {
+		return q.partitionPeek(ctx, partitionKey, sequential, until, limit, accountID, timing)
+	}, map[string]any{
+		"is_global_partition_peek": global,
+	}, func() []any {
+		return append([]any{
+			"queue_shard", q.name,
+			"is_global_partition_peek", global,
+			"pause_check_deferred", deferPause,
+		}, pause.logFields()...)
+	})
 }
 
 func (q *queue) PartitionSize(ctx context.Context, scope osqueue.Scope, partitionID string, until time.Time) (int64, error) {
@@ -1339,8 +1375,43 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 	return nil
 }
 
+func (q *queue) partitionPaused(ctx context.Context, item *osqueue.QueuePartition, timing *partitionPauseTimings, protectLease bool) bool {
+	// The getter reports unpaused on lookup errors.
+	dbCtx, cancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
+	start := time.Now()
+	info := q.PartitionPausedGetter(dbCtx, *item.FunctionID)
+	timing.total += time.Since(start)
+	timing.count++
+	timing.cachePath += info.CachePathTime
+	timing.postgres += info.PostgresTime
+
+	if dbCtx.Err() == context.DeadlineExceeded {
+		metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"operation": "partition_paused_getter"},
+		})
+	}
+	cancel()
+
+	// An unpause pulls the pointer forward. Only a fresh pause may push it back.
+	if info.Paused && !info.Stale {
+		l := logger.StdlibLogger(ctx)
+		err := q.partitionRequeue(ctx, item, q.Clock.Now().Truncate(time.Second).Add(q.PausedRequeueExtension()), true, protectLease)
+		switch {
+		case errors.Is(err, osqueue.ErrPartitionAlreadyLeased):
+			// Another worker took the lease while we checked the pause.
+		case err != nil && !errors.Is(err, osqueue.ErrPartitionGarbageCollected):
+			l.Error("failed to push back paused partition", "error", err, "partition", item)
+		default:
+			l.Trace("pushed back paused partition", "partition", item.Queue())
+		}
+	}
+	return info.Paused
+}
+
 // partitionPeek returns pending queue partitions within the global partition pointer _or_ account partition pointer ZSET.
-func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID) ([]*osqueue.QueuePartition, error) {
+// A nil pause timer defers pause checks to the scanner's partition workers.
+func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequential bool, until time.Time, limit int64, accountId *uuid.UUID, pause *partitionPauseTimings) ([]*osqueue.QueuePartition, error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionPeek"), redis_telemetry.ScopeQueue)
@@ -1544,39 +1615,18 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 
 		if item.FunctionID != nil {
-			// Check paused status from database with a timeout
-			// PartitionPausedGetter does not return errors and simply returns a zero value of
-			// info.Paused = false when it encounters an error.
-			dbCtx, dbCtxCancel := context.WithTimeout(ctx, osqueue.DatabaseReadTimeout)
-			info := q.PartitionPausedGetter(dbCtx, *item.FunctionID)
-
-			if dbCtx.Err() == context.DeadlineExceeded {
-				metrics.IncrQueueDatabaseContextTimeoutCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"operation": "partition_paused_getter",
-					},
-				})
-			}
-
-			dbCtxCancel()
-
-			if info.Paused {
-				// Only push back partition if the partition is marked as paused in the database.
-				// If the in-memory cache is stale, we don't want to accidentally push back the partition
-				// in case the function was unpaused in the last 60s.
-				if !info.Stale {
-					// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-					err := q.PartitionRequeue(ctx, item, q.Clock.Now().Truncate(time.Second).Add(q.PausedRequeueExtension()), true)
-					if err != nil && !errors.Is(err, osqueue.ErrPartitionGarbageCollected) {
-						l.Error("failed to push back paused partition", "error", err, "partition", item)
-					} else {
-						l.Trace("pushed back paused partition", "partition", item.Queue())
-					}
+			if pause != nil {
+				if q.partitionPaused(ctx, item, pause, false) {
+					ignored++
+					continue
 				}
-
-				ignored++
-				continue
+			} else if q.CachedPartitionPauseGetter != nil {
+				// Keep locally known paused functions out of selection. A stale
+				// pause skips the partition without pushing its pointer back.
+				if paused, found := q.CachedPartitionPauseGetter(*item.FunctionID); found && paused {
+					ignored++
+					continue
+				}
 			}
 
 			if lockedUntil, ok := migrateLocks[*item.FunctionID]; ok {
@@ -1763,6 +1813,10 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
 func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
+	return q.partitionRequeue(ctx, p, at, forceAt, false)
+}
+
+func (q *queue) partitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt, protectLease bool) error {
 	l := logger.StdlibLogger(ctx)
 
 	partitionID := p.Identifier()
@@ -1816,12 +1870,11 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition,
 	if forceAt {
 		force = 1
 	}
-	args, err := StrSlice([]any{
-		p.Queue(),
-		at.UnixMilli(),
-		force,
-		p.AccountID.String(),
-	})
+	values := []any{p.Queue(), at.UnixMilli(), force, p.AccountID.String()}
+	if protectLease {
+		values = append(values, q.Clock.Now().UnixMilli())
+	}
+	args, err := StrSlice(values)
 	if err != nil {
 		return err
 	}
@@ -1854,6 +1907,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition,
 		return osqueue.ErrPartitionNotFound
 	case 2, 3:
 		return osqueue.ErrPartitionGarbageCollected
+	case 4:
+		return osqueue.ErrPartitionAlreadyLeased
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
 	}

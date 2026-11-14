@@ -83,7 +83,11 @@ type ExtendLeaseOptions struct{}
 
 type ExtendLeaseOptionFn func(o *ExtendLeaseOptions)
 
-type PartitionLeaseOptions struct{}
+type PartitionLeaseOptions struct {
+	// RecheckEligibilityUntil asks a Redis lease to recheck forced parks
+	// and migration locks after a deferred pause check.
+	RecheckEligibilityUntil time.Time
+}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 

@@ -14,7 +14,7 @@ func Duration[T any](ctx context.Context, queueShardName string, op string, star
 }
 
 // durationWithTags is a helper function to record durations of queue operations.
-func DurationWithTags[T any](ctx context.Context, queueShardName string, op string, start time.Time, f func(ctx context.Context) (T, error), tags map[string]any) (T, error) {
+func DurationWithTags[T any](ctx context.Context, queueShardName string, op string, start time.Time, f func(ctx context.Context) (T, error), tags map[string]any, slowLogFields ...func() []any) (T, error) {
 	if start.IsZero() {
 		start = time.Now()
 	}
@@ -31,7 +31,11 @@ func DurationWithTags[T any](ctx context.Context, queueShardName string, op stri
 
 	d := time.Since(start)
 	if d > time.Second {
-		logger.StdlibLogger(ctx).Warn("queue operation took >1s", "op", op, "duration", d)
+		fields := []any{"op", op, "duration", d}
+		for _, getFields := range slowLogFields {
+			fields = append(fields, getFields()...)
+		}
+		logger.StdlibLogger(ctx).Warn("queue operation took >1s", fields...)
 	}
 	metrics.HistogramQueueOperationDuration(
 		ctx,
