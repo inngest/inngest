@@ -221,6 +221,28 @@ func TestCallPreservesIntegerArguments(t *testing.T) {
 	require.Equal(t, "limit=1000000", gotQuery)
 }
 
+func TestCallForwardsAuthorizationHeader(t *testing.T) {
+	endpoint := endpointByMethod(t, "GetApps")
+	var gotAuth string
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer signkey-prod-abc123")
+
+	result, err := call(context.Background(), &mcp.CallToolRequest{
+		Extra: &mcp.RequestExtra{
+			Header: headers,
+		},
+	}, endpoint, Options{
+		Execute: func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+			gotAuth = req.Header.Get("Authorization")
+			return ToolResult(map[string]any{}, "{}"), nil
+		},
+	})
+
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer signkey-prod-abc123", gotAuth)
+}
+
 func TestEndpointInputsDoNotUseReservedEnvField(t *testing.T) {
 	for _, endpoint := range apiv2endpoint.Discover() {
 		require.Nil(t, endpoint.Input.Fields().ByJSONName("env"), endpoint.MethodName)
