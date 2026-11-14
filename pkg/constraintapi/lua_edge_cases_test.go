@@ -423,7 +423,7 @@ func TestLuaScriptEdgeCases_ErrorConditions(t *testing.T) {
 			},
 		}
 
-		_, _, _, fingerprint, err := buildRequestState(req)
+		_, _, _, fingerprint, err := buildRequestState(req, false)
 		require.NoError(t, err)
 
 		acquireIdempotencyKey := fmt.Sprintf("idempotency-test-%s", fingerprint)

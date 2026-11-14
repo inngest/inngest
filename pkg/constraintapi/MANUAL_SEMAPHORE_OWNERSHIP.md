@@ -1,0 +1,48 @@
+# Manual permits and start retries
+
+Tracking is opt-in and off by default. It does not repair legacy holds or
+authorize backlog recovery.
+
+`WithManualSemaphoreOwnership(enabled func(uuid.UUID) bool)` selects accounts
+using an immutable startup policy. It applies only to requests containing manual
+semaphores, and requires exactly one job, matching the queue's per-item checks.
+Owned manual batches are rejected before writes; other batches are unchanged.
+One record per run and manual constraint stores `weight:requestID`. The request
+ID already exists in the lease details and stays unchanged through renewal.
+
+- Acquire writes the record with the usage increment in the same Lua operation.
+- Ordinary release or scavenging changes it to `weight:` while deleting the
+  step lease. The run still holds its admission, but its next start attempt may
+  reuse it. Expiry alone is not evidence that the run finished.
+- A retry requires the same weight and an empty request ID. It claims the record
+  without incrementing usage. A live attempt cannot be reused.
+- Only finalization consumes the held weight once, then writes `0:`
+  with the existing seven-day retention. Cleanup of a different active request
+  is rejected before writes. Finalization never trusts its supplied weight.
+
+Run IDs and all other capacity checks remain required. Held admissions have no
+expiry; finalized records reject reacquisition for their seven-day retention.
+
+Shared exhaustion cannot rule out reuse of an owned manual admission. Redis
+acquisition excludes these constraints from its shared cache. In-process cache
+wrappers must do the same using `WithConstraintCacheShouldCacheForAccount` for
+the same enrolled accounts. Queue processors must also receive
+`queue.WithManualSemaphoreOwnership` with that policy, so both Redis and FDB
+scanners avoid memoizing these refusals across runs in a pass. Other constraints
+and legacy accounts keep their caching and memoization.
+
+Default remains off. Compatible acquisition, ordinary release, finalization and
+scavenger code must be installed before enabling. Buckets must be drained of
+legacy holds first; missing ownership is not evidence that old usage is safe to
+decrement. The permanent bucket marker still forbids unsafe legacy release after
+a finalized record expires. Mixed legacy writers on an enabled bucket are not
+supported. This record format differs from the earlier unshipped two-record
+draft; those records are not converted automatically.
+
+Use the existing `BenchmarkManualSemaphoreOwnership` on a dedicated disposable
+localhost Redis with `SEMAPHORE_TEST_REDIS_ADDR`. Compare revisions on the same
+engine. Owned manual requests must reach Redis even when the shared limit is
+full, so cache-hit avoidance cannot be assumed in load sizing. Fewer records do
+not prove production latency is unaffected; check CPU and memory headroom before
+enabling an account. Finalization checks ownership even when new tracking is
+disabled; benchmark that legacy path as well as grants, refusals and retries.
