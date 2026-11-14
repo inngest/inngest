@@ -3898,6 +3898,20 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Attributes: tracing.ResumeAttrs(&pause, &r),
 		})
 
+		// If the pause was not consumed, another handler consumed it first.
+		// There is nothing left for us to discover, and enqueueing a
+		// discovery item here would plan the still-pending step against
+		// incomplete state. When that step completes, its own discovery is
+		// dropped as a duplicate and nothing is left to drive the run
+		// forward, leaving it Running forever.
+		//
+		// ResumePauseTimeout handles the same condition by returning before
+		// it enqueues anything; the event path receives it as a result value
+		// instead of an error, so it has to be checked here.
+		if !consumeResult.DidConsume {
+			return nil
+		}
+
 		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
 			if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
 				return fmt.Errorf("error resetting force step plan: %w", err)
@@ -3953,12 +3967,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
-			// if we did not consume the pause, it implies another handler raced to consume
-			// the pause first. Drop the span and exit and let the other handler write spans.
-			if !consumeResult.DidConsume {
-				nextStepSpan.Drop()
-				return nil
-			}
 
 			if err != nil {
 				if errors.Is(err, queue.ErrQueueItemExists) {
