@@ -1,0 +1,19 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+negate(25::i8) = -25::i8
+negate(-200::i16) = 200::i16
+negate(30000::i32) = -30000::i32
+negate(9223372036854775800::i64) = -9223372036854775800::i64
+negate(2.50::fp32) = -2.50::fp32
+negate(2.000002861022949::fp64) = -2.000002861022949::fp64
+negate(inf::fp64) = -inf::fp64
+
+# null_input: Examples with null as input
+negate(null::i8?) = null::i8?
+
+# overflow: Examples demonstrating overflow behavior
+negate(-128::i8) [overflow:ERROR] = <!ERROR>
+negate(-128::i8) [overflow:SATURATE] = 127::i8
+negate(-128::i8) [overflow:SILENT] = <!UNDEFINED>

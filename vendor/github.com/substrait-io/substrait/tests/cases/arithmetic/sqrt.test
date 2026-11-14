@@ -1,0 +1,12 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+sqrt(25::i64) = 5::fp64
+sqrt(0::i64) = 0::fp64
+sqrt(-1::i64) [on_domain_error:NAN] = null::fp64?
+sqrt(-9223372036854775800::i64) [on_domain_error:NAN] = null::fp64?
+sqrt(9223372036854775800::i64) = 3037000499.97605::fp64
+sqrt(null::i64?) = null::fp64?
+sqrt(6.25::fp32) = 2.5::fp32
+sqrt(2.0000007152557373046875::fp64) = 1.4142138152541635::fp64

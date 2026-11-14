@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+bitwise_not(0::i8) = -1::i8
+bitwise_not(1::i8) = -2::i8
+bitwise_not(-127::i8) = 126::i8
+bitwise_not(31766::i16) = -31767::i16
+bitwise_not(-31766::i16) = 31765::i16
+bitwise_not(2147483647::i32) = -2147483648::i32
+bitwise_not(2147483647::i32) = -2147483648::i32
+bitwise_not(9223372036854775807::i64) = -9223372036854775808::i64
+bitwise_not(-9223372036854775807::i64) = 9223372036854775806::i64
+bitwise_not(null::i64?) = null::i64?
