@@ -283,6 +283,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	q := adapter.Q()
 	runID := ulid.Make()
 	eventID := ulid.Make()
+	workspaceID := uuid.New()
 	now := time.Now().UTC()
 	finishedAt := now.Add(2 * time.Second)
 
@@ -294,7 +295,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 		TriggerType:     "event",
 		EventID:         eventID,
 		Cron:            sql.NullString{},
-		WorkspaceID:     uuid.New(),
+		WorkspaceID:     workspaceID,
 	}))
 
 	require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
@@ -311,6 +312,10 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	assert.Equal(t, runID, got.FunctionRun.RunID)
 	assert.Equal(t, eventID, got.FunctionRun.EventID)
 	assert.Equal(t, int64(3), got.FunctionRun.FunctionVersion)
+	// The workspace must survive the round trip. apiv1.CancelFunctionRun
+	// compares it against the caller's workspace, so a run read back with
+	// the zero UUID is treated as belonging to another workspace.
+	assert.Equal(t, workspaceID, got.FunctionRun.WorkspaceID)
 	assert.Equal(t, "completed", got.FunctionFinish.Status.String)
 	assert.JSONEq(t, `{"ok":true}`, got.FunctionFinish.Output.String)
 	assert.Equal(t, int64(4), got.FunctionFinish.CompletedStepCount.Int64)
