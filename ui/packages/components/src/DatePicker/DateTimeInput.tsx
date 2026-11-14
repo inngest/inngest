@@ -78,16 +78,38 @@ export function DateTimeInput({
 
   useEffect(() => {
     if (yearInput === '0000' || monthInput === '00' || dayInput == '00') {
+      setValid(false);
       onSelect(undefined);
       return;
     }
+    // Validate every part before Date can silently normalize an impossible date or time.
+    const parts = [
+      [yearSchema, yearInput],
+      [monthSchema, monthInput],
+      [getHourSchema(is24HourFormat), hourInput],
+      [minutesSchema, minuteInput],
+      [secondsSchema, secondInput],
+      [millisecondsSchema, millisecondInput],
+    ] as const;
+    const day = Number(dayInput);
+    const daysInMonth = getDaysInMonth(new Date(Number(yearInput), Number(monthInput) - 1));
+    if (
+      parts.some(([schema, value]) => value.trim() === '' || !schema.safeParse(value).success) ||
+      !Number.isInteger(day) ||
+      day < 1 ||
+      day > daysInMonth ||
+      (!is24HourFormat && !periodSchema.safeParse(periodInput).success)
+    ) {
+      setValid(false);
+      return;
+    }
     // Aggregates the multiple input time parts and combines in one date
-    const newDate = new Date(parseInt(yearInput), parseInt(monthInput) - 1, parseInt(dayInput));
+    const newDate = new Date(Number(yearInput), Number(monthInput) - 1, Number(dayInput));
 
-    newDate.setHours(parseInt(hourInput));
-    newDate.setMinutes(parseInt(minuteInput));
-    newDate.setSeconds(parseInt(secondInput));
-    newDate.setMilliseconds(parseInt(millisecondInput));
+    newDate.setHours(Number(hourInput));
+    newDate.setMinutes(Number(minuteInput));
+    newDate.setSeconds(Number(secondInput));
+    newDate.setMilliseconds(Number(millisecondInput));
 
     if (periodInput && !is24HourFormat) {
       const hour = newDate.getHours();
@@ -102,6 +124,7 @@ export function DateTimeInput({
       setValid(false);
       return;
     }
+    setValid(true);
     onSelect(newDate);
   }, [
     monthInput,
@@ -159,7 +182,7 @@ export function DateTimeInput({
       setValid(false);
       return;
     }
-    const days = getDaysInMonth(new Date(parseInt(yearInput), parseInt(monthInput) - 1));
+    const days = getDaysInMonth(new Date(Number(yearInput), Number(monthInput) - 1));
 
     setValid(isNumeric(value) && Number(value) >= 1 && Number(value) <= days);
     setInputValue(value);
