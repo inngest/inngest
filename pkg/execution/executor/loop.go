@@ -353,6 +353,13 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	if len(ret.State) > consts.MaxLoopStateSize {
 		return loopInvalid(fmt.Sprintf("loop state is %d bytes, the limit is %d bytes", len(ret.State), consts.MaxLoopStateSize))
 	}
+	// a config that did not go through sync, such as a test fixture, has no
+	// TTL.  without the default every wake is rejected and every commit
+	// expires the instance at once.
+	ttl := fn.Loop.IdleTTL
+	if ttl <= 0 {
+		ttl = consts.DefaultLoopIdleTTL
+	}
 	var after time.Duration
 	if ret.Wake != nil && !ret.End {
 		if ret.Wake.ID == "" {
@@ -362,8 +369,11 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 		if err != nil || after <= 0 {
 			return loopInvalid(fmt.Sprintf("loop wake %q has an invalid duration %q", ret.Wake.ID, ret.Wake.After))
 		}
-		if after > consts.MaxSleepDuration {
-			return loopInvalid(fmt.Sprintf("loop wake %q is %s away, the limit is %s", ret.Wake.ID, after, consts.MaxSleepDuration))
+		// a longer wake keeps an idle instance alive past its TTL.  this cap
+		// means every instance commits or expires within its TTL plus one
+		// hour.
+		if after > ttl {
+			return loopInvalid(fmt.Sprintf("loop wake %q is %s away, the limit is the idle_ttl of %s.  to wait longer, wake again from the wake run", ret.Wake.ID, after, ttl))
 		}
 		if e.shards == nil {
 			return queue.NeverRetryError(fmt.Errorf("executor has no shard registry"))
@@ -421,9 +431,13 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 			State:    ret.State,
 			OpenedBy: openedBy,
 		}
-		if fn.Loop.IdleTTL > 0 {
-			commit.ExpiresAt = e.now().Add(fn.Loop.IdleTTL)
+		// a wake gets one hour past its time, so a wake at the full TTL that
+		// the queue runs late still finds the instance.
+		expiry := ttl
+		if ret.Wake != nil {
+			expiry = max(ttl, after+time.Hour)
 		}
+		commit.ExpiresAt = e.now().Add(expiry)
 		snap, err := e.loops.Commit(ctx, commit)
 		switch {
 		case errors.Is(err, loops.ErrConflict):

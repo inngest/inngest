@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngestgo"
@@ -171,7 +172,7 @@ func TestSyncCarriesLoopConfig(t *testing.T) {
 	require.Equal(t, "fsm", fsm.Loop.Kind)
 	require.Equal(t, "event.data.id", fsm.Loop.Key)
 	require.Equal(t, 30*time.Second, fsm.Loop.Tick)
-	require.Equal(t, time.Duration(0), fsm.Loop.IdleTTL)
+	require.Equal(t, consts.DefaultLoopIdleTTL, fsm.Loop.IdleTTL)
 
 	for _, f := range typed.Functions {
 		built, err := f.Function()
