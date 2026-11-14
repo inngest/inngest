@@ -90,6 +90,10 @@ func (r *Resolver) RunDeferredFrom() generated.RunDeferredFromResolver {
 	return &runDeferredFromResolver{r}
 }
 
+func (r *Resolver) RunInvokedFrom() generated.RunInvokedFromResolver {
+	return &runInvokedFromResolver{r}
+}
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
@@ -106,5 +110,6 @@ type eventsConnectionResolver struct{ *Resolver }
 type sessionRunsConnResolver struct{ *Resolver }
 type runDeferResolver struct{ *Resolver }
 type runDeferredFromResolver struct{ *Resolver }
+type runInvokedFromResolver struct{ *Resolver }
 
 type eventV2Resolver struct{ *Resolver }

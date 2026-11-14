@@ -268,6 +268,7 @@ type FunctionRunV2 struct {
 	SiblingDefers  []*RunDefer        `json:"siblingDefers"`
 	DeferredFrom   []*RunDeferredFrom `json:"deferredFrom"`
 	IsDeferred     bool               `json:"isDeferred"`
+	InvokedFrom    *RunInvokedFrom    `json:"invokedFrom,omitempty"`
 }
 
 type FunctionRunV2Edge struct {
