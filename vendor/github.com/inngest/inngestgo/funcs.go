@@ -9,6 +9,7 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngestgo/internal/event"
 	"github.com/inngest/inngestgo/internal/fn"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 )
 
 // Slugify converts a string to a slug. This is only useful for replicating the
@@ -70,6 +71,9 @@ func CreateFunction[T any](
 	if fc.Checkpoint == nil {
 		if v, ok := c.(*apiClient); ok {
 			fc.Checkpoint = v.Checkpoint
+		}
+		if fc.Checkpoint == nil {
+			fc.Checkpoint = &checkpoint.Config{}
 		}
 	}
 
