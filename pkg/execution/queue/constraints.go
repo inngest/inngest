@@ -476,12 +476,14 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not refresh capacity lease before processing: %w", err)
 		}
 		if res.LeaseID == nil {
-			return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not refresh capacity lease before processing: lease expired")
-		}
-
-		item.CapacityLease = &CapacityLease{
-			LeaseID:    *res.LeaseID,
-			IssuedAtMS: currentLease.IssuedAtMS,
+			// The lease is gone (released or expired).  Drop the stale pointer and
+			// fall through to a fresh acquire below.
+			item.CapacityLease = nil
+		} else {
+			item.CapacityLease = &CapacityLease{
+				LeaseID:    *res.LeaseID,
+				IssuedAtMS: currentLease.IssuedAtMS,
+			}
 		}
 	}
 
@@ -540,8 +542,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		// Release synchronously and under its own idempotency key: the slot must
 		// be free before the acquire below, and ProcessItem's final release uses
 		// the item's key.  Then claim every constraint plus the semaphores in one
-		// lease.  Throttle is not charged twice, as the acquire reuses the item's
-		// lease idempotency key and the GCRA check is skipped for it.
+		// lease.  Throttle is not charged twice, as it is left out of the acquire.
 		if err := q.releaseCapacityLease(ctx, shadowPart, item.CapacityLease, idempotencyKey+":backlog"); err != nil {
 			l.ReportError(err, "failed to release backlog capacity lease", logger.WithErrorReportTags(map[string]string{
 				"account_id":  shadowPart.AccountID.String(),
@@ -549,7 +550,18 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 				"function_id": shadowPart.FunctionID.String(),
 			}))
 		}
-		constraintItems = constraintItemsFromBacklog(backlog, constraints)
+		// The backlog lease is released, so the item must not keep pointing at it.
+		item.CapacityLease = nil
+
+		// The item already paid its throttle token when the backlog lease was
+		// acquired.  Leave throttle out of the replacement acquire: a throttle
+		// constraint cache entry would reject it before the GCRA skip applies.
+		for _, ci := range constraintItemsFromBacklog(backlog, constraints) {
+			if ci.Kind == constraintapi.ConstraintKindThrottle {
+				continue
+			}
+			constraintItems = append(constraintItems, ci)
+		}
 		config = ConstraintConfigFromConstraints(constraints)
 	case false:
 		// release expired/near-expiring lease in the background so that capacity
