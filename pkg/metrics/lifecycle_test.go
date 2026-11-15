@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -37,6 +38,32 @@ func counterValue(t *testing.T, name string, labels map[string]string) float64 {
 		}
 	}
 	return 0
+}
+
+// histogramValue reads the current sample count and sum of a histogram from
+// the package-level registry by metric name and label values.
+func histogramValue(t *testing.T, name string, labels map[string]string) (uint64, float64) {
+	t.Helper()
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	for _, f := range families {
+		if f.GetName() != name {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			match := true
+			for _, lp := range m.GetLabel() {
+				if v, ok := labels[lp.GetName()]; !ok || v != lp.GetValue() {
+					match = false
+					break
+				}
+			}
+			if match && len(m.GetLabel()) == len(labels) {
+				return m.GetHistogram().GetSampleCount(), m.GetHistogram().GetSampleSum()
+			}
+		}
+	}
+	return 0, 0
 }
 
 func mdWithSlug(slug string) statev2.Metadata {
@@ -142,4 +169,54 @@ func TestPrometheusLifecycleListener_StepLifecycle(t *testing.T) {
 		NoRetry: true,
 	}, nil)
 	assert.Equal(t, baseFailed+1, counterValue(t, "inngest_sdk_req_ended_total", map[string]string{"fn": slug, "status": "failed"}))
+}
+
+func TestPrometheusLifecycleListener_QueueDelay(t *testing.T) {
+	l := NewPrometheusLifecycleListener()
+	slug := "test-queue-delay"
+	md := mdWithSlug(slug)
+	labels := map[string]string{"fn": slug}
+
+	tests := []struct {
+		name   string
+		metric string
+		start  func(ctx context.Context)
+	}{
+		{
+			name:   "function run",
+			metric: "inngest_function_run_queue_delay_seconds",
+			start: func(ctx context.Context) {
+				l.OnFunctionStarted(ctx, md, queue.Item{}, nil)
+			},
+		},
+		{
+			name:   "sdk request",
+			metric: "inngest_sdk_req_queue_delay_seconds",
+			start: func(ctx context.Context) {
+				l.OnStepStarted(ctx, md, queue.Item{}, inngest.Edge{}, "http://localhost")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseCount, baseSum := histogramValue(t, tt.metric, labels)
+
+			tt.start(queue.WithItemStartLatency(context.Background(), 1500*time.Millisecond))
+			count, sum := histogramValue(t, tt.metric, labels)
+			assert.Equal(t, baseCount+1, count)
+			assert.InDelta(t, baseSum+1.5, sum, 1e-9)
+
+			// A zero delay is still an observation:  the item started on time.
+			tt.start(queue.WithItemStartLatency(context.Background(), 0))
+			count, sum = histogramValue(t, tt.metric, labels)
+			assert.Equal(t, baseCount+2, count)
+			assert.InDelta(t, baseSum+1.5, sum, 1e-9)
+
+			// Work that didn't come from the queue has no start latency.
+			tt.start(context.Background())
+			count, _ = histogramValue(t, tt.metric, labels)
+			assert.Equal(t, baseCount+2, count)
+		})
+	}
 }

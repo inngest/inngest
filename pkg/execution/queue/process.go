@@ -473,7 +473,10 @@ func (q *queueProcessor) ProcessItem(
 		latency := qi.Latency(n)
 		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
-		metrics.HistogramQueueItemStartLatency(ctx, qi.StartLatency(n).Milliseconds(), metrics.HistogramOpt{
+		startLatency := qi.StartLatency(n)
+		doCtx = WithItemStartLatency(doCtx, startLatency)
+
+		metrics.HistogramQueueItemStartLatency(ctx, startLatency.Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"kind":          qi.Data.Kind,
