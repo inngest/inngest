@@ -530,6 +530,27 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			result.CapacityLease = item.CapacityLease
 			return result, nil
 		}
+
+		// The item carries semaphores, which the backlog lease does not cover, so
+		// a new lease is acquired below.  ProcessItem only extends and releases
+		// that new lease, so the backlog lease must be released now.  Otherwise
+		// it keeps holding the function's concurrency slot until it expires,
+		// long after the step has finished.
+		//
+		// Release synchronously and under its own idempotency key: the slot must
+		// be free before the acquire below, and ProcessItem's final release uses
+		// the item's key.  Then claim every constraint plus the semaphores in one
+		// lease.  Throttle is not charged twice, as the acquire reuses the item's
+		// lease idempotency key and the GCRA check is skipped for it.
+		if err := q.releaseCapacityLease(ctx, shadowPart, item.CapacityLease, idempotencyKey+":backlog"); err != nil {
+			l.ReportError(err, "failed to release backlog capacity lease", logger.WithErrorReportTags(map[string]string{
+				"account_id":  shadowPart.AccountID.String(),
+				"lease_id":    item.CapacityLease.LeaseID.String(),
+				"function_id": shadowPart.FunctionID.String(),
+			}))
+		}
+		constraintItems = constraintItemsFromBacklog(backlog, constraints)
+		config = ConstraintConfigFromConstraints(constraints)
 	case false:
 		// release expired/near-expiring lease in the background so that capacity
 		// is freed promptly.  this is safe to call even if the lease scavenger has
@@ -539,18 +560,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		if item.CapacityLease != nil {
 			expiredLease := item.CapacityLease
 			service.Go(func() {
-				_, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-					AccountID:      *shadowPart.AccountID,
-					IdempotencyKey: idempotencyKey,
-					LeaseID:        expiredLease.LeaseID,
-					Source: constraintapi.LeaseSource{
-						Location:          constraintapi.CallerLocationItemLease,
-						Service:           constraintapi.ServiceExecutor,
-						RunProcessingMode: constraintapi.RunProcessingModeBackground,
-					},
-					LeaseIssuedAt: time.UnixMilli(expiredLease.IssuedAtMS),
-				})
-				if err != nil {
+				if err := q.releaseCapacityLease(context.Background(), shadowPart, expiredLease, idempotencyKey); err != nil {
 					l.ReportError(err, "failed to release expired capacity", logger.WithErrorReportTags(map[string]string{
 						"account_id":  shadowPart.AccountID.String(),
 						"lease_id":    expiredLease.LeaseID.String(),
@@ -657,6 +667,27 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		IssuedAtMS: now.UnixMilli(),
 	}
 	return result, nil
+}
+
+// releaseCapacityLease releases a capacity lease held by a queue item.
+func (q *queueProcessor) releaseCapacityLease(
+	ctx context.Context,
+	shadowPart *QueueShadowPartition,
+	lease *CapacityLease,
+	idempotencyKey string,
+) error {
+	_, err := q.CapacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+		AccountID:      *shadowPart.AccountID,
+		IdempotencyKey: idempotencyKey,
+		LeaseID:        lease.LeaseID,
+		Source: constraintapi.LeaseSource{
+			Location:          constraintapi.CallerLocationItemLease,
+			Service:           constraintapi.ServiceExecutor,
+			RunProcessingMode: constraintapi.RunProcessingModeBackground,
+		},
+		LeaseIssuedAt: time.UnixMilli(lease.IssuedAtMS),
+	})
+	return err
 }
 
 // exhaustedSemaphores returns the semaphore constraints in the given exhausted
