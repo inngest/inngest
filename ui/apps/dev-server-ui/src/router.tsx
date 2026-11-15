@@ -4,10 +4,12 @@ import { routeTree } from './routeTree.gen';
 import { NotFound } from './components/NotFound';
 import { Error } from '@inngest/components/Error/Error';
 import { queryClient } from './components/StoreProvider';
+import { parseDevServerSearch } from './search-params';
 
 export const getRouter = () => {
   const router = createRouter({
     routeTree,
+    parseSearch: parseDevServerSearch,
     context: { queryClient },
     defaultPreload: 'intent',
     defaultErrorComponent: (err) => (
