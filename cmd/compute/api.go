@@ -133,10 +133,18 @@ func (c *client) do(ctx context.Context, method, path string, in, out proto.Mess
 		return err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, errorMessage(respBody))
+		return &apiError{statusCode: resp.StatusCode, msg: fmt.Sprintf("%s %s: %s: %s", method, path, resp.Status, errorMessage(respBody))}
 	}
 	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(respBody, out)
 }
+
+// apiError is an error response from the API.
+type apiError struct {
+	statusCode int
+	msg        string
+}
+
+func (e *apiError) Error() string { return e.msg }
 
 // errorMessage returns "code: message" for each error in a v2 error
 // response, such as a 403 machine_size_not_allowed for a spec larger than

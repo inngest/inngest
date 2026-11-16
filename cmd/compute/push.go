@@ -15,9 +15,11 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	pollInterval = 2 * time.Second
+// pollInterval is how often deploy and push ask whether a build, deploy or
+// verification is done.
+var pollInterval = 2 * time.Second
 
+const (
 	buildReady  = "ready"
 	buildFailed = "failed"
 )

@@ -104,6 +104,9 @@ func deployAppCommand(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	if err := requireComputeAccess(ctx, stdin, stdout, api); err != nil {
+		return err
+	}
 	if len(names) == 1 {
 		_, err := deployApp(ctx, stdout, dc, api, names[0], apps[names[0]], args)
 		return err
