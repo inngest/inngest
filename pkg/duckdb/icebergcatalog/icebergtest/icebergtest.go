@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/catalogdb"
 )
 
 // Start starts an embedded catalog (sqlite + a local warehouse) on a temp
@@ -18,15 +19,14 @@ import (
 func Start(t testing.TB) *driver.IcebergOptions {
 	t.Helper()
 	dir := t.TempDir()
-	e, err := icebergcatalog.Open(context.Background(), icebergcatalog.Config{
-		SQLitePath: filepath.Join(dir, "catalog.db"),
-		Warehouse:  filepath.Join(dir, "warehouse"),
+	c, err := catalogdb.Open(context.Background(), catalogdb.SQLite(filepath.Join(dir, "catalog.db")), icebergcatalog.Config{
+		Warehouse: filepath.Join(dir, "warehouse"),
 	})
 	if err != nil {
 		t.Fatalf("starting iceberg catalog: %v", err)
 	}
-	t.Cleanup(func() { _ = e.Close() })
-	return Options(e)
+	t.Cleanup(func() { _ = c.Close() })
+	return Options(c.Embedded)
 }
 
 // Options are the driver options to attach e w/.

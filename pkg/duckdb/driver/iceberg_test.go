@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/catalogdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,9 +19,8 @@ import (
 func testIceberg(t testing.TB) *IcebergOptions {
 	t.Helper()
 	dir := t.TempDir()
-	e, err := icebergcatalog.Open(context.Background(), icebergcatalog.Config{
-		SQLitePath: filepath.Join(dir, "catalog.db"),
-		Warehouse:  filepath.Join(dir, "warehouse"),
+	e, err := catalogdb.Open(context.Background(), catalogdb.SQLite(filepath.Join(dir, "catalog.db")), icebergcatalog.Config{
+		Warehouse: filepath.Join(dir, "warehouse"),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Close() })

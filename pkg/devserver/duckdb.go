@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/catalogdb"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/duckdb/tracing"
@@ -167,11 +168,12 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	dbFile := ":memory:"
 	var (
 		lake    *driver.IcebergOptions
-		catalog *icebergcatalog.Embedded
+		catalog *catalogdb.Catalog
 	)
 	if persist {
 		dbFile = filepath.Join(duckdbDir, "main.duckdb")
-		catalog, err = icebergcatalog.Open(ctx, icebergConfigFor(duckdbDir, postgresURI))
+		backend, cfg := icebergConfigFor(duckdbDir, postgresURI)
+		catalog, err = catalogdb.Open(ctx, backend, cfg)
 		if err != nil {
 			l.Warn("failed to start the embedded iceberg catalog; dual-write disabled", "error", err)
 			return nil, nil, nil
@@ -242,7 +244,7 @@ const lakeFlushInterval = 3 * time.Second
 // attached to.
 type lakeListener struct {
 	execution.SyncLifecycleListener
-	catalog *icebergcatalog.Embedded
+	catalog *catalogdb.Catalog
 }
 
 func (l lakeListener) Close(ctx context.Context) error {
@@ -269,14 +271,12 @@ func (l lakeListener) Close(ctx context.Context) error {
 //
 // Kept as a pure function (no I/O) so this branching is unit-testable
 // without starting anything.
-func icebergConfigFor(duckdbDir, postgresURI string) icebergcatalog.Config {
+func icebergConfigFor(duckdbDir, postgresURI string) (catalogdb.Backend, icebergcatalog.Config) {
 	cfg := icebergcatalog.Config{Warehouse: filepath.Join(duckdbDir, "warehouse")}
 	if postgresURI != "" {
-		cfg.PostgresURI = postgresURI
-	} else {
-		cfg.SQLitePath = filepath.Join(duckdbDir, "catalog.sqlite")
+		return catalogdb.Postgres(postgresURI), cfg
 	}
-	return cfg
+	return catalogdb.SQLite(filepath.Join(duckdbDir, "catalog.sqlite")), cfg
 }
 
 // stopDualWrite stops the background batcher goroutines started by

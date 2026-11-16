@@ -28,10 +28,10 @@ func TestSetupDualWriteReturnsNilListenerWhenBinaryMissing(t *testing.T) {
 // persisted lake's catalog is a sqlite file under duckdbDir.
 func TestIcebergConfigForUsesSQLiteWhenURIEmpty(t *testing.T) {
 	dir := t.TempDir()
-	cfg := icebergConfigFor(dir, "")
+	backend, cfg := icebergConfigFor(dir, "")
 
-	require.Equal(t, filepath.Join(dir, "catalog.sqlite"), cfg.SQLitePath)
-	require.Empty(t, cfg.PostgresURI)
+	require.Equal(t, filepath.Join(dir, "catalog.sqlite"), backend.SQLitePath)
+	require.Empty(t, backend.PostgresURI)
 	require.Equal(t, filepath.Join(dir, "warehouse"), cfg.Warehouse)
 }
 
@@ -41,10 +41,10 @@ func TestIcebergConfigForUsesSQLiteWhenURIEmpty(t *testing.T) {
 func TestIcebergConfigForUsesPostgresWhenURIProvided(t *testing.T) {
 	dir := t.TempDir()
 	const uri = "postgres://user:pass@localhost:5432/inngest"
-	cfg := icebergConfigFor(dir, uri)
+	backend, cfg := icebergConfigFor(dir, uri)
 
-	require.Equal(t, uri, cfg.PostgresURI)
-	require.Empty(t, cfg.SQLitePath)
+	require.Equal(t, uri, backend.PostgresURI)
+	require.Empty(t, backend.SQLitePath)
 	require.Equal(t, filepath.Join(dir, "warehouse"), cfg.Warehouse)
 }
 

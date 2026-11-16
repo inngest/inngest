@@ -28,6 +28,7 @@ import (
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/catalogdb"
 )
 
 // runConfig parameterizes run — the seeding pipeline main wires up from
@@ -259,9 +260,8 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 		return nil, nil, nil, fmt.Errorf("creating %q: %w", dir, err)
 	}
 
-	catalog, err := icebergcatalog.Open(ctx, icebergcatalog.Config{
-		SQLitePath: filepath.Join(dir, "catalog.sqlite"),
-		Warehouse:  filepath.Join(dir, "warehouse"),
+	catalog, err := catalogdb.Open(ctx, catalogdb.SQLite(filepath.Join(dir, "catalog.sqlite")), icebergcatalog.Config{
+		Warehouse: filepath.Join(dir, "warehouse"),
 	})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("starting iceberg catalog: %w", err)
