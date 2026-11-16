@@ -177,7 +177,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.opts.OnRequest(r.Method, r.URL.RequestURI(), rec.status)
 		}
 		if s.opts.Logger != nil {
-			s.opts.Logger.Debug("iceberg rest", "method", r.Method, "path", r.URL.RequestURI(), "status", rec.status, "dur", time.Since(start))
+			// The matched route (IE "GET /v1/namespaces/{ns}/tables/{table}"),
+			// not the raw URI, so nothing the client sent ends up in the log.
+			route := r.Pattern
+			if route == "" {
+				route = "unmatched"
+			}
+			s.opts.Logger.Debug("iceberg rest", "route", route, "status", rec.status, "dur", time.Since(start))
 		}
 	}()
 
