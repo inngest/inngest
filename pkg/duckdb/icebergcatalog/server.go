@@ -714,6 +714,16 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if loc != "" {
+		// Table directories aren't exclusive (a rename keeps the directory,
+		// so a new table w/ the old name gets the same default location), so
+		// skip the purge if any remaining table lives in, above or below it.
+		if shared, err := s.locationInUse(ctx, loc); err != nil || shared {
+			if s.opts.Logger != nil {
+				s.opts.Logger.Warn("dropped iceberg table w/o purging files (location shared w/ another table)", "table", strings.Join(ident, "."), "location", loc, "error", err)
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
 			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
 		}
