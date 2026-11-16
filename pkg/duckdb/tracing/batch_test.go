@@ -565,3 +565,58 @@ func TestBatcherFinalFlushIsBounded(t *testing.T) {
 		})
 	}
 }
+
+// After a partialFlushError only its retry runs again, never the whole
+// batch (which would insert the part that already committed twice).
+func TestBatcherRetriesOnlyUncommittedPart(t *testing.T) {
+	for _, stopDuringBackoff := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stop during backoff %v", stopDuringBackoff), func(t *testing.T) {
+			var flushes, retries atomic.Int64
+			failed := make(chan struct{})
+			retried := make(chan struct{})
+			retry := func(context.Context) error {
+				if retries.Add(1) == 1 && !stopDuringBackoff {
+					return errConflict
+				}
+				close(retried)
+				return nil
+			}
+			flush := func(context.Context, []Event) error {
+				if flushes.Add(1) == 1 {
+					close(failed)
+					return &partialFlushError{err: errConflict, retry: retry}
+				}
+				return nil
+			}
+			opts := fastRetry(batcherOpts{maxSize: 1, flushInterval: time.Hour})
+			if stopDuringBackoff {
+				opts.retryBaseDelay, opts.retryMaxDelay = time.Hour, time.Hour
+			}
+			ch := make(chan Event, 10)
+			b := newBatcher("run_trace_spans", ch, flush, opts)
+			done := make(chan struct{})
+			go func() { b.run(t.Context()); close(done) }()
+
+			ch <- testEvent("1", "a")
+			<-failed
+			if stopDuringBackoff {
+				b.stop()
+			}
+			select {
+			case <-retried:
+			case <-time.After(5 * time.Second):
+				t.Fatal("retry never ran")
+			}
+			if !stopDuringBackoff {
+				b.stop()
+			}
+			<-done
+			require.Equal(t, int64(1), flushes.Load(), "the batch itself is flushed once")
+			want := int64(2)
+			if stopDuringBackoff {
+				want = 1 // by the final flush
+			}
+			require.Equal(t, want, retries.Load())
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -303,6 +304,16 @@ func TestInsertSpansAtomicity(t *testing.T) {
 			require.Equal(t, c.wantSpans, spans)
 			require.Zero(t, runs)
 
+			// Once spans committed on their own, the error says so, and its
+			// retry doesn't insert them again.
+			var partial *partialFlushError
+			require.Equal(t, c.wantSpans > 0, errors.As(err, &partial))
+			if partial != nil {
+				require.ErrorIs(t, partial.retry(t.Context()), driver.ErrStatementFailed)
+				require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
+				require.Equal(t, c.wantSpans, spans)
+			}
+
 			runB, runC := ulid.Make(), ulid.Make()
 			require.NoError(t, ins.InsertSpans(t.Context(), spanBatch(runB, runC)))
 			require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
@@ -342,4 +353,30 @@ func TestInsertRunMetadataBucketAt(t *testing.T) {
 	var bucketAt time.Time
 	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT bucket_at FROM inngest.run_metadata").Scan(&bucketAt))
 	require.False(t, bucketAt.Before(before), "bucket_at %s is before the insert (%s)", bucketAt, before)
+}
+
+// A span batch whose runs commit fails after its spans landed (on a lake w/o
+// atomic multi-table commits) is finished by its partialFlushError's retry
+// w/o a second copy of the spans.
+func TestInsertSpansPartialRetry(t *testing.T) {
+	db := newTestIcebergLake(t)
+	ins := NewDuckDBInserter(db)
+	runA, runB := ulid.Make(), ulid.Make()
+	batch := spanBatch(runA, runB)
+
+	// Fail the runs insert (and only it) by moving the table out of the way.
+	_, err := db.ExecContext(t.Context(), "ALTER TABLE inngest.runs RENAME TO runs_moved")
+	require.NoError(t, err)
+	err = ins.InsertSpans(t.Context(), batch)
+	var partial *partialFlushError
+	require.ErrorAs(t, err, &partial)
+	_, err = db.ExecContext(t.Context(), "ALTER TABLE inngest.runs_moved RENAME TO runs")
+	require.NoError(t, err)
+
+	require.NoError(t, partial.retry(t.Context()))
+	var spans, runs int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
+	require.Equal(t, len(batch), spans)
+	require.Equal(t, 3, runs)
 }

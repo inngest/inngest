@@ -138,7 +138,9 @@ const rollbackTimeout = 5 * time.Second
 // jsonlines transport (tests) can't recover from a failed statement inside
 // a transaction, and a lake that can't commit 2 tables at once (IE an
 // Iceberg catalog w/o /v1/transactions/commit) rejects the transaction
-// outright, so there spans and runs are 2 commits.
+// outright, so there spans and runs are 2 commits. If the runs commit fails
+// after the spans landed, the error is a partialFlushError so a retry only
+// redoes the runs insert.
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
@@ -155,19 +157,20 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 
 	cols := strings.Join(spanColumns, ", ")
 	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows)
-	stmts := []string{
+	stage := []string{
 		// Clones run_trace_spans' column types (VARIANT etc.) so the runs
 		// projection sees exactly what it would reading the stored span.
 		// LIMIT 0 is planned as an empty result, so this doesn't scan the
 		// lake.
 		"CREATE OR REPLACE TEMP TABLE " + spanBatchTable + " AS SELECT * FROM inngest.run_trace_spans LIMIT 0;",
 		stageSQL,
-		fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable),
 	}
+	insertSpans := []string{fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable)}
+	var insertRuns []string
 	if slices.ContainsFunc(spans, func(s Span) bool { return slices.Contains(runsMaterializingSpanNames, s.Name) }) {
-		stmts = append(stmts, runsInsertSQL(spanBatchTable))
+		insertRuns = []string{runsInsertSQL(spanBatchTable)}
 	}
-	stmts = append(stmts, "DROP TABLE "+spanBatchTable+";")
+	drop := []string{"DROP TABLE " + spanBatchTable + ";"}
 
 	conn, err := d.db.Conn(ctx)
 	if err != nil {
@@ -176,12 +179,27 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	defer conn.Close()
 
 	if !driver.AtomicMultiTableCommit(conn) {
-		_, err = conn.ExecContext(ctx, strings.Join(stmts, "\n"), args...)
-		return err
+		// Spans and runs are separate commits here, so if the runs insert
+		// fails after the spans landed, a retry has to restage the batch
+		// and insert just its runs rows (see partialFlushError).
+		if len(insertRuns) == 0 {
+			_, err = conn.ExecContext(ctx, script(stage, insertSpans, drop), args...)
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(stage, insertSpans), args...); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(insertRuns, drop)); err != nil {
+			return &partialFlushError{err: err, retry: func(ctx context.Context) error {
+				_, err := d.db.ExecContext(ctx, script(stage, insertRuns, drop), args...)
+				return err
+			}}
+		}
+		return nil
 	}
 
-	script := "BEGIN TRANSACTION;\n" + strings.Join(stmts, "\n") + "\nCOMMIT;"
-	if _, err := conn.ExecContext(ctx, script, args...); err != nil {
+	txn := script([]string{"BEGIN TRANSACTION;"}, stage, insertSpans, insertRuns, drop, []string{"COMMIT;"})
+	if _, err := conn.ExecContext(ctx, txn, args...); err != nil {
 		// A failed statement leaves the transaction aborted on this session
 		// (a failed COMMIT has already rolled back, and this just errors).
 		// Roll back so the pooled conn is usable again.
@@ -267,6 +285,11 @@ func insertSQL(table string, cols []string, rows [][]any, extra ...[2]string) (s
 	}
 	sb.WriteString(";")
 	return sb.String(), args
+}
+
+// script joins groups of statements into one script.
+func script(parts ...[]string) string {
+	return strings.Join(slices.Concat(parts...), "\n")
 }
 
 // bucketAtNow is a batch's bucket_at: when it became visible, at the ms

@@ -172,46 +172,58 @@ func retryableFlushError(err error) bool {
 	return false
 }
 
-// flushWithRetry runs b.flush, retrying retryableFlushError failures up to
-// maxAttempts times w/ exponential backoff. A final (shutdown) flush is
-// bounded by finalFlushBudget overall. interrupted is true when a
-// non-final flush gave up mid-backoff because stopc closed (or ctx ended),
-// in which case the caller keeps the batch for the final flush.
-func (b *batcher[T]) flushWithRetry(ctx context.Context, items []T, final bool, stopc <-chan struct{}) (interrupted bool, err error) {
-	base := context.WithoutCancel(ctx)
-	if final {
-		var cancel context.CancelFunc
-		base, cancel = context.WithTimeout(base, b.opts.finalFlushBudget)
-		defer cancel()
-	}
+// partialFlushError is a flush error after part of the batch already
+// committed (IE InsertSpans' spans on a lake w/o atomic multi-table
+// commits). Retrying the whole batch would insert that part twice, so
+// flushWithRetry only ever retries retry, the part that didn't commit.
+type partialFlushError struct {
+	err   error
+	retry func(ctx context.Context) error
+}
+
+func (e *partialFlushError) Error() string { return e.err.Error() }
+func (e *partialFlushError) Unwrap() error { return e.err }
+
+// flushWithRetry runs flush (rows is just for logs), retrying
+// retryableFlushError failures up to maxAttempts times w/ exponential
+// backoff (after a partialFlushError, only its retry). base bounds every
+// attempt and the backoff between them (the final flush's budget).
+// interrupted is true when a non-final flush gave up mid-backoff because
+// stopc closed (or ctx ended), in which case rest is what's still left to
+// run and the caller keeps it for the final flush.
+func (b *batcher[T]) flushWithRetry(ctx, base context.Context, flush func(context.Context) error, rows int, final bool, stopc <-chan struct{}) (interrupted bool, rest func(context.Context) error, err error) {
 	var done <-chan struct{}
 	if !final {
 		done = ctx.Done()
 	}
 
+	rest = flush
 	delay := b.opts.retryBaseDelay
 	for attempt := 1; ; attempt++ {
 		flushCtx, cancel := context.WithTimeout(base, flushExecTimeout)
-		err = b.flush(flushCtx, items)
+		err = rest(flushCtx)
 		cancel()
+		if p := (*partialFlushError)(nil); errors.As(err, &p) {
+			rest = p.retry
+		}
 		if err == nil || !retryableFlushError(err) || attempt >= b.opts.maxAttempts || base.Err() != nil {
-			return false, err
+			return false, nil, err
 		}
 
 		logger.StdlibLogger(ctx).Debug("dualwrite: retrying batch after transient flush failure",
-			"entity", b.name, "attempt", attempt, "error", err, "rows", len(items))
+			"entity", b.name, "attempt", attempt, "error", err, "rows", rows)
 		t := time.NewTimer(delay)
 		select {
 		case <-t.C:
 		case <-stopc:
 			t.Stop()
-			return true, err
+			return true, rest, err
 		case <-done:
 			t.Stop()
-			return true, err
+			return true, rest, err
 		case <-base.Done():
 			t.Stop()
-			return false, err
+			return false, nil, err
 		}
 		delay = min(delay*2, b.opts.retryMaxDelay)
 	}
@@ -225,23 +237,45 @@ func (b *batcher[T]) run(ctx context.Context) {
 	// flushBuf flushes buf w/ retries (see flushWithRetry). final is the
 	// shutdown flush: it gets a bounded budget and can't be interrupted by
 	// stop. A non-final flush whose retry backoff is interrupted by stop
-	// keeps buf, so the final flush picks it up instead of dropping it.
+	// keeps what's left of it (resume, covering buf[:resumeN]) for the final
+	// flush instead of dropping it.
+	var (
+		resume  func(context.Context) error
+		resumeN int
+	)
 	flushBuf := func(final bool) {
 		if len(buf) == 0 {
 			return
 		}
 		if b.opts.disabled.disabled() {
-			buf = buf[:0]
+			buf, resume = buf[:0], nil
 			return
 		}
 		logger.StdlibLogger(ctx).Debug("dualwrite: flushing batch", "entity", b.name, "rows", len(buf))
+		base := context.WithoutCancel(ctx)
 		stopc := b.stopc
 		if final {
+			var cancel context.CancelFunc
+			base, cancel = context.WithTimeout(base, b.opts.finalFlushBudget)
+			defer cancel()
 			stopc = nil
 		}
-		interrupted, err := b.flushWithRetry(ctx, buf, final, stopc)
-		if interrupted {
-			return
+
+		items := buf
+		var err error
+		if resume != nil {
+			// Only reachable from the final flush (an interrupted flush is
+			// always followed by it), so this can't be interrupted again.
+			_, _, err = b.flushWithRetry(ctx, base, resume, resumeN, final, stopc)
+			items, resume = buf[resumeN:], nil
+		}
+		if len(items) > 0 {
+			interrupted, rest, itemsErr := b.flushWithRetry(ctx, base, func(ctx context.Context) error { return b.flush(ctx, items) }, len(items), final, stopc)
+			if interrupted {
+				resume, resumeN = rest, len(buf)
+				return
+			}
+			err = errors.Join(err, itemsErr)
 		}
 		if err != nil {
 			// driver.ErrDisabled is terminal, so record it (logging once
