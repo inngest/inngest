@@ -908,8 +908,8 @@ func TestDrainingGatewayRouting(t *testing.T) {
 		for range 50 {
 			conn, err := getSuitableConnection(context.Background(), rnd, stateMan, draining.envId, draining.appId, draining.fnSlug, log)
 			require.NoError(t, err)
-			require.Equal(t, active.connIds[0].String(), conn.Id)
-			require.Equal(t, active.gatewayId.String(), conn.GatewayId)
+			require.Equal(t, active.connIds[0].String(), conn.conn.Id)
+			require.Equal(t, active.gatewayId.String(), conn.conn.GatewayId)
 		}
 	})
 
@@ -1010,7 +1010,7 @@ func TestDrainingGatewayRouting(t *testing.T) {
 
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, starting.envId, starting.appId, starting.fnSlug, log)
 		require.NoError(t, err)
-		require.Equal(t, starting.connIds[0].String(), conn.Id)
+		require.Equal(t, starting.connIds[0].String(), conn.conn.Id)
 	})
 
 	t.Run("isHealthy marks draining gateway connections as draining without cleanup", func(t *testing.T) {
