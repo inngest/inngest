@@ -308,3 +308,45 @@ func TestPurgeSharedLocation(t *testing.T) {
 		t.Fatalf("expected a to be dropped, got %d", status)
 	}
 }
+
+// TestCreateDefaultLocationSymlink checks a create w/o an explicit location
+// can't write through a symlink inside the warehouse that points out of it.
+func TestCreateDefaultLocationSymlink(t *testing.T) {
+	dir := t.TempDir()
+	wh := filepath.Join(dir, "warehouse")
+	outside := filepath.Join(dir, "outside")
+	for _, d := range []string{wh, outside} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(outside, filepath.Join(wh, "app.db")); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	t.Cleanup(ts.Close)
+
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {
+		t.Fatalf("create ns: %d %v", status, body)
+	}
+	if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"t","schema":`+schema+`}`); status != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d %v", status, body)
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("create wrote outside the warehouse: %v", entries)
+	}
+}

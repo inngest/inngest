@@ -439,13 +439,19 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NOTE: w/o an explicit location, iceberg-go's CreateTable derives one
-	// from the namespace `location` property (validated on write) or the
-	// warehouse, same as defaultLocation.
-	opts := []catalog.CreateTableOpt{}
-	if req.Location != "" {
-		opts = append(opts, catalog.WithLocation(req.Location))
+	// W/o an explicit location, derive the same default iceberg-go's
+	// CreateTable would and pass it explicitly, so it goes through
+	// checkLocation (which resolves symlinks) before anything is written
+	// there.
+	if req.Location == "" {
+		loc, err := s.defaultLocation(r.Context(), ns, req.Name)
+		if err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		req.Location = loc
 	}
+	opts := []catalog.CreateTableOpt{catalog.WithLocation(req.Location)}
 	if req.PartitionSpec != nil {
 		opts = append(opts, catalog.WithPartitionSpec(req.PartitionSpec))
 	}
