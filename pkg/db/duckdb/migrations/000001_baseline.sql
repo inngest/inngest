@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   is_deferred BOOLEAN NOT NULL DEFAULT FALSE,
   defer_parent_fn_slug VARCHAR,
   defer_parent_run_ids VARCHAR[],
-  -- The run's OTel trace ID, copied from the span row materializeRuns builds
+  -- The run's OTel trace ID, copied from the span row runsInsertSQL builds
   -- each runs row from, so run listings can report it without joining
   -- run_trace_spans.
   trace_id VARCHAR,
@@ -162,7 +162,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (y
 -- pkg/duckdb/tracing/helpers_test.go's newTestDuckDB doc comment). Its
 -- logic is instead run as an explicit secondary query on every span batch
 -- insertion in the duckdb dual-write path — see
--- pkg/duckdb/tracing/batch.go's materializeRuns.
+-- pkg/duckdb/tracing/tracing.go's runsInsertSQL.
 --
 -- CREATE TRIGGER inngest_runs_mv AFTER INSERT ON inngest.run_trace_spans
 -- REFERENCING NEW TABLE AS new_rows

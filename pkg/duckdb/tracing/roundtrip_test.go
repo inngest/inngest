@@ -19,7 +19,7 @@ import (
 
 // TestJSONRoundTripsByteForByte checks a JSON payload w/ unsorted keys, odd
 // whitespace, 1.10 and an int past INT64_MAX comes back exactly as written
-// through the dual-write inserter (and materializeRuns) -> DuckLake
+// through the dual-write inserter (and runsInsertSQL) -> DuckLake
 // -> the UI/GQL read path and Insights, the way ClickHouse's String columns
 // return it.
 func TestJSONRoundTripsByteForByte(t *testing.T) {

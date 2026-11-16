@@ -1,18 +1,23 @@
 package tracing
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	duckdbdriver "github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -323,4 +328,240 @@ func TestDisabledStateSharedAcrossBatchersLogsOnce(t *testing.T) {
 	logged := 0
 	shared.once.Do(func() { logged++ })
 	require.Equal(t, 0, logged, "the warning must already have been logged exactly once")
+}
+
+// syncBuffer is a goroutine-safe log sink for asserting on batcher logs.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func logCtx(t *testing.T) (context.Context, *syncBuffer) {
+	buf := &syncBuffer{}
+	l := logger.FromSlog(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})), slog.LevelDebug)
+	return logger.WithStdlib(t.Context(), l), buf
+}
+
+// errConflict is what a DuckLake commit conflict looks like coming out of
+// the driver: a statement error, so it definitely didn't commit.
+var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit DuckLake transaction: Transaction conflict - attempting to insert into table with index \"1\"", duckdbdriver.ErrStatementFailed)
+
+// fastRetry keeps retry tests quick.
+func fastRetry(o batcherOpts) batcherOpts {
+	o.retryBaseDelay = 5 * time.Millisecond
+	o.retryMaxDelay = 20 * time.Millisecond
+	return o
+}
+
+func TestRetryableFlushError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"ducklake conflict", errConflict, true},
+		{"aborted txn", fmt.Errorf("%w: TransactionContext Error: Current transaction is aborted (please ROLLBACK)", duckdbdriver.ErrStatementFailed), true},
+		{"sqlite catalog busy", fmt.Errorf("%w: IO Error: database is locked", duckdbdriver.ErrStatementFailed), true},
+		{"postgres catalog serialization", fmt.Errorf("%w: could not serialize access due to concurrent update", duckdbdriver.ErrStatementFailed), true},
+		{"constraint", fmt.Errorf("%w: Constraint Error: NOT NULL constraint failed: runs.status", duckdbdriver.ErrStatementFailed), false},
+		// Ambiguous: the statement may have committed before the response
+		// was lost, so a retry could insert twice.
+		{"transport", errors.New("duckdb: quack prepare: connection reset by peer"), false},
+		{"transport mentioning conflict", errors.New("Transaction conflict, then EOF"), false},
+		{"timeout", context.DeadlineExceeded, false},
+		{"disabled", fmt.Errorf("%w: boom", duckdbdriver.ErrDisabled), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, retryableFlushError(tc.err))
+		})
+	}
+}
+
+// flakyInserter fails InsertEvents w/ errs (in order) before passing
+// through to next, counting every call.
+type flakyInserter struct {
+	next  *DuckDBInserter
+	mu    sync.Mutex
+	errs  []error
+	calls int
+}
+
+func (f *flakyInserter) InsertEvents(ctx context.Context, events []Event) error {
+	f.mu.Lock()
+	f.calls++
+	var err error
+	if len(f.errs) > 0 {
+		err, f.errs = f.errs[0], f.errs[1:]
+	}
+	f.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	return f.next.InsertEvents(ctx, events)
+}
+
+func (f *flakyInserter) callCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
+func countEvents(t *testing.T, db *sql.DB) int {
+	var n int
+	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.events;").Scan(&n))
+	return n
+}
+
+func TestBatcherRetriesTransientFlushFailureWithoutDuplicates(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	ins := &flakyInserter{next: NewDuckDBInserter(db), errs: []error{errConflict, errConflict}}
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, ins.InsertEvents, fastRetry(batcherOpts{maxSize: 2, flushInterval: time.Hour}))
+	go b.run(t.Context())
+	defer b.stop()
+
+	ch <- testEvent("1", "a")
+	ch <- testEvent("2", "b")
+
+	require.Eventually(t, func() bool { return countEvents(t, db) == 2 }, 5*time.Second, 20*time.Millisecond)
+	require.Equal(t, 3, ins.callCount(), "2 conflicts then a success")
+
+	// Nothing else lands later either.
+	time.Sleep(100 * time.Millisecond)
+	require.Equal(t, 2, countEvents(t, db))
+}
+
+func TestBatcherDropsNonRetryableFlushFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"statement error", fmt.Errorf("%w: Constraint Error: NOT NULL constraint failed", duckdbdriver.ErrStatementFailed)},
+		{"ambiguous transport error", errors.New("duckdb: quack prepare: unexpected EOF")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, logs := logCtx(t)
+			var calls atomic.Int64
+			flush := func(context.Context, []Event) error {
+				calls.Add(1)
+				return tc.err
+			}
+			ch := make(chan Event, 10)
+			b := newBatcher("events", ch, flush, fastRetry(batcherOpts{maxSize: 1, flushInterval: time.Hour}))
+			done := make(chan struct{})
+			go func() { b.run(ctx); close(done) }()
+
+			ch <- testEvent("1", "a")
+			require.Eventually(t, func() bool {
+				return strings.Contains(logs.String(), "dualwrite: dropping batch after flush failure")
+			}, 2*time.Second, 10*time.Millisecond)
+			require.Equal(t, int64(1), calls.Load(), "no retry")
+
+			b.stop()
+			<-done
+			require.Equal(t, int64(1), calls.Load(), "the dropped batch isn't flushed again on stop")
+		})
+	}
+}
+
+func TestBatcherGivesUpAfterMaxAttempts(t *testing.T) {
+	ctx, logs := logCtx(t)
+	var calls atomic.Int64
+	flush := func(context.Context, []Event) error {
+		calls.Add(1)
+		return errConflict
+	}
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, flush, fastRetry(batcherOpts{maxSize: 1, flushInterval: time.Hour, maxAttempts: 3}))
+	go b.run(ctx)
+	defer b.stop()
+
+	ch <- testEvent("1", "a")
+	require.Eventually(t, func() bool {
+		return strings.Contains(logs.String(), "dualwrite: dropping batch after flush failure")
+	}, 2*time.Second, 10*time.Millisecond)
+	require.Equal(t, int64(3), calls.Load())
+}
+
+// A batch whose retry backoff is interrupted by stop isn't dropped: the
+// final flush picks it up.
+func TestBatcherStopDuringBackoffKeepsBatchForFinalFlush(t *testing.T) {
+	var calls atomic.Int64
+	var flushed atomic.Int64
+	firstFailed := make(chan struct{})
+	flush := func(_ context.Context, items []Event) error {
+		if calls.Add(1) == 1 {
+			close(firstFailed)
+			return errConflict
+		}
+		flushed.Add(int64(len(items)))
+		return nil
+	}
+	ch := make(chan Event, 10)
+	// A long backoff, so stop always lands during it.
+	b := newBatcher("events", ch, flush, batcherOpts{maxSize: 1, flushInterval: time.Hour, retryBaseDelay: time.Hour, retryMaxDelay: time.Hour})
+	done := make(chan struct{})
+	go func() { b.run(t.Context()); close(done) }()
+
+	ch <- testEvent("1", "a")
+	<-firstFailed
+	b.stop()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batcher did not exit after stop during backoff")
+	}
+	require.Equal(t, int64(2), calls.Load())
+	require.Equal(t, int64(1), flushed.Load(), "the batch is flushed exactly once, by the final flush")
+}
+
+// Shutdown never waits on retries for longer than finalFlushBudget, even
+// against a store that keeps conflicting or hangs.
+func TestBatcherFinalFlushIsBounded(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flush func(ctx context.Context, _ []Event) error
+	}{
+		{"always conflicts", func(context.Context, []Event) error { return errConflict }},
+		{"hangs until ctx ends", func(ctx context.Context, _ []Event) error {
+			<-ctx.Done()
+			return ctx.Err()
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ch := make(chan Event, 10)
+			b := newBatcher("events", ch, tc.flush, batcherOpts{
+				maxSize: 100, flushInterval: time.Hour,
+				maxAttempts: 1000, retryBaseDelay: 10 * time.Millisecond, retryMaxDelay: 10 * time.Millisecond,
+				finalFlushBudget: 200 * time.Millisecond,
+			})
+			ch <- testEvent("1", "a")
+			b.stop()
+
+			start := time.Now()
+			done := make(chan struct{})
+			go func() { b.run(t.Context()); close(done) }()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("final flush hung shutdown")
+			}
+			require.Less(t, time.Since(start), 2*time.Second)
+		})
+	}
 }

@@ -139,7 +139,7 @@ func TestGetRunDefersResolvesChildRunIDViaEventID(t *testing.T) {
 	})
 	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "span-3", "", meta.SpanNameDefer, now, now, addAttrs)
 
-	// Mirrors what materializeRuns would produce once the child's own
+	// Mirrors what runsInsertSQL would produce once the child's own
 	// run.queued span batch flushes: a row in inngest.runs whose event_ids
 	// includes the same deterministic event ID.
 	_, err = m.db.ExecContext(ctx,
