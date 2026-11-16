@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/strduration"
+	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -328,6 +329,24 @@ func (d Debounce) TimeoutDuration() *time.Duration {
 	return nil
 }
 
+// validateOptionalDuration returns an error if val is set to anything other than
+// a non-negative duration.  Empty strings are allowed, as the duration accessors
+// treat them as unset.  Those accessors also ignore values they can't parse, so
+// these must be rejected when the function is validated.
+func validateOptionalDuration(name string, val *string) error {
+	if val == nil || *val == "" {
+		return nil
+	}
+	dur, err := str2duration.ParseDuration(*val)
+	if err != nil {
+		return fmt.Errorf("The %s of '%s' is invalid: %w", name, *val, err)
+	}
+	if dur < 0 {
+		return fmt.Errorf("The %s of '%s' must not be negative", name, *val)
+	}
+	return nil
+}
+
 // Cancel represents a cancellation signal for a function.  When specified, this
 // will set up pauses which automatically cancel the function based off of matching
 // events and expressions.
@@ -499,8 +518,22 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	// Validate cancellation expressions
+	if f.Timeouts != nil {
+		if terr := validateOptionalDuration("start timeout", f.Timeouts.Start); terr != nil {
+			err = multierror.Append(err, terr)
+		}
+		if terr := validateOptionalDuration("finish timeout", f.Timeouts.Finish); terr != nil {
+			err = multierror.Append(err, terr)
+		}
+	}
+
+	// Validate cancellation expressions and timeouts
 	for _, c := range f.Cancel {
+		if c.Timeout != nil {
+			if _, terr := strtimeout.ParseTimeout(*c.Timeout, time.Now); terr != nil {
+				err = multierror.Append(err, fmt.Errorf("Cancellation timeout is invalid: %w", terr))
+			}
+		}
 		if c.If != nil {
 			if exprErr := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *c.If); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
@@ -533,6 +566,9 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 		if period > consts.MaxDebouncePeriod {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, consts.MaxDebouncePeriod))
+		}
+		if terr := validateOptionalDuration("debounce timeout", f.Debounce.Timeout); terr != nil {
+			err = multierror.Append(err, terr)
 		}
 	}
 

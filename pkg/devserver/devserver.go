@@ -2,88 +2,34 @@ package devserver
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
-	"github.com/coocood/freecache"
-	"github.com/eko/gocache/lib/v4/cache"
-	freecachestore "github.com/eko/gocache/store/freecache/v4"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/api/apiv1"
-	apiv2 "github.com/inngest/inngest/pkg/api/v2"
-	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
-	"github.com/inngest/inngest/pkg/authn"
-	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
-	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
-	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
-	connstate "github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
-	dbpkg "github.com/inngest/inngest/pkg/db"
-	"github.com/inngest/inngest/pkg/db/driverhelp"
-	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
-	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
-	"github.com/inngest/inngest/pkg/debugapi"
-	"github.com/inngest/inngest/pkg/deploy"
-	"github.com/inngest/inngest/pkg/devserver/devutil"
-	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
-	"github.com/inngest/inngest/pkg/execution/batch"
-	"github.com/inngest/inngest/pkg/execution/cancellation"
-	"github.com/inngest/inngest/pkg/execution/cron"
-	"github.com/inngest/inngest/pkg/execution/debounce"
-	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/driver/httpv2"
-	"github.com/inngest/inngest/pkg/execution/exechttp"
-	"github.com/inngest/inngest/pkg/execution/executor"
-	"github.com/inngest/inngest/pkg/execution/history"
-	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/ratelimit"
-	"github.com/inngest/inngest/pkg/execution/realtime"
-	"github.com/inngest/inngest/pkg/execution/runner"
-	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/expressions/expragg"
-	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/inngest/inngest/pkg/run"
-	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/service/servicefx"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/testapi"
-	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/pkg/util/awsgateway"
-	"github.com/jonboulle/clockwork"
-	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
+	"go.uber.org/fx"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -167,7 +113,7 @@ type StartOpts struct {
 	// only -- see EnableDuckDBReads for reading. Enabling this alone always
 	// dual-writes to an in-memory catalog; writing an on-disk catalog that
 	// outlives the process additionally requires --persist AND the
-	// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE feature flag (see start()).
+	// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE feature flag.
 	EnableDuckDB bool `json:"enable_duckdb"`
 
 	// EnableDuckDBReads opts into serving the GQL API and REST trace/run
@@ -181,802 +127,70 @@ type StartOpts struct {
 
 	// Debug API
 	DebugAPIPort int `json:"debugAPIPort"`
-
-	// DuckDBClosed, if non-nil, is closed once the DuckDB dual-write
-	// subprocess (see EnableDuckDB) has been fully torn down as part of
-	// start()'s shutdown sequence -- i.e. after service.StartAll has already
-	// stopped every other service, since that call is synchronous and this
-	// signal only fires from start()'s deferred cleanup once it returns. It
-	// is closed immediately, with nothing to wait for, if dual-write was
-	// never enabled or never started successfully. Callers (e.g. cmd/devserver's
-	// signal-triggered exit) can block on this to guarantee they never
-	// terminate the process before dual-write has flushed and closed its
-	// subprocess.
-	DuckDBClosed chan struct{} `json:"-"`
 }
 
-// Create and start a new dev server.  The dev server is used during (surprise surprise)
-// development.
-//
-// It runs all available services from `inngest serve`, plus:
-// - Adds development-specific APIs for communicating with the SDK.
+// New runs the server until ctx is cancelled, the process receives an
+// interrupt, terminate, or quit signal, or a service returns.  it returns
+// after every service stops and every dependency closes, so the DuckDB
+// dual-write has flushed when it returns.
 func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
-	if !opts.Config.Execution.LogOutput {
-		opts.Config.Execution.LogOutput = true
-	}
-
-	return start(ctx, opts)
-}
-
-func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
-	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
-}
-
-func start(ctx context.Context, opts StartOpts) error {
-	l := logger.StdlibLogger(ctx)
-	ctx = logger.WithStdlib(ctx, l)
-
-	services := []service.Service{}
-
+	opts.Config.Execution.LogOutput = true
 	if opts.Tick == 0 {
 		opts.Tick = DefaultTickDuration
 	}
 
-	enableDuckDBPersistence := os.Getenv("EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE") == "true"
-	if err := validateDuckDBPersistenceFlags(opts.Persist, opts.EnableDuckDB, enableDuckDBPersistence); err != nil {
+	exp := readExperiments()
+	if err := validateDuckDBPersistenceFlags(opts.Persist, opts.EnableDuckDB, exp.duckDBPersistence); err != nil {
 		return err
 	}
 
-	var err error
+	// cancelling ctx when New returns ends the goroutines that the
+	// constructors start, also when the app fails to build or start.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	// Initialize the devserver
-	var adapter interface {
-		dbpkg.Adapter
-		Helpers() driverhelp.DialectHelpers
-	}
-	if opts.PostgresURI != "" {
-		// Pool settings are in minutes, mirroring the postgres-conn-max-* flags.
-		db, err := dbpostgres.Open(ctx, dbpostgres.Options{
-			URI:             opts.PostgresURI,
-			MaxIdleConns:    opts.PostgresMaxIdleConns,
-			MaxOpenConns:    opts.PostgresMaxOpenConns,
-			ConnMaxIdleTime: time.Duration(opts.PostgresConnMaxIdleTime) * time.Minute,
-			ConnMaxLifetime: time.Duration(opts.PostgresConnMaxLifetime) * time.Minute,
-		})
-		if err != nil {
-			return err
-		}
-		adapter = dbpostgres.New(db)
-	} else {
-		db, err := dbsqlite.Open(ctx, dbsqlite.Options{
-			Persist:   opts.Persist,
-			Directory: opts.SQLiteDir,
-		})
-		if err != nil {
-			return err
-		}
-		adapter = dbsqlite.New(db)
-	}
-	dbcqrs := cqrsmanager.New(adapter)
-	hd := base_cqrs.NewHistoryDriver(adapter)
-	loader := dbcqrs.(state.FunctionLoader)
-
-	stepLimitOverrides := make(map[string]int)
-	stateSizeLimitOverrides := make(map[string]int)
-	pauseState := &functionPauses{}
-
-	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
-	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
-
-	if opts.RedisURI != "" {
-		// Use external Redis
-		// Mask Redis URI credentials before logging
-		loggedURI := ""
-		if u, parseErr := url.Parse(opts.RedisURI); parseErr == nil {
-			loggedURI = " " + u.Redacted()
-		}
-		l.Info("using external redis", "url", loggedURI)
-
-		shardedRc, err = connectToOrCreateRedis(opts.RedisURI)
-		if err != nil {
-			return err
-		}
-		unshardedRc, err = connectToOrCreateRedis(opts.RedisURI)
-		if err != nil {
-			return err
-		}
-		connectRcOpt, err := connectToOrCreateRedisOption(opts.RedisURI)
-		if err != nil {
-			return err
-		}
-		connectRc, err = rueidis.NewClient(connectRcOpt)
-		if err != nil {
-			return err
-		}
-		realtimePubRc, err = connectToOrCreateRedis(opts.RedisURI)
-		if err != nil {
-			return err
-		}
-		realtimeSubRc, err = connectToOrCreateRedis(opts.RedisURI)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Use in-memory Redis
-		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
-		if err != nil {
-			return err
-		}
-		unshardedRc, unshardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
-		if err != nil {
-			return err
-		}
-		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
-		if err != nil {
-			return err
-		}
-
-		// Realtime MUST use separate Redis clients for publishing and
-		// subscribing. This is because a Redis client cannot publish once it
-		// enters subscribe mode.
-		realtimePubRc, realtimeCluster, err = createInmemoryRedis(ctx, opts.Tick)
-		if err != nil {
-			return err
-		}
-		realtimeSubRc, err = rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{realtimeCluster.Addr()},
-			DisableCache: true,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
-		UnshardedClient:        unshardedClient,
-		FunctionRunStateClient: shardedRc,
-		StateDefaultKey:        redis_state.StateDefaultKey,
-		FnRunIsSharded:         redis_state.AlwaysShardOnRun,
-		BatchClient:            shardedRc,
-		QueueDefaultKey:        redis_state.QueueDefaultKey,
-	})
-
-	pauseMgr := pauses.NewPauseStoreManager(unshardedClient)
-
-	var sm state.Manager
-	sm, err = redis_state.New(ctx, redis_state.WithShardedClient(shardedClient), redis_state.WithPauseDeleter(pauseMgr))
-	if err != nil {
-		return err
-	}
-	smv2 := redis_state.MustRunServiceV2(sm)
-
-	broadcaster := realtime.NewRedisBroadcaster(realtimePubRc, realtimeSubRc)
-	defer func() {
-		realtimePubRc.Close()
-		realtimeSubRc.Close()
-		if realtimeCluster != nil {
-			realtimeCluster.Close()
-		}
-	}()
-
-	runMode := queue.QueueRunMode{
-		Sequential:    true,
-		Scavenger:     true,
-		Partition:     true,
-		Continuations: true,
-	}
-	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
-	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
-	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
-	enableAsyncDispatchValidation := os.Getenv("EXPERIMENTAL_ASYNC_DISPATCH_VALIDATION") == "true"
-	if enableKeyQueues {
-		runMode.ShadowPartition = true
-		runMode.AccountShadowPartition = true
-		runMode.AccountShadowPartitionWeight = 80
-		runMode.ShadowContinuations = true
-		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
-		runMode.NormalizePartition = true
-	}
-
-	conditionalQueueTracer := itrace.NewConditionalTracer(itrace.QueueTracer(), itrace.AlwaysTrace)
-
-	// Instantiate Constraint API
-	semaphores := constraintapi.NewRedisSemaphoreManager(unshardedRc)
-	cm, err := constraintapi.NewRedisCapacityManager(
-		constraintapi.WithClock(clockwork.NewRealClock()),
-		constraintapi.WithShardName("default"),
-		constraintapi.WithClient(unshardedRc),
-		constraintapi.WithEnableHighCardinalityInstrumentation(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool) {
-			return false
-		}),
-	)
-	if err != nil {
-		return fmt.Errorf("could not create constraint API: %w", err)
-	}
-
-	queueOpts := []queue.QueueOpt{
-		queue.WithRunMode(runMode),
-		queue.WithIdempotencyTTL(time.Hour),
-		queue.WithNumWorkers(int32(opts.QueueWorkers)),
-		queue.WithPollTick(opts.Tick),
-		queue.WithShadowPollTick(2 * opts.Tick),
-		queue.WithBacklogNormalizePollTick(5 * opts.Tick),
-
-		queue.WithLogger(l),
-
-		// Key queues
-		queue.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		queue.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
-		queue.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
-
-		queue.WithAllowKeyQueues(func(ctx context.Context, acctID, envID, functionID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
-		queue.WithBacklogRefillLimit(10),
-		queue.WithPartitionPausedGetter(pauseState.partitionPaused),
-		queue.WithConditionalTracer(conditionalQueueTracer),
-		queue.WithCapacityManager(cm),
-		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		queue.WithCapacityManager(cm),
-		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
-		queue.WithCapacityReleaseWakeEnabled(func(context.Context, uuid.UUID) bool {
-			return true
-		}),
-	}
-
-	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
-
-	var retryBackoff backoff.BackoffFunc
-	if opts.RetryInterval > 0 {
-		retryBackoff = backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval) * time.Second)
-		queueOpts = append(queueOpts, queue.WithBackoffFunc(retryBackoff))
-	}
-
-	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
-	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
-	if err != nil {
-		return fmt.Errorf("could not create shard registry: %w", err)
-	}
-
-	rq, err := queue.New(ctx, "queue", shardRegistry, queueOpts...)
-	if err != nil {
-		return fmt.Errorf("could not create queue: %w", err)
-	}
-	functionProvider := NewFunctionProvider(dbcqrs, pauseState, rq)
-
-	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
-
-	// Create the batch manager. In production, a second BatchClient can be provided
-	// to enable zero-downtime migration between Redis clusters via
-	// batch.NewMigratingBatchManager.
-	//
-	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION controls the
-	// schedule-batch routing experiment: when "true", schedule-batch jobs go to
-	// a function-scoped system partition; otherwise they share the global
-	// schedule-batch partition.
-	splitBatchPartitionByFunction := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION") == "true"
-	batchOpts := []batch.RedisBatchManagerOpt{batch.WithLogger(l)}
-	if splitBatchPartitionByFunction {
-		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByFunction(func(_ context.Context, _ uuid.UUID) bool {
-			return true
-		}))
-	}
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batchOpts...)
-	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
-	if err != nil {
-		return fmt.Errorf("could not create debounce manager: %w", err)
-	}
-	croner := cron.NewManager(queueShard, rq, l, cron.WithSplitCronPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
-		return true
-	}))
-
-	sn := singleton.New(ctx, shardRegistry)
-
-	conditionalConnectTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
-
-	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
-
-	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
-
-	// Create a new expression aggregator, using the Redis only pause manager to load evaluables.
-	agg := expragg.NewAggregator(ctx, 100, 100, pauseMgr, expressions.ExprEvaluator, nil, nil)
-
-	executorLogger := connectPubSubLogger.With("svc", "executor")
-
-	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
-		Tracer:             conditionalConnectTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-		GRPCConfig:         opts.ConnectGRPCConfig,
-	}, connectgrpc.WithConnectorLogger(executorLogger))
-
-	// Before running the development service, ensure that we change the http
-	// driver in development to use our AWS Gateway http client, attempting to
-	// automatically transform dev requests to lambda invocations.
-	//
-	// We also make sure to allow local requests.
-	url := opts.Config.CoreAPI.Addr
-	if url == "0.0.0.0" {
-		url = "127.0.0.1"
-	}
-	publishURL := fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port)
-	httpClient := exechttp.Client(
-		exechttp.SecureDialerOpts{
-			AllowHostDocker: true, // In local dev, this is OK
-			AllowPrivate:    true, // In local dev, this is OK
-			AllowNAT64:      true, // In local dev, this is OK
-		},
-		// Enable publishing of any requests made directly from the dev server.  Note that this
-		// is different from the cloud.
-		exechttp.WithDevServerRealtimePublishing(publishURL),
-	)
-
-	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
-	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
-
-	drivers := []driver.DriverV1{}
-	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder:       executorProxy,
-			ConditionalTracer:      conditionalConnectTracer,
-			HTTPClient:             httpClient,
-			LocalSigningKey:        opts.SigningKey,
-			RequireLocalSigningKey: opts.RequireKeys,
-		})
-		if err != nil {
-			return err
-		}
-		drivers = append(drivers, d)
-	}
-	pb, err := pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
-	if err != nil {
-		return fmt.Errorf("failed to create publisher: %w", err)
-	}
-
-	tp := tracing.NewSqlcTracerProvider(adapter.Q())
-
-	// Opt-in, best-effort DuckDB dual-write: nil unless opts.EnableDuckDB is
-	// true (the `--duckdb` flag / INNGEST_DUCKDB env var), and nil on any
-	// failure (missing binary, failed spawn, failed migration), in which
-	// case the rest of devserver startup proceeds unaffected. When non-nil,
-	// stopDualWrite tears down its background goroutines and the duckdb
-	// subprocess when start() returns (i.e. once service.StartAll below has
-	// finished shutting every other service down).
+	// Fx runs stop hooks only after the app starts.  dw is populated before
+	// options builds the tasks, so New can stop the duckdb subprocess when a
+	// later constructor fails.  without this, the subprocess keeps running
+	// after New returns.
 	var (
-		syncListeners []execution.SyncLifecycleListener
-		// gqlData is the GQL resolver's data source, and also the trace/run
-		// read path for REST (apiv1's TraceReader, apiv2's Runs/
-		// FunctionTraces providers). It stays the primary (SQLite/
-		// Postgres-backed) manager unless dual-write starts successfully AND
-		// opts.EnableDuckDBReads is set, in which case it's wrapped to also
-		// read runs/events/run-trace data from DuckDB. EnableDuckDBReads is
-		// deliberately separate from EnableDuckDB: dual-write (writing) can
-		// run alone to validate throughput/correctness before any read
-		// traffic depends on it. The executor, runner, queue, and REST's
-		// apps/functions/event-write paths keep using dbcqrs/ds.Data
-		// directly regardless — DuckDB has no apps/functions tables and
-		// dual-write only covers reads.
-		gqlData = dbcqrs
-		// dwDB is the read handle on dual-write's DuckDB subprocess (its own
-		// pool, separate from the one dual-write writes through, so reads
-		// can't starve flushes) -- nil unless dual-write started
-		// successfully (opts.EnableDuckDB), same gate as gqlData's
-		// query.Wrap. Threaded into coreapi.Options below so insights can
-		// execute against it directly, independently of whether
-		// EnableDuckDBReads (which only affects gqlData) is also set.
-		dwDB *sql.DB
+		dw       *dualWrite
+		services *servicefx.Runner
 	)
-	// opts.Persist alone (--persist) is not enough to write an on-disk DuckLake
-	// catalog: that also requires enableDuckDBPersistence
-	// (EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE), so --duckdb without that env
-	// var still dual-writes, just against an in-memory catalog. opts.PostgresURI
-	// is only honored alongside those same two gates (see duckLakeOptionsFor):
-	// a persisted DuckLake catalog reuses the same Postgres database as its
-	// catalog store when one is already configured, instead of a local file.
-	if dwListener, _, readDB := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && enableDuckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI); dwListener != nil {
-		dwDB = readDB
-		l.Info("dual-write enabled: syncing executions to DuckDB subprocess")
-		syncListeners = append(syncListeners, dwListener)
-		if opts.EnableDuckDBReads {
-			l.Info("dual-write reads enabled: serving GQL/REST trace and run data from DuckDB")
-			gqlData = query.Wrap(dbcqrs, readDB)
+	app := fx.New(
+		fx.Populate(&dw),
+		options(ctx, opts, exp),
+		fx.Populate(&services),
+	)
+	if err := app.Err(); err != nil {
+		if dw != nil {
+			dw.close(context.WithoutCancel(ctx))
 		}
-		defer func() {
-			// Bounded like every other service.Service's Stop (see
-			// pkg/service's defaultTimeout/stopTimeout, 30s) -- Close must
-			// never hang start()'s return indefinitely if a batcher flush
-			// wedges on an unresponsive subprocess.
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			// Before stopDualWrite, which closes the write handle and with it
-			// the subprocess readDB's connections run against.
-			_ = readDB.Close()
-			stopDualWrite(shutdownCtx, dwListener)
-			if opts.DuckDBClosed != nil {
-				close(opts.DuckDBClosed)
-			}
-		}()
-	} else if opts.DuckDBClosed != nil {
-		// Dual-write was never enabled or never started; nothing for a
-		// caller waiting on DuckDBClosed to wait for.
-		close(opts.DuckDBClosed)
+		return err
 	}
+	shutdown := app.Wait()
 
-	executorOpts := []executor.ExecutorOpt{
-		executor.WithHTTPClient(httpClient),
-		executor.WithStateManager(smv2),
-		executor.WithPauseManager(pauseMgr),
-		executor.WithDriverV1(drivers...),
-		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
-		executor.WithExpressionAggregator(agg),
-		executor.WithQueue(rq),
-		// records never expire; each step reads all of a function's cancellations
-		executor.WithCancellationChecker(cancellation.NewChecker(cancellation.NewRedisReader(unshardedRc, ""))),
-		executor.WithRateLimiter(rl),
-		executor.WithLogger(l),
-		executor.WithFunctionLoader(loader),
-		executor.WithRealtimePublisher(broadcaster),
-		executor.WithSigningKeyLoader(func(ctx context.Context, envID uuid.UUID) ([]byte, error) {
-			// for httpv2, ensuring we sign sync and async requests using the new driver.
-			if opts.SigningKey == nil {
-				return nil, nil
-			}
-			return []byte(*opts.SigningKey), nil
-		}),
-		executor.WithLifecycleListeners(
-			append([]execution.LifecycleListener{
-				history.NewLifecycleListener(
-					nil,
-					hd,
-				),
-				Lifecycle{
-					Cqrs:       dbcqrs,
-					Pb:         pb,
-					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
-				},
-				run.NewTraceLifecycleListener(nil),
-			}, metrics.NewLifecycleListeners()...)...,
-		),
-		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
-		executor.WithSyncLifecycleListeners(syncListeners...),
-		executor.WithStepLimits(func(id sv2.ID) int {
-			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
-				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
-				return override
-			}
-
-			return consts.DefaultMaxStepLimit
-		}),
-		executor.WithStateSizeLimits(func(id sv2.ID) int {
-			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
-				l.Warn("using state size limit override", "override", override, "fn_id", id.FunctionID)
-				return override
-			}
-
-			return consts.DefaultMaxStateSizeLimit
-		}),
-		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithInvokeEventHandler(getInvokeEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
-		executor.WithDebouncer(debouncer),
-		executor.WithSingletonManager(sn),
-		executor.WithBatcher(batcher),
-		executor.WithShardRegistry(shardRegistry),
-		executor.WithTraceReader(dbcqrs),
-		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
-			Secret:     consts.DevServerRealtimeJWTSecret,
-			PublishURL: publishURL,
-		}),
-		executor.WithTracerProvider(tp),
-
-		executor.WithCapacityManager(cm),
-		executor.WithSemaphoreManager(semaphores),
-		executor.WithUseConstraintAPI(func(ctx context.Context, accountID uuid.UUID) (enable bool) {
-			return true
-		}),
-		executor.WithEnableBatchingInstrumentation(func(ctx context.Context, accountID, envID uuid.UUID) (enable bool) {
-			return false
-		}),
-	}
-
-	exec, err := executor.NewExecutor(executorOpts...)
-	if err != nil {
+	startCtx, cancelStart := context.WithTimeout(ctx, app.StartTimeout())
+	defer cancelStart()
+	if err := app.Start(startCtx); err != nil {
 		return err
 	}
 
-	// Create an executor.
-	executorSvc := executor.NewService(
-		opts.Config,
-		executor.WithExecutionManager(dbcqrs),
-		executor.WithState(sm),
-		executor.WithServiceQueueProcessor(rq),
-		executor.WithServiceExecutor(exec),
-		executor.WithServiceBatcher(batcher),
-		executor.WithServiceDebouncer(debouncer),
-		executor.WithServiceCroner(croner),
-		executor.WithServiceLogger(l),
-		executor.WithServiceShardRegistry(shardRegistry),
-		executor.WithServicePublisher(pb),
-	)
-
-	runner := runner.NewService(
-		opts.Config,
-		runner.WithCQRS(dbcqrs),
-		runner.WithExecutor(exec),
-		runner.WithExecutionManager(dbcqrs),
-		runner.WithPauseManager(pauseMgr),
-		runner.WithStateManager(sm),
-		runner.WithBatchManager(batcher),
-		runner.WithCronManager(croner),
-		runner.WithPublisher(pb),
-		runner.WithLogger(l),
-		runner.WithSyncLifecycleListeners(syncListeners...),
-	)
-
-	// The devserver embeds the event API.
-	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)
-	// Same dwDB dual-write succeeded/failed against as coreapi.Options.DuckDB
-	// below -- lets devapi.Info report the "duckdb-insights" feature flag
-	// accurately (nil here means insights would error).
-	ds.DuckDB = dwDB
-	ds.State = sm
-	ds.Executor = exec
-	ds.SemaphoreManager = semaphores
-	ds.CronSyncer = croner
-	// start the API
-	// Create a new API endpoint which hosts SDK-related functionality for
-	// registering functions.
-	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
-
-	core, err := coreapi.NewCoreApi(coreapi.Options{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		Data:           gqlData,
-		DuckDB:         dwDB,
-		Config:         ds.Opts.Config,
-		Logger:         l,
-		Runner:         ds.Runner,
-		State:          ds.State,
-		QueueReader:    rq,
-		EventHandler:   ds.HandleEvent,
-		Executor:       ds.Executor,
-		HistoryReader:  cqrsmanager.NewHistoryReader(adapter),
-		DisableGraphQL: &opts.NoUI,
-		ConnectOpts: connectv0.Opts{
-			GroupManager:               connectionManager,
-			ConnectManager:             connectionManager,
-			ConnectRequestStateManager: connectionManager,
-			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
-			RequestAuther:              ds,
-			ConnectGatewayRetriever:    ds,
-			Dev:                        true,
-			EntitlementProvider:        ds,
-			ConditionalTracer:          conditionalConnectTracer,
-			ConnectGRPCConfig:          opts.ConnectGRPCConfig,
-		},
-	})
-	if err != nil {
-		return err
+	signals, stopSignals := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stopSignals()
+	select {
+	case <-signals.Done():
+	case <-shutdown:
 	}
 
-	devAPI.Route("/v1", func(r chi.Router) {
-		// Add the V1 API to our dev server API.
-		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
-		caching := apiv1.NewCacheMiddleware(cache)
-
-		apiv1.AddRoutes(r, apiv1.Opts{
-			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
-			CachingMiddleware: caching,
-			FunctionReader:    ds.Data,
-			Executor:          ds.Executor,
-			QueueProducer:     rq,
-			RunQueueReader:    rq,
-			QueueItemReader:   rq,
-			AttemptResetter:   rq,
-			QueueShards:       shardRegistry,
-			Broadcaster:       broadcaster,
-			TraceReader:       gqlData,
-
-			AppCreator:             dbcqrs,
-			FunctionCreator:        dbcqrs,
-			EventPublisher:         runner,
-			TracerProvider:         tp,
-			SyncLifecycleListeners: syncListeners,
-			State:                  smv2,
-			RealtimeJWTSecret:      consts.DevServerRealtimeJWTSecret,
-
-			CheckpointOpts: apiv1.CheckpointAPIOpts{
-				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), gqlData, gqlData),
-				RunJWTSecret:    consts.DevServerRunJWTSecret,
-				BackoffFunc:     retryBackoff,
-				AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
-					return enableAsyncDispatchValidation
-				},
-			},
-
-			MetadataOpts: apiv1.MetadataOpts{
-				Flag: func(ctx context.Context, accountID uuid.UUID) bool {
-					return enableStepMetadata
-				},
-				SpanExtractor: extractors.DefaultSpanExtractors,
-			},
-		})
-	})
-
-	connGateway := connect.NewConnectGatewayService(
-		connect.WithConnectionStateManager(connectionManager),
-		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
-		connect.WithDev(),
-		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
-		connect.WithGRPCConfig(opts.ConnectGRPCConfig),
-		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
-		connect.WithLifeCycles(
-			[]connect.ConnectGatewayLifecycleListener{
-				lifecycles.NewHistoryLifecycle(dbcqrs),
-				lifecycles.NewSemaphoreLifecycleListener(semaphores, time.Time{}),
-			}),
-	)
-
-	// Initialize metrics API for Prometheus-compatible metrics endpoint.
-	// This provides system queue depth metrics via /metrics endpoint.
-	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
-		QueueManager: queueShard,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Create the API v2 service handler
-	appProvider := NewAppProvider(dbcqrs)
-	serviceOpts := apiv2.ServiceOptions{
-		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
-		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
-		Apps:                appProvider,
-		Functions:           functionProvider,
-		FunctionPauser:      functionProvider,
-		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),
-		Runs:                NewRunProvider(gqlData, exec),
-		Events:              NewEventProvider(gqlData),
-		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
-			return !functionProvider.pauses.get(id).IsZero()
-		}),
-		FunctionTraces: NewFunctionTraceReader(gqlData),
-		Executor:       exec,
-		EventPublisher: runner,
-		// Same dwDB dual-write succeeded/failed against as coreapi.Options.DuckDB
-		// above -- nil means QueryInsights errors clearly instead of resolving empty.
-		DuckDB: dwDB,
-		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
-			return ds.HandleEvent(ctx, evt, nil)
-		},
-		Scores: apiv2.NewStateScoreProvider(apiv2.StateScoreProviderOptions{
-			State:          smv2,
-			TracerProvider: tp,
-			Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
-				return consts.DevServerAccountID, consts.DevServerEnvID, nil
-			},
-			Enabled: func(ctx context.Context, accountID uuid.UUID) bool {
-				return enableStepMetadata
-			},
-			MissingStateLoader: scoreMetadataLoader(dbcqrs),
-		}),
-	}
-
-	apiv2Base := apiv2base.NewBase()
-	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, serviceOpts, apiv2.HTTPHandlerOptions{
-		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-	}, apiv2Base)
-	if err != nil {
-		return fmt.Errorf("failed to create v2 handler: %w", err)
-	}
-
-	mcpHandler := newMCPHandler(ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler)
-	addMCPRoute(devAPI, mcpHandler)
-
-	// Create a new data API directly in the devserver.  This allows us to inject
-	// the data API into the dev server port, providing a single router for the dev
-	// server UI, events, and API for loading data.
-	//
-	// Merge the dev server API (for handling files & registration) with the data
-	// API into the event API router.
-
-	mounts := []api.Mount{
-		{At: "/", Router: devAPI},
-		{At: "/v0", Router: core.Router},
-		{At: "/api/v2/operations", Handler: http.HandlerFunc(mcpHandler.Operations)},
-		{At: "/v2/operations", Handler: http.HandlerFunc(mcpHandler.Operations)},
-		{At: "/api/v2", Handler: apiv2Handler},
-		{At: "/v2", Handler: apiv2Handler},
-		{At: "/debug", Handler: middleware.Profiler()},
-		{At: "/metrics", Router: metricsAPI.Router},
-	}
-
-	if opts.CloudSandboxes != nil {
-		for _, path := range []string{"/dev/cloud", "/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots"} {
-			mounts = append(mounts, api.Mount{At: path, Handler: opts.CloudSandboxes})
-		}
-	}
-
-	if testapi.ShouldEnable() {
-		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
-			QueueShards:  shardRegistry,
-			Executor:     exec,
-			StateManager: smv2,
-			ResetAll: func() {
-				// Only flush in-memory clusters if they exist
-				if shardedCluster != nil {
-					shardedCluster.FlushAll()
-				}
-				if unshardedCluster != nil {
-					unshardedCluster.FlushAll()
-				}
-				if connectCluster != nil {
-					connectCluster.FlushAll()
-				}
-				if realtimeCluster != nil {
-					realtimeCluster.FlushAll()
-				}
-			},
-			PauseFunction: func(id uuid.UUID) {
-				functionProvider.pauses.pause(id)
-			},
-		})})
-	}
-
-	ds.Apiservice = api.NewService(api.APIServiceOptions{
-		Config:         ds.Opts.Config,
-		Mounts:         mounts,
-		LocalEventKeys: opts.EventKeys,
-		Logger:         l,
-	})
-
-	services = append(services, ds, runner, executorSvc, ds.Apiservice, connGateway)
-
-	if os.Getenv("DEBUG") != "" {
-		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:              l,
-			DB:               ds.Data,
-			RunReader:        rq,
-			ItemReader:       rq,
-			PartitionReader:  rq,
-			BacklogReader:    rq,
-			State:            ds.State,
-			Cron:             croner,
-			ShardRegistry:    shardRegistry,
-			Port:             ds.Opts.DebugAPIPort,
-			PauseManager:     pauseMgr,
-			CapacityManager:  cm,
-			SemaphoreManager: semaphores,
-			// Dependencies for batching and debounce insights
-			BatchManager: batcher,
-			Debouncer:    debouncer,
-		}))
-	}
-
-	return service.StartAll(ctx, services...)
+	stopCtx, cancelStop := context.WithTimeout(context.WithoutCancel(ctx), app.StopTimeout())
+	defer cancelStop()
+	return errors.Join(services.Err(), app.Stop(stopCtx))
 }
 
-func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// If tick is lower than the default, tick every 50ms.  This lets us save
-	// CPU for standard dev-server testing.
-	poll := DefaultTickDuration
-
-	go func() {
-		for range time.Tick(poll) {
-			r.FastForward(poll)
-		}
-	}()
-	return rc, r, nil
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
 func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleInvokeEvent {
@@ -1195,69 +409,4 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) queue.PartitionConstra
 
 		return constraints
 	}
-}
-
-func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
-	opt, err := connectToOrCreateRedisOption(redisURI)
-	if err != nil {
-		return nil, fmt.Errorf("could not create redis options: %w", err)
-	}
-
-	rc, err := rueidis.NewClient(opt)
-	if err != nil {
-		return nil, fmt.Errorf("error creating redis client: %w", err)
-	}
-
-	return rc, nil
-}
-
-func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {
-	if redisURI == "" {
-		return createInmemoryRedisConnectionOpt()
-	}
-
-	opt, err := rueidis.ParseURL(redisURI)
-	if err != nil {
-		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: invalid format")
-	}
-
-	// Fix for Redis Sentinel authentication: rueidis.ParseURL correctly identifies
-	// Sentinel configurations but fails to populate Sentinel credentials.
-	// When a master_set is configured but Sentinel credentials are empty,
-	// copy the main credentials to Sentinel authentication.
-	if opt.Sentinel.MasterSet != "" && opt.Sentinel.Username == "" && opt.Username != "" {
-		opt.Sentinel.Username = opt.Username
-		opt.Sentinel.Password = opt.Password
-	}
-
-	// Set default overrides
-	opt.DisableCache = true
-	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
-
-	return opt, nil
-}
-
-// createInmemoryRedisConnectionOpt creates the options for a new connection to the in-memory Redis
-// server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
-	// For devserver, we don't use a singleton like lite.go does
-	r := miniredis.NewMiniRedis()
-	err := r.Start()
-	if err != nil {
-		return rueidis.ClientOption{}, fmt.Errorf("error starting in-memory redis: %w", err)
-	}
-
-	poll := time.Second
-	go func() {
-		for range time.Tick(poll) {
-			r.FastForward(poll)
-		}
-	}()
-
-	return rueidis.ClientOption{
-		InitAddress:       []string{r.Addr()},
-		DisableCache:      true,
-		BlockingPoolSize:  consts.RedisBlockingPoolSize,
-		ForceSingleClient: true,
-	}, nil
 }

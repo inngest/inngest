@@ -30,7 +30,6 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
@@ -44,10 +43,14 @@ const (
 
 type Opt func(s *svc)
 
-// Runner is the interface for the runner, which provides a standard Service
-// and the ability to re-initialize crons.
+// Runner starts the function runs that events trigger, and can re-initialize
+// crons.
 type Runner interface {
-	service.Service
+	// Run initializes the crons, then handles the events on the event stream
+	// until ctx is done.
+	Run(ctx context.Context) error
+	// Stop closes the batch manager.  call it after Run returns.
+	Stop(ctx context.Context) error
 
 	// This allows publishing of events to local CQRS for development.
 	event.Publisher
@@ -116,12 +119,29 @@ func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) func(s *sv
 	}
 }
 
-func NewService(c config.Config, opts ...Opt) Runner {
-	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
+// NewService creates the runner and subscribes it to the event stream of c.
+// without WithStateManager, it uses the state manager of c.
+func NewService(ctx context.Context, c config.Config, opts ...Opt) (Runner, error) {
+	s := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
-		o(svc)
+		o(s)
 	}
-	return svc
+
+	var err error
+	s.log.Info("starting event stream", "backend", s.config.Queue.Service.Backend)
+	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.state == nil {
+		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return s, nil
 }
 
 // notifySyncLifecyclesEventReceived invokes all registered sync lifecycle
@@ -159,29 +179,6 @@ type svc struct {
 	syncLifecycles []execution.SyncLifecycleListener
 
 	log logger.Logger
-}
-
-func (s svc) Name() string {
-	return "runner"
-}
-
-func (s *svc) Pre(ctx context.Context) error {
-	var err error
-
-	s.log.Info("starting event stream", "backend", s.config.Queue.Service.Backend)
-	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
-	if err != nil {
-		return err
-	}
-
-	if s.state == nil {
-		s.state, err = s.config.State.Service.Concrete.SingleClusterManager(ctx, nil)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *svc) Run(ctx context.Context) error {

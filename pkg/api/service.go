@@ -13,17 +13,11 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
-
-// NewService returns a new API service for ingesting events.  Any additional
-// APIs can be mounted to this service to provide additional functionality.
-//
-// XXX (tonyhb): refactor this to remove extra mounts.
 
 type Mount struct {
 	At      string
@@ -49,56 +43,28 @@ type APIServiceOptions struct {
 	Logger logger.Logger
 }
 
-func NewService(opts APIServiceOptions) service.Service {
-	return &apiServer{
-		config:         opts.Config,
-		mounts:         opts.Mounts,
-		localEventKeys: opts.LocalEventKeys,
-		requireKeys:    opts.RequireKeys,
-		log:            opts.Logger,
+// NewServer creates the HTTP server of the event API, with every mount in
+// opts on the same router.  events that the server receives are published to
+// the event stream of opts.Config.
+func NewServer(ctx context.Context, opts APIServiceOptions) (*Server, error) {
+	s := &Server{
+		config: opts.Config,
+		log:    opts.Logger,
 	}
-}
-
-type apiServer struct {
-	config    config.Config
-	api       *API
-	publisher pubsub.Publisher
-
-	mounts []Mount
-
-	// localEventKeys are the keys used to send events to the local event API
-	// from an app. If this is set, only keys that match one of these values
-	// will be accepted.
-	localEventKeys []string
-
-	// requireKeys defines whether event and signing keys are required for the
-	// server to function. If this is true and signing keys are not defined,
-	// the server will still boot but core actions such as syncing, runs, and
-	// ingesting events will not work.
-	requireKeys bool
-	log         logger.Logger
-}
-
-func (a *apiServer) Name() string {
-	return "api"
-}
-
-func (a *apiServer) Pre(ctx context.Context) error {
-	var err error
 
 	api, err := NewAPI(Options{
-		Config:         a.config,
-		Logger:         a.log,
-		EventHandler:   a.handleEvent,
-		LocalEventKeys: a.localEventKeys,
-		RequireKeys:    a.requireKeys,
+		Config:         opts.Config,
+		Logger:         opts.Logger,
+		EventHandler:   s.handleEvent,
+		LocalEventKeys: opts.LocalEventKeys,
+		RequireKeys:    opts.RequireKeys,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.api = api.(*API)
+	s.api = api.(*API)
 
-	for _, m := range a.mounts {
+	for _, m := range opts.Mounts {
 		if m.Handler != nil {
 			api.Mount(m.At, m.Handler)
 			continue
@@ -106,15 +72,23 @@ func (a *apiServer) Pre(ctx context.Context) error {
 		api.Mount(m.At, m.Router)
 	}
 
-	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)
+	s.publisher, err = pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	return nil
+	return s, nil
 }
 
-func (a *apiServer) Run(ctx context.Context) error {
+// Server is the HTTP server of the event API.
+type Server struct {
+	config    config.Config
+	api       *API
+	publisher pubsub.Publisher
+	log       logger.Logger
+}
+
+// Run serves HTTP until ctx is done.
+func (a *Server) Run(ctx context.Context) error {
 	err := a.api.Start(ctx)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -122,7 +96,7 @@ func (a *apiServer) Run(ctx context.Context) error {
 	return err
 }
 
-func (a *apiServer) handleEvent(
+func (a *Server) handleEvent(
 	ctx context.Context,
 	e *event.Event,
 	seed *event.SeededID,
@@ -176,6 +150,8 @@ func (a *apiServer) handleEvent(
 	return trackedEvent.GetInternalID().String(), err
 }
 
-func (a *apiServer) Stop(ctx context.Context) error {
+// Stop waits for the requests that are in progress.  call it after Run
+// returns.
+func (a *Server) Stop(ctx context.Context) error {
 	return a.api.Stop(ctx)
 }
