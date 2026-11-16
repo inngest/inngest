@@ -123,12 +123,6 @@ var spanColumns = []string{
 // span batch in.
 const spanBatchTable = "temp.main.dualwrite_span_batch"
 
-// bucketAtSQL is inngest.run_trace_spans.bucket_at's column default (see
-// 000001_baseline.sql). InsertSpans stamps it once while staging, so a span
-// and the runs row built from it share one bucket_at, same as when runs were
-// read back from the stored span.
-const bucketAtSQL = "make_timestamp_ms(epoch_ms(current_timestamp))"
-
 // rollbackTimeout bounds the ROLLBACK after a failed span batch.
 const rollbackTimeout = 5 * time.Second
 
@@ -137,7 +131,7 @@ const rollbackTimeout = 5 * time.Second
 // runsInsertSQL), so building the batch's runs rows never reads the lake.
 //
 // When the lake commits several tables atomically
-// (driver.AtomicMultiTableCommit: DuckLake over quack), the whole thing runs
+// (driver.AtomicMultiTableCommit: plain tables over quack), the whole thing runs
 // as one transaction, so a failure can't leave the batch's spans w/o their
 // runs rows (nothing ever rebuilds runs from spans, so that run row would be
 // lost for good). Otherwise it runs the same statements w/o one: the
@@ -159,8 +153,8 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 		}
 	}
 
-	cols := strings.Join(spanColumns, ", ") + ", bucket_at"
-	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows, [2]string{"bucket_at", bucketAtSQL})
+	cols := strings.Join(spanColumns, ", ")
+	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows)
 	stmts := []string{
 		// Clones run_trace_spans' column types (VARIANT etc.) so the runs
 		// projection sees exactly what it would reading the stored span.
