@@ -75,6 +75,9 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 }
 
 func (s *Service) GetAccountUsage(ctx context.Context, req *apiv2.GetAccountUsageRequest) (*apiv2.GetAccountUsageResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetAccountUsage_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no account usage was fetched.")
+	}
 	now := time.Now()
 	start, end := accountUsagePeriod(now)
 	return &apiv2.GetAccountUsageResponse{
