@@ -29,8 +29,12 @@ local setExists = redis.call("EXISTS", workerRequestsKey)
 
 -- If set doesn't exist, nothing to remove
 if setExists == 0 then
-  -- Still clean up the mapping in case it exists
-  redis.call("DEL", requestWorkerKey)
+  -- the request can move to a worker with no capacity limit, which also
+  -- writes this mapping.  only delete it when it names this worker, or that
+  -- worker loses its mapping.
+  if redis.call("GET", requestWorkerKey) == instanceID then
+    redis.call("DEL", requestWorkerKey)
+  end
   return 2
 end
 

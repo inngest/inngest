@@ -432,3 +432,33 @@ func TestGeneratorAttrsSpanPathAndOrigin(t *testing.T) {
 	require.Nil(t, run.StepSpanPath)
 	require.Nil(t, run.StepOrigin)
 }
+
+func TestDriverResponseAttrsConnectInstanceID(t *testing.T) {
+	extract := func(resp *state.DriverResponse) (*meta.ExtractedValues, map[string]any) {
+		attrs := map[string]any{}
+		for _, kv := range DriverResponseAttrs(resp, nil).Serialize() {
+			attrs[string(kv.Key)] = kv.Value.AsInterface()
+		}
+		values, err := meta.ExtractTypedValues(context.Background(), attrs)
+		require.NoError(t, err)
+		return values, attrs
+	}
+
+	t.Run("set when the response has an instance ID", func(t *testing.T) {
+		values, raw := extract(&state.DriverResponse{
+			StatusCode: 200,
+			InstanceID: "worker-1",
+		})
+		require.NotNil(t, values.ConnectInstanceID)
+		assert.Equal(t, "worker-1", *values.ConnectInstanceID)
+		assert.Equal(t, "worker-1", raw["_inngest.connect.instance_id"])
+	})
+
+	t.Run("omitted when the instance ID is empty", func(t *testing.T) {
+		values, raw := extract(&state.DriverResponse{
+			StatusCode: 200,
+		})
+		assert.Nil(t, values.ConnectInstanceID)
+		assert.NotContains(t, raw, "_inngest.connect.instance_id")
+	})
+}
