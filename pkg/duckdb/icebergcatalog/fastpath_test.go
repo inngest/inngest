@@ -284,10 +284,10 @@ func TestFastPathMetadataCompression(t *testing.T) {
 func TestFastPathConcurrentServers(t *testing.T) {
 	t.Run("sqlite", func(t *testing.T) {
 		dir := t.TempDir()
-		testConcurrentServers(t, Config{SQLitePath: filepath.Join(dir, "catalog.db"), Warehouse: filepath.Join(dir, "warehouse")})
+		testConcurrentServers(t, Config{DB: openSQLite(t, filepath.Join(dir, "catalog.db")), Dialect: SQLite, Warehouse: filepath.Join(dir, "warehouse")})
 	})
 	t.Run("postgres", func(t *testing.T) {
-		testConcurrentServers(t, Config{PostgresURI: requirePostgres(t), Warehouse: filepath.Join(t.TempDir(), "warehouse")})
+		testConcurrentServers(t, Config{DB: openPostgres(t, requirePostgres(t)), Dialect: Postgres, Warehouse: filepath.Join(t.TempDir(), "warehouse")})
 	})
 }
 

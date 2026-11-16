@@ -22,8 +22,9 @@ func TestOpenSQLite(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	cfg := Config{
-		SQLitePath: filepath.Join(dir, "catalog.db"),
-		Warehouse:  filepath.Join(dir, "warehouse"),
+		DB:        openSQLite(t, filepath.Join(dir, "catalog.db")),
+		Dialect:   SQLite,
+		Warehouse: filepath.Join(dir, "warehouse"),
 	}
 	e, err := Open(ctx, cfg)
 	if err != nil {
@@ -127,8 +128,9 @@ func TestRESTConformancePostgres(t *testing.T) {
 		SupportsNamespaceProperties: true,
 		NewCatalog: func(t *testing.T) catalog.Catalog {
 			e, err := Open(context.Background(), Config{
-				PostgresURI: requirePostgres(t),
-				Warehouse:   filepath.Join(t.TempDir(), "warehouse"),
+				DB:        openPostgres(t, requirePostgres(t)),
+				Dialect:   Postgres,
+				Warehouse: filepath.Join(t.TempDir(), "warehouse"),
 			})
 			if err != nil {
 				t.Fatal(err)
