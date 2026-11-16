@@ -11801,12 +11801,12 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14FetchAccountResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.AccountR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x18\n" +
-	"\x16GetAccountUsageRequest\"\xe6\x03\n" +
+	"\x16GetAccountUsageRequest\"\xa5\x04\n" +
 	"\fAccountUsage\x12}\n" +
 	"\n" +
 	"executions\x18\x01 \x01(\x03B]\x92AZ2XExecutions used in the current period: function runs plus steps, across all environmentsR\n" +
-	"executions\x12p\n" +
-	"\x10executions_limit\x18\x02 \x01(\x03B@\x92A=2;Plan execution limit for the period. Omitted when unlimitedH\x00R\x0fexecutionsLimit\x88\x01\x01\x12j\n" +
+	"executions\x12\xae\x01\n" +
+	"\x10executions_limit\x18\x02 \x01(\x03B~\x92A{2yExecutions included in the plan for the period. Usage can go past it when the plan allows overage. Omitted when unlimitedH\x00R\x0fexecutionsLimit\x88\x01\x01\x12j\n" +
 	"\fperiod_start\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB+\x92A(2&Start of the current period, inclusiveR\vperiodStart\x12d\n" +
 	"\n" +
 	"period_end\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB)\x92A&2$End of the current period, exclusiveR\tperiodEndB\x13\n" +

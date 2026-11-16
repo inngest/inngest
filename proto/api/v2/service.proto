@@ -3714,7 +3714,7 @@ message AccountUsage {
   ];
   optional int64 executions_limit = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Plan execution limit for the period. Omitted when unlimited"
+      description: "Executions included in the plan for the period. Usage can go past it when the plan allows overage. Omitted when unlimited"
     }
   ];
   google.protobuf.Timestamp period_start = 3 [
