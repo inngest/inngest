@@ -12356,7 +12356,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032ؠ\x02\n" +
+	"\x04INFO\x10\x032\xeb\xa2\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12527,9 +12527,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rf\n" +
 	"d\n" +
-	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x8a\xb5\x18\x1a\b\x01\x12\x16signing_keys:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signing\x12\x95\a\n" +
-	"\rCreateWebhook\x12\x1c.api.v2.CreateWebhookRequest\x1a\x1d.api.v2.CreateWebhookResponse\"\xc6\x06\x92A\x8d\x06\n" +
-	"\bWebhooks\x12\x0eCreate webhook\x1a*Creates a new webhook for receiving eventsJP\n" +
+	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x8a\xb5\x18\x1a\b\x01\x12\x16signing_keys:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signing\x12\xa1\b\n" +
+	"\rCreateWebhook\x12\x1c.api.v2.CreateWebhookRequest\x1a\x1d.api.v2.CreateWebhookResponse\"\xd2\a\x92A\x89\a\n" +
+	"\bWebhooks\x12\x0eCreate webhook\x1a\xa5\x01Creates a new webhook for receiving events. Prefer POST /v2/webhooks. The POST /v2/env/webhooks alias is deprecated but remains supported for backward compatibility.JP\n" +
 	"\x03201\x12I\n" +
 	"\x1cWebhook successfully created\x12)\n" +
 	"'\x1a%#/definitions/v2CreateWebhookResponseJL\n" +
@@ -12555,9 +12555,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rh\n" +
 	"f\n" +
-	"\rX-Inngest-Env\x12QTarget environment for the webhook (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x19\b\x01\x12\x15webhooks:write:create\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/env/webhooks\x12\xc8\x05\n" +
-	"\fListWebhooks\x12\x1b.api.v2.ListWebhooksRequest\x1a\x1c.api.v2.ListWebhooksResponse\"\xfc\x04\x92A\xc9\x04\n" +
-	"\bWebhooks\x12\rList webhooks\x1a/Lists all webhooks in the specified environmentJC\n" +
+	"\rX-Inngest-Env\x12QTarget environment for the webhook (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x19\b\x01\x12\x15webhooks:write:create\x82\xd3\xe4\x93\x02\":\x01*Z\x12:\x01*\"\r/env/webhooks\"\t/webhooks\x12\xcf\x06\n" +
+	"\fListWebhooks\x12\x1b.api.v2.ListWebhooksRequest\x1a\x1c.api.v2.ListWebhooksResponse\"\x83\x06\x92A\xc3\x05\n" +
+	"\bWebhooks\x12\rList webhooks\x1a\xa8\x01Lists all webhooks in the specified environment. Prefer GET /v2/webhooks. The GET /v2/env/webhooks alias is deprecated but remains supported for backward compatibility.JC\n" +
 	"\x03200\x12<\n" +
 	"\x10List of webhooks\x12(\n" +
 	"&\x1a$#/definitions/v2ListWebhooksResponseJR\n" +
@@ -12577,7 +12577,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00ri\n" +
 	"g\n" +
-	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x16\b\x01\x12\x12webhooks:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\xd7\a\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x16\b\x01\x12\x12webhooks:read:list\x82\xd3\xe4\x93\x02\x1cZ\x0f\x12\r/env/webhooks\x12\t/webhooks\x12\xd7\a\n" +
 	"\rUpdateWebhook\x12\x1c.api.v2.UpdateWebhookRequest\x1a\x1d.api.v2.UpdateWebhookResponse\"\x88\a\x92A\xce\x06\n" +
 	"\bWebhooks\x12\x0eUpdate webhook\x1aIUpdates a webhook's name or transform. Omitted fields are left unchanged.JP\n" +
 	"\x03200\x12I\n" +

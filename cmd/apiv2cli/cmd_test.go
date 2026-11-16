@@ -1533,3 +1533,31 @@ func TestUpdateWebhookCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestWebhookCommandsUseCanonicalPath(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	for _, tc := range []struct {
+		command, method string
+		flags           []string
+	}{
+		{"create-webhook", http.MethodPost, []string{"--name", "hook", "--transform", "function transform(e) { return e; }"}},
+		{"get-webhooks", http.MethodGet, nil},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			var method, path, env string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path, env = r.Method, r.URL.Path, r.Header.Get("X-Inngest-Env")
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			cmd.Writer = io.Discard
+			args := []string{"api", tc.command, "--api-host", srv.URL, "--env", "production"}
+			require.NoError(t, cmd.Run(t.Context(), append(args, tc.flags...)))
+			require.Equal(t, tc.method, method)
+			require.Equal(t, "/api/v2/webhooks", path)
+			require.Equal(t, "production", env)
+		})
+	}
+}

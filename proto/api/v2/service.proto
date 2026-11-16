@@ -698,8 +698,12 @@ service V2 {
 
   rpc CreateWebhook(CreateWebhookRequest) returns (CreateWebhookResponse) {
     option (google.api.http) = {
-      post: "/env/webhooks",
+      post: "/webhooks",
       body: "*"
+      additional_bindings: {
+        post: "/env/webhooks"
+        body: "*"
+      }
     };
     option (authz) = {
       require_authz: true
@@ -707,7 +711,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create webhook"
-      description: "Creates a new webhook for receiving events"
+      description: "Creates a new webhook for receiving events. Prefer POST /v2/webhooks. The POST /v2/env/webhooks alias is deprecated but remains supported for backward compatibility."
       tags: "Webhooks"
       parameters: {
         headers: {
@@ -805,7 +809,10 @@ service V2 {
 
   rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse) {
     option (google.api.http) = {
-      get: "/env/webhooks"
+      get: "/webhooks"
+      additional_bindings: {
+        get: "/env/webhooks"
+      }
     };
     option (authz) = {
       require_authz: true
@@ -813,7 +820,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List webhooks"
-      description: "Lists all webhooks in the specified environment"
+      description: "Lists all webhooks in the specified environment. Prefer GET /v2/webhooks. The GET /v2/env/webhooks alias is deprecated but remains supported for backward compatibility."
       tags: "Webhooks"
       parameters: {
         headers: {

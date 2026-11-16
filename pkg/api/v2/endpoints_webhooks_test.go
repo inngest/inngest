@@ -71,6 +71,7 @@ func TestHTTPGateway_WebhookBodyLimit(t *testing.T) {
 		path, body string
 		limit      int
 	}{
+		{"/v2/webhooks", `{"name":"hook","transform":"function transform(e) { return e; }"}`, 64 << 10},
 		{"/v2/env/webhooks", `{"name":"hook","transform":"function transform(e) { return e; }"}`, 64 << 10},
 		{"/v2/webhooks/11111111-1111-1111-1111-111111111111", `{"name":"Renamed"}`, 16 << 10},
 	} {
@@ -84,6 +85,40 @@ func TestHTTPGateway_WebhookBodyLimit(t *testing.T) {
 			handler.ServeHTTP(rec, req)
 			require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
 		})
+	}
+}
+
+func TestHTTPGateway_WebhookAliases(t *testing.T) {
+	for _, path := range []string{"/v2/webhooks", "/v2/env/webhooks"} {
+		for _, tc := range []struct {
+			name, method, body string
+			status             int
+		}{
+			{"create", http.MethodPost, `{"name":"hook","transform":"function transform(e) { return e; }"}`, http.StatusNotImplemented},
+			{"list", http.MethodGet, "", http.StatusNotImplemented},
+			{"invalid create", http.MethodPost, `{"name":"hook"}`, http.StatusBadRequest},
+			{"unknown field", http.MethodPost, `{"name":"hook","transform":"function transform(e) { return e; }","extra":true}`, http.StatusBadRequest},
+		} {
+			t.Run(path+"/"+tc.name, func(t *testing.T) {
+				authorized := false
+				handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{
+					AuthzMiddleware: func(next http.Handler) http.Handler {
+						return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+							authorized = true
+							next.ServeHTTP(w, r)
+						})
+					},
+				})
+				require.NoError(t, err)
+				req := httptest.NewRequest(tc.method, path, strings.NewReader(tc.body))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("X-Inngest-Env", "production")
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+				require.Equal(t, tc.status, rec.Code, rec.Body.String())
+				require.True(t, authorized)
+			})
+		}
 	}
 }
 

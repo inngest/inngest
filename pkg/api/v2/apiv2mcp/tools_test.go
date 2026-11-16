@@ -35,6 +35,22 @@ func TestRequest(t *testing.T) {
 	require.False(t, Tool(endpoint).Annotations.IdempotentHint)
 }
 
+func TestWebhookRequestsUseCanonicalPath(t *testing.T) {
+	for _, tc := range []struct{ method, httpMethod string }{
+		{"CreateWebhook", http.MethodPost},
+		{"ListWebhooks", http.MethodGet},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			endpoint := endpointByMethod(t, tc.method)
+			req, err := Request(t.Context(), endpoint, map[string]any{"env": "production"}, Options{EnvHeader: "X-Inngest-Env"})
+			require.NoError(t, err)
+			require.Equal(t, tc.httpMethod, req.Method)
+			require.Equal(t, "/api/v2/webhooks", req.URL.Path)
+			require.Equal(t, "production", req.Header.Get("X-Inngest-Env"))
+		})
+	}
+}
+
 func TestFunctionPauseResumeRequest(t *testing.T) {
 	for _, action := range []struct{ method, name string }{{"PauseFunction", "pause"}, {"ResumeFunction", "resume"}} {
 		t.Run(action.name, func(t *testing.T) {
