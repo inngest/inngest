@@ -135,6 +135,14 @@ func HTTPRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
 	return rule
 }
 
+func HTTPBindings(method protoreflect.MethodDescriptor) []*annotations.HttpRule {
+	rule := HTTPRule(method)
+	if rule == nil {
+		return nil
+	}
+	return append([]*annotations.HttpRule{rule}, rule.AdditionalBindings...)
+}
+
 func AuthzPermission(method protoreflect.MethodDescriptor) string {
 	opts := method.Options()
 	if !proto.HasExtension(opts, apiv2.E_Authz) {

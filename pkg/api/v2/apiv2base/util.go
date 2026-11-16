@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc/codes"
@@ -128,9 +129,10 @@ func BuildAuthzPathMap() map[string]bool {
 
 		// Check if method has authz annotation
 		if hasAuthzAnnotation(method) {
-			// Get the HTTP path from google.api.http annotation
-			if path := getHTTPPath(method); path != "" {
-				authzPaths[path] = true
+			for _, binding := range apiv2endpoint.HTTPBindings(method) {
+				if _, path := apiv2endpoint.MethodAndPath(binding); path != "" {
+					authzPaths[path] = true
+				}
 			}
 		}
 	}

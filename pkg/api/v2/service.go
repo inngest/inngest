@@ -260,13 +260,20 @@ func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Han
 			"CreateReplay":    64 << 10,
 			"PauseFunctions":  256 << 10,
 			"ResumeFunctions": 256 << 10,
+			"CreateWebhook":   64 << 10,
+			"UpdateWebhook":   16 << 10,
 		}
 		handlers := map[route]http.Handler{}
 		paths := chi.NewRouter()
-		for _, endpoint := range apiv2endpoint.Discover() {
-			if limit, ok := limits[endpoint.MethodName]; ok {
-				paths.Method(endpoint.HTTPMethod, endpoint.Path, next)
-				handlers[route{endpoint.HTTPMethod, endpoint.Path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+		methods := apiv2.File_api_v2_service_proto.Services().ByName("V2").Methods()
+		for i := 0; i < methods.Len(); i++ {
+			method := methods.Get(i)
+			if limit, ok := limits[string(method.Name())]; ok {
+				for _, binding := range apiv2endpoint.HTTPBindings(method) {
+					httpMethod, path := apiv2endpoint.MethodAndPath(binding)
+					paths.Method(httpMethod, path, next)
+					handlers[route{httpMethod, path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+				}
 			}
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

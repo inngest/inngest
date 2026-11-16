@@ -12,6 +12,8 @@ func TestScopesForEndpoints(t *testing.T) {
 		{AuthzPermission: "apps:read:get"},
 		{AuthzPermission: "apps:read:list"},
 		{AuthzPermission: "functions:write:invoke"},
+		{AuthzPermission: "webhooks:write:create"},
+		{AuthzPermission: "webhooks:write:update"},
 		{AuthzPermission: "event_keys:read:list"},
 		{AuthzPermission: "api_keys:write:create"},
 		{AuthzPermission: "partners:read:list_accounts"},
@@ -21,6 +23,7 @@ func TestScopesForEndpoints(t *testing.T) {
 	require.Equal(t, []string{
 		"apps:read:*",
 		"functions:write:*",
+		"webhooks:write:*",
 	}, scopesForEndpoints(endpoints, cliExcludedResources))
 }
 
@@ -30,6 +33,7 @@ func TestCLIScopesExcludeNonDelegatableKeys(t *testing.T) {
 
 	require.Contains(t, scopes, "apps:read:*")
 	require.Contains(t, scopes, "apps:write:*")
+	require.Contains(t, scopes, "webhooks:write:*")
 	require.NotContains(t, scopes, "event_keys:read:*")
 	require.NotContains(t, scopes, "signing_keys:read:*")
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
@@ -235,6 +237,9 @@ func (s *Service) CreateWebhook(ctx context.Context, req *apiv2.CreateWebhookReq
 	if req.Name == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook name is required")
 	}
+	if utf8.RuneCountInString(req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
+	}
 
 	if req.Transform == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Transform function is required")
@@ -270,6 +275,31 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	// 1. Query the database for webhooks in the specified environment
 	// 2. Apply cursor-based pagination
 	// 3. Return the list with proper pagination metadata
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
+}
+
+func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookRequest) (*apiv2.UpdateWebhookResponse, error) {
+	if s.base.GetInngestEnvHeader(ctx) == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "X-Inngest-Env header is required")
+	}
+	if _, err := uuid.Parse(req.Id); err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Invalid webhook ID")
+	}
+	if req.Name == nil && req.Transform == nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Name or transform is required")
+	}
+	if req.Name != nil && *req.Name == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name cannot be empty")
+	}
+	if req.Name != nil && utf8.RuneCountInString(*req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
+	}
+	if req.Transform != nil && *req.Transform == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Transform function cannot be empty")
+	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_UpdateWebhook_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and the webhook was not updated.")
+	}
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
 
