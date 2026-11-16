@@ -12,8 +12,9 @@
 --
 -- bucket_at is when the row reached the buffer (Kafka LogAppendTime, or the
 -- insert time here): federated reads take the lake for bucket_at <= W and
--- the buffer above it. Its default only matters in-memory/tests, Iceberg
--- freezes defaults at CREATE time so writers always set it.
+-- the buffer above it. Its default only matters in-memory/tests: Iceberg
+-- evaluates an expression default once at CREATE time (literal ones like
+-- '{}' are fine), so writers always set it.
 -- +goose ENVSUB ON
 CREATE TABLE IF NOT EXISTS inngest.runs (
 	account_id UUID NOT NULL,
@@ -101,10 +102,10 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   source_id VARCHAR NULL,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
-  event_data VARCHAR NOT NULL,
+  event_data VARCHAR NOT NULL DEFAULT '{}',
   event_v VARCHAR NOT NULL,
   event_ts TIMESTAMPTZ NOT NULL,
-  event_meta VARCHAR NOT NULL,
+  event_meta VARCHAR NOT NULL DEFAULT '{}',
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 ) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(received_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
