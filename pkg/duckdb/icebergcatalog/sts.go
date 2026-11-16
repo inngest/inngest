@@ -119,15 +119,7 @@ func (v *STSVendor) assumeRole(ctx context.Context, ident table.Identifier, loca
 		exp = *c.Expiration
 		props["s3.session-token-expires-at-ms"] = strconv.FormatInt(exp.UnixMilli(), 10)
 	}
-	if v.Region != "" {
-		props["s3.region"] = v.Region
-	}
-	if v.Endpoint != "" {
-		props["s3.endpoint"] = v.Endpoint
-	}
-	if v.PathStyle {
-		props["s3.path-style-access"] = "true"
-	}
+	setS3EndpointProps(props, v.Region, v.Endpoint, v.PathStyle)
 	return props, exp, nil
 }
 
