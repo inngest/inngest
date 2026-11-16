@@ -210,6 +210,64 @@ func TestRedisScanDeferredPauseSkipsCachedPausedPartitionsBeforeSelection(t *tes
 	require.True(t, checkPause(t.Context(), partitions[0]))
 }
 
+func TestRedisSequentialScanAdvancesPastCachedPausedPage(t *testing.T) {
+	for _, name := range []string{"global", "account"} {
+		t.Run(name, func(t *testing.T) {
+			const limit = 2
+			accountID, envID, activeID := uuid.New(), uuid.New(), uuid.New()
+			paused := make(map[uuid.UUID]bool)
+			redis, client := initRedis(t)
+			t.Cleanup(client.Close)
+			shard := shardFromClient("test", client,
+				osqueue.WithConcurrentPartitionPauseChecks(2),
+				osqueue.WithCachedPartitionPauseGetter(func(id uuid.UUID) (bool, bool) {
+					return paused[id], true
+				}),
+			)
+			scanner := shard.(*queue)
+			var account *uuid.UUID
+			index := shard.Client().kg.GlobalPartitionIndex()
+			if name == "account" {
+				account = &accountID
+				index = shard.Client().kg.AccountPartitionIndex(accountID)
+			}
+			now := time.Now()
+			for range 2 * limit {
+				id := uuid.New()
+				paused[id] = true
+				enqueueRedisPauseTestItem(t, shard, osqueue.Scope{AccountID: accountID, EnvID: envID, FunctionID: id})
+				_, err := redis.ZAdd(index, float64(now.Unix()-2), id.String())
+				require.NoError(t, err)
+			}
+			enqueueRedisPauseTestItem(t, shard, osqueue.Scope{AccountID: accountID, EnvID: envID, FunctionID: activeID})
+			_, err := redis.ZAdd(index, float64(now.Unix()-1), activeID.String())
+			require.NoError(t, err)
+
+			for range 2 {
+				partitions, _, err := scanner.PeekPartitionsForScan(t.Context(), account, true, now, limit)
+				require.NoError(t, err)
+				require.Empty(t, partitions)
+			}
+			partitions, checkPause, err := scanner.PeekPartitionsForScan(t.Context(), account, true, now, limit)
+			require.NoError(t, err)
+			require.Len(t, partitions, 1, "ready work must be reached beyond the initial Redis page")
+			require.Equal(t, &activeID, partitions[0].FunctionID)
+			require.True(t, checkPause(t.Context(), partitions[0]))
+
+			// On reaching the end, start at the oldest partition again. It
+			// must still be due when its local pause cache entry changes.
+			clear(paused)
+			partitions, _, err = scanner.PeekPartitionsForScan(t.Context(), account, true, now, limit)
+			require.NoError(t, err)
+			require.Len(t, partitions, limit)
+			for _, partition := range partitions {
+				require.NotEqual(t, &activeID, partition.FunctionID)
+				require.Zero(t, partition.ForceAtMS)
+			}
+		})
+	}
+}
+
 func TestRedisScanDeferredPauseSkipsDuplicateInFlightLookups(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()

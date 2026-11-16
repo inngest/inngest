@@ -39,6 +39,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/inngest/expr v0.0.0-20260516032105-f2cf85864a0e
 	github.com/inngest/go-httpstat v0.0.0-20261113154221-ce1920315a8d
 	github.com/inngest/inngestgo v0.16.5
@@ -193,7 +194,6 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

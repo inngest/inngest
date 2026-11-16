@@ -16,6 +16,7 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -33,6 +34,9 @@ import (
 
 const (
 	pkgName = "redis_state.state.execution.inngest"
+
+	// Retain scan positions only for recently visited indexes.
+	pausePeekCursorLimit = 1024
 )
 
 func (q *queue) Name() string {
@@ -72,6 +76,9 @@ func NewQueueShard(name string, queueClient *QueueClient, opts ...osqueue.QueueO
 	}
 	if options.ConcurrentPartitionPauseChecks > 0 {
 		q.pauseCheckSlots = semaphore.NewWeighted(int64(options.ConcurrentPartitionPauseChecks))
+		if options.CachedPartitionPauseGetter != nil {
+			q.pausePeekCursors, _ = lru.New[string, string](pausePeekCursorLimit)
+		}
 	}
 
 	return q
@@ -86,6 +93,7 @@ type queue struct {
 
 	pauseCheckSlots     *semaphore.Weighted
 	pauseChecksInFlight sync.Map
+	pausePeekCursors    *lru.Cache[string, string]
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
@@ -1437,11 +1445,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		isSequential = 1
 	}
 
-	args, err := StrSlice([]any{
-		ms,
-		limit,
-		isSequential,
-	})
+	// Only sequential scans with deferred pause checks resume a prior peek.
+	advancePastPaused := sequential && pause == nil && q.pausePeekCursors != nil
+	var after string
+	if advancePastPaused {
+		after, _ = q.pausePeekCursors.Get(partitionKey)
+	}
+	args, err := StrSlice([]any{ms, limit, isSequential, after})
 	if err != nil {
 		return nil, err
 	}
@@ -1466,6 +1476,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	var potentiallyMissingPartitions, allPartitionIds []any
+	var remaining int64
 	if len(returnedSet) == 3 {
 		potentiallyMissingPartitions, ok = returnedSet[1].([]any)
 		if !ok {
@@ -1475,6 +1486,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		allPartitionIds, ok = returnedSet[2].([]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected third item in set returned from partitionPeek: %T", peekRet)
+		}
+		remaining, ok = returnedSet[0].(int64)
+		if !ok {
+			return nil, fmt.Errorf("unexpected remaining partition count in partitionPeek: %T", returnedSet[0])
 		}
 	} else if len(returnedSet) != 0 {
 		return nil, fmt.Errorf("expected zero or three items in set returned by partitionPeek: %v", returnedSet)
@@ -1604,6 +1619,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	ignored := 0
+	var lastCachedPause string
 	for n, item := range partitions {
 		// NOTE: Nil partitions were already reported above. If we got to this point, they're
 		// in the account partition pointer and should simply be skipped.
@@ -1624,6 +1640,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				// Keep locally known paused functions out of selection. A stale
 				// pause skips the partition without pushing its pointer back.
 				if paused, found := q.CachedPartitionPauseGetter(*item.FunctionID); found && paused {
+					lastCachedPause = item.Queue()
 					ignored++
 					continue
 				}
@@ -1676,6 +1693,27 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	// Remove any ignored items from the slice.
 	items = items[0 : len(items)-ignored]
+
+	if advancePastPaused {
+		// An underfilled page can hide ready work beyond the Redis limit.
+		// Continue on the next scan without changing any cached-paused
+		// partition's score. Prefer a paused member as the cursor because
+		// a ready member might leave the index when dispatched.
+		if remaining > 0 && int64(len(items)) < min(limit, osqueue.PartitionSelectionMax) &&
+			(lastCachedPause != "" || after != "") {
+			cursor := lastCachedPause
+			if cursor == "" {
+				last := allPartitionIds[len(allPartitionIds)-1]
+				cursor, ok = last.(string)
+				if !ok {
+					return nil, fmt.Errorf("unexpected last partition ID in partitionPeek: %T", last)
+				}
+			}
+			q.pausePeekCursors.Add(partitionKey, cursor)
+		} else if after != "" {
+			q.pausePeekCursors.Remove(partitionKey)
+		}
+	}
 
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
