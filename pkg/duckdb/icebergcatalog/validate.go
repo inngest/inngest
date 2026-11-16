@@ -1,6 +1,7 @@
 package icebergcatalog
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -391,4 +392,37 @@ func (s *Server) purgeLocation(md table.Metadata) (string, error) {
 		return "", fmt.Errorf("%w: refusing to purge %q", errBadRequest, loc)
 	}
 	return loc, nil
+}
+
+// locationInUse reports whether any table in the catalog has a location
+// equal to, inside or containing loc (a local path from purgeLocation). It
+// loads every table, which is fine for something as rare as a purge.
+func (s *Server) locationInUse(ctx context.Context, loc string) (bool, error) {
+	sep := string(filepath.Separator)
+	// The sql catalog lists every namespace (nested ones included) for a
+	// nil parent.
+	nss, err := s.cat.ListNamespaces(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	for _, ns := range nss {
+		for id, err := range s.cat.ListTables(ctx, ns) {
+			if err != nil {
+				return false, err
+			}
+			tbl, err := s.cat.LoadTable(ctx, id)
+			if err != nil {
+				return false, err
+			}
+			other, err := s.checkLocation(tbl.Metadata().Location())
+			if err != nil {
+				// Not under the warehouse, so it can't overlap loc.
+				continue
+			}
+			if underRoot(other, loc, sep) || underRoot(loc, other, sep) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

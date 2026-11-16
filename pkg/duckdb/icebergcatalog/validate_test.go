@@ -268,3 +268,43 @@ func TestPurge(t *testing.T) {
 		t.Fatalf("warehouse was purged: %v", err)
 	}
 }
+
+// TestPurgeSharedLocation checks a purge doesn't delete another table's
+// files when both share a directory, IE create app.a, rename it to app.b,
+// then create app.a again (which gets app.b's original default location).
+func TestPurgeSharedLocation(t *testing.T) {
+	ts := newTestServer(t)
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {
+		t.Fatalf("create ns: %d %v", status, body)
+	}
+	status, body := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"a","schema":`+schema+`}`)
+	if status != 200 {
+		t.Fatalf("create a: %d %v", status, body)
+	}
+	bMetadata := body["metadata-location"].(string)
+	if status, body := do(t, ts, "POST", "/v1/tables/rename", `{"source":{"namespace":["app"],"name":"a"},"destination":{"namespace":["app"],"name":"b"}}`); status != http.StatusNoContent {
+		t.Fatalf("rename: %d %v", status, body)
+	}
+	status, body = do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"a","schema":`+schema+`}`)
+	if status != 200 {
+		t.Fatalf("recreate a: %d %v", status, body)
+	}
+	aMetadata := body["metadata-location"].(string)
+	if filepath.Dir(aMetadata) != filepath.Dir(bMetadata) {
+		t.Fatalf("expected a and b to share a metadata dir: %q vs %q", aMetadata, bMetadata)
+	}
+
+	if status, body := do(t, ts, "DELETE", "/v1/namespaces/app/tables/a?purgeRequested=true", ""); status != http.StatusNoContent {
+		t.Fatalf("purge a: %d %v", status, body)
+	}
+	if _, err := os.Stat(bMetadata); err != nil {
+		t.Fatalf("purging a deleted b's metadata: %v", err)
+	}
+	if status, body := do(t, ts, "GET", "/v1/namespaces/app/tables/b", ""); status != 200 {
+		t.Fatalf("load b after purging a: %d %v", status, body)
+	}
+	if status, _ := do(t, ts, "GET", "/v1/namespaces/app/tables/a", ""); status != http.StatusNotFound {
+		t.Fatalf("expected a to be dropped, got %d", status)
+	}
+}
