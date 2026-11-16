@@ -91,6 +91,19 @@ message CommitDeployRequest {
 message GetDeployRequest { string deploy_id = 1; }
 message CancelDeployRequest { string deploy_id = 1; }
 message DeployResponse { Deploy data = 1; }
+message GetComputeAccessRequest {}
+// ComputeAccess says whether a deploy to hosted compute can start now.
+message ComputeAccess {
+  bool allowed = 1;
+  // code and message are the error a deploy gets when allowed is false, such
+  // as verification_required.
+  string code = 2;
+  string message = 3;
+  // verify_url is where an account admin verifies the account.  it is set
+  // when code is verification_required.
+  string verify_url = 4;
+}
+message ComputeAccessResponse { ComputeAccess data = 1; }
 message ListDeploysRequest {}
 message ListDeploysResponse {
   // the response has at most 100 deploys to bound its size.
