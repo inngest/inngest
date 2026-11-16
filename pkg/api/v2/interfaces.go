@@ -136,6 +136,12 @@ type FunctionPauser interface {
 	ResumeFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
 }
 
+type FunctionArchiver interface {
+	// idempotent archive and unarchive; preserve runs and pause state
+	ArchiveFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+	UnarchiveFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+}
+
 type GetRunOpts struct {
 	IncludeOutput bool
 }

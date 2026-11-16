@@ -56,7 +56,7 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 	idempotent := readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete
 	// idempotent despite post
 	switch endpoint.MethodName {
-	case "PauseFunction", "ResumeFunction", "PauseFunctions", "ResumeFunctions", "UpdateWebhook":
+	case "PauseFunction", "ResumeFunction", "ArchiveFunction", "UnarchiveFunction", "PauseFunctions", "ResumeFunctions", "UpdateWebhook":
 		idempotent = true
 	}
 	return &mcp.Tool{
