@@ -419,6 +419,71 @@ service V2 {
     };
   }
 
+  rpc GetAccountUsage(GetAccountUsageRequest) returns (GetAccountUsageResponse) {
+    option (google.api.http) = {
+      get: "/account/usage"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "accounts:read:usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get account usage"
+      description: "Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. The dev server has no billing, so it returns 0 executions with no limit."
+      tags: "Account"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Account usage"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2GetAccountUsageResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
     option (google.api.http) = {
       get: "/envs"
@@ -3636,6 +3701,36 @@ message FetchAccountsResponse {
 
 message FetchAccountResponse {
   Account data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message GetAccountUsageRequest {}
+
+message AccountUsage {
+  int64 executions = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Executions used in the current period: function runs plus steps, across all environments"
+    }
+  ];
+  optional int64 executions_limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Plan execution limit for the period. Omitted when unlimited"
+    }
+  ];
+  google.protobuf.Timestamp period_start = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Start of the current period, inclusive"
+    }
+  ];
+  google.protobuf.Timestamp period_end = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "End of the current period, exclusive"
+    }
+  ];
+}
+
+message GetAccountUsageResponse {
+  AccountUsage data = 1;
   ResponseMetadata metadata = 2;
 }
 

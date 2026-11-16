@@ -25,6 +25,21 @@
       }
     }
   },
+  "/account/usage": {
+    "get": {
+      "200": {
+        "data": {
+          "executions": "12500",
+          "executionsLimit": "50000",
+          "periodStart": "2026-11-01T00:00:00Z",
+          "periodEnd": "2026-12-01T00:00:00Z"
+        },
+        "metadata": {
+          "fetchedAt": "2026-11-16T12:00:00Z"
+        }
+      }
+    }
+  },
   "/apps/{appId}": {
     "get": {
       "200": {

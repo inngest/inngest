@@ -74,6 +74,27 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 	}, nil
 }
 
+func (s *Service) GetAccountUsage(ctx context.Context, req *apiv2.GetAccountUsageRequest) (*apiv2.GetAccountUsageResponse, error) {
+	now := time.Now()
+	start, end := accountUsagePeriod(now)
+	return &apiv2.GetAccountUsageResponse{
+		Data: &apiv2.AccountUsage{
+			Executions:  0,
+			PeriodStart: timestamppb.New(start),
+			PeriodEnd:   timestamppb.New(end),
+		},
+		Metadata: &apiv2.ResponseMetadata{
+			FetchedAt: timestamppb.New(now),
+		},
+	}, nil
+}
+
+func accountUsagePeriod(now time.Time) (time.Time, time.Time) {
+	now = now.UTC()
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	return start, start.AddDate(0, 1, 0)
+}
+
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
 	// Extract environment from X-Inngest-Env header
 	envName := s.base.GetInngestEnvHeader(ctx)

@@ -46,6 +46,8 @@ const (
 	V2FetchPartnerAccountsProcedure = "/api.v2.V2/FetchPartnerAccounts"
 	// V2FetchAccountProcedure is the fully-qualified name of the V2's FetchAccount RPC.
 	V2FetchAccountProcedure = "/api.v2.V2/FetchAccount"
+	// V2GetAccountUsageProcedure is the fully-qualified name of the V2's GetAccountUsage RPC.
+	V2GetAccountUsageProcedure = "/api.v2.V2/GetAccountUsage"
 	// V2FetchAccountEnvsProcedure is the fully-qualified name of the V2's FetchAccountEnvs RPC.
 	V2FetchAccountEnvsProcedure = "/api.v2.V2/FetchAccountEnvs"
 	// V2FetchAccountEventKeysProcedure is the fully-qualified name of the V2's FetchAccountEventKeys
@@ -212,6 +214,7 @@ type V2Client interface {
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	GetAccountUsage(context.Context, *connect.Request[v2.GetAccountUsageRequest]) (*connect.Response[v2.GetAccountUsageResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
@@ -332,6 +335,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2FetchAccountProcedure,
 			connect.WithSchema(v2Methods.ByName("FetchAccount")),
+			connect.WithClientOptions(opts...),
+		),
+		getAccountUsage: connect.NewClient[v2.GetAccountUsageRequest, v2.GetAccountUsageResponse](
+			httpClient,
+			baseURL+V2GetAccountUsageProcedure,
+			connect.WithSchema(v2Methods.ByName("GetAccountUsage")),
 			connect.WithClientOptions(opts...),
 		),
 		fetchAccountEnvs: connect.NewClient[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse](
@@ -783,6 +792,7 @@ type v2Client struct {
 	createEnv                  *connect.Client[v2.CreateEnvRequest, v2.CreateEnvResponse]
 	fetchPartnerAccounts       *connect.Client[v2.FetchAccountsRequest, v2.FetchAccountsResponse]
 	fetchAccount               *connect.Client[v2.FetchAccountRequest, v2.FetchAccountResponse]
+	getAccountUsage            *connect.Client[v2.GetAccountUsageRequest, v2.GetAccountUsageResponse]
 	fetchAccountEnvs           *connect.Client[v2.FetchAccountEnvsRequest, v2.FetchAccountEnvsResponse]
 	fetchAccountEventKeys      *connect.Client[v2.FetchAccountEventKeysRequest, v2.FetchAccountEventKeysResponse]
 	fetchAccountSigningKeys    *connect.Client[v2.FetchAccountSigningKeysRequest, v2.FetchAccountSigningKeysResponse]
@@ -886,6 +896,11 @@ func (c *v2Client) FetchPartnerAccounts(ctx context.Context, req *connect.Reques
 // FetchAccount calls api.v2.V2.FetchAccount.
 func (c *v2Client) FetchAccount(ctx context.Context, req *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error) {
 	return c.fetchAccount.CallUnary(ctx, req)
+}
+
+// GetAccountUsage calls api.v2.V2.GetAccountUsage.
+func (c *v2Client) GetAccountUsage(ctx context.Context, req *connect.Request[v2.GetAccountUsageRequest]) (*connect.Response[v2.GetAccountUsageResponse], error) {
+	return c.getAccountUsage.CallUnary(ctx, req)
 }
 
 // FetchAccountEnvs calls api.v2.V2.FetchAccountEnvs.
@@ -1264,6 +1279,7 @@ type V2Handler interface {
 	CreateEnv(context.Context, *connect.Request[v2.CreateEnvRequest]) (*connect.Response[v2.CreateEnvResponse], error)
 	FetchPartnerAccounts(context.Context, *connect.Request[v2.FetchAccountsRequest]) (*connect.Response[v2.FetchAccountsResponse], error)
 	FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error)
+	GetAccountUsage(context.Context, *connect.Request[v2.GetAccountUsageRequest]) (*connect.Response[v2.GetAccountUsageResponse], error)
 	FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error)
 	FetchAccountEventKeys(context.Context, *connect.Request[v2.FetchAccountEventKeysRequest]) (*connect.Response[v2.FetchAccountEventKeysResponse], error)
 	FetchAccountSigningKeys(context.Context, *connect.Request[v2.FetchAccountSigningKeysRequest]) (*connect.Response[v2.FetchAccountSigningKeysResponse], error)
@@ -1380,6 +1396,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2FetchAccountProcedure,
 		svc.FetchAccount,
 		connect.WithSchema(v2Methods.ByName("FetchAccount")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetAccountUsageHandler := connect.NewUnaryHandler(
+		V2GetAccountUsageProcedure,
+		svc.GetAccountUsage,
+		connect.WithSchema(v2Methods.ByName("GetAccountUsage")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2FetchAccountEnvsHandler := connect.NewUnaryHandler(
@@ -1834,6 +1856,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2FetchPartnerAccountsHandler.ServeHTTP(w, r)
 		case V2FetchAccountProcedure:
 			v2FetchAccountHandler.ServeHTTP(w, r)
+		case V2GetAccountUsageProcedure:
+			v2GetAccountUsageHandler.ServeHTTP(w, r)
 		case V2FetchAccountEnvsProcedure:
 			v2FetchAccountEnvsHandler.ServeHTTP(w, r)
 		case V2FetchAccountEventKeysProcedure:
@@ -2011,6 +2035,10 @@ func (UnimplementedV2Handler) FetchPartnerAccounts(context.Context, *connect.Req
 
 func (UnimplementedV2Handler) FetchAccount(context.Context, *connect.Request[v2.FetchAccountRequest]) (*connect.Response[v2.FetchAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.FetchAccount is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetAccountUsage(context.Context, *connect.Request[v2.GetAccountUsageRequest]) (*connect.Response[v2.GetAccountUsageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetAccountUsage is not implemented"))
 }
 
 func (UnimplementedV2Handler) FetchAccountEnvs(context.Context, *connect.Request[v2.FetchAccountEnvsRequest]) (*connect.Response[v2.FetchAccountEnvsResponse], error) {
