@@ -136,16 +136,15 @@ const rollbackTimeout = 5 * time.Second
 // inserts both inngest.run_trace_spans and inngest.runs from it (see
 // runsInsertSQL), so building the batch's runs rows never reads the lake.
 //
-// On a quack connection the whole thing runs as one transaction, so a
-// failure can't leave the batch's spans w/o their runs rows (nothing ever
-// rebuilds runs from spans, so that run row would be lost for good). DuckLake
-// commits multi-table transactions atomically. NOTE: an Iceberg catalog
-// can't commit 2 tables atomically unless it advertises
-// /v1/transactions/commit, so there this degrades to 2 commits; the
-// batcher's retries (retryableFlushError) cover most of that gap. The
-// jsonlines transport (tests) can't recover from a failed statement inside a
-// transaction (see driver.SupportsTransactions), so it runs the same
-// statements w/o one.
+// When the lake commits several tables atomically
+// (driver.AtomicMultiTableCommit: DuckLake over quack), the whole thing runs
+// as one transaction, so a failure can't leave the batch's spans w/o their
+// runs rows (nothing ever rebuilds runs from spans, so that run row would be
+// lost for good). Otherwise it runs the same statements w/o one: the
+// jsonlines transport (tests) can't recover from a failed statement inside
+// a transaction, and a lake that can't commit 2 tables at once (IE an
+// Iceberg catalog w/o /v1/transactions/commit) rejects the transaction
+// outright, so there spans and runs are 2 commits.
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
@@ -181,7 +180,7 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	}
 	defer conn.Close()
 
-	if !driver.SupportsTransactions(conn) {
+	if !driver.AtomicMultiTableCommit(conn) {
 		_, err = conn.ExecContext(ctx, strings.Join(stmts, "\n"), args...)
 		return err
 	}

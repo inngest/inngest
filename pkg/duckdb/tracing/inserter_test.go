@@ -119,12 +119,12 @@ func spanBatch(runA, runB ulid.ULID) []Span {
 	queued.Input = json.RawMessage(`[{"name":"evt","data":{"n":1}}]`)
 
 	finished := runSpan(runA, "span-a-run", "executor.run", map[string]any{
-		"_inngest.dynamic.status":         "Completed",
-		"_inngest.scheduled_at":           ms(1),
-		"_inngest.started_at":             ms(2),
-		"_inngest.ended_at":               ms(5),
-		"_inngest.defer.parent_fn_slug":   "parent-fn",
-		"_inngest.defer.parent_run_ids":   []string{"01PARENT"},
+		"_inngest.dynamic.status":        "Completed",
+		"_inngest.scheduled_at":          ms(1),
+		"_inngest.started_at":            ms(2),
+		"_inngest.ended_at":              ms(5),
+		"_inngest.defer.parent_fn_slug":  "parent-fn",
+		"_inngest.defer.parent_run_ids":  []string{"01PARENT"},
 		"_inngest.function.output_extra": map[string]any{"nested": true},
 	})
 	finished.Output = json.RawMessage(`{"data":"ok"}`)

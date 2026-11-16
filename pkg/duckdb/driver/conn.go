@@ -193,6 +193,41 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	return driver.ErrSkip
 }
 
+// AtomicMultiTableCommit reports whether a transaction on c that writes
+// several lake tables commits them all or none: SupportsTransactions, and a
+// lake whose commits span tables. DuckLake's do (one catalog transaction),
+// as do plain duckdb tables. c must be pinned, as for SupportsTransactions.
+func AtomicMultiTableCommit(c *sql.Conn) bool {
+	if !SupportsTransactions(c) {
+		return false
+	}
+	ok := true
+	_ = c.Raw(func(driverConn any) error {
+		if dc, isConn := driverConn.(*conn); isConn {
+			if p := processOf(dc); p != nil {
+				ok = p.atomicMultiTableCommit()
+			}
+		}
+		return nil
+	})
+	return ok
+}
+
+// processOf is the subprocess behind dc, or nil for a bare quack session.
+func processOf(dc *conn) *process {
+	switch s := dc.sess.(type) {
+	case *process:
+		return s
+	case *pooledQuackConn:
+		return s.p
+	}
+	return nil
+}
+
+// atomicMultiTableCommit: DuckLake and plain duckdb tables commit every
+// table in a transaction at once.
+func (p *process) atomicMultiTableCommit() bool { return true }
+
 // SupportsTransactions reports whether c can run an explicit
 // `BEGIN ... COMMIT` script and recover from a failure partway through it
 // (by running `ROLLBACK` on the same connection afterwards), IE whether
