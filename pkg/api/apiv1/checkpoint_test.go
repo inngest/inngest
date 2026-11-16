@@ -74,6 +74,52 @@ func TestCheckpointAsyncStepsRouteAfterDecode(t *testing.T) {
 	}
 }
 
+type instanceIDRecorder struct {
+	syncInstanceID  string
+	asyncInstanceID string
+}
+
+func (m *instanceIDRecorder) CheckpointAsyncSteps(_ context.Context, input checkpoint.AsyncCheckpoint) error {
+	m.asyncInstanceID = input.InstanceID
+	return nil
+}
+
+func (m *instanceIDRecorder) CheckpointSyncSteps(_ context.Context, input checkpoint.SyncCheckpoint) error {
+	m.syncInstanceID = input.InstanceID
+	return nil
+}
+
+func (*instanceIDRecorder) Metrics() checkpoint.MetricsProvider { return nil }
+
+func TestCheckpointStepsPassConnectInstanceID(t *testing.T) {
+	for _, instanceID := range []string{"worker-1", ""} {
+		t.Run("instance ID "+instanceID, func(t *testing.T) {
+			checkpointer := &instanceIDRecorder{}
+			api := &checkpointAPI{
+				Opts:         Opts{AuthFinder: apiv1auth.NilAuthFinder},
+				checkpointer: checkpointer,
+			}
+
+			syncReq := httptest.NewRequest(http.MethodPost, "/v1/checkpoint/run", bytes.NewBufferString(`{"steps":[]}`))
+			asyncReq := httptest.NewRequest(http.MethodPost, "/v1/checkpoint/run/async", bytes.NewBufferString(`{"qi_id":"job","steps":[]}`))
+			if instanceID != "" {
+				syncReq.Header.Set("X-Inngest-Instance-Id", instanceID)
+				asyncReq.Header.Set("X-Inngest-Instance-Id", instanceID)
+			}
+
+			rec := httptest.NewRecorder()
+			api.CheckpointSteps(rec, syncReq)
+			require.Equal(t, http.StatusOK, rec.Code)
+			require.Equal(t, instanceID, checkpointer.syncInstanceID)
+
+			rec = httptest.NewRecorder()
+			api.CheckpointAsyncSteps(rec, asyncReq)
+			require.Equal(t, http.StatusOK, rec.Code)
+			require.Equal(t, instanceID, checkpointer.asyncInstanceID)
+		})
+	}
+}
+
 // mockOutputReader implements RunOutputReader for testing
 type mockOutputReader struct {
 	output []byte

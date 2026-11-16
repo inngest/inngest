@@ -27,6 +27,10 @@ type SyncCheckpoint struct {
 
 	// Optional function. When set, CheckpointSyncSteps skips loading it from the DB.
 	Function *inngest.Function `json:"-"`
+
+	// InstanceID is the connect worker instance that sent the checkpoint.  it
+	// comes from the x-inngest-instance-id header and is empty for HTTP apps.
+	InstanceID string `json:"-"`
 }
 
 func (s SyncCheckpoint) ID() state.ID {
@@ -62,6 +66,10 @@ type AsyncCheckpoint struct {
 	// for security.
 	AccountID uuid.UUID `json:"-"`
 	EnvID     uuid.UUID `json:"-"`
+
+	// InstanceID is the connect worker instance that sent the checkpoint.  it
+	// comes from the x-inngest-instance-id header and is empty for HTTP apps.
+	InstanceID string `json:"-"`
 }
 
 func (s AsyncCheckpoint) ID() state.ID {
