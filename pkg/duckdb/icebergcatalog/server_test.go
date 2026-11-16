@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -100,4 +101,36 @@ func TestRESTConformance(t *testing.T) {
 			return cat
 		},
 	})
+}
+
+// TestRequestLogUsesRoute: the request log names the matched route, never
+// the raw URI the client sent.
+func TestRequestLogUsesRoute(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	wh := filepath.Join(dir, "warehouse")
+	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logs strings.Builder
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ts := httptest.NewServer(New(cat, Options{Warehouse: wh, Logger: logger}))
+	t.Cleanup(ts.Close)
+
+	do(t, ts, "GET", "/v1/namespaces/evil%0Ainjected/tables/x?q=secret", "")
+	do(t, ts, "GET", "/nope/secret", "")
+	out := logs.String()
+	if !strings.Contains(out, `route="GET /v1/namespaces/{ns}/tables/{table}"`) || !strings.Contains(out, "route=unmatched") {
+		t.Fatalf("want routes in the log, got %q", out)
+	}
+	for _, leak := range []string{"evil", "injected", "secret"} {
+		if strings.Contains(out, leak) {
+			t.Fatalf("log has %q from the request: %q", leak, out)
+		}
+	}
 }
