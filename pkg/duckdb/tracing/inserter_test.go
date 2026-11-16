@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
@@ -323,4 +324,22 @@ func TestInsertSpansFailureDoesNotHangJSONLines(t *testing.T) {
 	err := NewDuckDBInserter(db).InsertSpans(ctx, []Span{runSpan(runA, "span-run", "executor.run", map[string]any{})})
 	require.ErrorIs(t, err, driver.ErrStatementFailed)
 	require.NoError(t, ctx.Err())
+}
+
+// An Iceberg column default is frozen at CREATE TABLE time, so a metadata
+// batch's bucket_at has to be set by the writer to be its insert time.
+func TestInsertRunMetadataBucketAt(t *testing.T) {
+	db := newTestIcebergLake(t)
+	time.Sleep(50 * time.Millisecond)
+	before := time.Now().UTC().Truncate(time.Millisecond)
+
+	require.NoError(t, NewDuckDBInserter(db).InsertRunMetadata(t.Context(), []RunMetadata{{
+		AccountID: uuid.NewString(), EnvID: uuid.NewString(), RunID: ulid.Make().String(),
+		RunQueuedAt: time.Now(), SpanID: "span", Scope: "run", Kind: "inngest.test",
+		Values: json.RawMessage(`{"a":1}`), CreatedAt: time.Now(),
+	}}))
+
+	var bucketAt time.Time
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT bucket_at FROM inngest.run_metadata").Scan(&bucketAt))
+	require.False(t, bucketAt.Before(before), "bucket_at %s is before the insert (%s)", bucketAt, before)
 }

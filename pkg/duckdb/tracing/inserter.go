@@ -212,15 +212,16 @@ func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error
 
 var runMetadataColumns = []string{
 	"account_id", "env_id", "run_id", "run_queued_at", "span_id", "scope", "kind",
-	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt",
+	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt", "bucket_at",
 }
 
 func (d *DuckDBInserter) InsertRunMetadata(ctx context.Context, entries []RunMetadata) error {
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(entries))
 	for i, m := range entries {
 		rows[i] = []any{
 			m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt, m.SpanID, m.Scope, m.Kind,
-			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt),
+			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt), bucketAt,
 		}
 	}
 	return d.insert(ctx, "inngest.run_metadata", runMetadataColumns, rows)
