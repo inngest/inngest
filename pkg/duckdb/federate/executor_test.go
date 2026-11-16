@@ -452,6 +452,24 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		f.query(t, []Table{TableSpans}, nil, `SELECT count(*)::VARCHAR, '' FROM spans`)
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, bounds, names(f.streamer.reqs[0].Columns))
+
+		// W/ several tables federated, each Iceberg scan (which doesn't name
+		// its table in the plan) still only counts for the tables whose
+		// columns it fits, so neither delta streams the JSON payloads.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT s.span_id, m.kind FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id`)
+		require.Len(t, f.streamer.reqs, 2)
+		byTable := map[Table][]string{}
+		for _, r := range f.streamer.reqs {
+			byTable[r.Table] = names(r.Columns)
+		}
+		require.Subset(t, byTable[TableSpans], []string{"span_id", "run_id"})
+		require.Subset(t, byTable[TableMetadata], []string{"kind", "run_id", "span_id"})
+		for _, big := range []string{"output", "error", "input", "attributes", "values"} {
+			require.NotContains(t, byTable[TableSpans], big)
+			require.NotContains(t, byTable[TableMetadata], big)
+		}
 	})
 }
 

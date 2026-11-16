@@ -73,13 +73,12 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int, kind deltaKind) (d
 // conservative.
 //
 // NOTE: an Iceberg scan's plan node doesn't name its table (just
-// `"Function": "ICEBERG_SCAN"`), so unnamed scans are only attributed when
-// one table is federated, to that table. Scans of other lake tables (IE
-// run_metadata under the insights macros) can then only add columns, which
-// is safe. W/ more than one table every column streams.
-//
-// TODO: tell Iceberg scans apart (per-table planning, or upstream naming the
-// table in the plan) so multi-table queries prune too.
+// `"Function": "ICEBERG_SCAN"` w/ its projections and filters), so an
+// unnamed scan is attributed by its columns: to every needed table whose
+// lake schema has all the columns it reads. A scan of table T always fits
+// T, so T never misses a column, and a scan that also fits another table
+// only adds columns the two share (keys and times, IE run_id/span_id), which
+// is safe.
 func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Table) (map[Table][]Column, error) {
 	if len(needed) == 0 {
 		return nil, nil
@@ -105,9 +104,10 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 		return nil, nil
 	}
 
+	read := scanColumns(plan, needed)
 	out := map[Table][]Column{}
 	for _, t := range needed {
-		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t), len(needed) == 1)
+		names, found := read[t]
 		if !found {
 			out[t] = nil
 			continue
@@ -156,34 +156,43 @@ func explainJSON(ctx context.Context, conn *sql.Conn, sqlText string, args []any
 	return plan, nil
 }
 
-// scanColumns returns the columns the plan reads from table: each scan of it
-// contributes its projections, and any of cols named in its filters. When
-// anonymous is set, scans that don't name a table (Iceberg's) count as
-// table's too.
-func scanColumns(plan []planNode, table string, cols []Column, anonymous bool) (map[string]bool, bool) {
-	names := map[string]bool{}
-	found := false
+// scanColumns returns the columns the plan reads from each needed table
+// (only tables w/ a scan): each scan contributes its projections and any
+// column named in its filters. A named scan counts for its table, an
+// unnamed Iceberg scan for every needed table whose columns it fits (see
+// deltaColumnsUsed).
+func scanColumns(plan []planNode, needed []Table) map[Table]map[string]bool {
+	cols := map[Table]map[string]bool{}
+	var all []Column
+	for _, t := range needed {
+		cols[t] = map[string]bool{}
+		for _, c := range DeltaColumns(t) {
+			cols[t][c.Name] = true
+		}
+		all = append(all, DeltaColumns(t)...)
+	}
+	out := map[Table]map[string]bool{}
+	add := func(t Table, names map[string]bool) {
+		if out[t] == nil {
+			out[t] = map[string]bool{}
+		}
+		for n := range names {
+			out[t][n] = true
+		}
+	}
 	var walk func(n planNode)
 	walk = func(n planNode) {
 		if strings.Contains(n.Name, "SCAN") {
 			var info map[string]any
 			_ = json.Unmarshal(n.ExtraInfo, &info)
 			tbl, named := info["Table"].(string)
-			if tableIs(tbl, table) || (anonymous && !named && info["Function"] == "ICEBERG_SCAN") {
-				found = true
-				for _, p := range stringsOf(info["Projections"]) {
-					names[projectedColumn(p)] = true
-				}
-				for k, v := range info {
-					if !strings.Contains(strings.ToLower(k), "filter") {
-						continue
-					}
-					for _, f := range stringsOf(v) {
-						for _, c := range cols {
-							if identIn(f, c.Name) {
-								names[c.Name] = true
-							}
-						}
+			for _, t := range needed {
+				switch {
+				case named && tableIs(tbl, Physical[t].Name):
+					add(t, scanRead(info, DeltaColumns(t)))
+				case !named && info["Function"] == "ICEBERG_SCAN":
+					if read := scanRead(info, all); fits(read, cols[t]) {
+						add(t, read)
 					}
 				}
 			}
@@ -195,7 +204,42 @@ func scanColumns(plan []planNode, table string, cols []Column, anonymous bool) (
 	for _, n := range plan {
 		walk(n)
 	}
-	return names, found
+	return out
+}
+
+// scanRead is the columns a scan's plan node reads: its projections, and
+// any of cols named in its filters.
+func scanRead(info map[string]any, cols []Column) map[string]bool {
+	names := map[string]bool{}
+	for _, p := range stringsOf(info["Projections"]) {
+		// A scan w/ no projections (IE under a count) plans them as "".
+		if c := projectedColumn(p); c != "" {
+			names[c] = true
+		}
+	}
+	for k, v := range info {
+		if !strings.Contains(strings.ToLower(k), "filter") {
+			continue
+		}
+		for _, f := range stringsOf(v) {
+			for _, c := range cols {
+				if identIn(f, c.Name) {
+					names[c.Name] = true
+				}
+			}
+		}
+	}
+	return names
+}
+
+// fits reports whether every column in read is one of cols.
+func fits(read, cols map[string]bool) bool {
+	for n := range read {
+		if !cols[n] {
+			return false
+		}
+	}
+	return true
 }
 
 // projectedColumn is the column a scan projection reads: the projection
