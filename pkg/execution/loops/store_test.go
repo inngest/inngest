@@ -530,23 +530,9 @@ func TestNewLoopEvents(t *testing.T) {
 	require.WithinDuration(t, time.Now(), time.UnixMilli(wake.Timestamp), 5*time.Second)
 	require.True(t, wake.IsInternal())
 
-	// a given id names the event, and the timestamp is still now, not the
-	// time part of the id.
-	old := ulid.MustNew(ulid.Timestamp(time.Now().Add(-time.Hour)), nil)
-	tick = NewTickEventWithID("user-1", old)
-	require.Equal(t, old.String(), tick.ID)
-	require.WithinDuration(t, time.Now(), time.UnixMilli(tick.Timestamp), 5*time.Second)
-	wake = NewWakeEventWithID("user-1", "wake-1", old)
-	require.Equal(t, old.String(), wake.ID)
-	require.WithinDuration(t, time.Now(), time.UnixMilli(wake.Timestamp), 5*time.Second)
-
-	// the timer id is deterministic and its time part is the nonce's.
-	nonce := ulid.MustNew(ulid.Timestamp(time.Now().Add(-time.Hour)), nil)
-	a := TimerEventID("tick:x", nonce.String())
-	require.Equal(t, a, TimerEventID("tick:x", nonce.String()))
-	require.NotEqual(t, a, TimerEventID("tick:x", ulid.Make().String()))
-	require.NotEqual(t, a, TimerEventID("tick:y", nonce.String()))
-	require.Equal(t, nonce.Time(), a.Time())
+	// two events for the same key have different ids.
+	require.NotEqual(t, tick.ID, NewTickEvent("user-1").ID)
+	require.NotEqual(t, wake.ID, NewWakeEvent("user-1", "wake-1").ID)
 }
 
 func TestInputFromEvent(t *testing.T) {

@@ -459,10 +459,9 @@ func TestLoopReturnWake(t *testing.T) {
 	requireWithin(t, time.Now().Add(30*time.Second), item.AtMS, 5*time.Second)
 	require.Equal(t, queue.KindLoopWake, item.Data.Kind)
 	require.Equal(t, queue.PayloadLoop{
-		Key:   "user-1",
-		Kind:  loops.InputWake,
-		ID:    "w1",
-		Nonce: id.RunID.String(),
+		Key:  "user-1",
+		Kind: loops.InputWake,
+		ID:   "w1",
 	}, item.Data.Payload)
 	require.Equal(t, id.FunctionID, item.Data.Identifier.WorkflowID)
 	require.Equal(t, id.Tenant.AccountID, item.Data.Identifier.AccountID)
@@ -889,7 +888,7 @@ func TestLoopReturnTick(t *testing.T) {
 	t.Run("a return without end enqueues the tick", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.setTick(t, time.Minute)
-		id, resp, err := h.runLoop(t, ret(), nil)
+		_, resp, err := h.runLoop(t, ret(), nil)
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
 
@@ -898,14 +897,13 @@ func TestLoopReturnTick(t *testing.T) {
 		requireWithin(t, time.Now().Add(time.Minute), item.AtMS, 5*time.Second)
 		require.Equal(t, queue.KindLoopTick, item.Data.Kind)
 		require.Equal(t, queue.PayloadLoop{
-			Key:   "user-1",
-			Kind:  loops.InputTick,
-			Nonce: id.RunID.String(),
+			Key:  "user-1",
+			Kind: loops.InputTick,
 		}, item.Data.Payload)
 		require.Equal(t, h.req.Function.ID, item.Data.Identifier.WorkflowID)
 		require.Equal(t, ulid.ULID{}, item.Data.Identifier.RunID)
 
-		// a pending tick is kept by the next return, with its nonce.
+		// a pending tick is kept by the next return, at its first time.
 		_, resp, err = h.runLoop(t, ret(), new(loops.NewTickEvent("user-1")))
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)

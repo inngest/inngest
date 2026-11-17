@@ -677,10 +677,6 @@ type PayloadLoop struct {
 	Kind string `json:"kind"`
 	// ID is the wake id.  it is empty for a tick.
 	ID string `json:"id,omitempty"`
-	// Nonce is the id of the run that enqueued the item.  the event id of
-	// the run the item starts is derived from it, so every run of the same
-	// item starts the same run.
-	Nonce string `json:"n,omitempty"`
 }
 
 // PayloadPauseFunction represents the queue item payload for the internal system queue for

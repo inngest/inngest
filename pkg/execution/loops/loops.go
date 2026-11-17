@@ -4,10 +4,8 @@
 package loops
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -67,61 +65,32 @@ type Input struct {
 	ID   string
 }
 
-// NewTickEvent returns the event that starts a tick run for key, with a
-// random event id.
+// NewTickEvent returns the event that starts a tick run for key.  the
+// event id is random and the timestamp is now, the time the input is
+// handled.
 func NewTickEvent(key LoopKey) event.Event {
-	return NewTickEventWithID(key, ulid.MustNew(ulid.Now(), rand.Reader))
-}
-
-// NewTickEventWithID returns the event that starts a tick run for key with
-// the event id.  the timestamp is now, the time the input is handled.
-func NewTickEventWithID(key LoopKey, id ulid.ULID) event.Event {
-	return newLoopEvent(EventTick, id, map[string]any{
+	return newLoopEvent(EventTick, map[string]any{
 		"key": key,
 	})
 }
 
 // NewWakeEvent returns the event that starts a wake run for key with the
-// wake id, with a random event id.
+// wake id.  the event id is random and the timestamp is now, the time the
+// input is handled.
 func NewWakeEvent(key LoopKey, wakeID string) event.Event {
-	return NewWakeEventWithID(key, wakeID, ulid.MustNew(ulid.Now(), rand.Reader))
-}
-
-// NewWakeEventWithID returns the event that starts a wake run for key with
-// the wake id and the event id.  the timestamp is now, the time the input
-// is handled.
-func NewWakeEventWithID(key LoopKey, wakeID string, id ulid.ULID) event.Event {
-	return newLoopEvent(EventWake, id, map[string]any{
+	return newLoopEvent(EventWake, map[string]any{
 		"key": key,
 		"id":  wakeID,
 	})
 }
 
-func newLoopEvent(name string, id ulid.ULID, data map[string]any) event.Event {
+func newLoopEvent(name string, data map[string]any) event.Event {
 	return event.Event{
-		ID:        id.String(),
+		ID:        ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		Name:      name,
 		Data:      data,
 		Timestamp: time.Now().UnixMilli(),
 	}
-}
-
-// TimerEventID returns the event id for one tick or wake item.  the id is
-// derived from the item's job id and its nonce, the run id that enqueued
-// it, so every run of the same item builds the same id and the schedule
-// idempotency key drops all but the first.  the item's scheduled time is
-// not part of it, since a retry and a scavenge move the item.  the time
-// part of the id is the nonce's time, or zero when the nonce is not a
-// ulid.  that is the enqueuing run's time, not the time the timer fired,
-// so the id sorts by enqueue time.  the event timestamp is the firing
-// time, set when the item is handled.
-func TimerEventID(jobID string, nonce string) ulid.ULID {
-	var ms uint64
-	if id, err := ulid.Parse(nonce); err == nil {
-		ms = id.Time()
-	}
-	sum := sha256.Sum256([]byte(jobID + ":" + nonce))
-	return ulid.MustNew(ms, bytes.NewReader(sum[:]))
 }
 
 // InputFromEvent derives the input from the event map of a run's first
