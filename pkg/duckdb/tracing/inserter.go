@@ -262,19 +262,12 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 }
 
 // insertSQL builds one literal multi-row INSERT of rows (each in cols order)
-// into table, w/ a ? per value. extra are {column, SQL expression} pairs
-// appended to every row after cols (InsertSpans passes bucket_at's).
-func insertSQL(table string, cols []string, rows [][]any, extra ...[2]string) (string, []any) {
+// into table, w/ a ? per value.
+func insertSQL(table string, cols []string, rows [][]any) (string, []any) {
 	var sb strings.Builder
-	colList := strings.Join(cols, ", ")
-	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
-	for _, e := range extra {
-		colList += ", " + e[0]
-		placeholders += ", " + e[1]
-	}
-	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, colList)
+	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, strings.Join(cols, ", "))
 
-	placeholders = "(" + placeholders + ")"
+	placeholders := "(" + strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ") + ")"
 	args := make([]any, 0, len(rows)*len(cols))
 	for i, row := range rows {
 		if i > 0 {
