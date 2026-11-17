@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/conformance"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -245,4 +246,76 @@ func fixturesDevHandler(f *serveFixture) func(http.ResponseWriter, *http.Request
 			http.NotFound(w, r)
 		}
 	}
+}
+
+func TestRunCaseHonorsConfiguredTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Accept the trigger but never dispatch it back to the SDK. The case must
+	// stop at its configured deadline, not the five-second request wait.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	eventURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+	env := &runtimeEnv{
+		client: server.Client(),
+		runtime: conformance.RuntimeConfig{
+			EventURL: eventURL,
+			EventKey: "test",
+			Timeout:  50 * time.Millisecond,
+		},
+		proxy: &proxyServer{},
+		functionsBySlug: map[string]sdk.SDKFunction{
+			"test-suite-simple-fn": {Slug: "test-suite-simple-fn"},
+		},
+	}
+
+	started := time.Now()
+	result := env.runCase(context.Background(), conformance.Case{ID: "basic-invoke", SuiteID: "core"})
+	require.Equal(t, conformance.CaseStatusFailed, result.Status)
+	require.Contains(t, result.Reason, context.DeadlineExceeded.Error())
+	require.Less(t, time.Since(started), time.Second)
+}
+
+func TestCaseHarnessWaitsHonorCancellation(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"request", "response", "quiet window", "delay"} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			h := &caseHarness{ctx: ctx}
+			done := make(chan error, 1)
+			go func() {
+				switch name {
+				case "request":
+					done <- h.expectRequest(time.Second, "step")
+				case "response":
+					done <- h.expectResponse(http.StatusOK, time.Second, func([]byte) error {
+						return nil
+					})
+				case "quiet window":
+					done <- h.expectNoRequests(time.Second)
+				case "delay":
+					done <- h.wait(time.Second)
+				}
+			}()
+			cancel()
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(500 * time.Millisecond):
+				t.Fatal("case wait did not stop after cancellation")
+			}
+		})
+	}
+}
+
+func TestCaseHarnessQuietWindowCompletes(t *testing.T) {
+	t.Parallel()
+	h := &caseHarness{ctx: context.Background()}
+	require.NoError(t, h.expectNoRequests(time.Millisecond))
+	require.NoError(t, h.wait(time.Millisecond))
 }
