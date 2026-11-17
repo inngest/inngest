@@ -11,12 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSortRunsMatchesTheRunsTableSortKey pins inngest.runs' partition month
-// + sort key (schema.Runs.SortKey): (year(queued_at), month(queued_at),
-// account_id, env_id, run_id, queued_at) — tenant grouping outranks
+// TestSortRuns pins runs' key: (year(queued_at), month(queued_at),
+// account_id, env_id, run_id, queued_at). Tenant grouping outranks
 // chronological order within the same year/month, so a later-queued run in
 // an alphabetically-earlier account must still sort first.
-func TestSortRunsMatchesTheRunsTableSortKey(t *testing.T) {
+func TestSortRuns(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	accountA := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	accountB := uuid.MustParse("00000000-0000-0000-0000-000000000002")
@@ -33,10 +32,10 @@ func TestSortRunsMatchesTheRunsTableSortKey(t *testing.T) {
 		"account_id must outrank queued_at within the same year/month")
 }
 
-// TestSortSpansMatchesTheSpansTableSortKey pins run_trace_spans' key:
+// TestSortSpans pins run_trace_spans' key:
 // (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, start_time, end_time).
-func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
+func TestSortSpans(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	runA := uuid.MustParse("00000000-0000-0000-0000-000000000001").String()
 	runB := uuid.MustParse("00000000-0000-0000-0000-000000000002").String()
@@ -53,10 +52,10 @@ func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
 		"run_id must outrank start_time within the same year/month/tenant")
 }
 
-// TestSortEventsMatchesTheEventsTableSortKey pins events' key:
+// TestSortEvents pins events' key:
 // (year(received_at), month(received_at), account_id, env_id,
 // internal_id, received_at).
-func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
+func TestSortEvents(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	accountID, envID := uuid.New(), uuid.New()
 
@@ -71,10 +70,10 @@ func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
 		"internal_id must outrank received_at within the same year/month/tenant")
 }
 
-// TestSortMetadataMatchesTheMetadataTableSortKey pins run_metadata's key:
+// TestSortMetadata pins run_metadata's key:
 // (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, scope, step_id, step_index, step_attempt, span_id, kind).
-func TestSortMetadataMatchesTheMetadataTableSortKey(t *testing.T) {
+func TestSortMetadata(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	runID := uuid.New().String()
 	accountID, envID := uuid.New(), uuid.New()

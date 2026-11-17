@@ -537,23 +537,21 @@ func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work
 	return summary, timings, err
 }
 
-// sortRuns, sortSpans, and sortEvents sort a batch's rows in place to match
-// each table's partition month + sort key (schema.Table.SortKey, which
-// compaction will sort by, the lake tables don't declare one) — GenerateRuns
-// produces rows in arbitrary RNG order, so without this, writes would land
-// out of the order compaction sorts by for min/max pruning. Each key is built as a
-// single sortable string — year and month zero-padded, timestamps as
-// zero-padded UnixNano — so a plain lexicographic string comparison
-// reproduces the exact multi-column ORDER BY the schema declares, including
-// that tenant/natural-key columns outrank the trailing timestamp column(s)
-// within the same year/month.
+// sortRuns, sortSpans, sortEvents and sortMetadata sort a batch's rows in
+// place by partition month, then tenant + natural key, then timestamp(s).
+// The lake tables don't declare a sort order (appends land unsorted), and
+// GenerateRuns produces rows in arbitrary RNG order, so this just makes a
+// seeded lake's files look like sorted (compacted) ones for min/max
+// pruning. Each key is a single sortable string (year and month
+// zero-padded, timestamps as zero-padded UnixNano), so a plain
+// lexicographic comparison gives the multi-column order.
 
 func sortRuns(rows []RunRow) {
 	sort.Slice(rows, func(i, j int) bool { return runSortKey(rows[i]) < runSortKey(rows[j]) })
 }
 
-// runSortKey mirrors inngest.runs' sort key (year(queued_at),
-// month(queued_at), account_id, env_id, run_id, queued_at).
+// runSortKey is (year(queued_at), month(queued_at), account_id, env_id,
+// run_id, queued_at).
 func runSortKey(r RunRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d",
 		r.QueuedAt.Year(), r.QueuedAt.Month(), r.AccountID, r.EnvID, r.RunID, r.QueuedAt.UnixNano())
@@ -563,9 +561,8 @@ func sortSpans(rows []SpanRow) {
 	sort.Slice(rows, func(i, j int) bool { return spanSortKey(rows[i]) < spanSortKey(rows[j]) })
 }
 
-// spanSortKey mirrors inngest.run_trace_spans' sort key
-// (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id,
-// start_time, end_time).
+// spanSortKey is (year(run_queued_at), month(run_queued_at), account_id,
+// env_id, run_id, start_time, end_time).
 func spanSortKey(s SpanRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d-%020d",
 		s.RunQueuedAt.Year(), s.RunQueuedAt.Month(), s.AccountID, s.EnvID, s.RunID,
@@ -576,8 +573,8 @@ func sortEvents(rows []EventRow) {
 	sort.Slice(rows, func(i, j int) bool { return eventSortKey(rows[i]) < eventSortKey(rows[j]) })
 }
 
-// eventSortKey mirrors inngest.events' sort key (year(received_at),
-// month(received_at), account_id, env_id, internal_id, received_at).
+// eventSortKey is (year(received_at), month(received_at), account_id,
+// env_id, internal_id, received_at).
 func eventSortKey(e EventRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d",
 		e.ReceivedAt.Year(), e.ReceivedAt.Month(), e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt.UnixNano())
@@ -587,11 +584,10 @@ func sortMetadata(rows []MetadataRow) {
 	sort.Slice(rows, func(i, j int) bool { return metadataSortKey(rows[i]) < metadataSortKey(rows[j]) })
 }
 
-// metadataSortKey mirrors inngest.run_metadata's sort key
-// (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id,
-// scope, step_id, step_index, step_attempt, span_id, kind). step_index/
-// step_attempt sort as -1 when NULL (a run-scoped row) — only meant to keep
-// output deterministic, not to reproduce DuckDB's own NULL-ordering rules.
+// metadataSortKey is (year(run_queued_at), month(run_queued_at),
+// account_id, env_id, run_id, scope, step_id, step_index, step_attempt,
+// span_id, kind). step_index/step_attempt sort as -1 when NULL (a
+// run-scoped row), only to keep output deterministic.
 func metadataSortKey(m MetadataRow) string {
 	var stepID string
 	if m.StepID != nil {
