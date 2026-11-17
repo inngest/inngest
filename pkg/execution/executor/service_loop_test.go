@@ -155,7 +155,6 @@ func TestHandleLoopInput(t *testing.T) {
 		payload := item.Payload.(queue.PayloadLoop)
 		require.Equal(t, "user-1", payload.Key)
 		require.Equal(t, loops.InputTick, payload.Kind)
-		require.NotEmpty(t, payload.Nonce)
 		require.NoError(t, s.handleLoopInput(h.ctx, item))
 
 		require.Len(t, exec.reqs, 1)
@@ -232,40 +231,49 @@ func TestHandleLoopInput(t *testing.T) {
 		require.Eventually(t, func() bool { return pub.count() == 1 }, 2*time.Second, 10*time.Millisecond)
 	})
 
-	t.Run("the same item twice starts one run", func(t *testing.T) {
-		h := newLoopHarness(t)
-		h.openAndCommit(t)
-		s, exec, pub := h.loopService(t, h.req.Function)
+	// the queue runs an item twice when a worker stops after the schedule
+	// and before the dequeue.  each run of the item starts its own loop run,
+	// so a tick is never dropped as a duplicate.
+	for _, tt := range []struct {
+		name    string
+		kind    string
+		input   string
+		inputID string
+	}{
+		{
+			name:  "the same tick item twice starts two runs",
+			kind:  queue.KindLoopTick,
+			input: loops.InputTick,
+		},
+		{
+			name:    "the same wake item twice starts two runs",
+			kind:    queue.KindLoopWake,
+			input:   loops.InputWake,
+			inputID: "w1",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newLoopHarness(t)
+			h.openAndCommit(t)
+			s, exec, pub := h.loopService(t, h.req.Function)
 
-		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
+			item := h.timerItem(t, tt.kind, tt.input, tt.inputID)
+			require.NoError(t, s.handleLoopInput(h.ctx, item))
+			require.NoError(t, s.handleLoopInput(h.ctx, item))
 
-		// a retry or a scavenge moves the item, so the rerun has a new time.
-		item.At = item.At.Add(time.Minute)
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
-
-		require.Len(t, exec.reqs, 2)
-		first := exec.reqs[0].Events[0].GetEvent()
-		second := exec.reqs[1].Events[0].GetEvent()
-		require.Equal(t, first.ID, second.ID)
-		require.Equal(t, exec.reqs[0].Events[0].GetInternalID(), exec.reqs[1].Events[0].GetInternalID())
-		require.NotNil(t, exec.reqs[0].IdempotencyKey)
-		require.Equal(t, first.ID, *exec.reqs[0].IdempotencyKey)
-		require.NotNil(t, exec.mds[0])
-		require.Nil(t, exec.mds[1])
-		require.Eventually(t, func() bool { return pub.count() == 2 }, 2*time.Second, 10*time.Millisecond)
-
-		// the same job enqueued by another run carries a new nonce and is
-		// a new run.
-		payload := item.Payload.(queue.PayloadLoop)
-		payload.Nonce = ulid.Make().String()
-		item.Payload = payload
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
-		require.Len(t, exec.reqs, 3)
-		third := exec.reqs[2].Events[0].GetEvent()
-		require.NotEqual(t, first.ID, third.ID)
-		require.NotNil(t, exec.mds[2])
-	})
+			require.Len(t, exec.reqs, 2)
+			first := exec.reqs[0].Events[0]
+			second := exec.reqs[1].Events[0]
+			require.NotEqual(t, first.GetEvent().ID, second.GetEvent().ID)
+			require.NotEqual(t, first.GetInternalID(), second.GetInternalID())
+			require.Nil(t, exec.reqs[0].IdempotencyKey)
+			require.Nil(t, exec.reqs[1].IdempotencyKey)
+			require.NotNil(t, exec.mds[0])
+			require.NotNil(t, exec.mds[1])
+			require.NotEqual(t, exec.mds[0].ID.RunID, exec.mds[1].ID.RunID)
+			require.Eventually(t, func() bool { return pub.count() == 2 }, 2*time.Second, 10*time.Millisecond)
+		})
+	}
 
 	t.Run("the service run loop dispatches both kinds", func(t *testing.T) {
 		h := newLoopHarness(t)

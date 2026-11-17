@@ -681,8 +681,7 @@ func (e *executor) loopTickOnFinalize(ctx context.Context, md sv2.Metadata, stat
 }
 
 // loopTimerJobID returns the queue job id of the tick item or the wake
-// item of an instance.  the service builds the same id to name the event
-// that a run of the item starts.
+// item of an instance.
 func loopTimerJobID(id loops.ID, kind string, wakeID string) string {
 	if kind == loops.InputWake {
 		return fmt.Sprintf("wake:%s:%s", id.InstanceID(), wakeID)
@@ -692,9 +691,7 @@ func loopTimerJobID(id loops.ID, kind string, wakeID string) string {
 
 // loopTimerItem builds the queue item for a tick or a wake.  the item has
 // the function, account, env, and app ids and no run id, no semaphore, and
-// no concurrency key.  the run is created when the item is handled.  the
-// payload nonce is the enqueuing run id.  a pending tick that is kept and
-// a wake that is moved keep their nonce.
+// no concurrency key.  the run is created when the item is handled.
 func loopTimerItem(md sv2.Metadata, id loops.ID, jobID string, kind string, input string, inputID string) queue.Item {
 	maxAttempts := consts.MaxRetries + 1
 	return queue.Item{
@@ -710,10 +707,9 @@ func loopTimerItem(md sv2.Metadata, id loops.ID, jobID string, kind string, inpu
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,
 		Payload: queue.PayloadLoop{
-			Key:   id.Key,
-			Kind:  input,
-			ID:    inputID,
-			Nonce: md.ID.RunID.String(),
+			Key:  id.Key,
+			Kind: input,
+			ID:   inputID,
 		},
 	}
 }
