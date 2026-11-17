@@ -106,6 +106,10 @@ func (c *locationChecker) check(loc string) (string, error) {
 	if u.Scheme != wh.Scheme || u.Host != wh.Host || u.RawQuery != "" || u.Fragment != "" {
 		return "", fmt.Errorf("%w: location %q is outside the warehouse", errBadRequest, loc)
 	}
+	if hasDotSegment(u.Path) {
+		// Encoded (IE %2e%2e), which the raw check above can't see.
+		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
+	}
 	root := path.Clean("/" + wh.Path)
 	p := path.Clean("/" + u.Path)
 	if !underRoot(p, root, "/") {
@@ -147,6 +151,13 @@ func checkLocalLocation(root, loc string) (string, error) {
 		return "", fmt.Errorf("%w: location %q is outside the warehouse", errBadRequest, loc)
 	}
 	p := localPath(loc, u)
+	if hasDotSegment(p) {
+		// A file:// URL's path is decoded, so an encoded `..` (%2e%2e)
+		// only shows up here. Cleaning it away below would check a
+		// different path than the one written, which follows symlinks
+		// before applying the `..`.
+		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
+	}
 	if !filepath.IsAbs(p) {
 		return "", fmt.Errorf("%w: location %q must be absolute", errBadRequest, loc)
 	}
