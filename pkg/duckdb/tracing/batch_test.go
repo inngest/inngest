@@ -622,3 +622,47 @@ func TestBatcherRetriesOnlyUncommittedPart(t *testing.T) {
 		})
 	}
 }
+
+// An interrupted flush's leftover (resume) can be retried by a non-final
+// flush, if run takes another item off b.in before it sees stop. That
+// retry's backoff is interrupted by stop right away, and it has to keep
+// resume for the final flush rather than drop it. run's select picks
+// between the two at random, so this runs a bunch of times.
+func TestBatcherKeepsResumeInterruptedAgain(t *testing.T) {
+	for i := range 20 {
+		var flushes, retries atomic.Int64
+		var succeeded atomic.Bool
+		failed := make(chan struct{})
+		retry := func(context.Context) error {
+			if retries.Add(1) == 1 {
+				return errConflict
+			}
+			succeeded.Store(true)
+			return nil
+		}
+		var got []string
+		flush := func(_ context.Context, items []Event) error {
+			if flushes.Add(1) == 1 {
+				close(failed)
+				return &partialFlushError{err: errConflict, retry: retry}
+			}
+			for _, it := range items {
+				got = append(got, it.EventName)
+			}
+			return nil
+		}
+		opts := batcherOpts{maxSize: 1, flushInterval: time.Hour, retryBaseDelay: 100 * time.Millisecond, retryMaxDelay: 100 * time.Millisecond}
+		ch := make(chan Event, 10)
+		b := newBatcher("run_trace_spans", ch, flush, opts)
+		done := make(chan struct{})
+		go func() { b.run(t.Context()); close(done) }()
+
+		ch <- testEvent("1", "a")
+		<-failed
+		ch <- testEvent("2", "b")
+		b.stop()
+		<-done
+		require.True(t, succeeded.Load(), "run %d: the uncommitted part was dropped", i)
+		require.Equal(t, []string{"b"}, got, "run %d", i)
+	}
+}

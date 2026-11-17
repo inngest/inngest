@@ -266,10 +266,16 @@ func (b *batcher[T]) run(ctx context.Context) {
 		items := buf
 		var err error
 		if resume != nil {
-			// Only reachable from the final flush (an interrupted flush is
-			// always followed by it), so this can't be interrupted again.
-			_, _, err = b.flushWithRetry(ctx, base, resume, resumeN, final, stopc)
-			items, resume = buf[resumeN:], nil
+			// Usually the final flush, but a non-final one can get here too
+			// if run took another item off b.in (and hit maxSize) before
+			// seeing stopc. If that's interrupted again, keep what's left of
+			// it (and buf) for the final flush, same as the items path below.
+			interrupted, rest, resumeErr := b.flushWithRetry(ctx, base, resume, resumeN, final, stopc)
+			if interrupted {
+				resume = rest
+				return
+			}
+			items, resume, err = buf[resumeN:], nil, resumeErr
 		}
 		if len(items) > 0 {
 			interrupted, rest, itemsErr := b.flushWithRetry(ctx, base, func(ctx context.Context) error { return b.flush(ctx, items) }, len(items), final, stopc)
