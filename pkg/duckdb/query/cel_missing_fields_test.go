@@ -48,8 +48,8 @@ func TestEventsCELMissingFields(t *testing.T) {
 	for i := 1; i < len(evts); i++ {
 		ids[i] = ulid.MustNew(ulid.Timestamp(now.Add(time.Duration(i)*time.Millisecond)), nil)
 		_, err := m.db.ExecContext(ctx,
-			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, ?, ?);`,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, ?, ?, '{}'::JSON);`,
 			accountID.String(), envID.String(), ids[i].String(), now, evts[i].id, evts[i].name, evts[i].v, now,
 		)
 		require.NoError(t, err)

@@ -15,7 +15,7 @@ func TestTranspileRaw(t *testing.T) {
 	res, err := insights.TranspileRaw(`SELECT account_id, run_id, status FROM runs WHERE account_id = '` + acct + `' AND status = 'Failed'`)
 	require.NoError(t, err)
 	require.True(t, res.Raw())
-	require.Equal(t, "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.raw_runs()) "+
+	require.Equal(t, "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest_local.raw_runs()) "+
 		"SELECT account_id, run_id, status FROM __inngest_runs AS runs WHERE account_id = '"+acct+"' AND status = 'Failed' LIMIT 1000", res.SQL)
 	require.Empty(t, res.Args, "raw mode is unscoped")
 
@@ -74,7 +74,7 @@ func TestExecuteRaw(t *testing.T) {
 	})
 
 	t.Run("a product query can't call the raw macros", func(t *testing.T) {
-		_, err := insights.Execute(t.Context(), db, &insights.TranspileResult{SQL: `SELECT run_id FROM inngest.raw_runs()`})
+		_, err := insights.Execute(t.Context(), db, &insights.TranspileResult{SQL: `SELECT run_id FROM inngest_local.raw_runs()`})
 		require.ErrorContains(t, err, "not allowed")
 	})
 }

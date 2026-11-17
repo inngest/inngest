@@ -116,18 +116,12 @@ func NewDuckDBInserter(db *sql.DB) *DuckDBInserter {
 var spanColumns = []string{
 	"account_id", "env_id", "app_id", "app_name", "function_id", "function_slug",
 	"run_id", "run_queued_at", "trace_id", "span_id", "parent_span_id", "name",
-	"start_time", "end_time", "attributes", "output", "error", "input",
+	"start_time", "end_time", "attributes", "output", "error", "input", "bucket_at",
 }
 
 // spanBatchTable is the per-connection temp table InsertSpans stages each
 // span batch in.
 const spanBatchTable = "temp.main.dualwrite_span_batch"
-
-// bucketAtSQL is inngest.run_trace_spans.bucket_at's column default (see
-// 000001_baseline.sql). InsertSpans stamps it once while staging, so a span
-// and the runs row built from it share one bucket_at, same as when runs were
-// read back from the stored span.
-const bucketAtSQL = "make_timestamp_ms(epoch_ms(current_timestamp))"
 
 // rollbackTimeout bounds the ROLLBACK after a failed span batch.
 const rollbackTimeout = 5 * time.Second
@@ -137,42 +131,46 @@ const rollbackTimeout = 5 * time.Second
 // runsInsertSQL), so building the batch's runs rows never reads the lake.
 //
 // When the lake commits several tables atomically
-// (driver.AtomicMultiTableCommit: DuckLake over quack), the whole thing runs
+// (driver.AtomicMultiTableCommit: plain tables over quack), the whole thing runs
 // as one transaction, so a failure can't leave the batch's spans w/o their
 // runs rows (nothing ever rebuilds runs from spans, so that run row would be
 // lost for good). Otherwise it runs the same statements w/o one: the
 // jsonlines transport (tests) can't recover from a failed statement inside
 // a transaction, and a lake that can't commit 2 tables at once (IE an
 // Iceberg catalog w/o /v1/transactions/commit) rejects the transaction
-// outright, so there spans and runs are 2 commits.
+// outright, so there spans and runs are 2 commits. If the runs commit fails
+// after the spans landed, the error is a partialFlushError so a retry only
+// redoes the runs insert.
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
 	}
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(spans))
 	for i, s := range spans {
 		rows[i] = []any{
 			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
 			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
-			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input),
+			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input), bucketAt,
 		}
 	}
 
-	cols := strings.Join(spanColumns, ", ") + ", bucket_at"
-	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows, [2]string{"bucket_at", bucketAtSQL})
-	stmts := []string{
+	cols := strings.Join(spanColumns, ", ")
+	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows)
+	stage := []string{
 		// Clones run_trace_spans' column types (VARIANT etc.) so the runs
 		// projection sees exactly what it would reading the stored span.
 		// LIMIT 0 is planned as an empty result, so this doesn't scan the
 		// lake.
 		"CREATE OR REPLACE TEMP TABLE " + spanBatchTable + " AS SELECT * FROM inngest.run_trace_spans LIMIT 0;",
 		stageSQL,
-		fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable),
 	}
+	insertSpans := []string{fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable)}
+	var insertRuns []string
 	if slices.ContainsFunc(spans, func(s Span) bool { return slices.Contains(runsMaterializingSpanNames, s.Name) }) {
-		stmts = append(stmts, runsInsertSQL(spanBatchTable))
+		insertRuns = []string{runsInsertSQL(spanBatchTable)}
 	}
-	stmts = append(stmts, "DROP TABLE "+spanBatchTable+";")
+	drop := []string{"DROP TABLE " + spanBatchTable + ";"}
 
 	conn, err := d.db.Conn(ctx)
 	if err != nil {
@@ -181,12 +179,27 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	defer conn.Close()
 
 	if !driver.AtomicMultiTableCommit(conn) {
-		_, err = conn.ExecContext(ctx, strings.Join(stmts, "\n"), args...)
-		return err
+		// Spans and runs are separate commits here, so if the runs insert
+		// fails after the spans landed, a retry has to restage the batch
+		// and insert just its runs rows (see partialFlushError).
+		if len(insertRuns) == 0 {
+			_, err = conn.ExecContext(ctx, script(stage, insertSpans, drop), args...)
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(stage, insertSpans), args...); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(insertRuns, drop)); err != nil {
+			return &partialFlushError{err: err, retry: func(ctx context.Context) error {
+				_, err := d.db.ExecContext(ctx, script(stage, insertRuns, drop), args...)
+				return err
+			}}
+		}
+		return nil
 	}
 
-	script := "BEGIN TRANSACTION;\n" + strings.Join(stmts, "\n") + "\nCOMMIT;"
-	if _, err := conn.ExecContext(ctx, script, args...); err != nil {
+	txn := script([]string{"BEGIN TRANSACTION;"}, stage, insertSpans, insertRuns, drop, []string{"COMMIT;"})
+	if _, err := conn.ExecContext(ctx, txn, args...); err != nil {
 		// A failed statement leaves the transaction aborted on this session
 		// (a failed COMMIT has already rolled back, and this just errors).
 		// Roll back so the pooled conn is usable again.
@@ -200,15 +213,16 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 
 var eventColumns = []string{
 	"account_id", "env_id", "internal_id", "received_at", "source", "source_id", "event_id",
-	"event_name", "event_ts", "event_data", "event_v", "event_meta",
+	"event_name", "event_ts", "event_data", "event_v", "event_meta", "bucket_at",
 }
 
 func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error {
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(events))
 	for i, e := range events {
 		rows[i] = []any{
 			e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt, e.Source, nullable(e.SourceID), e.EventID,
-			e.EventName, e.EventTS, e.EventData, e.EventV, e.EventMeta,
+			e.EventName, e.EventTS, e.EventData, e.EventV, e.EventMeta, bucketAt,
 		}
 	}
 	return d.insert(ctx, "inngest.events", eventColumns, rows)
@@ -216,15 +230,16 @@ func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error
 
 var runMetadataColumns = []string{
 	"account_id", "env_id", "run_id", "run_queued_at", "span_id", "scope", "kind",
-	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt",
+	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt", "bucket_at",
 }
 
 func (d *DuckDBInserter) InsertRunMetadata(ctx context.Context, entries []RunMetadata) error {
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(entries))
 	for i, m := range entries {
 		rows[i] = []any{
 			m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt, m.SpanID, m.Scope, m.Kind,
-			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt),
+			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt), bucketAt,
 		}
 	}
 	return d.insert(ctx, "inngest.run_metadata", runMetadataColumns, rows)
@@ -247,19 +262,12 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 }
 
 // insertSQL builds one literal multi-row INSERT of rows (each in cols order)
-// into table, w/ a ? per value. extra are {column, SQL expression} pairs
-// appended to every row after cols (InsertSpans passes bucket_at's).
-func insertSQL(table string, cols []string, rows [][]any, extra ...[2]string) (string, []any) {
+// into table, w/ a ? per value.
+func insertSQL(table string, cols []string, rows [][]any) (string, []any) {
 	var sb strings.Builder
-	colList := strings.Join(cols, ", ")
-	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
-	for _, e := range extra {
-		colList += ", " + e[0]
-		placeholders += ", " + e[1]
-	}
-	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, colList)
+	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, strings.Join(cols, ", "))
 
-	placeholders = "(" + placeholders + ")"
+	placeholders := "(" + strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ") + ")"
 	args := make([]any, 0, len(rows)*len(cols))
 	for i, row := range rows {
 		if i > 0 {
@@ -270,6 +278,18 @@ func insertSQL(table string, cols []string, rows [][]any, extra ...[2]string) (s
 	}
 	sb.WriteString(";")
 	return sb.String(), args
+}
+
+// script joins groups of statements into one script.
+func script(parts ...[]string) string {
+	return strings.Join(slices.Concat(parts...), "\n")
+}
+
+// bucketAtNow is a batch's bucket_at: when it became visible, at the ms
+// precision the ClickHouse buffer stores. Writers set it explicitly since an
+// Iceberg column default is a literal frozen at CREATE TABLE time.
+func bucketAtNow() time.Time {
+	return time.Now().UTC().Truncate(time.Millisecond)
 }
 
 // nullableJSON maps an absent JSON value to SQL NULL rather than an empty

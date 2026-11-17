@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -12,17 +13,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
-// newTestDuckLake opens a real duckdb subprocess the way the dev server's
+// newTestIcebergLake opens a real duckdb subprocess the way the dev server's
 // persisted dual-write does: a DuckLake catalog over the quack transport.
 // The pool is capped at 1 conn, so a test can see whether a failed batch
 // left that conn unusable (IE stuck in an aborted transaction).
-func newTestDuckLake(t *testing.T) *sql.DB {
+func newTestIcebergLake(t *testing.T) *sql.DB {
 	t.Helper()
 	binPath, err := exec.LookPath("duckdb")
 	if err != nil {
@@ -34,10 +37,7 @@ func newTestDuckLake(t *testing.T) *sql.DB {
 		BinaryPath: binPath,
 		StateDir:   dir,
 		DBFile:     filepath.Join(dir, "main.duckdb"),
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 		QuackAddr:  &addr,
 		QuackConns: 2,
 	})
@@ -77,7 +77,7 @@ func legacyInsertSpans(ctx context.Context, db *sql.DB, spans []Span) error {
 		rows[i] = []any{
 			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
 			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
-			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input),
+			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input), bucketAtNow(),
 		}
 	}
 	if err := NewDuckDBInserter(db).insert(ctx, "inngest.run_trace_spans", spanColumns, rows); err != nil {
@@ -182,7 +182,7 @@ func TestInsertSpansRunsMatchLegacyMaterialization(t *testing.T) {
 	memDB, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
-	for name, db := range map[string]*sql.DB{"jsonlines memory": memDB, "quack ducklake": newTestDuckLake(t)} {
+	for name, db := range map[string]*sql.DB{"jsonlines memory": memDB, "quack ducklake": newTestIcebergLake(t)} {
 		t.Run(name, func(t *testing.T) {
 			require.NoError(t, NewDuckDBInserter(db).InsertSpans(t.Context(), batch))
 			require.Equal(t, normalized(t, want), normalized(t, selectRows(t, db, runsCompareSQL, runA.String(), runB.String())))
@@ -204,7 +204,7 @@ func TestInsertSpansRunsMatchLegacyMaterialization(t *testing.T) {
 // so every queued/started/finished emission of a run shares one span_id) and
 // re-inserted it as another runs row.
 func TestInsertSpansIgnoresSpansAlreadyInLake(t *testing.T) {
-	db := newTestDuckLake(t)
+	db := newTestIcebergLake(t)
 	ins := NewDuckDBInserter(db)
 
 	runA, runB := ulid.Make(), ulid.Make()
@@ -248,7 +248,7 @@ func TestInsertSpansIgnoresSpansAlreadyInLake(t *testing.T) {
 
 // The staging CTAS clones run_trace_spans' column types w/o reading it.
 func TestInsertSpansStagingDoesNotScanLake(t *testing.T) {
-	db := newTestDuckLake(t)
+	db := newTestIcebergLake(t)
 	rows := selectRows(t, db, "EXPLAIN SELECT * FROM inngest.run_trace_spans LIMIT 0")
 	var plan strings.Builder
 	for _, r := range rows {
@@ -258,35 +258,68 @@ func TestInsertSpansStagingDoesNotScanLake(t *testing.T) {
 	require.NotContains(t, strings.ToUpper(plan.String()), "SCAN", plan.String())
 }
 
-// TestInsertSpansIsAtomicOnDuckLake fails a batch's runs insert (a run span
-// w/o a status violates runs.status NOT NULL) and checks the batch's spans
-// were rolled back w/ it, and that the conn isn't left in an aborted
-// transaction.
-func TestInsertSpansIsAtomicOnDuckLake(t *testing.T) {
-	db := newTestDuckLake(t)
-	ins := NewDuckDBInserter(db)
+// newTestQuackDB is newTestDuckDB (plain in-memory tables) over quack, so
+// InsertSpans runs its batch in a transaction.
+func newTestQuackDB(t *testing.T) *sql.DB {
+	t.Helper()
+	addr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: driver.RequireDuckDBBinary(t), DBFile: ":memory:", QuackAddr: &addr})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeMemory))
+	db.SetMaxOpenConns(1)
+	return db
+}
 
-	runA := ulid.Make()
-	bad := []Span{
-		runSpan(runA, "span-step", "executor.step", map[string]any{}),
-		runSpan(runA, "span-run", "executor.run", map[string]any{}), // no status
+// TestInsertSpansAtomicity fails a batch's runs insert (a run span w/o a
+// status violates runs.status NOT NULL). Plain tables commit both tables at
+// once, so the batch's spans roll back w/ it. An Iceberg lake can't (no
+// /v1/transactions/commit), so there it's 2 commits and the spans stay.
+// Either way the conn is usable after, and a batch w/ a run span lands.
+func TestInsertSpansAtomicity(t *testing.T) {
+	for name, c := range map[string]struct {
+		open      func(*testing.T) *sql.DB
+		wantSpans int
+	}{
+		"plain tables": {newTestQuackDB, 0},
+		"iceberg":      {newTestIcebergLake, 2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := c.open(t)
+			ins := NewDuckDBInserter(db)
+
+			runA := ulid.Make()
+			bad := []Span{
+				runSpan(runA, "span-step", "executor.step", map[string]any{}),
+				runSpan(runA, "span-run", "executor.run", map[string]any{}), // no status
+			}
+			err := ins.InsertSpans(t.Context(), bad)
+			require.ErrorIs(t, err, driver.ErrStatementFailed)
+			require.Contains(t, err.Error(), "NOT NULL")
+			require.False(t, retryableFlushError(err))
+
+			var spans, runs int
+			require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
+			require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
+			require.Equal(t, c.wantSpans, spans)
+			require.Zero(t, runs)
+
+			// Once spans committed on their own, the error says so, and its
+			// retry doesn't insert them again.
+			var partial *partialFlushError
+			require.Equal(t, c.wantSpans > 0, errors.As(err, &partial))
+			if partial != nil {
+				require.ErrorIs(t, partial.retry(t.Context()), driver.ErrStatementFailed)
+				require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
+				require.Equal(t, c.wantSpans, spans)
+			}
+
+			runB, runC := ulid.Make(), ulid.Make()
+			require.NoError(t, ins.InsertSpans(t.Context(), spanBatch(runB, runC)))
+			require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
+			require.Equal(t, 3, runs)
+		})
 	}
-	err := ins.InsertSpans(t.Context(), bad)
-	require.ErrorIs(t, err, driver.ErrStatementFailed)
-	require.Contains(t, err.Error(), "NOT NULL")
-	require.False(t, retryableFlushError(err))
-
-	var spans, runs int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
-	require.Zero(t, spans, "spans must roll back w/ the failed runs insert")
-	require.Zero(t, runs)
-
-	// The (only) conn is usable again.
-	runB, runC := ulid.Make(), ulid.Make()
-	require.NoError(t, ins.InsertSpans(t.Context(), spanBatch(runB, runC)))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
-	require.Equal(t, 3, runs)
 }
 
 // jsonlines can't run the batch in a transaction (see
@@ -302,4 +335,48 @@ func TestInsertSpansFailureDoesNotHangJSONLines(t *testing.T) {
 	err := NewDuckDBInserter(db).InsertSpans(ctx, []Span{runSpan(runA, "span-run", "executor.run", map[string]any{})})
 	require.ErrorIs(t, err, driver.ErrStatementFailed)
 	require.NoError(t, ctx.Err())
+}
+
+// An Iceberg column default is frozen at CREATE TABLE time, so a metadata
+// batch's bucket_at has to be set by the writer to be its insert time.
+func TestInsertRunMetadataBucketAt(t *testing.T) {
+	db := newTestIcebergLake(t)
+	time.Sleep(50 * time.Millisecond)
+	before := time.Now().UTC().Truncate(time.Millisecond)
+
+	require.NoError(t, NewDuckDBInserter(db).InsertRunMetadata(t.Context(), []RunMetadata{{
+		AccountID: uuid.NewString(), EnvID: uuid.NewString(), RunID: ulid.Make().String(),
+		RunQueuedAt: time.Now(), SpanID: "span", Scope: "run", Kind: "inngest.test",
+		Values: json.RawMessage(`{"a":1}`), CreatedAt: time.Now(),
+	}}))
+
+	var bucketAt time.Time
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT bucket_at FROM inngest.run_metadata").Scan(&bucketAt))
+	require.False(t, bucketAt.Before(before), "bucket_at %s is before the insert (%s)", bucketAt, before)
+}
+
+// A span batch whose runs commit fails after its spans landed (on a lake w/o
+// atomic multi-table commits) is finished by its partialFlushError's retry
+// w/o a second copy of the spans.
+func TestInsertSpansPartialRetry(t *testing.T) {
+	db := newTestIcebergLake(t)
+	ins := NewDuckDBInserter(db)
+	runA, runB := ulid.Make(), ulid.Make()
+	batch := spanBatch(runA, runB)
+
+	// Fail the runs insert (and only it) by moving the table out of the way.
+	_, err := db.ExecContext(t.Context(), "ALTER TABLE inngest.runs RENAME TO runs_moved")
+	require.NoError(t, err)
+	err = ins.InsertSpans(t.Context(), batch)
+	var partial *partialFlushError
+	require.ErrorAs(t, err, &partial)
+	_, err = db.ExecContext(t.Context(), "ALTER TABLE inngest.runs_moved RENAME TO runs")
+	require.NoError(t, err)
+
+	require.NoError(t, partial.retry(t.Context()))
+	var spans, runs int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.run_trace_spans").Scan(&spans))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM inngest.runs").Scan(&runs))
+	require.Equal(t, len(batch), spans)
+	require.Equal(t, 3, runs)
 }

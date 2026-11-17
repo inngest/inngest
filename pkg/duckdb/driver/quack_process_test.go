@@ -18,7 +18,7 @@ func TestStartProcessWithQuackTransport(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -44,7 +44,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -109,7 +109,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -197,7 +197,7 @@ func TestQuackAbandonedStatementDoesNotBlockNextStatement(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -241,7 +241,7 @@ func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -296,7 +296,7 @@ func TestQuackAbandonedStatementsAreCapped(t *testing.T) {
 	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
-	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr, withMaxAbandoned(1))
+	p, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr, withMaxAbandoned(1))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 

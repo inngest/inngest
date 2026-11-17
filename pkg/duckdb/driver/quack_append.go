@@ -68,11 +68,11 @@ type QuackAppender struct {
 // The wire protocol has no catalog field: it resolves schema.table against
 // the target connection's own default catalog, which is per-connection, not
 // shared with the bootstrapping CLI session. So when catalog is non-empty,
-// NewQuackAppender issues "USE <catalog>;" once on the resolved session
+// NewQuackAppender issues "USE <catalog>.<schema>;" once on the resolved session
 // before returning. This is a real, global mutation of that session's
-// default catalog for every later statement — safe here only because every
-// other caller already fully qualifies table names with DuckLakeAlias (see
-// cmd/duckdbseed/insert.go).
+// default catalog (and schema) for every later statement — safe here only
+// because every other caller already fully qualifies table names with
+// LakeAlias (see cmd/duckdbseed/insert.go).
 func NewQuackAppender(ctx context.Context, db *sql.DB, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
 	sqlConn, err := db.Conn(ctx)
 	if err != nil {
@@ -107,7 +107,7 @@ func NewQuackAppenderFromConn(ctx context.Context, driverConn driver.Conn, catal
 // NewQuackAppenderFromConn share: resolve driverConn to its underlying
 // quack.Session, optionally switch catalog, construct the QuackAppender.
 func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
-	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, "quack appender")
+	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, schema, "quack appender")
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +123,10 @@ func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog
 // The wire protocol has no catalog field: it resolves schema.table against
 // the target connection's own default catalog, which is per-connection, not
 // shared with the bootstrapping CLI session. So when catalog is non-empty,
-// this issues "USE <catalog>;" once on the resolved session before
+// this issues "USE <catalog>.<schema>;" once on the resolved session before
 // returning. This is a real, global mutation of that session's default
-// catalog for every later statement — safe here only because every other
-// caller already fully qualifies table names with DuckLakeAlias (see
-// cmd/duckdbseed/insert.go).
-func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog, errPrefix string) (*quack.Session, error) {
+// catalog for every later statement (see NewQuackAppender's NOTE).
+func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog, schema, errPrefix string) (*quack.Session, error) {
 	c, ok := driverConn.(*conn)
 	if !ok {
 		return nil, fmt.Errorf("duckdb: %s: unexpected driver connection type %T", errPrefix, driverConn)
@@ -163,7 +161,15 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 	}
 
 	if catalog != "" {
-		if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", quack.Identifier(catalog))); err != nil {
+		// USE catalog.schema rather than just the catalog: on an Iceberg
+		// catalog (no default schema of its own) a bare `USE "inngest"`
+		// leaves 2-part `inngest.<table>` names on the session binding as
+		// schema "inngest" and failing.
+		target := quack.Identifier(catalog)
+		if schema != "" {
+			target += "." + quack.Identifier(schema)
+		}
+		if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", target)); err != nil {
 			return nil, fmt.Errorf("duckdb: %s: switching to catalog %q: %w", errPrefix, catalog, err)
 		}
 	}

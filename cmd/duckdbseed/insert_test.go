@@ -11,12 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSortRunsMatchesTheRunsTableSortKey pins the exact key schema.go
-// declares for inngest.runs: SORTED BY (year(queued_at), month(queued_at),
-// account_id, env_id, run_id, queued_at) — tenant grouping outranks
+// TestSortRuns pins runs' key: (year(queued_at), month(queued_at),
+// account_id, env_id, run_id, queued_at). Tenant grouping outranks
 // chronological order within the same year/month, so a later-queued run in
 // an alphabetically-earlier account must still sort first.
-func TestSortRunsMatchesTheRunsTableSortKey(t *testing.T) {
+func TestSortRuns(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	accountA := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	accountB := uuid.MustParse("00000000-0000-0000-0000-000000000002")
@@ -33,10 +32,10 @@ func TestSortRunsMatchesTheRunsTableSortKey(t *testing.T) {
 		"account_id must outrank queued_at within the same year/month")
 }
 
-// TestSortSpansMatchesTheSpansTableSortKey pins run_trace_spans' key:
-// SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// TestSortSpans pins run_trace_spans' key:
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, start_time, end_time).
-func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
+func TestSortSpans(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	runA := uuid.MustParse("00000000-0000-0000-0000-000000000001").String()
 	runB := uuid.MustParse("00000000-0000-0000-0000-000000000002").String()
@@ -53,10 +52,10 @@ func TestSortSpansMatchesTheSpansTableSortKey(t *testing.T) {
 		"run_id must outrank start_time within the same year/month/tenant")
 }
 
-// TestSortEventsMatchesTheEventsTableSortKey pins events' key:
-// SORTED BY (year(received_at), month(received_at), account_id, env_id,
+// TestSortEvents pins events' key:
+// (year(received_at), month(received_at), account_id, env_id,
 // internal_id, received_at).
-func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
+func TestSortEvents(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	accountID, envID := uuid.New(), uuid.New()
 
@@ -71,10 +70,10 @@ func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
 		"internal_id must outrank received_at within the same year/month/tenant")
 }
 
-// TestSortMetadataMatchesTheMetadataTableSortKey pins run_metadata's key:
-// SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// TestSortMetadata pins run_metadata's key:
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
 // run_id, scope, step_id, step_index, step_attempt, span_id, kind).
-func TestSortMetadataMatchesTheMetadataTableSortKey(t *testing.T) {
+func TestSortMetadata(t *testing.T) {
 	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	runID := uuid.New().String()
 	accountID, envID := uuid.New(), uuid.New()
@@ -115,22 +114,22 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	require.Greater(t, wantMetadata, 0, "testTemplates' MetadataProfiles should produce some metadata across 3 runs")
 
 	var runCount int
-	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;")
+	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;")
 	require.NoError(t, row.Scan(&runCount))
 	require.Equal(t, 3, runCount)
 
 	var spanCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".run_trace_spans;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_trace_spans;")
 	require.NoError(t, row.Scan(&spanCount))
 	require.Equal(t, wantSpans, spanCount)
 
 	var eventCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".events;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".events;")
 	require.NoError(t, row.Scan(&eventCount))
 	require.Equal(t, wantEvents, eventCount)
 
 	var metadataCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".run_metadata;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_metadata;")
 	require.NoError(t, row.Scan(&metadataCount))
 	require.Equal(t, wantMetadata, metadataCount)
 }
@@ -201,7 +200,7 @@ func TestInsertGeneratedRunsBatchesAcrossMultipleRunsPerFlush(t *testing.T) {
 	require.Equal(t, wantEvents, summary.Events)
 
 	var runCount int
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
 	require.Equal(t, 5, runCount)
 }
 
@@ -242,8 +241,8 @@ func TestInsertGeneratedRunsProgressBatchIndicesAreDistinctUnderConcurrency(t *t
 
 	require.Equal(t, 40, summary.Runs)
 	var runCount, distinctRunIDs int
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(DISTINCT run_id) FROM "+driver.DuckLakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
 	require.Equal(t, 40, runCount)
 	require.Equal(t, 40, distinctRunIDs, "no run should have been written more than once")
 }
@@ -330,7 +329,7 @@ func TestGenerateAndInsertPropagatesGenerationErrors(t *testing.T) {
 // instead of leaving the generator blocked on work.
 func TestGenerateAndInsertReturnsWriteErrors(t *testing.T) {
 	connector, db := newTestDB(t, 1)
-	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.DuckLakeAlias+".run_trace_spans;")
+	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.LakeAlias+".run_trace_spans;")
 	require.NoError(t, err)
 	genCfg := GenerateConfig{RunCount: 50, Window: time.Hour, Now: time.Now().UTC()}
 
@@ -360,8 +359,8 @@ func TestGenerateAndInsertWithParallelism(t *testing.T) {
 	require.Equal(t, 40, summary.Runs)
 
 	var runCount, distinctRunIDs int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.DuckLakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
 	require.Equal(t, 40, runCount)
 	require.Equal(t, 40, distinctRunIDs)
 }

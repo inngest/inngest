@@ -195,8 +195,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 
 // AtomicMultiTableCommit reports whether a transaction on c that writes
 // several lake tables commits them all or none: SupportsTransactions, and a
-// lake whose commits span tables. DuckLake's do (one catalog transaction),
-// as do plain duckdb tables. c must be pinned, as for SupportsTransactions.
+// lake whose commits span tables (plain duckdb tables, not Iceberg). c must be pinned, as for SupportsTransactions.
 func AtomicMultiTableCommit(c *sql.Conn) bool {
 	if !SupportsTransactions(c) {
 		return false
@@ -224,9 +223,11 @@ func processOf(dc *conn) *process {
 	return nil
 }
 
-// atomicMultiTableCommit: DuckLake and plain duckdb tables commit every
-// table in a transaction at once.
-func (p *process) atomicMultiTableCommit() bool { return true }
+// atomicMultiTableCommit: plain duckdb tables commit every table in a
+// transaction at once. An Iceberg lake doesn't: duckdb-iceberg needs the
+// catalog's /v1/transactions/commit for that, and rejects a multi-table
+// transaction w/o it (the embedded catalog doesn't have it).
+func (p *process) atomicMultiTableCommit() bool { return p.iceberg == nil }
 
 // SupportsTransactions reports whether c can run an explicit
 // `BEGIN ... COMMIT` script and recover from a failure partway through it

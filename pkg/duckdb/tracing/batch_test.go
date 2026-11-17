@@ -354,9 +354,10 @@ func logCtx(t *testing.T) (context.Context, *syncBuffer) {
 	return logger.WithStdlib(t.Context(), l), buf
 }
 
-// errConflict is what a DuckLake commit conflict looks like coming out of
-// the driver: a statement error, so it definitely didn't commit.
-var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit DuckLake transaction: Transaction conflict - attempting to insert into table with index \"1\"", duckdbdriver.ErrStatementFailed)
+// errConflict is what an Iceberg commit conflict looks like coming out of
+// the driver: the catalog's 409 as a statement error, so it definitely
+// didn't commit.
+var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit: Failed to commit Iceberg transaction: Request to 'http://127.0.0.1:12345/v1' returned a non-200 status code (Conflict_409).", duckdbdriver.ErrStatementFailed)
 
 // fastRetry keeps retry tests quick.
 func fastRetry(o batcherOpts) batcherOpts {
@@ -371,10 +372,11 @@ func TestRetryableFlushError(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"ducklake conflict", errConflict, true},
+		{"iceberg conflict", errConflict, true},
+		// The commit may have gone through before the catalog failed.
+		{"iceberg catalog 5xx", fmt.Errorf("%w: TransactionContext Error: Failed to commit: Failed to commit Iceberg transaction: Request to 'http://127.0.0.1:12345/v1' returned a non-200 status code (InternalServerError_500).", duckdbdriver.ErrStatementFailed), false},
+		{"duckdb conflict", fmt.Errorf("%w: TransactionContext Error: Catalog write-write conflict on create with \"runs\"", duckdbdriver.ErrStatementFailed), true},
 		{"aborted txn", fmt.Errorf("%w: TransactionContext Error: Current transaction is aborted (please ROLLBACK)", duckdbdriver.ErrStatementFailed), true},
-		{"sqlite catalog busy", fmt.Errorf("%w: IO Error: database is locked", duckdbdriver.ErrStatementFailed), true},
-		{"postgres catalog serialization", fmt.Errorf("%w: could not serialize access due to concurrent update", duckdbdriver.ErrStatementFailed), true},
 		{"constraint", fmt.Errorf("%w: Constraint Error: NOT NULL constraint failed: runs.status", duckdbdriver.ErrStatementFailed), false},
 		// Ambiguous: the statement may have committed before the response
 		// was lost, so a retry could insert twice.
@@ -563,5 +565,104 @@ func TestBatcherFinalFlushIsBounded(t *testing.T) {
 			}
 			require.Less(t, time.Since(start), 2*time.Second)
 		})
+	}
+}
+
+// After a partialFlushError only its retry runs again, never the whole
+// batch (which would insert the part that already committed twice).
+func TestBatcherRetriesOnlyUncommittedPart(t *testing.T) {
+	for _, stopDuringBackoff := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stop during backoff %v", stopDuringBackoff), func(t *testing.T) {
+			var flushes, retries atomic.Int64
+			failed := make(chan struct{})
+			retried := make(chan struct{})
+			retry := func(context.Context) error {
+				if retries.Add(1) == 1 && !stopDuringBackoff {
+					return errConflict
+				}
+				close(retried)
+				return nil
+			}
+			flush := func(context.Context, []Event) error {
+				if flushes.Add(1) == 1 {
+					close(failed)
+					return &partialFlushError{err: errConflict, retry: retry}
+				}
+				return nil
+			}
+			opts := fastRetry(batcherOpts{maxSize: 1, flushInterval: time.Hour})
+			if stopDuringBackoff {
+				opts.retryBaseDelay, opts.retryMaxDelay = time.Hour, time.Hour
+			}
+			ch := make(chan Event, 10)
+			b := newBatcher("run_trace_spans", ch, flush, opts)
+			done := make(chan struct{})
+			go func() { b.run(t.Context()); close(done) }()
+
+			ch <- testEvent("1", "a")
+			<-failed
+			if stopDuringBackoff {
+				b.stop()
+			}
+			select {
+			case <-retried:
+			case <-time.After(5 * time.Second):
+				t.Fatal("retry never ran")
+			}
+			if !stopDuringBackoff {
+				b.stop()
+			}
+			<-done
+			require.Equal(t, int64(1), flushes.Load(), "the batch itself is flushed once")
+			want := int64(2)
+			if stopDuringBackoff {
+				want = 1 // by the final flush
+			}
+			require.Equal(t, want, retries.Load())
+		})
+	}
+}
+
+// An interrupted flush's leftover (resume) can be retried by a non-final
+// flush, if run takes another item off b.in before it sees stop. That
+// retry's backoff is interrupted by stop right away, and it has to keep
+// resume for the final flush rather than drop it. run's select picks
+// between the two at random, so this runs a bunch of times.
+func TestBatcherKeepsResumeInterruptedAgain(t *testing.T) {
+	for i := range 20 {
+		var flushes, retries atomic.Int64
+		var succeeded atomic.Bool
+		failed := make(chan struct{})
+		retry := func(context.Context) error {
+			if retries.Add(1) == 1 {
+				return errConflict
+			}
+			succeeded.Store(true)
+			return nil
+		}
+		var got []string
+		flush := func(_ context.Context, items []Event) error {
+			if flushes.Add(1) == 1 {
+				close(failed)
+				return &partialFlushError{err: errConflict, retry: retry}
+			}
+			for _, it := range items {
+				got = append(got, it.EventName)
+			}
+			return nil
+		}
+		opts := batcherOpts{maxSize: 1, flushInterval: time.Hour, retryBaseDelay: 100 * time.Millisecond, retryMaxDelay: 100 * time.Millisecond}
+		ch := make(chan Event, 10)
+		b := newBatcher("run_trace_spans", ch, flush, opts)
+		done := make(chan struct{})
+		go func() { b.run(t.Context()); close(done) }()
+
+		ch <- testEvent("1", "a")
+		<-failed
+		ch <- testEvent("2", "b")
+		b.stop()
+		<-done
+		require.True(t, succeeded.Load(), "run %d: the uncommitted part was dropped", i)
+		require.Equal(t, []string{"b"}, got, "run %d", i)
 	}
 }

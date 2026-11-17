@@ -64,20 +64,20 @@ func TestCheckRenderedSQLRejectsWhatTranspileNeverProduces(t *testing.T) {
 	defer cleanup()
 
 	for q, want := range map[string]string{
-		"SELECT getenv('HOME')":                                     `function "getenv"`,
-		"SELECT content FROM read_text('/etc/hosts')":               `function "read_text"`,
-		"SELECT * FROM query('SELECT * FROM inngest.runs')":         `function "query"`,
-		"SELECT current_setting('enable_external_access')":          `function "current_setting"`,
-		"SELECT * FROM inngest.runs":                                `table "runs"`,
-		"SELECT * FROM runs":                                        `table "runs"`,
-		"SELECT * FROM inngest.insights_runs(?, ?) r, inngest.runs": `table "runs"`,
-		"SELECT inngest.insights_runs(?, ?)":                        `function "inngest.insights_runs"`,
-		"SELECT main.abs(1)":                                        `function "main.abs"`,
-		"SELECT 1; SELECT 2":                                        "2 statements",
-		"SELECT * FROM (SELECT * FROM glob('/etc/*'))":              `function "glob"`,
-		"SELECT (SELECT getenv('USER'))":                            `function "getenv"`,
-		"SELECT * FROM range(10)":                                   `table function "range"`,
-		"SUMMARIZE inngest.runs":                                    "",
+		"SELECT getenv('HOME')":                                           `function "getenv"`,
+		"SELECT content FROM read_text('/etc/hosts')":                     `function "read_text"`,
+		"SELECT * FROM query('SELECT * FROM inngest.runs')":               `function "query"`,
+		"SELECT current_setting('enable_external_access')":                `function "current_setting"`,
+		"SELECT * FROM inngest.runs":                                      `table "runs"`,
+		"SELECT * FROM runs":                                              `table "runs"`,
+		"SELECT * FROM inngest_local.insights_runs(?, ?) r, inngest.runs": `table "runs"`,
+		"SELECT inngest_local.insights_runs(?, ?)":                        `function "inngest_local.insights_runs"`,
+		"SELECT main.abs(1)":                                              `function "main.abs"`,
+		"SELECT 1; SELECT 2":                                              "2 statements",
+		"SELECT * FROM (SELECT * FROM glob('/etc/*'))":                    `function "glob"`,
+		"SELECT (SELECT getenv('USER'))":                                  `function "getenv"`,
+		"SELECT * FROM range(10)":                                         `table function "range"`,
+		"SUMMARIZE inngest.runs":                                          "",
 	} {
 		err := insights.CheckRenderedSQL(context.Background(), db, q)
 		require.Error(t, err, q)

@@ -154,11 +154,11 @@ func newDualWrite(
 		data: primary,
 	}
 
-	// --persist alone does not write an on-disk DuckLake catalog.  that also
+	// --persist alone does not write an on-disk Iceberg lake.  that also
 	// needs EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE, so --duckdb without it
-	// dual-writes to an in-memory catalog.  a persisted catalog uses the
-	// database of StartOpts.PostgresURI as its catalog store when it is set
-	// (see duckLakeOptionsFor).
+	// dual-writes to an in-memory catalog.  a persisted lake's embedded
+	// catalog uses the database of StartOpts.PostgresURI as its catalog store
+	// when it is set (see icebergConfigFor).
 	listener, _, readDB := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && exp.duckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI)
 	if listener == nil {
 		return dw
