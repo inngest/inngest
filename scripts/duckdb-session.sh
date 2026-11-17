@@ -6,9 +6,9 @@
 #
 # Mirrors the layout setupDualWrite builds in pkg/devserver/duckdb.go:
 #
-#   <state-dir>/duckdb/main.duckdb      -- main db file (views + macros, see pkg/db/duckdb/views.sql)
-#   <state-dir>/duckdb/catalog.sqlite   -- embedded Iceberg catalog
-#   <state-dir>/duckdb/warehouse/       -- Iceberg data + metadata files
+#   <state-dir>/duckdb/iceberg/main.duckdb      -- main db file (views + macros, see pkg/db/duckdb/views.sql)
+#   <state-dir>/duckdb/iceberg/catalog.sqlite   -- embedded Iceberg catalog
+#   <state-dir>/duckdb/iceberg/warehouse/       -- Iceberg data + metadata files
 #
 # The Iceberg catalog only runs inside the dev server (on a random port w/ a
 # per-process token), so this doesn't attach it. Instead each lake table is
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 state_dir="${1:-.inngest}"
-duckdb_dir="${state_dir%/}/duckdb"
+duckdb_dir="${state_dir%/}/duckdb/iceberg"
 db_file="${duckdb_dir}/main.duckdb"
 catalog_db="${duckdb_dir}/catalog.sqlite"
 warehouse="${duckdb_dir}/warehouse/main.db"

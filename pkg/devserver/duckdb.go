@@ -171,8 +171,21 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		catalog *catalogdb.Catalog
 	)
 	if persist {
-		dbFile = filepath.Join(duckdbDir, "main.duckdb")
-		backend, cfg := icebergConfigFor(duckdbDir, postgresURI)
+		// Its own dir, not duckdbDir itself: that's where the DuckLake lake
+		// before it kept main.duckdb, whose goose version table already
+		// says the baseline ran, so migrating it would create no Iceberg
+		// tables at all.
+		lakeDir := filepath.Join(duckdbDir, "iceberg")
+		if err := os.MkdirAll(lakeDir, 0o755); err != nil {
+			l.Warn("failed to create duckdb lake directory; dual-write disabled", "path", lakeDir, "error", err)
+			return nil, nil, nil
+		}
+		if _, err := os.Stat(filepath.Join(duckdbDir, "catalog.duckdb")); err == nil {
+			l.Info("ignoring the old DuckLake lake, delete it to free the space",
+				"files", []string{"catalog.duckdb", "main.duckdb", "data"}, "dir", duckdbDir)
+		}
+		dbFile = filepath.Join(lakeDir, "main.duckdb")
+		backend, cfg := icebergConfigFor(lakeDir, postgresURI)
 		catalog, err = catalogdb.Open(ctx, backend, cfg)
 		if err != nil {
 			l.Warn("failed to start the embedded iceberg catalog; dual-write disabled", "error", err)
@@ -256,9 +269,9 @@ func (l lakeListener) Close(ctx context.Context) error {
 }
 
 // icebergConfigFor builds the embedded catalog config for a persisted
-// (--persist) lake rooted at duckdbDir: data + metadata files under
-// duckdbDir/warehouse, and the catalog's table pointers in
-// duckdbDir/catalog.sqlite, or in postgresURI's database when set (so a dev
+// (--persist) lake rooted at lakeDir: data + metadata files under
+// lakeDir/warehouse, and the catalog's table pointers in
+// lakeDir/catalog.sqlite, or in postgresURI's database when set (so a dev
 // server already configured w/ --postgres-uri doesn't also keep a local
 // catalog file).
 //
@@ -271,12 +284,12 @@ func (l lakeListener) Close(ctx context.Context) error {
 //
 // Kept as a pure function (no I/O) so this branching is unit-testable
 // without starting anything.
-func icebergConfigFor(duckdbDir, postgresURI string) (catalogdb.Backend, icebergcatalog.Config) {
-	cfg := icebergcatalog.Config{Warehouse: filepath.Join(duckdbDir, "warehouse")}
+func icebergConfigFor(lakeDir, postgresURI string) (catalogdb.Backend, icebergcatalog.Config) {
+	cfg := icebergcatalog.Config{Warehouse: filepath.Join(lakeDir, "warehouse")}
 	if postgresURI != "" {
 		return catalogdb.Postgres(postgresURI), cfg
 	}
-	return catalogdb.SQLite(filepath.Join(duckdbDir, "catalog.sqlite")), cfg
+	return catalogdb.SQLite(filepath.Join(lakeDir, "catalog.sqlite")), cfg
 }
 
 // stopDualWrite stops the background batcher goroutines started by

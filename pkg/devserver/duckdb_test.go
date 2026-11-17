@@ -117,9 +117,9 @@ func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.NoFileExists(t, filepath.Join(stateDir, "duckdb", "catalog.sqlite"),
+	require.NoFileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "catalog.sqlite"),
 		"persist=false must not create an Iceberg catalog file")
-	require.NoDirExists(t, filepath.Join(stateDir, "duckdb", "warehouse"),
+	require.NoDirExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "warehouse"),
 		"persist=false must not create an Iceberg warehouse")
 }
 
@@ -142,7 +142,7 @@ func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
 	require.NotNil(t, l)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.FileExists(t, filepath.Join(wd, "relative-state", "duckdb", "catalog.sqlite"))
+	require.FileExists(t, filepath.Join(wd, "relative-state", "duckdb", "iceberg", "catalog.sqlite"))
 }
 
 // TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty proves that an
@@ -254,7 +254,42 @@ func TestSetupDualWritePersistedLakeSurvivesRestart(t *testing.T) {
 		stopDualWrite(context.Background(), l)
 	})
 	require.Equal(t, 1, count(readDB))
-	require.DirExists(t, filepath.Join(stateDir, "duckdb", "warehouse", "main.db", "events"))
+	require.DirExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "warehouse", "main.db", "events"))
+}
+
+// TestSetupDualWriteIgnoresOldLakeMainDB checks a state dir from before the
+// Iceberg lake (whose duckdb/main.duckdb already records the baseline
+// migration as applied, against some other catalog) still gets the lake
+// tables created, instead of a lake w/ none.
+func TestSetupDualWriteIgnoresOldLakeMainDB(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	stateDir := t.TempDir()
+	ctx := t.Context()
+	require.NoError(t, os.MkdirAll(filepath.Join(stateDir, "duckdb"), 0o755))
+
+	old, err := driver.Open(ctx, driver.Options{
+		BinaryPath: binPath,
+		DBFile:     filepath.Join(stateDir, "duckdb", "main.duckdb"),
+		Iceberg:    icebergtest.Start(t),
+	})
+	require.NoError(t, err)
+	require.NoError(t, duckdb.Migrate(ctx, old, duckdb.ModeRawLake))
+	require.NoError(t, old.Close())
+
+	l, _, readDB := setupDualWrite(ctx, true, true, binPath, stateDir, "")
+	require.NotNil(t, l)
+	t.Cleanup(func() {
+		_ = readDB.Close()
+		stopDualWrite(context.Background(), l)
+	})
+	l.OnEventReceived(ctx, event.NewBaseTrackedEvent(event.Event{Name: "e2e/upgraded"}, nil))
+	require.Eventually(t, func() bool {
+		var n int
+		return readDB.QueryRowContext(ctx, "SELECT count(*) FROM inngest.events;").Scan(&n) == nil && n == 1
+	}, 3*lakeFlushInterval, 100*time.Millisecond)
 }
 
 func TestStopDualWriteIsSafeWithNilListener(t *testing.T) {
@@ -287,8 +322,8 @@ func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "smoke/test"}, nil)
 	l.OnEventReceived(ctx, evt)
 
-	require.FileExists(t, filepath.Join(stateDir, "duckdb", "catalog.sqlite"), "the embedded catalog should have created its sqlite file")
-	require.FileExists(t, filepath.Join(stateDir, "duckdb", "main.duckdb"), "driver.Open should have created the main db file")
+	require.FileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "catalog.sqlite"), "the embedded catalog should have created its sqlite file")
+	require.FileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "main.duckdb"), "driver.Open should have created the main db file")
 
 	stopDualWrite(context.Background(), l)
 }
