@@ -265,13 +265,19 @@ func unionColumnHints(stmt *parser.SelectStatement, ctes map[string]logicalTable
 type starColumn struct {
 	name string
 	col  knownColumn
+	// alias is the scope entry the column came from, for a qualified
+	// RENAME entry.
+	alias string
 }
 
 // resolveStarColumns resolves a StarExpr (bare "*", "t.*", or either with
-// "EXCLUDE (...)") to the columns it expands to, in the same left-to-right
-// order DuckDB itself would project them — every in-scope table's own
-// columnOrder, in scope order for a bare "*", or just the qualified
-// table's for "t.*".
+// "EXCLUDE (...)", "REPLACE (...)" and "RENAME (...)") to the columns it
+// expands to, in the same left-to-right order DuckDB itself would project
+// them — every in-scope table's own columnOrder, in scope order for a bare
+// "*", or just the qualified table's for "t.*". A REPLACE entry's column
+// takes its type and hints from the replacing expression, and a RENAME
+// entry's column is renamed in place, both matched by the column's name as
+// expanded (before any rename), like DuckDB.
 func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 	var excluded []excludeName
 	for i := range star.Exclude {
@@ -316,7 +322,23 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 					col = scope.usingCols[id]
 				}
 			}
-			out = append(out, starColumn{name: name, col: col})
+			out = append(out, starColumn{name: name, col: col, alias: e.alias})
+		}
+	}
+	for i := range out {
+		for _, r := range star.Replace {
+			if strings.EqualFold(r.Alias, out[i].name) {
+				out[i].col = knownColumn{
+					colType:   inferType(r.Expr, scope),
+					pathHints: exprPathHints(r.Expr, scope),
+					json:      isJSONValue(r.Expr, scope),
+				}
+			}
+		}
+		for _, r := range star.Rename {
+			if x, _, ok := parseStarColumnName(r.From); ok && x.matches(out[i].alias, out[i].name) {
+				out[i].name = r.To
+			}
 		}
 	}
 	return out

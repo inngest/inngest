@@ -1,0 +1,1 @@
+SELECT * EXCLUDE (inputs) REPLACE (lower(status) AS status, CAST(queued_at AS DATE) AS queued_at) FROM runs
