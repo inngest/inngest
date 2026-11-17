@@ -154,8 +154,8 @@ func TestMigrateModeRawRunsCollapse(t *testing.T) {
 			account, env := "00000000-0000-4000-a000-000000000000", "00000000-0000-4000-b000-000000000000"
 			for _, status := range []string{"Queued", "Completed"} {
 				_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.runs
-					(account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
-					VALUES (?::UUID, ?::UUID, 'run-1', now(), now(), CASE WHEN ? = 'Completed' THEN now() END, uuid(), 'app', uuid(), 'fn', ?, '{}', '[]')`,
+					(account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, bucket_at)
+					VALUES (?::UUID, ?::UUID, 'run-1', now(), now(), CASE WHEN ? = 'Completed' THEN now() END, uuid(), 'app', uuid(), 'fn', ?, '{}', '[]', now())`,
 					account, env, status, status)
 				require.NoError(t, err)
 			}
@@ -191,8 +191,15 @@ func TestLakeTableProperties(t *testing.T) {
 			props := lt.Properties()
 			require.Equal(t, "zstd", props["write.parquet.compression-codec"])
 			require.Equal(t, "false", props["commit.manifest-merge.enabled"])
-			// No declared sort order, see schema.Table.SortKey.
+			// No declared sort order, compaction owns sorting.
 			require.True(t, lt.SortOrder().IsUnsorted(), "sort order %v", lt.SortOrder())
 		})
 	}
+
+	// No bucket_at default on a lake (it'd be frozen at CREATE), so a writer
+	// that forgets it fails instead of writing under every watermark.
+	_, err = db.ExecContext(t.Context(), `INSERT INTO inngest.events
+		(account_id, env_id, internal_id, received_at, source, event_id, event_name, event_v, event_ts)
+		VALUES (uuid(), uuid(), 'i', now(), 's', 'e', 'n', '1', now())`)
+	require.ErrorContains(t, err, "bucket_at")
 }

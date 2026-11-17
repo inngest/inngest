@@ -34,31 +34,31 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	receivedAt := now.Add(-200 * time.Millisecond)
 
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, event_ids, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, now());`,
 		accountID.String(), envID.String(), runID, now, now, startedAt, endedAt, appID.String(), "my-app", functionID.String(), "my-app-my-function",
 		"Completed", `{"event":{"name":"app/one"}}`, `"ok"`, []string{eventInternalID},
 	)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_trace_spans (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, input)
-		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, ?, ?, ?, ?, ?, ?, ?);`,
+		`INSERT INTO inngest.run_trace_spans (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes, output, input, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, ?, ?, ?, ?, ?, ?, ?, now());`,
 		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
 		"my-function", startedAt, endedAt, "trace-1", "span-1", `{"sys.step.name":"my-function"}`, `"ok"`, `{"event":{"name":"app/one"}}`,
 	)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
-		 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '1', ?, '{}'::JSON);`,
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta, bucket_at)
+		 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '1', ?, '{}'::JSON, now());`,
 		accountID.String(), envID.String(), eventInternalID, receivedAt, eventInternalID, "app/one", `{"k":"v"}`, receivedAt,
 	)
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?);`,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?, now());`,
 		accountID.String(), envID.String(), runID, now,
 		"span-1", `{"variant":"a"}`, now,
 	)
@@ -133,8 +133,8 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	now := time.Now().UTC()
 
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output)
-		 VALUES (?, ?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, '{}', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, '{}', ?, ?, now());`,
 		accountID.String(), envID.String(), runID, now, now, appID.String(), functionID.String(),
 		"Completed", `{}`, `{}`,
 	)
@@ -143,8 +143,8 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	const rootSpanID = "deadbeefdeadbeef" // stands in for the real deterministic run-derived span ID
 	insertSpan := func(spanID, parentSpanID string, start time.Time) {
 		_, err := db.ExecContext(ctx,
-			`INSERT INTO inngest.run_trace_spans (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, parent_span_id, attributes)
-			 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, ?, ?, ?, ?, ?, ?);`,
+			`INSERT INTO inngest.run_trace_spans (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, parent_span_id, attributes, bucket_at)
+			 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, ?, ?, ?, ?, ?, ?, now());`,
 			accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
 			spanID, start, start.Add(time.Second), "trace-1", spanID, parentSpanID, `{}`,
 		)
@@ -159,8 +159,8 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	insertSpan("step-1", rootSpanID, now.Add(2*time.Second))
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, step_id, step_index, step_attempt, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, 'step', ?, 1, 1, 'user.custom', true, '{"n":2}', ?);`,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, step_id, step_index, step_attempt, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, 'step', ?, 1, 1, 'user.custom', true, '{"n":2}', ?, now());`,
 		accountID.String(), envID.String(), runID, now, "step-1", "step-1", now,
 	)
 	require.NoError(t, err)

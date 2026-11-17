@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -67,10 +68,29 @@ func (m Mode) String() string {
 // Every occurrence uses the no-colon "${VAR-default}" form, which (unlike
 // "${VAR:-default}") only falls back to the default when the var is
 // completely unset, so an explicitly empty value wins.
+//
+// DUCKDB_BUCKET_AT_DEFAULT gives bucket_at an insert-time default, only
+// in-memory (see the baseline migration for why the lake tables have none).
 var modeEnv = map[Mode]map[string]string{
-	ModeMemory:   {"DUCKDB_ICEBERG_ONLY": ""},
+	ModeMemory: {
+		"DUCKDB_ICEBERG_ONLY":      "",
+		"DUCKDB_BUCKET_AT_DEFAULT": bucketAtInsertDefault,
+	},
 	ModeRawLake:  {},
 	ModeFlatLake: {},
+}
+
+const bucketAtInsertDefault = " DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))"
+
+// MigrateOption tweaks a Migrate.
+type MigrateOption func(env map[string]string)
+
+// WithBucketAtDefault gives bucket_at the in-memory insert-time default on
+// a lake too, for tests whose inserts don't set it. On Iceberg the default
+// is frozen at CREATE time (see the baseline migration), so never use this
+// outside tests.
+func WithBucketAtDefault() MigrateOption {
+	return func(env map[string]string) { env["DUCKDB_BUCKET_AT_DEFAULT"] = bucketAtInsertDefault }
 }
 
 // migrateMu serializes Migrate: a mode travels as process env vars, so two
@@ -103,10 +123,13 @@ const migrationModeTable = "duckdb_migration_mode"
 // Options.DBFile ":memory:" and Options.Iceberg nil, so there is no lake
 // ATTACH to create the "inngest" catalog and Migrate creates a schema of
 // that name directly; the others' db was opened with Options.Iceberg set.
-func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
-	env, ok := modeEnv[mode]
+func Migrate(ctx context.Context, db *sql.DB, mode Mode, opts ...MigrateOption) error {
+	env, ok := maps.Clone(modeEnv[mode]), modeEnv[mode] != nil
 	if !ok {
 		return fmt.Errorf("duckdb: unknown migration mode %d", mode)
+	}
+	for _, o := range opts {
+		o(env)
 	}
 	migrateMu.Lock()
 	defer migrateMu.Unlock()
