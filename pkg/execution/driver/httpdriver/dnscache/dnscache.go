@@ -349,6 +349,11 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 	// bounded context instead of the first caller's; each caller stops
 	// waiting when its own context ends.
 	ch := r.lookupGroup.DoChan(key, func() (any, error) {
+		// another caller may have cached an answer since our miss above.
+		if fresh := r.cache.Get(key); fresh != nil && !fresh.Expired() {
+			return fresh.Value(), nil
+		}
+
 		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.lookupTimeout)
 		defer cancel()
 
