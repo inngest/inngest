@@ -89,6 +89,10 @@ var (
 	// ErrNoLoopSemaphore means the function was synced before the keyed
 	// semaphore was injected.  no run is created.
 	ErrNoLoopSemaphore = fmt.Errorf("loop function has no keyed semaphore, sync the app again")
+	// ErrLoopRerunFromStep rejects a rerun of a loop function from a step.
+	// the original run saved its step results against an older loop state,
+	// and a commit of those results writes over the current state.
+	ErrLoopRerunFromStep = fmt.Errorf("a loop run cannot be rerun from a step, rerun the whole run instead")
 
 	ErrFunctionEnded   = fmt.Errorf("function already ended")
 	ErrNoCorrelationID = fmt.Errorf("no correlation ID found in event when trying to resume invoke parent")
@@ -856,6 +860,9 @@ func (e *executor) schedule(
 	}
 	if req.Function.Loop != nil && e.loops == nil {
 		return nil, nil, ErrNoLoopStore
+	}
+	if req.Function.Loop != nil && req.FromStep != nil {
+		return nil, nil, ErrLoopRerunFromStep
 	}
 
 	req = cloneScheduleRequest(req)

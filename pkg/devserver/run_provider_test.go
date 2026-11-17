@@ -126,6 +126,46 @@ func TestRunProviderRerunUsesRunIDWhenOriginalRunIDIsMissing(t *testing.T) {
 	require.Equal(t, runID, *scheduler.req.OriginalRunID)
 }
 
+func TestRunProviderRerunRejectsLoopFromStep(t *testing.T) {
+	runID := ulid.MustParse("01HR3ZJ4Z4E0MZ6PRP7Z3A4T00")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
+	fnConfig, err := json.Marshal(inngest.Function{
+		ID:   functionID,
+		Name: "Loop function",
+		Slug: "loop-function",
+		Loop: &inngest.Loop{
+			Kind: "loop",
+			Key:  "event.data.id",
+		},
+	})
+	require.NoError(t, err)
+
+	scheduler := &stubRunProviderScheduler{}
+	provider := &runProvider{
+		data: &stubRunProviderDataReader{
+			run: &cqrs.FunctionRun{
+				RunID:      runID,
+				FunctionID: functionID,
+			},
+			fn: &cqrs.Function{
+				ID:     functionID,
+				Config: fnConfig,
+			},
+		},
+		scheduler: scheduler,
+	}
+
+	_, err = provider.Rerun(context.Background(), runID, apiv2.RerunOpts{
+		FromStep: &apiv2.RerunFromStep{
+			StepID: "step-1",
+		},
+	})
+
+	require.ErrorIs(t, err, apiv2.ErrLoopRerunFromStep)
+	require.Nil(t, scheduler.req)
+}
+
 func TestRunProviderCancel(t *testing.T) {
 	runID := ulid.MustParse("01HR3ZJ4Z4E0MZ6PRP7Z3A4T00")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")

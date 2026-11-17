@@ -52,7 +52,7 @@ const (
 	MaxLoopStateSize = 512 * 1024
 
 	// MinLoopIdleTTL is the shortest idle_ttl a loop can sync with.
-	MinLoopIdleTTL = time.Minute
+	MinLoopIdleTTL = 5 * time.Minute
 
 	// MaxLoopIdleTTL is the longest idle_ttl a loop can sync with.  it is
 	// also the longest wake a LoopReturn can schedule.  a loop that waits

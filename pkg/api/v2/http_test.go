@@ -477,6 +477,7 @@ func TestHTTPGateway_RerunFromStepErrors(t *testing.T) {
 	}{
 		{name: "missing step", stepID: "missing", err: ErrRerunStepNotFound, message: "Step not found in original run"},
 		{name: "ambiguous step", stepID: "duplicate", err: ErrRerunStepAmbiguous, message: "Step name matches multiple steps in original run"},
+		{name: "loop run", stepID: "step", err: ErrLoopRerunFromStep, message: "A loop run cannot be rerun from a step. Rerun the whole run instead"},
 	}
 
 	for _, tt := range tests {

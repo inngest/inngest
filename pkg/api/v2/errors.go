@@ -18,6 +18,7 @@ var (
 	ErrCronRerunNotSupported       = errors.New("cron rerun is not supported")
 	ErrRerunStepNotFound           = errors.New("rerun step not found")
 	ErrRerunStepAmbiguous          = errors.New("rerun step name is ambiguous")
+	ErrLoopRerunFromStep           = errors.New("loop run cannot be rerun from a step")
 	ErrRunAlreadyCancelled         = errors.New("run is already cancelled")
 	ErrRunEnded                    = errors.New("run has already ended")
 	ErrExpressionInvalid           = errors.New("expression is invalid")
