@@ -311,14 +311,6 @@ func (s *Service) SyncApp(ctx context.Context, req *apiv2.SyncAppRequest) (*apiv
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App sync not implemented in OSS")
 }
 
-func (s *Service) ListExperiments(ctx context.Context, req *apiv2.ListExperimentsRequest) (*apiv2.ListExperimentsResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
-}
-
-func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentRequest) (*apiv2.GetExperimentResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
-}
-
 func (s *Service) SubmitFeedback(ctx context.Context, req *apiv2.SubmitFeedbackRequest) (*apiv2.SubmitFeedbackResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
 		"Submit feedback through Inngest Cloud: inngest api --prod submit-feedback --feedback \"Your feedback\"")
