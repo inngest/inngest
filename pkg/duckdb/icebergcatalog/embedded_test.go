@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/apache/iceberg-go/catalog"
 	"github.com/apache/iceberg-go/catalog/catalogtest"
 	_ "github.com/apache/iceberg-go/catalog/rest"
+	"github.com/inngest/inngest/tests/testutil"
 )
 
 func TestOpenSQLite(t *testing.T) {
@@ -80,23 +82,61 @@ func TestOpenSQLite(t *testing.T) {
 // overrides it.
 const defaultPostgresTestURI = "postgres://postgres:postgres@localhost:5432/inngest_test?sslmode=disable"
 
+// sharedPostgres is a postgres container started once per test binary
+// under TEST_DATABASE=postgres (the CI postgres job), since each catalog
+// conformance case wants its own catalog. testcontainers' reaper removes it
+// when the binary exits.
+var sharedPostgres struct {
+	once sync.Once
+	uri  string
+	err  error
+}
+
+func startSharedPostgres(t *testing.T) (string, error) {
+	sharedPostgres.once.Do(func() {
+		// t only bounds the start, the container outlives it.
+		pc, err := testutil.StartPostgres(t)
+		if err != nil {
+			sharedPostgres.err = err
+			return
+		}
+		sharedPostgres.uri = pc.URI
+	})
+	return sharedPostgres.uri, sharedPostgres.err
+}
+
 // requirePostgres returns a URI scoped (via search_path) to a fresh schema
-// on a reachable postgres, or skips.
+// on a reachable postgres, or skips. Under TEST_DATABASE=postgres it starts
+// one instead, and then (or w/ ICEBERG_POSTGRES_TEST_URI set) it fails
+// rather than skips if postgres isn't usable.
 func requirePostgres(t *testing.T) string {
 	t.Helper()
 	uri := defaultPostgresTestURI
+	// Asked for postgres (an explicit URI or the CI postgres job), so it
+	// failing is a failure, not a skip.
+	required := false
 	if env, ok := os.LookupEnv("ICEBERG_POSTGRES_TEST_URI"); ok {
-		uri = env
+		uri, required = env, true
+	} else if os.Getenv("TEST_DATABASE") == "postgres" {
+		var err error
+		if uri, err = startSharedPostgres(t); err != nil {
+			t.Fatalf("starting postgres: %v", err)
+		}
+		required = true
+	}
+	skipOrFail := t.Skipf
+	if required {
+		skipOrFail = t.Fatalf
 	}
 	db, err := sql.Open("pgx", uri)
 	if err != nil {
-		t.Skipf("skipping: opening postgres %q: %v", uri, err)
+		skipOrFail("opening postgres %q: %v", uri, err)
 	}
 	defer func() { _ = db.Close() }()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		t.Skipf("skipping: postgres not reachable at %q (set ICEBERG_POSTGRES_TEST_URI): %v", uri, err)
+		skipOrFail("postgres not reachable at %q (set ICEBERG_POSTGRES_TEST_URI): %v", uri, err)
 	}
 	schema := fmt.Sprintf("iceberg_test_%d", time.Now().UnixNano())
 	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+schema); err != nil {
