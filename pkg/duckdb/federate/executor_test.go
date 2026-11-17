@@ -547,3 +547,32 @@ func TestExecutorRejectsMalformedDeltaBatches(t *testing.T) {
 		})
 	}
 }
+
+// TestExecutorPrunedJoinKeepsFilteredRows is the join the plan-based
+// pruning got wrong: filter literals naming the other table's columns
+// (kind, name) made it stream neither table's filtered column, so the
+// delta rows' NULLs failed the filters and the rows silently vanished.
+func TestExecutorPrunedJoinKeepsFilteredRows(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		q := f.base
+		f.streamer.rows[TableSpans] = []map[string]any{{
+			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "app_id": f.app,
+			"app_name": "app", "function_id": f.fn, "function_slug": "fn", "name": "kind",
+			"start_time": q, "end_time": q, "trace_id": "trace-1", "span_id": "span-1", "parent_span_id": "",
+			"attributes": `{}`, "bucket_at": f.deltaBucketAt(),
+		}}
+		f.streamer.rows[TableMetadata] = []map[string]any{{
+			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "span_id": "span-1",
+			"scope": "step", "kind": "name", "is_user": true, "values": `{}`, "created_at": q, "bucket_at": f.deltaBucketAt(),
+		}}
+
+		got := f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT m.span_id, m.kind FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id WHERE m.kind = 'name' AND s.name = 'kind'`)
+		require.Equal(t, map[string]string{"span-1": "name"}, got)
+		for _, r := range f.streamer.reqs {
+			for _, c := range r.Columns {
+				require.NotEqual(t, "attributes", c.Name, "%s streamed a payload the query never reads", r.Table)
+			}
+		}
+	})
+}

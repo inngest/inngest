@@ -2,12 +2,9 @@ package federate
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
@@ -58,238 +55,51 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int, kind deltaKind) (d
 	return driver.QuackStream{ID: id, Columns: kinds, NextEncoded: next}, def, nil
 }
 
-// deltaColumnsUsed works out which delta columns the query reads, by
-// planning it with each source as its lake table alone, unbounded:
-// everything above a source's UNION reads its lake and delta sides alike, so
-// the delta needs exactly the columns the plan reads from the lake table
-// (projected, or named in a filter pushed into the scan). The macros' own
-// reads (raw_runs' collapse, for one) are included because they're part of
-// the planned query, and so are the delta side's own bounds
-// (deltaBoundColumns), which the lake-only plan doesn't have.
+// deltaColumnsUsed works out which delta columns the query reads, from its
+// AST (sourceColumnsRead): the columns it reads from each source CTE, plus
+// the delta side's own bounds (deltaBoundColumns).
 //
-// A table maps to nil when the plan has no scan of its lake table: stream
-// every column. That covers a table the query never reads, too: a missing
-// scan can't be told apart from one an optimization removed, so it stays
-// conservative.
-//
-// NOTE: an Iceberg scan's plan node doesn't name its table (just
-// `"Function": "ICEBERG_SCAN"` w/ its projections and filters), so an
-// unnamed scan is attributed by its columns: to every needed table whose
-// lake schema has all the columns it reads. A scan of table T always fits
-// T, so T never misses a column, and a scan that also fits another table
-// only adds columns the two share (keys and times, IE run_id/span_id), which
-// is safe.
-func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Table) (map[Table][]Column, error) {
+// A table maps to nil when the query never reaches its source (it's in
+// Tables but unread), or when its shape isn't one the lineage models: stream
+// every column.
+func deltaColumnsUsed(q Query, needed []Table) (map[Table][]Column, error) {
 	if len(needed) == 0 {
 		return nil, nil
 	}
-	stmt, args, err := assemble(q, needed, map[Table]string{}, nil, nil)
+	stmt, _, err := assemble(q, needed, map[Table]string{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	sqlText, err := render(stmt)
+	read, err := sourceColumnsRead(stmt, needed)
+	if errors.Is(err, errLineage) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	// With statistics, the planner can see a lake table (or its pruned
-	// files) is empty and replace the scan with an empty result, hiding the
-	// columns. Planning without those optimizations keeps the scan.
-	if _, err := conn.ExecContext(ctx, "SET disabled_optimizers = 'statistics_propagation,empty_result_pullup';"); err != nil {
-		return nil, nil
-	}
-	plan, err := explainJSON(ctx, conn, sqlText, args)
-	_, _ = conn.ExecContext(context.Background(), "RESET disabled_optimizers;")
-	if err != nil {
-		// Planning is only an optimization: stream every column.
-		return nil, nil
-	}
-
-	read := scanColumns(plan, needed)
 	out := map[Table][]Column{}
 	for _, t := range needed {
-		names, found := read[t]
-		if !found {
+		d, found := read[t]
+		if !found || d.all {
 			out[t] = nil
 			continue
+		}
+		names := map[string]bool{}
+		for n := range d.names {
+			names[n] = true
 		}
 		for _, c := range deltaBoundColumns(t, q.AllTenants) {
 			names[c] = true
 		}
 		cols := []Column{}
 		for _, c := range DeltaColumns(t) {
-			if names[c.Name] {
+			if names[strings.ToLower(c.Name)] {
 				cols = append(cols, c)
 			}
 		}
 		out[t] = cols
 	}
 	return out, nil
-}
-
-type planNode struct {
-	Name      string          `json:"name"`
-	ExtraInfo json.RawMessage `json:"extra_info"`
-	Children  []planNode      `json:"children"`
-}
-
-func explainJSON(ctx context.Context, conn *sql.Conn, sqlText string, args []any) ([]planNode, error) {
-	rows, err := conn.QueryContext(ctx, "EXPLAIN (FORMAT JSON) "+sqlText, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var plan []planNode
-	for rows.Next() {
-		var key, value sql.NullString
-		if err := rows.Scan(&key, &value); err != nil {
-			return nil, err
-		}
-		var nodes []planNode
-		if err := json.Unmarshal([]byte(value.String), &nodes); err != nil {
-			return nil, fmt.Errorf("federate: parsing plan: %w", err)
-		}
-		plan = append(plan, nodes...)
-	}
-	if err := rows.Err(); err != nil && err != io.EOF {
-		return nil, err
-	}
-	return plan, nil
-}
-
-// scanColumns returns the columns the plan reads from each needed table
-// (only tables w/ a scan): each scan contributes its projections and any
-// column named in its filters. A named scan counts for its table, an
-// unnamed Iceberg scan for every needed table whose columns it fits (see
-// deltaColumnsUsed).
-func scanColumns(plan []planNode, needed []Table) map[Table]map[string]bool {
-	cols := map[Table]map[string]bool{}
-	var all []Column
-	for _, t := range needed {
-		cols[t] = map[string]bool{}
-		for _, c := range DeltaColumns(t) {
-			cols[t][c.Name] = true
-		}
-		all = append(all, DeltaColumns(t)...)
-	}
-	out := map[Table]map[string]bool{}
-	add := func(t Table, names map[string]bool) {
-		if out[t] == nil {
-			out[t] = map[string]bool{}
-		}
-		for n := range names {
-			out[t][n] = true
-		}
-	}
-	var walk func(n planNode)
-	walk = func(n planNode) {
-		if strings.Contains(n.Name, "SCAN") {
-			var info map[string]any
-			_ = json.Unmarshal(n.ExtraInfo, &info)
-			tbl, named := info["Table"].(string)
-			for _, t := range needed {
-				switch {
-				case named && tableIs(tbl, Physical[t].Name):
-					add(t, scanRead(info, DeltaColumns(t)))
-				case !named && info["Function"] == "ICEBERG_SCAN":
-					if read := scanRead(info, all); fits(read, cols[t]) {
-						add(t, read)
-					}
-				}
-			}
-		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	for _, n := range plan {
-		walk(n)
-	}
-	return out
-}
-
-// scanRead is the columns a scan's plan node reads: its projections, and
-// any of cols named in its filters.
-func scanRead(info map[string]any, cols []Column) map[string]bool {
-	names := map[string]bool{}
-	for _, p := range stringsOf(info["Projections"]) {
-		// A scan w/ no projections (IE under a count) plans them as "".
-		if c := projectedColumn(p); c != "" {
-			names[c] = true
-		}
-	}
-	for k, v := range info {
-		if !strings.Contains(strings.ToLower(k), "filter") {
-			continue
-		}
-		for _, f := range stringsOf(v) {
-			// A literal isn't a column: `name='kind'` mustn't read as
-			// run_metadata's kind (which would make the spans scan not
-			// fit spans anymore).
-			f = stringLiteral.ReplaceAllString(f, "''")
-			for _, c := range cols {
-				if identIn(f, c.Name) {
-					names[c.Name] = true
-				}
-			}
-		}
-	}
-	return names
-}
-
-// stringLiteral is a SQL string literal (a quote inside one is doubled).
-var stringLiteral = regexp.MustCompile(`'(?:[^']|'')*'`)
-
-// fits reports whether every column in read is one of cols.
-func fits(read, cols map[string]bool) bool {
-	for n := range read {
-		if !cols[n] {
-			return false
-		}
-	}
-	return true
-}
-
-// projectedColumn is the column a scan projection reads: the projection
-// itself, or for a field pushed into the scan (attributes."a.b" plans as
-// the projection attributes.a.b) the column before the first dot. Column
-// names never have dots.
-func projectedColumn(p string) string {
-	p = strings.TrimSpace(p)
-	if strings.HasPrefix(p, `"`) {
-		if end := strings.Index(p[1:], `"`); end >= 0 {
-			return p[1 : end+1]
-		}
-	}
-	name, _, _ := strings.Cut(p, ".")
-	return name
-}
-
-// tableIs reports whether a plan's table reference (bare, or qualified as
-// catalog.schema.x) names table.
-func tableIs(ref, table string) bool {
-	ref = strings.ReplaceAll(ref, `"`, "")
-	return ref == table || strings.HasSuffix(ref, "."+table)
-}
-
-func stringsOf(v any) []string {
-	switch x := v.(type) {
-	case string:
-		return strings.Split(x, "\n")
-	case []any:
-		var out []string
-		for _, e := range x {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
-}
-
-// identIn reports whether name appears in expr as a whole identifier.
-func identIn(expr, name string) bool {
-	return regexp.MustCompile(`(^|[^A-Za-z0-9_])"?` + regexp.QuoteMeta(name) + `"?($|[^A-Za-z0-9_])`).MatchString(expr)
 }
 
 func columnSet(cols []Column) map[string]bool {
