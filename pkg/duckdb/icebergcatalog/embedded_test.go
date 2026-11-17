@@ -77,6 +77,29 @@ func TestOpenSQLite(t *testing.T) {
 	}
 }
 
+// TestOpenRejectsURLCharsInLocalWarehouse checks a local warehouse w/ a
+// character that means something in a URL fails Open (and creates
+// nothing), rather than every table create failing later.
+func TestOpenRejectsURLCharsInLocalWarehouse(t *testing.T) {
+	for _, name := range []string{"my#lake", "q?lake", "pct%41lake"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			wh := filepath.Join(dir, name, "warehouse")
+			_, err := Open(context.Background(), Config{
+				DB:        openSQLite(t, filepath.Join(dir, "catalog.db")),
+				Dialect:   SQLite,
+				Warehouse: wh,
+			})
+			if err == nil || !strings.Contains(err.Error(), "can't contain") {
+				t.Fatalf("expected a can't contain error, got %v", err)
+			}
+			if _, err := os.Stat(wh); !os.IsNotExist(err) {
+				t.Fatalf("Open created %s: %v", wh, err)
+			}
+		})
+	}
+}
+
 // defaultPostgresTestURI matches the postgres the repo's e2e CI and
 // pkg/duckdb/driver's postgres tests use. ICEBERG_POSTGRES_TEST_URI
 // overrides it.

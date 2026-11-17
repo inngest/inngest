@@ -93,6 +93,14 @@ func Open(ctx context.Context, cfg Config) (*Embedded, error) {
 
 	warehouse := cfg.Warehouse
 	if !strings.Contains(warehouse, "://") {
+		// Iceberg locations are URLs (iceberg-go, and duckdb on the other
+		// end, parse them as such), so a local path w/ a character that
+		// means something in a URL would be cut short (IE `/tmp/my#lake`
+		// at the `#`) somewhere down the line. Refuse it here, before
+		// anything's created.
+		if i := strings.IndexAny(warehouse, "#?%"); i >= 0 {
+			return nil, fmt.Errorf("icebergcatalog: local warehouse %q can't contain %q", warehouse, warehouse[i])
+		}
 		abs, err := filepath.Abs(warehouse)
 		if err != nil {
 			return nil, fmt.Errorf("icebergcatalog: resolving warehouse: %w", err)
