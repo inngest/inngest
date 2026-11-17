@@ -72,7 +72,7 @@ func (cfg runConfig) logf(format string, args ...any) {
 }
 
 func main() {
-	source := flag.String("source", filepath.Join(".inngest", "duckdb"), "directory containing the DuckDB catalog/data to sample real rows from as templates")
+	source := flag.String("source", duckdb.PersistedLakeDir(".inngest"), "directory containing the DuckDB catalog/data to sample real rows from as templates (the dev server's lake dir, see duckdb.PersistedLakeDir)")
 	target := flag.String("target", "", "directory to write seeded data into (defaults to -source)")
 	runs := flag.Int("runs", 50, "number of synthetic runs to generate")
 	window := flag.Duration("window", 7*24*time.Hour, "time range to spread generated runs' queued_at over, ending now")

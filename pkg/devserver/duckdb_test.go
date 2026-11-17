@@ -117,9 +117,9 @@ func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.NoFileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "catalog.sqlite"),
+	require.NoFileExists(t, filepath.Join(duckdb.PersistedLakeDir(stateDir), "catalog.sqlite"),
 		"persist=false must not create an Iceberg catalog file")
-	require.NoDirExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "warehouse"),
+	require.NoDirExists(t, filepath.Join(duckdb.PersistedLakeDir(stateDir), "warehouse"),
 		"persist=false must not create an Iceberg warehouse")
 }
 
@@ -142,7 +142,7 @@ func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
 	require.NotNil(t, l)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
-	require.FileExists(t, filepath.Join(wd, "relative-state", "duckdb", "iceberg", "catalog.sqlite"))
+	require.FileExists(t, filepath.Join(duckdb.PersistedLakeDir(filepath.Join(wd, "relative-state")), "catalog.sqlite"))
 }
 
 // TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty proves that an
@@ -254,7 +254,7 @@ func TestSetupDualWritePersistedLakeSurvivesRestart(t *testing.T) {
 		stopDualWrite(context.Background(), l)
 	})
 	require.Equal(t, 1, count(readDB))
-	require.DirExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "warehouse", "main.db", "events"))
+	require.DirExists(t, filepath.Join(duckdb.PersistedLakeDir(stateDir), "warehouse", "main.db", "events"))
 }
 
 // TestSetupDualWriteIgnoresOldLakeMainDB checks a state dir from before the
@@ -322,8 +322,8 @@ func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "smoke/test"}, nil)
 	l.OnEventReceived(ctx, evt)
 
-	require.FileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "catalog.sqlite"), "the embedded catalog should have created its sqlite file")
-	require.FileExists(t, filepath.Join(stateDir, "duckdb", "iceberg", "main.duckdb"), "driver.Open should have created the main db file")
+	require.FileExists(t, filepath.Join(duckdb.PersistedLakeDir(stateDir), "catalog.sqlite"), "the embedded catalog should have created its sqlite file")
+	require.FileExists(t, filepath.Join(duckdb.PersistedLakeDir(stateDir), "main.duckdb"), "driver.Open should have created the main db file")
 
 	stopDualWrite(context.Background(), l)
 }

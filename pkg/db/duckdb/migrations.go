@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
@@ -27,6 +28,16 @@ var MigrationsFS embed.FS
 var viewsSQL string
 
 var viewsTmpl = template.Must(template.New("views.sql").Parse(viewsSQL))
+
+// PersistedLakeDir is where a persisted (--persist) dual-write lake lives
+// under an Inngest state dir (IE .inngest, see util.ResolveStateDir):
+// main.duckdb, catalog.sqlite and warehouse/. It's its own dir, not
+// <stateDir>/duckdb itself, since that's where the DuckLake lake before it
+// kept a main.duckdb whose goose version table already says the baseline
+// ran. pkg/devserver and cmd/duckdbseed both use it, so they agree.
+func PersistedLakeDir(stateDir string) string {
+	return filepath.Join(stateDir, "duckdb", "iceberg")
+}
 
 // Mode is what kind of catalog Migrate runs against. Goose's ENVSUB can
 // only substitute a variable or fall back to a default, never branch on a

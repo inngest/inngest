@@ -171,11 +171,7 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		catalog *catalogdb.Catalog
 	)
 	if persist {
-		// Its own dir, not duckdbDir itself: that's where the DuckLake lake
-		// before it kept main.duckdb, whose goose version table already
-		// says the baseline ran, so migrating it would create no Iceberg
-		// tables at all.
-		lakeDir := filepath.Join(duckdbDir, "iceberg")
+		lakeDir := duckdb.PersistedLakeDir(resolvedStateDir)
 		if err := os.MkdirAll(lakeDir, 0o755); err != nil {
 			l.Warn("failed to create duckdb lake directory; dual-write disabled", "path", lakeDir, "error", err)
 			return nil, nil, nil
