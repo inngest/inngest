@@ -354,9 +354,10 @@ func logCtx(t *testing.T) (context.Context, *syncBuffer) {
 	return logger.WithStdlib(t.Context(), l), buf
 }
 
-// errConflict is what a DuckLake commit conflict looks like coming out of
-// the driver: a statement error, so it definitely didn't commit.
-var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit DuckLake transaction: Transaction conflict - attempting to insert into table with index \"1\"", duckdbdriver.ErrStatementFailed)
+// errConflict is what an Iceberg commit conflict looks like coming out of
+// the driver: the catalog's 409 as a statement error, so it definitely
+// didn't commit.
+var errConflict = fmt.Errorf("%w: TransactionContext Error: Failed to commit: Failed to commit Iceberg transaction: Request to 'http://127.0.0.1:12345/v1' returned a non-200 status code (Conflict_409).", duckdbdriver.ErrStatementFailed)
 
 // fastRetry keeps retry tests quick.
 func fastRetry(o batcherOpts) batcherOpts {
@@ -371,10 +372,11 @@ func TestRetryableFlushError(t *testing.T) {
 		err  error
 		want bool
 	}{
-		{"ducklake conflict", errConflict, true},
+		{"iceberg conflict", errConflict, true},
+		// The commit may have gone through before the catalog failed.
+		{"iceberg catalog 5xx", fmt.Errorf("%w: TransactionContext Error: Failed to commit: Failed to commit Iceberg transaction: Request to 'http://127.0.0.1:12345/v1' returned a non-200 status code (InternalServerError_500).", duckdbdriver.ErrStatementFailed), false},
+		{"duckdb conflict", fmt.Errorf("%w: TransactionContext Error: Catalog write-write conflict on create with \"runs\"", duckdbdriver.ErrStatementFailed), true},
 		{"aborted txn", fmt.Errorf("%w: TransactionContext Error: Current transaction is aborted (please ROLLBACK)", duckdbdriver.ErrStatementFailed), true},
-		{"sqlite catalog busy", fmt.Errorf("%w: IO Error: database is locked", duckdbdriver.ErrStatementFailed), true},
-		{"postgres catalog serialization", fmt.Errorf("%w: could not serialize access due to concurrent update", duckdbdriver.ErrStatementFailed), true},
 		{"constraint", fmt.Errorf("%w: Constraint Error: NOT NULL constraint failed: runs.status", duckdbdriver.ErrStatementFailed), false},
 		// Ambiguous: the statement may have committed before the response
 		// was lost, so a retry could insert twice.

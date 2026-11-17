@@ -137,11 +137,15 @@ const finalFlushBudget = 10 * time.Second
 // itself answered w/ an error (driver.ErrStatementFailed) and that error is a
 // transient concurrency failure:
 //
-//   - DuckLake/duckdb transaction conflicts ("Transaction conflict",
-//     "write-write conflict"): the commit was rejected, nothing landed
+//   - an Iceberg commit conflict: the catalog answered the commit w/ a 409
+//     (CommitFailedException, "Conflict_409" in duckdb's error), so the
+//     table's metadata never moved and nothing landed. Only the 409: a 5xx
+//     from the catalog is ambiguous (the commit may have gone through before
+//     it failed)
+//   - duckdb's own transaction conflicts ("Transaction conflict",
+//     "write-write conflict") on an in-memory/local db: the commit was
+//     rejected, nothing landed
 //   - an aborted transaction ("Current transaction is aborted"), same thing
-//   - a busy/locked catalog (sqlite "database is locked", postgres
-//     "could not serialize access"): the catalog commit never happened
 //
 // Everything else is dropped:
 //
@@ -158,12 +162,10 @@ func retryableFlushError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	for _, s := range []string{
+		"(conflict_409)",
 		"transaction conflict",
 		"write-write conflict",
 		"current transaction is aborted",
-		"database is locked",
-		"database is busy",
-		"could not serialize access",
 	} {
 		if strings.Contains(msg, s) {
 			return true
