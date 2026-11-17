@@ -38,6 +38,9 @@ type DNSResolver interface {
 	Lookup(ctx context.Context, host string) ([]net.IP, error)
 	Dialer() Dialer
 	DialerWithNAT64Fallback() Dialer
+	// DialIPs dials port on the given addresses without another lookup, so a
+	// caller that validated the addresses connects to exactly those.
+	DialIPs(ctx context.Context, network, port string, ips []net.IP, allowNAT64Fallback bool) (net.Conn, error)
 }
 
 type (
@@ -143,14 +146,18 @@ func (r *resolver) dialerWithNAT64Fallback(allowNAT64Fallback bool) Dialer {
 			return nil, err
 		}
 
-		// XXX: When IPv6 and IPv4 are both specified, prefer IPv4.  This allows us to
-		// prefer egress without NAT64 hops, which on some clouds is required.
-		//
-		// We also implement our own "happy eyes" dial mechanism which allows us
-		// to dial both and eject after some delay.
-		six, four := sixfour(ips)
-		return r.dialParallelWithNAT64Fallback(ctx, network, port, four, six, allowNAT64Fallback)
+		return r.DialIPs(ctx, network, port, ips, allowNAT64Fallback)
 	}
+}
+
+func (r *resolver) DialIPs(ctx context.Context, network, port string, ips []net.IP, allowNAT64Fallback bool) (net.Conn, error) {
+	// XXX: When IPv6 and IPv4 are both specified, prefer IPv4.  This allows us to
+	// prefer egress without NAT64 hops, which on some clouds is required.
+	//
+	// We also implement our own "happy eyes" dial mechanism which allows us
+	// to dial both and eject after some delay.
+	six, four := sixfour(ips)
+	return r.dialParallelWithNAT64Fallback(ctx, network, port, four, six, allowNAT64Fallback)
 }
 
 type dialResult struct {
@@ -338,14 +345,29 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 		return item.Value(), nil
 	}
 
-	v, err, _ := r.lookupGroup.Do(key, func() (any, error) {
-		ips, err := r.resolve(ctx, host)
+	// the shared lookup serves every waiting caller, so it gets its own
+	// bounded context instead of the first caller's; each caller stops
+	// waiting when its own context ends.
+	ch := r.lookupGroup.DoChan(key, func() (any, error) {
+		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.lookupTimeout)
+		defer cancel()
+
+		ips, err := r.resolve(lctx, host)
 		if err != nil {
 			return nil, err
 		}
 		r.cache.Set(key, ips, r.cacheTTL)
 		return ips, nil
 	})
+
+	var v any
+	var err error
+	select {
+	case res := <-ch:
+		v, err = res.Val, res.Err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	if err != nil {
 		if item != nil && time.Since(item.Expires()) < maxStale {
 			return item.Value(), nil

@@ -112,6 +112,36 @@ func TestLookupMergesConcurrentCalls(t *testing.T) {
 	require.EqualValues(t, 1, f.calls.Load())
 }
 
+func TestLookupCallerCancellationIsIndependent(t *testing.T) {
+	f := &fakeLookup{delay: 100 * time.Millisecond}
+	r := New()
+	r.lookupIPAddr = f.lookup
+
+	// the first caller starts the shared lookup, then gives up.
+	cctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := r.Lookup(cctx, "api.example.com")
+		firstDone <- err
+	}()
+	time.Sleep(10 * time.Millisecond)
+
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := r.Lookup(context.Background(), "api.example.com")
+		secondDone <- err
+	}()
+	time.Sleep(10 * time.Millisecond)
+
+	start := time.Now()
+	cancel()
+	require.ErrorIs(t, <-firstDone, context.Canceled)
+	require.Less(t, time.Since(start), 50*time.Millisecond, "a canceled caller should stop waiting at once")
+
+	require.NoError(t, <-secondDone, "another caller's cancellation must not fail this one")
+	require.EqualValues(t, 1, f.calls.Load())
+}
+
 func TestLookupUsesStaleEntryWhenLookupFails(t *testing.T) {
 	f := &fakeLookup{}
 	r := New(WithCacheTTL(10 * time.Millisecond))
