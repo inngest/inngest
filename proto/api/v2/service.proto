@@ -2335,7 +2335,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Unarchive a function"
-      description: "Unarchives a function and redeploys its latest synced config. Idempotent: unarchiving a function that is not archived returns 200 with isArchived: false and changes nothing. A paused function stays paused. Send no request body. The dev server returns 501."
+      description: "Unarchives a function and redeploys its latest synced config. Idempotent: unarchiving a function that is not archived returns 200 with isArchived: false and changes nothing. A paused function stays paused. Unarchiving a function the app no longer defines redeploys its last synced config until the next sync archives it again. Send no request body. The dev server returns 501."
       tags: "Functions"
       tags: "Beta"
       security: {

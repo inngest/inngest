@@ -12578,7 +12578,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xc0\xb4\x02\n" +
+	"\x04INFO\x10\x032\xb9\xb5\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -13242,10 +13242,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00r+\n" +
 	")\n" +
-	"\rX-Inngest-Env\x12\x16Environment name or ID\x18\x01\x8a\xb5\x18\x1b\b\x01\x12\x17functions:write:archive\x82\xd3\xe4\x93\x020\"./apps/{app_id}/functions/{function_id}/archive\x12\xcc\b\n" +
-	"\x11UnarchiveFunction\x12 .api.v2.UnarchiveFunctionRequest\x1a!.api.v2.UnarchiveFunctionResponse\"\xf1\a\x92A\x94\a\n" +
+	"\rX-Inngest-Env\x12\x16Environment name or ID\x18\x01\x8a\xb5\x18\x1b\b\x01\x12\x17functions:write:archive\x82\xd3\xe4\x93\x020\"./apps/{app_id}/functions/{function_id}/archive\x12\xc5\t\n" +
+	"\x11UnarchiveFunction\x12 .api.v2.UnarchiveFunctionRequest\x1a!.api.v2.UnarchiveFunctionResponse\"\xea\b\x92A\x8d\b\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x14Unarchive a function\x1a\xff\x01Unarchives a function and redeploys its latest synced config. Idempotent: unarchiving a function that is not archived returns 200 with isArchived: false and changes nothing. A paused function stays paused. Send no request body. The dev server returns 501.JK\n" +
+	"\x04Beta\x12\x14Unarchive a function\x1a\xf8\x02Unarchives a function and redeploys its latest synced config. Idempotent: unarchiving a function that is not archived returns 200 with isArchived: false and changes nothing. A paused function stays paused. Unarchiving a function the app no longer defines redeploys its last synced config until the next sync archives it again. Send no request body. The dev server returns 501.JK\n" +
 	"\x03200\x12D\n" +
 	"\x13Function unarchived\x12-\n" +
 	"+\x1a)#/definitions/v2UnarchiveFunctionResponseJ;\n" +
