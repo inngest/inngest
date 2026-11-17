@@ -127,11 +127,9 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"FetchAccountEnvs":           {},
 	"FetchAccountEventKeys":      {},
 	"FetchAccountSigningKeys":    {},
-	"GetExperiment":              {},
 	"GetSandbox":                 {},
 	"GetSandboxProcess":          {},
 	"GetSandboxProcessOutput":    {},
-	"ListExperiments":            {},
 	"ListInsightsEventSchemas":   {}, // no event-schema-catalog capability in OSS yet
 	"ListSandboxProcesses":       {},
 	"ListSandboxes":              {},
