@@ -222,6 +222,10 @@ func scanRead(info map[string]any, cols []Column) map[string]bool {
 			continue
 		}
 		for _, f := range stringsOf(v) {
+			// A literal isn't a column: `name='kind'` mustn't read as
+			// run_metadata's kind (which would make the spans scan not
+			// fit spans anymore).
+			f = stringLiteral.ReplaceAllString(f, "''")
 			for _, c := range cols {
 				if identIn(f, c.Name) {
 					names[c.Name] = true
@@ -231,6 +235,9 @@ func scanRead(info map[string]any, cols []Column) map[string]bool {
 	}
 	return names
 }
+
+// stringLiteral is a SQL string literal (a quote inside one is doubled).
+var stringLiteral = regexp.MustCompile(`'(?:[^']|'')*'`)
 
 // fits reports whether every column in read is one of cols.
 func fits(read, cols map[string]bool) bool {

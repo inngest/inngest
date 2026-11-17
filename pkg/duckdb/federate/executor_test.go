@@ -470,6 +470,19 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 			require.NotContains(t, byTable[TableSpans], big)
 			require.NotContains(t, byTable[TableMetadata], big)
 		}
+
+		// A filter literal that happens to be another table's column name
+		// (run_metadata's kind) doesn't stop the spans scan fitting spans,
+		// so spans still streams the filtered name.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT s.span_id FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id WHERE s.name = 'kind'`)
+		require.Len(t, f.streamer.reqs, 2)
+		for _, r := range f.streamer.reqs {
+			if r.Table == TableSpans {
+				require.Contains(t, names(r.Columns), "name")
+			}
+		}
 	})
 }
 
