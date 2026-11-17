@@ -1,0 +1,76 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+regexp_replace('test@test.com'::str, '^\S+@\S+$'::str, 'email_found'::str, 1::i64, 0::i64) = 'email_found'::str
+regexp_replace('17:50'::str, '[0-9]?[0-9]:[0-9][0-9]'::str, 'TIME'::str, 1::i64, 0::i64) = 'TIME'::str
+regexp_replace('test@test.com'::str, '^\S+@\S+$'::str, 'email_found'::str) = 'email_found'::str
+regexp_replace('17:50'::str, '[0-9]?[0-9]:[0-9][0-9]'::str, 'TIME'::str) = 'TIME'::str
+
+# lazy_matching: Examples with lazy matching
+regexp_replace('Hello'::str, 'Hel+?'::str, '1'::str, 1::i64, 0::i64) = '1lo'::str
+regexp_replace('Hello'::str, 'Hel+'::str, '1'::str, 1::i64, 0::i64) = '1o'::str
+regexp_replace('Hello'::str, 'Hel+?'::str, '1'::str) = '1lo'::str
+regexp_replace('Hello'::str, 'Hel+'::str, '1'::str) = '1o'::str
+
+# greedy_matching: Examples with greedy matching
+regexp_replace('Hello'::str, 'Hel+'::str, '1'::str, 1::i64, 0::i64) = '1o'::str
+regexp_replace('Helo'::str, 'Hel+'::str, '1'::str, 1::i64, 0::i64) = '1o'::str
+regexp_replace('Hello'::str, 'Hel+'::str, '1'::str) = '1o'::str
+regexp_replace('Helo'::str, 'Hel+'::str, '1'::str) = '1o'::str
+
+# null_input: Examples with null as input
+regexp_replace('Hello'::str, null::str?, '1'::str, 1::i64, 0::i64) = null::str?
+regexp_replace(null::str?, ' '::str, '1'::str, 1::i64, 0::i64) = null::str?
+regexp_replace('Hello'::str, null::str?, '1'::str) = null::str?
+regexp_replace(null::str?, ' '::str, '1'::str) = null::str?
+
+# position_anchors: Examples with position anchors
+regexp_replace('abcdefg'::str, '\Aabc'::str, '111'::str, 1::i64, 0::i64) = '111defg'::str
+regexp_replace('abcdefg'::str, 'efg$'::str, '111'::str, 1::i64, 0::i64) = 'abcd111'::str
+regexp_replace('catdogdog'::str, '^cat'::str, 'dog'::str, 1::i64, 0::i64) = 'dogdogdog'::str
+regexp_replace('dogcatdogdog'::str, '^cat'::str, 'dog'::str, 1::i64, 0::i64) = 'dogcatdogdog'::str
+regexp_replace('abcdefg'::str, '\Aabc'::str, '111'::str) = '111defg'::str
+regexp_replace('abcdefg'::str, 'efg$'::str, '111'::str) = 'abcd111'::str
+regexp_replace('catdogdog'::str, '^cat'::str, 'dog'::str) = 'dogdogdog'::str
+regexp_replace('dogcatdogdog'::str, '^cat'::str, 'dog'::str) = 'dogcatdogdog'::str
+
+# metacharacters: Examples with metacharacters
+regexp_replace('abc1abc'::str, '\d'::str, ''::str, 1::i64, 0::i64) = 'abcabc'::str
+regexp_replace('111a111'::str, '\D'::str, ''::str, 1::i64, 0::i64) = '111111'::str
+regexp_replace('abc def'::str, '\s'::str, ''::str, 1::i64, 0::i64) = 'abcdef'::str
+regexp_replace('a bcdef'::str, '\S'::str, ','::str, 1::i64, 0::i64) = ', bcdef'::str
+regexp_replace(' abcdef'::str, '\w'::str, '1'::str, 1::i64, 0::i64) = ' 1bcdef'::str
+regexp_replace('a bcdef'::str, '\W'::str, 'a'::str, 1::i64, 0::i64) = 'aabcdef'::str
+regexp_replace('abc1abc'::str, '\d'::str, ''::str) = 'abcabc'::str
+regexp_replace('111a111'::str, '\D'::str, ''::str) = '111111'::str
+regexp_replace('abc def'::str, '\s'::str, ''::str) = 'abcdef'::str
+regexp_replace('a bcdef'::str, '\S'::str, ','::str) = ', bcdef'::str
+regexp_replace(' abcdef'::str, '\w'::str, '1'::str) = ' 1bcdef'::str
+regexp_replace('a bcdef'::str, '\W'::str, 'a'::str) = 'aabcdef'::str
+
+# occurrence_indicator: Examples with occurrence indicators
+regexp_replace('abc123abc'::str, '[0-9]+'::str, 'abc'::str, 1::i64, 0::i64) = 'abcabcabc'::str
+regexp_replace('abcabcabc'::str, '[bc]'::str, 'dd'::str, 1::i64, 0::i64) = 'addcabcabc'::str
+regexp_replace('abc'::str, '(.*)c'::str, '\1e'::str, 1::i64, 0::i64) = 'abe'::str
+regexp_replace('abbbbc'::str, '[b]{2,3}'::str, 'd'::str, 1::i64, 0::i64) = 'adbc'::str
+regexp_replace('abc123abc'::str, '[0-9]+'::str, 'abc'::str) = 'abcabcabc'::str
+regexp_replace('abcabcabc'::str, '[bc]'::str, 'dd'::str) = 'addcabcabc'::str
+regexp_replace('abc'::str, '(.*)c'::str, '\1e'::str) = 'abe'::str
+regexp_replace('abbbbc'::str, '[b]{2,3}'::str, 'd'::str) = 'adbc'::str
+
+# lookahead: Examples with lookahead
+regexp_replace('100 dollars'::str, '\d+(?= dollars)'::str, 'hundred'::str, 1::i64, 0::i64) [lookaround:TRUE] = 'hundred dollars'::str
+regexp_replace('100 dollars'::str, '\d+(?= dollars)'::str, 'hundred'::str) [lookaround:TRUE] = 'hundred dollars'::str
+
+# negative_lookahead: Examples with negative lookahead
+regexp_replace('100 pesos'::str, '\d+(?!\d| dollars)'::str, '999'::str, 1::i64, 0::i64) [lookaround:TRUE] = '999 pesos'::str
+regexp_replace('100 pesos'::str, '\d+(?!\d| dollars)'::str, '999'::str) [lookaround:TRUE] = '999 pesos'::str
+
+# lookbehind: Examples with lookbehind
+regexp_replace('USD100'::str, '(?<=USD)\d{3}'::str, '999'::str, 1::i64, 0::i64) [lookaround:TRUE] = 'USD999'::str
+regexp_replace('USD100'::str, '(?<=USD)\d{3}'::str, '999'::str) [lookaround:TRUE] = 'USD999'::str
+
+# negative_lookbehind: Examples with negative lookbehind
+regexp_replace('JPY100'::str, '\d{3}(?<!USD\d{3})'::str, '999'::str, 1::i64, 0::i64) [lookaround:TRUE] = 'JPY999'::str
+regexp_replace('JPY100'::str, '\d{3}(?<!USD\d{3})'::str, '999'::str) [lookaround:TRUE] = 'JPY999'::str

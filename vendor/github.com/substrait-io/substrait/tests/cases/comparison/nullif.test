@@ -1,0 +1,21 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+nullif(10::i8, 2::i8) = 10::i8?
+nullif(3::i8, 3::i8) = null::i8?
+nullif(1::i16, 5::i16) = 1::i16?
+nullif(1::i16, 1::i16) = null::i16?
+nullif(7.25::fp32, 1.00::fp32) = 7.25::fp32?
+nullif(1.11::fp32, 1.11::fp32) = null::fp32?
+nullif(false::bool, true::bool) = false::bool?
+nullif(true::bool, false::bool) = true::bool?
+nullif(false::bool, false::bool) = null::bool?
+nullif(true::bool, true::bool) = null::bool?
+
+# null_input: Examples with null as input
+nullif(null::bool?, true::bool) = null::bool?
+nullif(true::bool, null::bool?) = true::bool?
+nullif(null::bool?, null::bool?) = null::bool?
+nullif(10::dec<38, 0>, null::dec?<38, 0>) = 10::dec?<38, 0>
+nullif(null::dec?<38, 0>, null::dec?<38, 0>) = null::bool?

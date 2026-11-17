@@ -1,0 +1,19 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+not_equal(1::i8, 1::i8) = false::bool
+not_equal(300::i16, 200::i16) = true::bool
+not_equal(-2147483648::i32, -2147483648::i32) = false::bool
+not_equal(9223372036854775807::i64, 9223372036854775804::i64) = true::bool
+not_equal(9223372036854775807::dec<38, 0>, 9223372036854775804::dec<38, 0>) = true::bool
+not_equal(9223372036854775804::dec<38, 0>, 9223372036854775804::dec<38, 0>) = false::bool
+not_equal(inf::fp64, inf::fp64) = false::bool
+not_equal(inf::fp64, 1.5e+308::fp64) = true::bool
+not_equal(inf::fp64, -inf::fp64) = true::bool
+
+# null_input: Examples with null as input
+not_equal(null::dec?<38, 2>, 2.50::dec<38, 2>) = null::bool?
+not_equal(null::dec?<38, 2>, null::dec?<38, 2>) = null::bool?
+not_equal(null::i16?, 1::i16) = null::bool?
+not_equal(null::i16?, null::i16?) = null::bool?

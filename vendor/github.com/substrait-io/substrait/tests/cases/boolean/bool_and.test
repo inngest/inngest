@@ -1,0 +1,13 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_boolean.yaml'
+
+# basic: Basic examples without any special cases
+bool_and((true, true)::bool) = true::bool?
+bool_and((true, false)::bool) = false::bool?
+bool_and((false, false)::bool) = false::bool?
+bool_and((false)::bool) = false::bool?
+bool_and((true)::bool) = true::bool?
+bool_and((true, null)::bool) = true::bool?
+bool_and((null, null)::bool) = null::bool?
+bool_and((false, null)::bool) = false::bool?
+bool_and(()::bool) = null::bool?

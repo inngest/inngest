@@ -1,0 +1,24 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_list.yaml'
+### SUBSTRAIT_DEPENDENCY: '/extensions/functions_comparison.yaml'
+
+# returns_true: At least one element matches the predicate
+any_match([1, 2, 3]::list<i32>, (x -> gt(x, 2::i32))::func<i32 -> bool?>) = true::bool?
+any_match([1, 2, 3]::list<i32>, (x -> lt(x, 2::i32))::func<i32 -> bool?>) = true::bool?
+any_match([5, 6, 7]::list<i32>, (x -> gt(x, 4::i32))::func<i32 -> bool?>) = true::bool?
+
+# returns_false: No element matches the predicate
+any_match([1, 2, 3]::list<i32>, (x -> gt(x, 5::i32))::func<i32 -> bool?>) = false::bool?
+
+# empty: Empty list returns false
+any_match([]::list<i32>, (x -> gt(x, 0::i32))::func<i32 -> bool?>) = false::bool?
+
+# null_list: Null list input returns null
+any_match(null::list?<i32>, (x -> gt(x, 0::i32))::func<i32 -> bool?>) = null::bool?
+
+# null_predicate: Null predicate returns null
+any_match([1, 2, 3]::list<i32>, null::func?<i32 -> bool?>) = null::bool?
+
+# three_valued_logic: Null predicate results follow three-valued logic
+any_match([1, Null, 3]::list<i32?>, (x -> gt(x, 2::i32))::func<i32? -> bool?>) = true::bool?
+any_match([1, Null, 2]::list<i32?>, (x -> gt(x, 5::i32))::func<i32? -> bool?>) = Null::bool?

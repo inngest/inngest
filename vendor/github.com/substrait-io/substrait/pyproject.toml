@@ -1,0 +1,19 @@
+[tool.black]
+# exclude filters out files found by Black itself during discovery
+exclude = '''
+(
+  .*/antlr_parser/.*\.py
+  | gen/.*
+)
+'''
+# pre-commit passes files into Black, rather than letting it discover files
+# force-exclude can be used to filter out these files from formatting
+force-exclude = '''
+(
+  .*/antlr_parser/.*\.py
+  | gen/.*
+)
+'''
+
+[tool.pytest.ini_options]
+pythonpath = ["gen/proto/python"]
