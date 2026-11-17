@@ -281,6 +281,9 @@ func (s *Server) checkMetadata(md, prev table.Metadata) error {
 	if err != nil {
 		return fmt.Errorf("table location: %w", err)
 	}
+	if err := c.checkMetadataDir(md.Location(), md.Properties()); err != nil {
+		return err
+	}
 	roots := []string{loc}
 	props := md.Properties()
 	for _, k := range locationProperties {
@@ -309,6 +312,24 @@ func (s *Server) checkMetadata(md, prev table.Metadata) error {
 		if err := c.checkUnder(p, roots); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// checkMetadataDir checks the directory the catalog writes a table's next
+// metadata file to (`<location>/metadata` unless `write.metadata.path` is
+// set). The location itself being inside the warehouse isn't enough: a
+// `metadata` symlink under it could still point outside, and a commit that
+// only changes properties adds no other path to check.
+func (c *locationChecker) checkMetadataDir(loc string, props iceberg.Properties) error {
+	provider, err := table.LoadLocationProvider(loc, props)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errBadRequest, err)
+	}
+	file := provider.NewMetadataLocation("f")
+	dir := strings.TrimSuffix(file, "/f")
+	if _, err := c.check(dir); err != nil {
+		return fmt.Errorf("metadata location: %w", err)
 	}
 	return nil
 }

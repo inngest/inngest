@@ -451,6 +451,10 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Location = loc
 	}
+	if err := s.locations().checkMetadataDir(req.Location, req.Properties); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 	opts := []catalog.CreateTableOpt{catalog.WithLocation(req.Location)}
 	if req.PartitionSpec != nil {
 		opts = append(opts, catalog.WithPartitionSpec(req.PartitionSpec))

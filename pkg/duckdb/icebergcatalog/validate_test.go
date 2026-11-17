@@ -350,3 +350,73 @@ func TestCreateDefaultLocationSymlink(t *testing.T) {
 		t.Fatalf("create wrote outside the warehouse: %v", entries)
 	}
 }
+
+// TestMetadataDirSymlink checks a table's `metadata` dir can't be a symlink
+// out of the warehouse, for a create and for a property-only commit (which
+// adds no other path to check).
+func TestMetadataDirSymlink(t *testing.T) {
+	dir := t.TempDir()
+	wh := filepath.Join(dir, "warehouse")
+	outside := filepath.Join(dir, "outside")
+	for _, d := range []string{filepath.Join(wh, "app.db", "t"), outside} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	t.Cleanup(ts.Close)
+
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {
+		t.Fatalf("create ns: %d %v", status, body)
+	}
+
+	// Create: app.db/t exists, app.db/t/metadata points out.
+	link := filepath.Join(wh, "app.db", "t", "metadata")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"t","schema":`+schema+`}`); status != http.StatusBadRequest {
+		t.Fatalf("create: expected 400, got %d %v", status, body)
+	}
+
+	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
+		t.Fatalf("create wrote outside the warehouse: %v", entries)
+	}
+
+	// Commit: create u normally, then move its metadata dir out (so the
+	// current metadata still loads through the symlink) and commit only a
+	// property.
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"u","schema":`+schema+`}`); status != 200 {
+		t.Fatalf("create u: %d %v", status, body)
+	}
+	if err := os.Remove(outside); err != nil {
+		t.Fatal(err)
+	}
+	md := filepath.Join(wh, "app.db", "u", "metadata")
+	if err := os.Rename(md, outside); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, md); err != nil {
+		t.Fatal(err)
+	}
+	commit := `{"requirements":[],"updates":[{"action":"set-properties","updates":{"k":"v"}}]}`
+	if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables/u", commit); status != http.StatusBadRequest {
+		t.Fatalf("commit: expected 400, got %d %v", status, body)
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) != 1 {
+		t.Fatalf("commit wrote outside the warehouse: %v", entries)
+	}
+}
