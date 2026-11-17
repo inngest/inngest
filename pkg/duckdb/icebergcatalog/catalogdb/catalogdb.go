@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -46,8 +47,23 @@ func (b Backend) OpenDB() (*sql.DB, icebergcatalog.Dialect, error) {
 	if err := os.MkdirAll(filepath.Dir(b.SQLitePath), 0o755); err != nil {
 		return nil, "", fmt.Errorf("catalogdb: creating sqlite dir: %w", err)
 	}
-	db, err := sql.Open("sqlite", "file:"+b.SQLitePath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	db, err := sql.Open("sqlite", sqliteDSN(b.SQLitePath))
 	return db, icebergcatalog.SQLite, err
+}
+
+// sqliteDSN is a file: URI for path w/ the pragmas OpenDB wants. The path is
+// escaped, so a `#`, `?` or `%` in it (IE in --sqlite-dir) can't end it
+// early or change which file sqlite opens.
+func sqliteDSN(path string) string {
+	u := url.URL{Scheme: "file", RawQuery: "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"}
+	if filepath.IsAbs(path) {
+		u.Path = filepath.ToSlash(path)
+	} else {
+		// file:rel/path, a relative path can't go in an authority-less
+		// URL's Path.
+		u.Opaque = (&url.URL{Path: filepath.ToSlash(path)}).EscapedPath()
+	}
+	return u.String()
 }
 
 // Catalog is an embedded catalog that owns its backing database.
