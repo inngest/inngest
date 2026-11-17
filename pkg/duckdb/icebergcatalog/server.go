@@ -33,6 +33,7 @@ package icebergcatalog
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -187,7 +188,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if s.opts.Token != "" && r.Header.Get("Authorization") != "Bearer "+s.opts.Token {
+	if s.opts.Token != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+s.opts.Token)) != 1 {
 		writeError(rec, http.StatusUnauthorized, "NotAuthorizedException", "missing or invalid bearer token")
 		return
 	}
