@@ -25,8 +25,9 @@ import (
 func TestDeployApp(t *testing.T) {
 	// the SHA256 of "image bytes", which fake docker saves.
 	const digest = "de7030234493a8bea844dbe1d8676e68a2c1a4b014c721f0425a22b6df66faec"
-	machineSize := `{"errors":[{"code":"machine_size_not_allowed","message":"deploy machine size is not allowed: spec of 2 vCPU and 4096 MiB exceeds this account's limit of 1 vCPU and 1024 MiB per instance; lower spec in inngest.toml or upgrade your plan"}]}`
+	machineSize := `{"errors":[{"code":"machine_size_not_allowed","message":"spec.cpu = 2 and spec.memory = 4096 are more than this account allows, which is 1 vCPU and 1024 MiB of memory per instance; lower spec in inngest.toml or upgrade your plan"}]}`
 	ready := `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc"}}`
+	syncURL := "https://app.inngest.com/env/production/apps/inngest/syncs?sync-id=s1"
 	twoApps := "[apps.web]\nserve = {}\n[apps.worker]\nconnect = {}"
 
 	for _, tc := range []struct {
@@ -65,9 +66,32 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			output: []string{
 				"Building app inngest from ./cmd/all-in-one/Dockerfile...",
 				"Uploading app inngest (11 bytes) for deploy d1...",
-				"Deploy d1 is ready.  Artifact digest abc",
-				"inngest/deploy.sync_failed",
+				// an API without sync reports.
+				"Deploy d1 is built.  Inngest is starting app inngest to sync its functions.  A failed sync sends an inngest/deploy.sync_failed event.",
 			},
+		},
+		{
+			name:       "serve synced",
+			toml:       "[apps.inngest]\nserve = {}",
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"serve":{}}`},
+			deploy:     `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc","sync":{"status":"synced","url":"` + syncURL + `"}}}`,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
+			output: []string{
+				"Built.  Inngest is starting app inngest to sync its functions...",
+				"App inngest is synced and ready to run functions.\nSee the sync at " + syncURL + "\n",
+			},
+		},
+		{
+			name:       "serve sync failed",
+			toml:       "[apps.inngest]\nserve = { port = 8080 }",
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"serve":{"port":8080}}`},
+			deploy:     `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc","sync":{"status":"failed","error":"the app exited","url":"` + syncURL + `"}}}`,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
+			err:        "app inngest did not sync: the app exited\nSee the sync at " + syncURL,
 		},
 		{
 			name:       "connect",
@@ -77,7 +101,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			wantConfig: map[string]string{"inngest": `{"connect":{"replicas":2}}`},
 			deploy:     ready,
 			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
-			output:     []string{"Deploy d1 is ready.  Artifact digest abc"},
+			output:     []string{"Deploy d1 of app inngest is ready.  Inngest is starting its workers."},
 		},
 		{
 			name:       "app by name with docker build args",
@@ -108,7 +132,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			rejected:   "inngest",
 			// a rejected deploy uploads nothing.
 			wantCalls: []string{"create inngest"},
-			err:       "create deploy: POST /deploys/inngest: 403 Forbidden: machine_size_not_allowed: deploy machine size is not allowed: spec of 2 vCPU and 4096 MiB exceeds this account's limit of 1 vCPU and 1024 MiB per instance; lower spec in inngest.toml or upgrade your plan",
+			err:       "spec.cpu = 2 and spec.memory = 4096 are more than this account allows, which is 1 vCPU and 1024 MiB of memory per instance; lower spec in inngest.toml or upgrade your plan",
 		},
 		{
 			name:       "failed deploy",
@@ -153,7 +177,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			wantCalls:  []string{"create web", "create worker", "upload d1", "commit worker d1", "get d1"},
 			err:        "1 of 2 apps failed to deploy: web",
 			output: []string{
-				"Summary:\n  web: failed: create deploy: POST /deploys/web: 403 Forbidden: machine_size_not_allowed: deploy machine size is not allowed",
+				"Summary:\n  web: failed: spec.cpu = 2 and spec.memory = 4096 are more than this account allows",
 				"\n  worker: deploy d1 is ready\n",
 			},
 		},

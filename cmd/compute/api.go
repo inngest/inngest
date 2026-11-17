@@ -133,25 +133,42 @@ func (c *client) do(ctx context.Context, method, path string, in, out proto.Mess
 		return err
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, errorMessage(respBody))
+		return newAPIError(method, path, resp.StatusCode, resp.Status, respBody)
 	}
 	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(respBody, out)
 }
 
-// errorMessage returns "code: message" for each error in a v2 error
-// response, such as a 403 machine_size_not_allowed for a spec larger than
-// the plan allows.  other bodies are returned as they are.
-func errorMessage(body []byte) string {
+// apiError is an error response from the API.
+type apiError struct {
+	statusCode int
+	// code is the code of the first error in a v2 error response, such as
+	// machine_size_not_allowed.  it is empty for other bodies.  callers
+	// check it, not msg, because msg leaves the codes out.
+	code string
+	msg  string
+}
+
+func (e *apiError) Error() string { return e.msg }
+
+// newAPIError returns the error for a response with status code statusCode.
+// the messages of a v2 error response are written for the user, so msg
+// leaves out the request, the HTTP status, and the error codes.  other bodies
+// are shown after the request and status.
+func newAPIError(method, path string, statusCode int, status string, body []byte) *apiError {
+	e := &apiError{statusCode: statusCode}
 	resp := &apiv2.ErrorResponse{}
 	err := protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(body, resp)
 	if err != nil || len(resp.GetErrors()) == 0 {
-		return strings.TrimSpace(string(body))
+		e.msg = fmt.Sprintf("%s %s: %s: %s", method, path, status, strings.TrimSpace(string(body)))
+		return e
 	}
+	e.code = resp.GetErrors()[0].GetCode()
 	messages := make([]string, 0, len(resp.GetErrors()))
-	for _, e := range resp.GetErrors() {
-		messages = append(messages, e.GetCode()+": "+e.GetMessage())
+	for _, item := range resp.GetErrors() {
+		messages = append(messages, item.GetMessage())
 	}
-	return strings.Join(messages, "; ")
+	e.msg = strings.Join(messages, "; ")
+	return e
 }
 
 // uploadArchive sends the archive to the signed URL from createBuild.
