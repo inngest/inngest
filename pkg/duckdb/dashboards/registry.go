@@ -27,7 +27,8 @@ import (
 // Scope carries the caller-provided parameters for one Get call.
 // AccountID/EnvID/From/To/Limit/Cursor are read by every entry; SessionKey/
 // SessionID/Search are only meaningful to the session-scoped entries
-// (sessions.go) and ignored by any entry that doesn't need them.
+// (sessions.go), FunctionID/ExperimentName to the experiment ones
+// (experiments.go), and ignored by any entry that doesn't need them.
 type Scope struct {
 	AccountID uuid.UUID
 	EnvID     uuid.UUID
@@ -38,6 +39,11 @@ type Scope struct {
 	SessionKey string
 	SessionID  string
 	Search     string
+
+	// FunctionID and ExperimentName scope the experiment entries
+	// (experiments.go). A zero FunctionID lists every function's.
+	FunctionID     uuid.UUID
+	ExperimentName string
 }
 
 // Result is one query's raw output: column names and every row's values,
@@ -66,6 +72,9 @@ var registry = map[string]registryEntry{
 	KeySessionRuns: {build: buildSessionRunsSQL},
 
 	KeySessionRunsCount: {build: buildSessionRunsCountSQL},
+
+	KeyExperiments: {build: buildExperimentsSQL},
+	KeyExperiment:  {build: buildExperimentSQL},
 }
 
 const (
