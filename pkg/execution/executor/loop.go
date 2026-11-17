@@ -86,7 +86,14 @@ func loopInput(ctx context.Context, fn inngest.Function, events []json.RawMessag
 // stored state.  a trigger whose instance is gone opens a fresh one, since
 // the instance ended after the trigger was scheduled.  a tick or a wake
 // whose instance is gone returns ErrLoopEnded, and run finishes the run as
-// cancelled without a request.
+// cancelled without a request.  both apply only to a run with no saved
+// steps.  a run with saved steps whose instance is gone fails without
+// retry, since its steps ran against state that no longer exists.
+//
+// a request of a run with no saved steps moves the expiry to now plus the
+// idle TTL when less than half the TTL is left.  the touch moves the
+// counter, so the SDK receives and echoes the new one.  a record that this
+// run opened and that has no commit keeps the expiry from the open.
 //
 // the record's OpenedBy and a replayed saved return are kept on i for the
 // handler, and i.loopReplay is set for a replay.
@@ -133,12 +140,26 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 		return nil, loopReplay(fn, saved.Return), nil
 	}
 	if !found {
+		if len(md.Stack) > 0 {
+			return nil, nil, queue.NeverRetryError(fmt.Errorf("loop instance for key %q expired or was removed while run %s was running", in.Key, md.ID.RunID))
+		}
 		if in.Kind != loops.InputEvent {
 			return nil, nil, fmt.Errorf("%w: run %s", ErrLoopEnded, md.ID.RunID)
 		}
 		snap, err = e.loops.Open(ctx, id, md.ID.RunID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error opening loop instance: %w", err)
+		}
+	}
+	opened := snap.OpenedBy == md.ID.RunID && snap.Counter == 0
+	if len(md.Stack) == 0 && !opened && !snap.ExpiresAt.IsZero() {
+		now := e.now()
+		ttl := loopIdleTTL(fn)
+		if snap.ExpiresAt.Sub(now) < ttl/2 {
+			snap, err = e.loops.Touch(ctx, snap, now.Add(ttl))
+			if err != nil {
+				return nil, nil, fmt.Errorf("error moving loop instance expiry: %w", err)
+			}
 		}
 	}
 	i.loopOpenedBy = snap.OpenedBy
@@ -353,13 +374,7 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	if len(ret.State) > consts.MaxLoopStateSize {
 		return loopInvalid(fmt.Sprintf("loop state is %d bytes, the limit is %d bytes", len(ret.State), consts.MaxLoopStateSize))
 	}
-	// a config that did not go through sync, such as a test fixture, has no
-	// TTL.  without the default every wake is rejected and every commit
-	// expires the instance at once.
-	ttl := fn.Loop.IdleTTL
-	if ttl <= 0 {
-		ttl = consts.DefaultLoopIdleTTL
-	}
+	ttl := loopIdleTTL(fn)
 	var after time.Duration
 	if ret.Wake != nil && !ret.End {
 		if ret.Wake.ID == "" {
@@ -465,6 +480,17 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 		}
 	}
 	return e.handleGeneratorFunctionFinished(ctx, runCtx, done, edge)
+}
+
+// loopIdleTTL returns the function's idle TTL, or the default when it has
+// none.  a config that did not go through sync, such as a test fixture, has
+// no TTL.  without the default every wake is rejected and every commit
+// expires the instance at once.
+func loopIdleTTL(fn inngest.Function) time.Duration {
+	if fn.Loop.IdleTTL <= 0 {
+		return consts.DefaultLoopIdleTTL
+	}
+	return fn.Loop.IdleTTL
 }
 
 // loopOpenedBy returns the opener of the record an end is for.  a known

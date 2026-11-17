@@ -34,6 +34,12 @@ type Store interface {
 	// the stored counter.  ErrConflict means the record moved.  ErrNotFound
 	// means the record is already gone.
 	End(context.Context, Snapshot) error
+	// Touch writes the snapshot back with a new expiry, as long as its
+	// counter matches the stored counter.  the state, OpenedBy, and
+	// LastRunID do not change, and the counter goes up by one.
+	// ErrConflict means the record moved.  ErrNotFound means the record is
+	// gone.
+	Touch(ctx context.Context, snap Snapshot, expiresAt time.Time) (Snapshot, error)
 }
 
 // openAttempts bounds the create then read loop in Open.  each extra pass
@@ -50,7 +56,8 @@ type record struct {
 
 // store keeps one kv entry per instance.  the kv version is the lock.  Open
 // writes the entry at kv version 1, which is Counter 0, and every Commit
-// adds one to both, so Counter is always the kv version minus one.
+// and every Touch adds one to both, so Counter is always the kv version
+// minus one.
 type store struct {
 	kv kv.Store
 }
@@ -171,9 +178,38 @@ func (s *store) End(ctx context.Context, snap Snapshot) error {
 	if !errors.Is(err, kv.ErrConflict) {
 		return err
 	}
-	// a missing key is at kv version 0, so the delete reports a conflict
-	// for it as well.  a read tells the two apart.
-	_, err = s.Load(ctx, snap.ID)
+	return s.conflictOrGone(ctx, snap.ID)
+}
+
+func (s *store) Touch(ctx context.Context, snap Snapshot, expiresAt time.Time) (Snapshot, error) {
+	rec := record{
+		OpenedBy:  snap.OpenedBy,
+		LastRunID: snap.LastRunID,
+		ExpiresAt: expiresAt,
+		State:     snap.State,
+	}
+	if rec.State == nil {
+		rec.State = json.RawMessage("null")
+	}
+	opts := []kv.Option{kv.WithExpected(snap.Counter + 1)}
+	if !expiresAt.IsZero() {
+		opts = append(opts, kv.WithTTL(ttlUntil(expiresAt)))
+	}
+	e, err := s.write(ctx, snap.ID.kvKey(), rec, opts...)
+	if err == nil {
+		return toSnapshot(snap.ID, e, rec)
+	}
+	if !errors.Is(err, kv.ErrConflict) {
+		return Snapshot{}, err
+	}
+	return Snapshot{}, s.conflictOrGone(ctx, snap.ID)
+}
+
+// conflictOrGone returns ErrNotFound when the record is gone and
+// ErrConflict when it is there.  a missing key is at kv version 0, so a
+// compare and set reports a conflict for it as well.
+func (s *store) conflictOrGone(ctx context.Context, id ID) error {
+	_, err := s.Load(ctx, id)
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return ErrNotFound

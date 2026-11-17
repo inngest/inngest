@@ -828,11 +828,11 @@ func TestValidateLoop(t *testing.T) {
 				ok:  false,
 			},
 			{
-				ttl: 59 * time.Second,
+				ttl: 5*time.Minute - time.Second,
 				ok:  false,
 			},
 			{
-				ttl: time.Minute,
+				ttl: 5 * time.Minute,
 				ok:  true,
 			},
 			{

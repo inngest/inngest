@@ -356,6 +356,90 @@ func TestCommitTTL(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
+func TestTouch(t *testing.T) {
+	ctx := context.Background()
+	s, r := newStore(t)
+	id := testID()
+	key := id.kvKey().String()
+
+	opener := ulid.Make()
+	snap, err := s.Open(ctx, id, opener)
+	require.NoError(t, err)
+	run := ulid.Make()
+	committed, err := s.Commit(ctx, Commit{
+		ID:        id,
+		RunID:     run,
+		Counter:   snap.Counter,
+		State:     json.RawMessage(`{"n":1}`),
+		OpenedBy:  snap.OpenedBy,
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	expires := time.Now().Add(time.Hour)
+	touched, err := s.Touch(ctx, committed, expires)
+	require.NoError(t, err)
+	require.Equal(t, committed.Counter+1, touched.Counter)
+	require.JSONEq(t, `{"n":1}`, string(touched.State))
+	require.Equal(t, opener, touched.OpenedBy)
+	require.NotNil(t, touched.LastRunID)
+	require.Equal(t, run, *touched.LastRunID)
+	require.WithinDuration(t, expires, touched.ExpiresAt, time.Second)
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
+
+	loaded, err := s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, touched, loaded)
+
+	// the record lives past the expiry it had before the touch.
+	r.FastForward(2 * time.Minute)
+	_, err = s.Load(ctx, id)
+	require.NoError(t, err)
+
+	// a commit on the touched counter is the next commit.
+	next, err := s.Commit(ctx, Commit{
+		ID:      id,
+		RunID:   ulid.Make(),
+		Counter: touched.Counter,
+	})
+	require.NoError(t, err)
+	require.Equal(t, touched.Counter+1, next.Counter)
+
+	// a touch on a counter the record moved past is a conflict.
+	_, err = s.Touch(ctx, touched, expires)
+	require.ErrorIs(t, err, ErrConflict)
+	loaded, err = s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, next, loaded)
+
+	// a touch on a record that is gone does not create it.
+	require.NoError(t, s.End(ctx, next))
+	_, err = s.Touch(ctx, next, expires)
+	require.ErrorIs(t, err, ErrNotFound)
+	_, err = s.Load(ctx, id)
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestTouchOpened(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newStore(t)
+	id := testID()
+
+	// a record with no commit keeps its null state and no last run.
+	snap, err := s.Open(ctx, id, ulid.Make())
+	require.NoError(t, err)
+	touched, err := s.Touch(ctx, snap, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, int64(1), touched.Counter)
+	require.Nil(t, touched.State)
+	require.Nil(t, touched.LastRunID)
+	require.Equal(t, snap.OpenedBy, touched.OpenedBy)
+
+	loaded, err := s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, touched, loaded)
+}
+
 func TestKVIsolation(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newStore(t)
