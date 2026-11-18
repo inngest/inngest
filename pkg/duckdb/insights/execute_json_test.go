@@ -256,7 +256,7 @@ func TestExecuteStarModifiers(t *testing.T) {
 	require.NoError(t, err)
 
 	tr, err := insights.Transpile(
-		"SELECT * EXCEPT (data, meta, ts, received_at) REPLACE (lower(name) AS name) RENAME (id AS event_id) FROM events",
+		"SELECT * EXCEPT (data, meta, ts, received_at) REPLACE (lower(name) AS name) RENAME (id AS event_id) FROM events ORDER BY event_id",
 		accountID, envID)
 	require.NoError(t, err)
 	res, err := insights.Execute(ctx, db, tr)

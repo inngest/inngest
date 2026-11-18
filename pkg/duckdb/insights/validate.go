@@ -238,6 +238,12 @@ func selectAliases(stmt *parser.SelectStatement) map[string]bool {
 		if item.Alias != "" {
 			aliases[strings.ToLower(item.Alias)] = true
 		}
+		// A star's RENAME names an output column too.
+		if star, ok := item.Expr.(*parser.StarExpr); ok {
+			for _, r := range star.Rename {
+				aliases[strings.ToLower(r.To)] = true
+			}
+		}
 	}
 	return aliases
 }

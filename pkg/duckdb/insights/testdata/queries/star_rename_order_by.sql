@@ -1,0 +1,1 @@
+SELECT * RENAME (run_id AS rid) FROM runs ORDER BY rid
