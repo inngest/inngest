@@ -429,7 +429,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account usage"
-      description: "Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
+      description: "Returns the account's execution usage and overage policy for the current UTC calendar month, plus current seat usage and effective capacity limits. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
       tags: "Account"
       security: {
         security_requirement: {
@@ -3725,6 +3725,57 @@ message AccountUsage {
   google.protobuf.Timestamp period_end = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "End of the current period, exclusive"
+    }
+  ];
+  bool executions_overage_allowed = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether the account allows billable execution overages. This is separate from execution-cap enforcement"
+    }
+  ];
+  AccountUsageExecutionCap execution_cap = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Configured execution-cap policy. Omitted when no finite cap is configured. Does not report whether the account is currently blocked"
+    }
+  ];
+  AccountUsageSeats seats = 7;
+  AccountUsageLimits limits = 8;
+}
+
+message AccountUsageExecutionCap {
+  int64 limit = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Execution threshold for refusing new runs when enforcement is enabled: included allowance plus the configured overage buffer"
+    }
+  ];
+  bool enforced = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether execution-cap enforcement is enabled for the account"
+    }
+  ];
+}
+
+message AccountUsageSeats {
+  int64 used = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Current account membership count, not a monthly total"
+    }
+  ];
+  optional int64 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective seat allowance, including add-ons and account overrides. Omitted when unlimited"
+    }
+  ];
+}
+
+message AccountUsageLimits {
+  optional int64 concurrent_steps = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective base concurrent-step limit, excluding burst capacity. Omitted when unlimited. Does not report current utilization"
+    }
+  ];
+  optional int64 workers = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective limit on concurrent Connect worker connections. Omitted when unlimited. Does not report current utilization"
     }
   ];
 }
