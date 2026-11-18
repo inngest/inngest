@@ -151,6 +151,14 @@ func TestSourceColumnsRead(t *testing.T) {
 			want: map[Table][]string{TableRuns: runsCols},
 		},
 		{
+			// x's columns are known only through its WITH, which sits on a
+			// UNION; s.output is the outer query's.
+			name:   "a set op's WITH and an outer reference",
+			sql:    `SELECT s.span_id FROM spans s WHERE EXISTS (SELECT 1 FROM (WITH c AS (SELECT run_id AS y FROM runs) SELECT y FROM c UNION ALL SELECT run_id FROM runs) x WHERE x.y = s.run_id AND s.output IS NOT NULL)`,
+			tables: []Table{TableSpans, TableRuns},
+			want:   map[Table][]string{TableSpans: {"output", "run_id", "span_id"}, TableRuns: {"run_id"}},
+		},
+		{
 			name: "unknown table", sql: `SELECT a FROM somewhere`, tables: []Table{TableSpans},
 		},
 		{

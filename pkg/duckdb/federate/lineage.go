@@ -671,14 +671,22 @@ func (l *lineage) outputNames(stmt *parser.SelectStatement, e *env, outer *scope
 	if stmt == nil || l.err != nil || !l.spend() {
 		return nil
 	}
-	for stmt.SetOp != parser.SetOpNone {
+	// A set op's WITH applies to its operands, so it's registered before
+	// descending into the left one.
+	for {
+		if stmt.With != nil {
+			if stmt.With.Recursive {
+				return nil
+			}
+			e = l.withCTEs(stmt.With, e)
+		}
+		if stmt.SetOp == parser.SetOpNone {
+			break
+		}
 		stmt = stmt.SetLeft
 	}
 	if stmt.Values != nil {
 		return nil
-	}
-	if stmt.With != nil && !stmt.With.Recursive {
-		e = l.withCTEs(stmt.With, e)
 	}
 	// A throwaway lineage: building the scope mustn't record demand.
 	probe := &lineage{macros: l.macros, sources: l.sources, lake: l.lake, out: map[Table]demand{}, depth: l.depth, budget: l.budget, names: l.names}
