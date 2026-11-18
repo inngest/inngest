@@ -452,6 +452,37 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		f.query(t, []Table{TableSpans}, nil, `SELECT count(*)::VARCHAR, '' FROM spans`)
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, bounds, names(f.streamer.reqs[0].Columns))
+
+		// W/ several tables federated, each Iceberg scan (which doesn't name
+		// its table in the plan) still only counts for the tables whose
+		// columns it fits, so neither delta streams the JSON payloads.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT s.span_id, m.kind FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id`)
+		require.Len(t, f.streamer.reqs, 2)
+		byTable := map[Table][]string{}
+		for _, r := range f.streamer.reqs {
+			byTable[r.Table] = names(r.Columns)
+		}
+		require.Subset(t, byTable[TableSpans], []string{"span_id", "run_id"})
+		require.Subset(t, byTable[TableMetadata], []string{"kind", "run_id", "span_id"})
+		for _, big := range []string{"output", "error", "input", "attributes", "values"} {
+			require.NotContains(t, byTable[TableSpans], big)
+			require.NotContains(t, byTable[TableMetadata], big)
+		}
+
+		// A filter literal that happens to be another table's column name
+		// (run_metadata's kind) doesn't stop the spans scan fitting spans,
+		// so spans still streams the filtered name.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT s.span_id FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id WHERE s.name = 'kind'`)
+		require.Len(t, f.streamer.reqs, 2)
+		for _, r := range f.streamer.reqs {
+			if r.Table == TableSpans {
+				require.Contains(t, names(r.Columns), "name")
+			}
+		}
 	})
 }
 
@@ -515,4 +546,33 @@ func TestExecutorRejectsMalformedDeltaBatches(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestExecutorPrunedJoinKeepsFilteredRows is the join the plan-based
+// pruning got wrong: filter literals naming the other table's columns
+// (kind, name) made it stream neither table's filtered column, so the
+// delta rows' NULLs failed the filters and the rows silently vanished.
+func TestExecutorPrunedJoinKeepsFilteredRows(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		q := f.base
+		f.streamer.rows[TableSpans] = []map[string]any{{
+			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "app_id": f.app,
+			"app_name": "app", "function_id": f.fn, "function_slug": "fn", "name": "kind",
+			"start_time": q, "end_time": q, "trace_id": "trace-1", "span_id": "span-1", "parent_span_id": "",
+			"attributes": `{}`, "bucket_at": f.deltaBucketAt(),
+		}}
+		f.streamer.rows[TableMetadata] = []map[string]any{{
+			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "span_id": "span-1",
+			"scope": "step", "kind": "name", "is_user": true, "values": `{}`, "created_at": q, "bucket_at": f.deltaBucketAt(),
+		}}
+
+		got := f.query(t, []Table{TableSpans, TableMetadata}, nil,
+			`SELECT m.span_id, m.kind FROM spans s JOIN metadata m ON m.run_id = s.run_id AND m.span_id = s.span_id WHERE m.kind = 'name' AND s.name = 'kind'`)
+		require.Equal(t, map[string]string{"span-1": "name"}, got)
+		for _, r := range f.streamer.reqs {
+			for _, c := range r.Columns {
+				require.NotEqual(t, "attributes", c.Name, "%s streamed a payload the query never reads", r.Table)
+			}
+		}
+	})
 }

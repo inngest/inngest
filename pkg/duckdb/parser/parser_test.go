@@ -69,8 +69,6 @@ func TestParseStringReportsUnsupportedConstructsAsParseErrors(t *testing.T) {
 		col      int
 	}{
 		{"DESCRIBE t", "DESCRIBE/TABLE as a standalone statement is not supported", 1},
-		{"SELECT * REPLACE (a + 1 AS a) FROM t", "* REPLACE (...) is not supported", 10},
-		{"SELECT * RENAME (a AS b) FROM t", "* RENAME (...) is not supported", 10},
 		{"SELECT * FROM t TABLESAMPLE 10%", "TABLESAMPLE is not supported", 17},
 		{"SELECT a OPERATOR(+) b FROM t", "OPERATOR(...) is not supported", 10},
 		{"SELECT TRY(a) FROM t", "TRY(...) is not supported", 8},

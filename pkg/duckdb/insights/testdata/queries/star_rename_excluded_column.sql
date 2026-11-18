@@ -1,0 +1,1 @@
+SELECT * EXCLUDE (status) RENAME (status AS s) FROM runs

@@ -149,7 +149,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	}
 
 	// Only stream the delta columns the query reads.
-	used, err := deltaColumnsUsed(ctx, conn, q, needed)
+	used, err := deltaColumnsUsed(q, needed)
 	if err != nil {
 		return fail(err)
 	}
