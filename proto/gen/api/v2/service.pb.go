@@ -12525,7 +12525,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xa4\xa8\x02\n" +
+	"\x04INFO\x10\x032Ө\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12623,9 +12623,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x15\b\x01\x12\x11accounts:read:get\x82\xd3\xe4\x93\x02\n" +
-	"\x12\b/account\x12\xb6\x05\n" +
-	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\xe1\x04\x92A\xac\x04\n" +
-	"\aAccount\x12\x11Get account usage\x1a\xcd\x01Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. The dev server has no billing, so it returns 0 executions with no limit.JC\n" +
+	"\x12\b/account\x12\xe5\x05\n" +
+	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\x90\x05\x92A\xdb\x04\n" +
+	"\aAccount\x12\x11Get account usage\x1a\xfc\x01Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage.JC\n" +
 	"\x03200\x12<\n" +
 	"\rAccount usage\x12+\n" +
 	")\x1a'#/definitions/v2GetAccountUsageResponseJR\n" +

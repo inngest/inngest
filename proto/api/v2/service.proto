@@ -429,7 +429,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account usage"
-      description: "Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. The dev server has no billing, so it returns 0 executions with no limit."
+      description: "Returns the account's execution usage for the current billing period, as shown on the billing page. Periods are UTC calendar months. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
       tags: "Account"
       security: {
         security_requirement: {

@@ -78,24 +78,8 @@ func (s *Service) GetAccountUsage(ctx context.Context, req *apiv2.GetAccountUsag
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetAccountUsage_FullMethodName); result.Limited {
 		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no account usage was fetched.")
 	}
-	now := time.Now()
-	start, end := accountUsagePeriod(now)
-	return &apiv2.GetAccountUsageResponse{
-		Data: &apiv2.AccountUsage{
-			Executions:  0,
-			PeriodStart: timestamppb.New(start),
-			PeriodEnd:   timestamppb.New(end),
-		},
-		Metadata: &apiv2.ResponseMetadata{
-			FetchedAt: timestamppb.New(now),
-		},
-	}, nil
-}
-
-func accountUsagePeriod(now time.Time) (time.Time, time.Time) {
-	now = now.UTC()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	return start, start.AddDate(0, 1, 0)
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
+		"Account usage is only available in Inngest Cloud. Run: inngest api --prod get-account-usage")
 }
 
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
