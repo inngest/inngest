@@ -240,6 +240,23 @@ func TestGetExperiment(t *testing.T) {
 	}, d.Variants)
 }
 
+// TestGetExperiment_StrategyChange checks a switch to a strategy w/o
+// weights doesn't keep the previous strategy's weights: both come from the
+// latest selection.
+func TestGetExperiment_StrategyChange(t *testing.T) {
+	f := seedExperiments(t)
+	t6 := f.now.Add(-30 * time.Minute)
+	f.run(t, "r6", f.checkoutFn, "app-checkout", t6)
+	f.md(t, testMetadata{runID: "r6", queuedAt: t6, spanID: "r6-select", kind: "experiment", values: map[string]any{
+		"name": "checkout", "variant": "a", "selection_strategy": "fixed", "available_variants": []string{"a", "b", "c"},
+	}})
+
+	d, err := dashboards.GetExperiment(t.Context(), f.db, f.accountID, f.envID, dashboards.ExperimentOpts{FunctionID: f.checkoutFn, Name: "checkout"})
+	require.NoError(t, err)
+	require.Equal(t, "fixed", d.SelectionStrategy)
+	require.Empty(t, d.Weights)
+}
+
 func TestGetExperiment_NotFound(t *testing.T) {
 	f := seedExperiments(t)
 
