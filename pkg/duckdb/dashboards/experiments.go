@@ -81,9 +81,9 @@ functions AS (
 SELECT
   s.name,
   f.function_id,
-  any_value(f.function_slug) AS function_slug,
-  any_value(f.app_id) AS app_id,
-  any_value(f.app_name) AS app_name,
+  max(f.function_slug) AS function_slug,
+  max(f.app_id) AS app_id,
+  max(f.app_name) AS app_name,
   arg_max(s.selection_strategy, s.run_queued_at) FILTER (WHERE s.selection_strategy IS NOT NULL) AS selection_strategy,
   arg_max(s.available_variants, s.run_queued_at) FILTER (WHERE s.available_variants IS NOT NULL) AS available_variants,
   list_sort(list_distinct(list(s.variant))) AS observed_variants,
