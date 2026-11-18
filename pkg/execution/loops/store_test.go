@@ -67,7 +67,7 @@ func TestOpenCreatesOnce(t *testing.T) {
 	require.Nil(t, snap.State)
 	require.Nil(t, snap.LastRunID)
 	require.Equal(t, int64(0), snap.Counter)
-	require.WithinDuration(t, time.Now().Add(OpenTTL), snap.ExpiresAt, time.Minute)
+	require.WithinDuration(t, time.Now(), snap.UpdatedAt, time.Minute)
 	require.Equal(t, OpenTTL, r.TTL(id.kvKey().String()))
 
 	// a second open keeps the first opener.
@@ -161,7 +161,8 @@ func TestCommit(t *testing.T) {
 	require.JSONEq(t, `{"n":1}`, string(c1.State))
 	require.NotNil(t, c1.LastRunID)
 	require.Equal(t, run1, *c1.LastRunID)
-	require.True(t, c1.ExpiresAt.IsZero())
+	require.WithinDuration(t, time.Now(), c1.UpdatedAt, time.Minute)
+	require.False(t, c1.UpdatedAt.Before(snap.UpdatedAt))
 
 	loaded, err := s.Load(ctx, id)
 	require.NoError(t, err)
@@ -326,7 +327,6 @@ func TestCommitTTL(t *testing.T) {
 		ExpiresAt: expires,
 	})
 	require.NoError(t, err)
-	require.WithinDuration(t, expires, c1.ExpiresAt, time.Second)
 	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
 
 	r.FastForward(30 * time.Minute)
@@ -340,7 +340,6 @@ func TestCommitTTL(t *testing.T) {
 		Counter: c1.Counter,
 	})
 	require.NoError(t, err)
-	require.True(t, c2.ExpiresAt.IsZero())
 	require.Zero(t, r.TTL(key))
 
 	c3, err := s.Commit(ctx, Commit{
@@ -376,68 +375,55 @@ func TestTouch(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// a touch moves the store's expiry and leaves the record as it is.
 	expires := time.Now().Add(time.Hour)
-	touched, err := s.Touch(ctx, committed, expires)
-	require.NoError(t, err)
-	require.Equal(t, committed.Counter+1, touched.Counter)
-	require.JSONEq(t, `{"n":1}`, string(touched.State))
-	require.Equal(t, opener, touched.OpenedBy)
-	require.NotNil(t, touched.LastRunID)
-	require.Equal(t, run, *touched.LastRunID)
-	require.WithinDuration(t, expires, touched.ExpiresAt, time.Second)
+	require.NoError(t, s.Touch(ctx, id, expires))
 	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
-
 	loaded, err := s.Load(ctx, id)
 	require.NoError(t, err)
-	require.Equal(t, touched, loaded)
+	require.Equal(t, committed, loaded)
+
+	// an earlier expiry changes nothing.
+	require.NoError(t, s.Touch(ctx, id, time.Now().Add(time.Minute)))
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
 
 	// the record lives past the expiry it had before the touch.
 	r.FastForward(2 * time.Minute)
 	_, err = s.Load(ctx, id)
 	require.NoError(t, err)
 
-	// a commit on the touched counter is the next commit.
+	// a commit on the counter from before the touch is the next commit.
 	next, err := s.Commit(ctx, Commit{
 		ID:      id,
 		RunID:   ulid.Make(),
-		Counter: touched.Counter,
+		Counter: committed.Counter,
 	})
 	require.NoError(t, err)
-	require.Equal(t, touched.Counter+1, next.Counter)
-
-	// a touch on a counter the record moved past is a conflict.
-	_, err = s.Touch(ctx, touched, expires)
-	require.ErrorIs(t, err, ErrConflict)
-	loaded, err = s.Load(ctx, id)
-	require.NoError(t, err)
-	require.Equal(t, next, loaded)
+	require.Equal(t, committed.Counter+1, next.Counter)
 
 	// a touch on a record that is gone does not create it.
 	require.NoError(t, s.End(ctx, next))
-	_, err = s.Touch(ctx, next, expires)
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, s.Touch(ctx, id, expires), ErrNotFound)
 	_, err = s.Load(ctx, id)
 	require.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestTouchOpened(t *testing.T) {
 	ctx := context.Background()
-	s, _ := newStore(t)
+	s, r := newStore(t)
 	id := testID()
+	key := id.kvKey().String()
 
-	// a record with no commit keeps its null state and no last run.
+	// a record with no commit stays at counter 0 with its null state.
 	snap, err := s.Open(ctx, id, ulid.Make())
 	require.NoError(t, err)
-	touched, err := s.Touch(ctx, snap, time.Now().Add(time.Hour))
-	require.NoError(t, err)
-	require.Equal(t, int64(1), touched.Counter)
-	require.Nil(t, touched.State)
-	require.Nil(t, touched.LastRunID)
-	require.Equal(t, snap.OpenedBy, touched.OpenedBy)
+	expires := time.Now().Add(2 * OpenTTL)
+	require.NoError(t, s.Touch(ctx, id, expires))
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
 
 	loaded, err := s.Load(ctx, id)
 	require.NoError(t, err)
-	require.Equal(t, touched, loaded)
+	require.Equal(t, snap, loaded)
 }
 
 func TestKVIsolation(t *testing.T) {

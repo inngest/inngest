@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/loops"
@@ -36,13 +37,11 @@ func (h *loopHarness) scheduleRun(t *testing.T, input *event.Event, steps ...str
 	}
 }
 
-// commitExpiring schedules the trigger and commits one state from its run
-// that expires after d.
+// commitExpiring opens the instance for a scheduled trigger run and commits
+// one state from that run that expires after d.
 func (h *loopHarness) commitExpiring(t *testing.T, d time.Duration) loops.Snapshot {
 	t.Helper()
-	first, firstID := h.request(nil)
-	_, _, err := h.e.Schedule(h.ctx, first)
-	require.NoError(t, err)
+	_, firstID := h.open(t)
 	snap, err := h.store.Commit(h.ctx, loops.Commit{
 		ID:        h.loopID("user-1"),
 		RunID:     firstID.RunID,
@@ -54,31 +53,76 @@ func (h *loopHarness) commitExpiring(t *testing.T, d time.Duration) loops.Snapsh
 	return snap
 }
 
+// TestLoopRequestTouch covers the touch that every request makes.  the
+// harness redis time moves forward to show which expiry the record has.
 func TestLoopRequestTouch(t *testing.T) {
-	t.Run("expiry within half the ttl is reset", func(t *testing.T) {
+	t.Run("a request moves the expiry and not the counter", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.req.Function.Loop.IdleTTL = time.Hour
-		committed := h.commitExpiring(t, 29*time.Minute)
+		committed := h.commitExpiring(t, 2*time.Minute)
 
 		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
 		loop, replay, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Nil(t, replay)
-		require.Equal(t, committed.Counter+1, loop.Version)
+		require.Equal(t, committed.Counter, loop.Version)
 		require.JSONEq(t, `{"n":1}`, string(loop.State))
 
+		// the record is past the expiry of its commit and has not changed.
+		h.mr.FastForward(30 * time.Minute)
 		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.NoError(t, err)
-		require.Equal(t, loop.Version, snap.Counter)
-		require.WithinDuration(t, time.Now().Add(time.Hour), snap.ExpiresAt, 10*time.Second)
-		require.Equal(t, committed.LastRunID, snap.LastRunID)
-		require.Equal(t, committed.OpenedBy, snap.OpenedBy)
+		require.Equal(t, committed, snap)
+
+		// the new expiry is the idle ttl plus the longest request after the
+		// request.  the record is there at the end of the longest request
+		// and gone one idle ttl later.
+		h.mr.FastForward(consts.MaxFunctionTimeout)
+		_, err = h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		h.mr.FastForward(31 * time.Minute)
+		_, err = h.store.Load(h.ctx, h.loopID("user-1"))
+		require.ErrorIs(t, err, loops.ErrNotFound)
 	})
 
-	t.Run("the run commits on the version after the reset", func(t *testing.T) {
+	t.Run("a request of a run with saved steps moves the expiry", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.req.Function.Loop.IdleTTL = time.Hour
-		committed := h.commitExpiring(t, 29*time.Minute)
+		committed := h.commitExpiring(t, 2*time.Minute)
+
+		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")), "step-1")
+		loop, _, err := h.e.loopRequest(h.ctx, run)
+		require.NoError(t, err)
+		require.Equal(t, committed.Counter, loop.Version)
+
+		h.mr.FastForward(30 * time.Minute)
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		require.Equal(t, committed, snap)
+	})
+
+	t.Run("an expiry further out is kept", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.req.Function.Loop.IdleTTL = time.Hour
+		committed := h.commitExpiring(t, 6*time.Hour)
+
+		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
+		loop, _, err := h.e.loopRequest(h.ctx, run)
+		require.NoError(t, err)
+		require.Equal(t, committed.Counter, loop.Version)
+
+		// the touch asks for three hours, the idle ttl plus the longest
+		// request.  the record still has the six hours of its commit.
+		h.mr.FastForward(5 * time.Hour)
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		require.Equal(t, committed, snap)
+	})
+
+	t.Run("the run commits on the version it was sent", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.req.Function.Loop.IdleTTL = time.Hour
+		committed := h.commitExpiring(t, 2*time.Minute)
 
 		d := &loopReturnDriver{
 			echo: true,
@@ -91,85 +135,48 @@ func TestLoopRequestTouch(t *testing.T) {
 		id, resp, err := h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
-		require.Equal(t, committed.Counter+1, d.seen.Version)
+		require.Equal(t, committed.Counter, d.seen.Version)
 
 		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.NoError(t, err)
-		require.Equal(t, committed.Counter+2, snap.Counter)
+		require.Equal(t, committed.Counter+1, snap.Counter)
 		require.JSONEq(t, `{"n":2}`, string(snap.State))
 		require.Equal(t, id.RunID, *snap.LastRunID)
 	})
 
-	t.Run("expiry further out writes nothing", func(t *testing.T) {
-		h := newLoopHarness(t)
-		h.req.Function.Loop.IdleTTL = time.Hour
-		committed := h.commitExpiring(t, 31*time.Minute)
-
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
-		loop, _, err := h.e.loopRequest(h.ctx, run)
-		require.NoError(t, err)
-		require.Equal(t, committed.Counter, loop.Version)
-
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.Equal(t, committed, snap)
-	})
-
-	t.Run("a run with saved steps is not reset", func(t *testing.T) {
-		h := newLoopHarness(t)
-		h.req.Function.Loop.IdleTTL = time.Hour
-		committed := h.commitExpiring(t, 29*time.Minute)
-
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")), "step-1")
-		loop, _, err := h.e.loopRequest(h.ctx, run)
-		require.NoError(t, err)
-		require.Equal(t, committed.Counter, loop.Version)
-
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.Equal(t, committed, snap)
-	})
-
-	t.Run("an instance this run opened is not reset", func(t *testing.T) {
-		// the default TTL is 7 days, so the one day expiry of an open is
-		// within half of it.
+	t.Run("a record the request opens gets the expiry of a request", func(t *testing.T) {
+		// the default idle ttl is 7 days, which is past the one day expiry
+		// of an open.
 		h := newLoopHarness(t)
 		_, run := h.scheduleRun(t, nil)
+		_, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.ErrorIs(t, err, loops.ErrNotFound)
+
 		loop, _, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), loop.Version)
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.Equal(t, int64(0), snap.Counter)
-		require.WithinDuration(t, time.Now().Add(loops.OpenTTL), snap.ExpiresAt, 10*time.Second)
+		require.Nil(t, loop.State)
 
-		// the same holds when the request opens the instance itself.
-		require.NoError(t, h.store.End(h.ctx, snap))
-		loop, _, err = h.e.loopRequest(h.ctx, run)
-		require.NoError(t, err)
-		require.Equal(t, int64(0), loop.Version)
-		snap, err = h.store.Load(h.ctx, h.loopID("user-1"))
+		h.mr.FastForward(loops.OpenTTL + time.Hour)
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.NoError(t, err)
 		require.Equal(t, int64(0), snap.Counter)
 		require.Equal(t, run.md.ID.RunID, snap.OpenedBy)
-		require.WithinDuration(t, time.Now().Add(loops.OpenTTL), snap.ExpiresAt, 10*time.Second)
 	})
 
-	t.Run("an instance another run opened is reset", func(t *testing.T) {
+	t.Run("a record another run opened stays at counter 0", func(t *testing.T) {
 		h := newLoopHarness(t)
-		first, _ := h.request(nil)
-		_, _, err := h.e.Schedule(h.ctx, first)
-		require.NoError(t, err)
+		_, first := h.open(t)
 
 		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
 		loop, _, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
-		require.Equal(t, int64(1), loop.Version)
+		require.Equal(t, int64(0), loop.Version)
 		require.Nil(t, loop.State)
 		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.NoError(t, err)
-		require.Equal(t, *first.RunID, snap.OpenedBy)
-		require.WithinDuration(t, time.Now().Add(7*24*time.Hour), snap.ExpiresAt, 10*time.Second)
+		require.Equal(t, first.RunID, snap.OpenedBy)
+		require.Equal(t, int64(0), snap.Counter)
 	})
 }
 

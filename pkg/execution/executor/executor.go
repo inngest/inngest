@@ -1319,7 +1319,7 @@ func (e *executor) schedule(
 	if skipReason == enums.SkipReasonNone {
 		listenerEvents = e.prepareStateEventsForSyncListeners(&newState)
 		if req.Function.Loop != nil {
-			if err := e.openLoop(ctx, req, loopInput, runID); err != nil {
+			if err := e.checkLoopInstance(ctx, req, loopInput); err != nil {
 				return nil, nil, err
 			}
 		}
