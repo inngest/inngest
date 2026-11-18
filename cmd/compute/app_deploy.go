@@ -221,25 +221,29 @@ func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *cl
 	if err != nil {
 		return "", err
 	}
-	sync := d.GetSync()
-	if sync.GetStatus() == syncFailed {
-		err := fmt.Errorf("app %s did not sync: %s", name, sync.GetError())
-		if sync.GetUrl() != "" {
-			err = fmt.Errorf("%w\nSee the sync at %s", err, sync.GetUrl())
+	result := d.GetSync()
+	if result.GetStatus() != syncSynced {
+		// the error is one line, so the summary of several apps stays readable.
+		err := fmt.Errorf("app %s did not sync: %s", name, result.GetError())
+		if result.GetUrl() != "" {
+			err = fmt.Errorf("%w; see %s", err, result.GetUrl())
 		}
 		return "", err
 	}
 	fmt.Fprintf(stdout, "\nApp %s is synced and ready to run functions.\n", name)
-	if sync.GetUrl() != "" {
-		fmt.Fprintf(stdout, "See the sync at %s\n", sync.GetUrl())
+	if result.GetUrl() != "" {
+		fmt.Fprintf(stdout, "See the sync at %s\n", result.GetUrl())
 	}
 	return deployID, nil
 }
 
+// the sync statuses of a deploy.
 const (
-	syncSynced = "synced"
-	syncFailed = "failed"
+	syncSyncing = "syncing"
+	syncSynced  = "synced"
+)
 
+const (
 	// deployWait limits the wait for one deploy.  Inngest stops a build after
 	// 35 minutes and a sync after a few more.
 	deployWait = 45 * time.Minute
@@ -259,14 +263,11 @@ func deployDone(d *apiv2.Deploy) (bool, error) {
 	return false, nil
 }
 
-// syncDone reports whether the sync of a ready deploy has ended.  the caller
-// reads a failed sync's error.
+// syncDone reports whether the sync of a ready deploy has ended.  a status
+// other than syncing ends the wait, so a status that this CLI does not know
+// fails at once.  the caller reads a failed sync's error.
 func syncDone(d *apiv2.Deploy) (bool, error) {
-	switch d.GetSync().GetStatus() {
-	case syncSynced, syncFailed:
-		return true, nil
-	}
-	return false, nil
+	return d.GetSync().GetStatus() != syncSyncing, nil
 }
 
 // waitForDeploy polls the deploy until done says it has ended, and says how
@@ -287,7 +288,7 @@ func waitForDeploy(ctx context.Context, stdout io.Writer, api *client, d *apiv2.
 		case <-progress.C:
 			waited := time.Since(start).Round(time.Second)
 			if waited >= deployWait {
-				return nil, fmt.Errorf("stopped waiting for deploy %s after %s; Inngest may still finish it.  Its app's syncs are in the Inngest dashboard", d.GetId(), waited)
+				return nil, fmt.Errorf("stopped waiting for deploy %s after %s; Inngest may still finish it", d.GetId(), waited)
 			}
 			fmt.Fprintf(stdout, "  still waiting (%s)\n", waited)
 			continue

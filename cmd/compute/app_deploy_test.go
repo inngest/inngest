@@ -96,7 +96,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			deploy:     `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc","sync":{"status":"failed","error":"the app exited","url":"` + syncURL + `"}}}`,
 			syncing:    true,
 			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1", "get d1"},
-			err:        "app inngest did not sync: the app exited\nSee the sync at " + syncURL,
+			err:        "app inngest did not sync: the app exited; see " + syncURL,
 		},
 		{
 			name:       "connect",

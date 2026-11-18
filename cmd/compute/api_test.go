@@ -111,25 +111,19 @@ func TestAPIError(t *testing.T) {
 	for _, tc := range []struct {
 		body string
 		msg  string
-		code string
 	}{
 		{
 			body: `{"errors":[{"code":"artifact_name_conflict","message":"Artifact name is already used by a different type"}]}`,
 			msg:  "Artifact name is already used by a different type",
-			code: "artifact_name_conflict",
 		},
-		{
-			body: `{"errors":[{"code":"a","message":"first"},{"code":"b","message":"second"}]}`,
-			msg:  "first; second",
-			code: "a",
-		},
+		{body: `{"errors":[{"code":"a","message":"first"},{"code":"b","message":"second"}]}`, msg: "first; second"},
+		// an error without a message shows its code.
+		{body: `{"errors":[{"code":"forbidden"}]}`, msg: "forbidden"},
 		{body: "upstream connect error\n", msg: "GET /deploys/d1: 502 Bad Gateway: upstream connect error"},
 		{body: `{"errors":[]}`, msg: `GET /deploys/d1: 502 Bad Gateway: {"errors":[]}`},
 		{body: `{"message":"not a v2 error"}`, msg: `GET /deploys/d1: 502 Bad Gateway: {"message":"not a v2 error"}`},
 	} {
-		err := newAPIError(http.MethodGet, "/deploys/d1", http.StatusBadGateway, "502 Bad Gateway", []byte(tc.body))
+		err := newAPIError(http.MethodGet, "/deploys/d1", "502 Bad Gateway", []byte(tc.body))
 		require.Equal(t, tc.msg, err.Error(), tc.body)
-		require.Equal(t, tc.code, err.code, tc.body)
-		require.Equal(t, http.StatusBadGateway, err.statusCode, tc.body)
 	}
 }
