@@ -151,6 +151,29 @@ func (p loopInputProcessor) Run(ctx context.Context, f queue.RunFunc) error {
 	return nil
 }
 
+// loopInputFailingExecutor fails every schedule request with err.
+type loopInputFailingExecutor struct {
+	execution.Executor
+	err error
+}
+
+func (e loopInputFailingExecutor) Schedule(context.Context, execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	return nil, nil, e.err
+}
+
+// requireLoopTickRequeued checks that err makes the queue run item again
+// one tick interval after start, on any attempt, without a new attempt
+// counted.
+func requireLoopTickRequeued(t *testing.T, err error, item queue.Item, start time.Time, tick time.Duration) {
+	t.Helper()
+	require.True(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
+	require.True(t, queue.IsAlwaysRetryable(err))
+	at := queue.AsRetryAtError(err)
+	require.NotNil(t, at)
+	require.NotNil(t, at.NextRetryAt())
+	require.WithinDuration(t, start.Add(tick), *at.NextRetryAt(), 5*time.Second)
+}
+
 func TestHandleLoopInput(t *testing.T) {
 	t.Run("tick starts a run with the tick event", func(t *testing.T) {
 		h := newLoopHarness(t)
@@ -396,6 +419,118 @@ func TestHandleLoopInput(t *testing.T) {
 		require.Equal(t, loops.EventWake, exec.reqs[1].Events[0].GetEvent().Name)
 		require.NotNil(t, exec.mds[0])
 		require.NotNil(t, exec.mds[1])
+	})
+
+	// the account is over its execution cap, so every schedule is skipped
+	// and no run exists to enqueue the next tick.
+	t.Run("a skipped tick runs again one tick interval later", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, pub := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		item.Attempt = item.GetMaxAttempts() - 1
+		start := time.Now()
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, ErrFunctionSkipped)
+		requireLoopTickRequeued(t, err, item, start, 30*time.Second)
+
+		require.Len(t, exec.reqs, 1)
+		require.Nil(t, exec.mds[0])
+		require.Equal(t, 0, pub.count())
+	})
+
+	t.Run("a skipped wake is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+		require.Len(t, exec.reqs, 1)
+		require.Nil(t, exec.mds[0])
+	})
+
+	t.Run("a skipped tick of a function without a tick is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, _, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+	})
+
+	// the ended instance is found before the skip, so the item is dropped
+	// and does not run again while the skip lasts.
+	t.Run("a skipped tick of an ended instance is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItemOf(t, ulid.Make(), queue.KindLoopTick, loops.InputTick, "")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+		require.Len(t, exec.reqs, 1)
+	})
+
+	t.Run("a tick that fails to schedule uses its attempts and then runs again one tick interval later", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		s, _, _ := h.loopService(t, h.req.Function)
+		cause := errors.New("schedule failed")
+		s.exec = loopInputFailingExecutor{
+			Executor: h.e,
+			err:      cause,
+		}
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		require.False(t, queue.IsAlwaysRetryable(err))
+		require.Nil(t, queue.AsRetryAtError(err))
+		require.True(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
+
+		item.Attempt = item.GetMaxAttempts() - 1
+		start := time.Now()
+		err = s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		requireLoopTickRequeued(t, err, item, start, 30*time.Second)
+	})
+
+	t.Run("a wake that fails to schedule on its last attempt is not run again", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		s, _, _ := h.loopService(t, h.req.Function)
+		cause := errors.New("schedule failed")
+		s.exec = loopInputFailingExecutor{
+			Executor: h.e,
+			err:      cause,
+		}
+
+		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
+		item.Attempt = item.GetMaxAttempts() - 1
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		require.False(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
 	})
 
 	t.Run("function that is no longer a loop drops the item", func(t *testing.T) {

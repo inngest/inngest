@@ -857,17 +857,30 @@ func TestValidateLoop(t *testing.T) {
 		}
 	})
 
-	t.Run("tick at the idle ttl rejected", func(t *testing.T) {
-		f := base()
-		f.Loop.Tick = f.Loop.IdleTTL
-		err := f.Validate(ctx)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "must be less than the idle_ttl")
+	t.Run("tick less than one minute below the idle ttl rejected", func(t *testing.T) {
+		for _, tick := range []time.Duration{
+			base().Loop.IdleTTL,
+			base().Loop.IdleTTL - time.Second,
+			base().Loop.IdleTTL - consts.MinLoopTickTTLGap + time.Second,
+		} {
+			f := base()
+			f.Loop.Tick = tick
+			err := f.Validate(ctx)
+			require.Error(t, err, tick)
+			require.Contains(t, err.Error(), "must be at least 1m0s less than the idle_ttl", tick)
+		}
 	})
 
-	t.Run("tick below the idle ttl passes", func(t *testing.T) {
+	t.Run("tick one minute below the idle ttl passes", func(t *testing.T) {
 		f := base()
-		f.Loop.Tick = f.Loop.IdleTTL - time.Second
+		f.Loop.Tick = f.Loop.IdleTTL - consts.MinLoopTickTTLGap
+		require.NoError(t, f.Validate(ctx))
+	})
+
+	t.Run("longest tick at the shortest idle ttl passes", func(t *testing.T) {
+		f := base()
+		f.Loop.IdleTTL = consts.MinLoopIdleTTL
+		f.Loop.Tick = consts.MinLoopIdleTTL - consts.MinLoopTickTTLGap
 		require.NoError(t, f.Validate(ctx))
 	})
 
