@@ -1,0 +1,142 @@
+package redis_state
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/google/uuid"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/redis/rueidis"
+)
+
+// Only maintenance callers use this script. The normal dequeue Lua is unchanged.
+// The comparison and lease checks execute in the SAME Redis operation as HDEL.
+const maintenanceDequeueGuard = `
+local observed = redis.call("HGET", KEYS[1], ARGV[1])
+if not observed then return 1 end
+if observed ~= ARGV[7] then return 2 end
+local item = cjson.decode(observed)
+if (item.leaseID ~= nil and item.leaseID ~= cjson.null) or
+   (item.cl ~= nil and item.cl ~= cjson.null) or
+   redis.call("ZCARD", KEYS[18]) ~= 0 then return 2 end
+`
+
+var maintenanceDequeueScript = sync.OnceValue(func() *rueidis.Lua {
+	// Reuse the normal index/pointer cleanup verbatim, not a second copy that
+	// could diverge. Expand includes just as the ordinary script loader does.
+	source, err := embedded.ReadFile("lua/queue/dequeue.lua")
+	if err != nil {
+		panic(err)
+	}
+	code := string(source)
+	for _, match := range include.FindAllStringSubmatch(code, -1) {
+		part, err := embedded.ReadFile("lua/includes/" + match[1])
+		if err != nil {
+			panic(err)
+		}
+		code = strings.ReplaceAll(code, match[0], string(part))
+	}
+	return rueidis.NewLuaScript(maintenanceDequeueGuard + code)
+})
+
+func (q *queue) MaintenanceLeaseCount(ctx context.Context, scope osqueue.Scope) (int64, error) {
+	if scope.FunctionID == uuid.Nil {
+		return 0, fmt.Errorf("maintenance function scope is required")
+	}
+	rc := q.RedisClient.unshardedRc
+	// No expiry filter: an expired execution lease is still unsafe to retire.
+	return rc.Do(ctx, rc.B().Zcard().Key(q.RedisClient.kg.PartitionScavengerIndex(scope.FunctionID.String())).Build()).AsInt64()
+}
+
+func (q *queue) DequeueMaintenance(ctx context.Context, expected osqueue.QueueItem) error {
+	rc := q.RedisClient.unshardedRc
+	raw, err := rc.Do(ctx, rc.B().Hget().Key(q.RedisClient.kg.QueueItem()).Field(expected.ID).Build()).ToString()
+	if rueidis.IsRedisNil(err) {
+		return osqueue.ErrQueueItemNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var current osqueue.QueueItem
+	if err := json.Unmarshal([]byte(raw), &current); err != nil {
+		return err
+	}
+	current.Data.JobID = &current.ID // match LoadQueueItem normalization
+	currentJSON, err := json.Marshal(current)
+	if err != nil {
+		return err
+	}
+	expectedJSON, err := json.Marshal(expected)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(currentJSON, expectedJSON) || current.LeaseID != nil || current.CapacityLease != nil {
+		return fmt.Errorf("maintenance job changed or retains a lease")
+	}
+	return q.dequeue(ctx, expected, maintenanceDequeueScript(), []string{raw})
+}
+
+var _ osqueue.MaintenanceShard = (*queue)(nil)
+
+// These checkpoints live outside run state so a partially successful state
+// deletion cannot erase the evidence needed to finish that same manifest.
+var maintenanceRetirementScript = rueidis.NewLuaScript(`
+local existing = redis.call("GET", KEYS[1])
+if existing and existing ~= ARGV[1] then return 1 end
+if ARGV[2] == "save" then
+  redis.call("SET", KEYS[1], ARGV[1])
+else
+  redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
+func (q *queue) LoadMaintenanceRetirement(ctx context.Context, jobID string) (*osqueue.MaintenanceRetirement, error) {
+	rc := q.RedisClient.unshardedRc
+	raw, err := rc.Do(ctx, rc.B().Get().Key(q.maintenanceRetirementKey(jobID)).Build()).ToString()
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var checkpoint osqueue.MaintenanceRetirement
+	if err := json.Unmarshal([]byte(raw), &checkpoint); err != nil {
+		return nil, err
+	}
+	return &checkpoint, nil
+}
+
+func (q *queue) SaveMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement) error {
+	return q.updateMaintenanceRetirement(ctx, checkpoint, "save")
+}
+
+func (q *queue) DeleteMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement) error {
+	return q.updateMaintenanceRetirement(ctx, checkpoint, "delete")
+}
+
+func (q *queue) maintenanceRetirementKey(jobID string) string {
+	return q.RedisClient.kg.QueueItem() + ":maintenance-retirement:" + jobID
+}
+
+func (q *queue) updateMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement, operation string) error {
+	raw, err := json.Marshal(checkpoint)
+	if err != nil {
+		return err
+	}
+	result, err := maintenanceRetirementScript.Exec(ctx, q.RedisClient.unshardedRc,
+		[]string{q.maintenanceRetirementKey(checkpoint.JobID)}, []string{string(raw), operation}).AsInt64()
+	if err != nil {
+		return err
+	}
+	if result != 0 {
+		return fmt.Errorf("maintenance retirement checkpoint belongs to a different manifest")
+	}
+	return nil
+}
+
+var _ osqueue.MaintenanceRetirementStore = (*queue)(nil)
