@@ -785,11 +785,15 @@ func (l *lineage) identIfColumn(name string, sc *scope) {
 
 // ident reads the column a (possibly qualified, possibly struct-field)
 // reference names. Every reading DuckDB could take is read: as
-// rel.col (w/ any catalog/schema before rel), and as col.field...
+// rel.col (w/ any catalog/schema before rel), as col.field..., and as a
+// select list alias (whichever wins depends on the clause, so both are
+// read). A rel whose columns are unknown might have any name, so it's read
+// from but doesn't end the search: the name may be the outer query's.
 func (l *lineage) ident(parts []string, sc *scope) {
 	if len(parts) == 1 && sc.isBound(parts[0]) {
 		return
 	}
+	maybe := false
 	for s := sc; s != nil; s = s.outer {
 		found := false
 		// Qualified: rel.col, schema.rel.col, catalog.schema.rel.col.
@@ -803,21 +807,29 @@ func (l *lineage) ident(parts []string, sc *scope) {
 		}
 		// Unqualified: col (any further parts are struct fields).
 		for _, r := range s.rels {
-			if r.has(parts[0]) {
-				r.need.add(parts[0])
+			if !r.has(parts[0]) {
+				continue
+			}
+			r.need.add(parts[0])
+			if r.cols == nil {
+				maybe = true
+			} else {
+				found = true
+			}
+		}
+		if len(parts) == 1 {
+			if x, ok := s.items[strings.ToLower(parts[0])]; ok {
+				delete(s.items, strings.ToLower(parts[0])) // once, and no cycles
+				l.expr(x, s)
 				found = true
 			}
 		}
 		if found {
 			return
 		}
-		// A select list alias (WHERE/GROUP BY/HAVING/QUALIFY/ORDER BY can
-		// reference one).
-		if x, ok := s.items[strings.ToLower(parts[0])]; ok && len(parts) == 1 {
-			delete(s.items, strings.ToLower(parts[0])) // once, and no cycles
-			l.expr(x, s)
-			return
-		}
+	}
+	if maybe {
+		return
 	}
 	if len(parts) == 1 {
 		if _, ok := sc.env.param(parts[0]); ok {

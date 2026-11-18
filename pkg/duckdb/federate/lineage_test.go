@@ -151,12 +151,27 @@ func TestSourceColumnsRead(t *testing.T) {
 			want: map[Table][]string{TableRuns: runsCols},
 		},
 		{
+			// ORDER BY prefers the alias, WHERE the column: both are read.
+			name:   "ORDER BY an alias shadowing a column",
+			sql:    `WITH t AS (SELECT run_id, output AS status FROM runs ORDER BY status LIMIT 1) SELECT run_id FROM t`,
+			tables: []Table{TableRuns},
+			want:   map[Table][]string{TableRuns: {"output", "run_id", "status"}},
+		},
+		{
 			// x's columns are known only through its WITH, which sits on a
 			// UNION; s.output is the outer query's.
 			name:   "a set op's WITH and an outer reference",
 			sql:    `SELECT s.span_id FROM spans s WHERE EXISTS (SELECT 1 FROM (WITH c AS (SELECT run_id AS y FROM runs) SELECT y FROM c UNION ALL SELECT run_id FROM runs) x WHERE x.y = s.run_id AND s.output IS NOT NULL)`,
 			tables: []Table{TableSpans, TableRuns},
 			want:   map[Table][]string{TableSpans: {"output", "run_id", "span_id"}, TableRuns: {"run_id"}},
+		},
+		{
+			// A subquery w/ an unnamed column has unknown columns, which
+			// mustn't swallow the outer query's s.output.
+			name:   "an outer reference past unknown columns",
+			sql:    `SELECT s.span_id FROM spans s WHERE EXISTS (SELECT 1 FROM (SELECT count(*) FROM runs) x WHERE s.output IS NOT NULL)`,
+			tables: []Table{TableSpans, TableRuns},
+			want:   map[Table][]string{TableSpans: {"output", "span_id"}, TableRuns: {}},
 		},
 		{
 			name: "unknown table", sql: `SELECT a FROM somewhere`, tables: []Table{TableSpans},
@@ -215,6 +230,19 @@ func TestSourceColumnsReadThroughMacros(t *testing.T) {
 			want: map[Table][]string{
 				TableSpans:    {"account_id", "attributes", "env_id", "name", "run_id", "span_id"},
 				TableMetadata: {"account_id", "created_at", "env_id", "is_user", "kind", "run_id", "scope", "span_id", "values"},
+			},
+		},
+		{
+			// Linell's query: the step_attempts delta must stream output.
+			name: "insights_step_attempts w/ a correlated set op",
+			sql: `SELECT s.step_id FROM inngest_local.insights_step_attempts(?, ?, p_spans := ` + src(TableSpans) + `, p_metadata := ` + src(TableMetadata) + `) s
+				WHERE EXISTS (SELECT 1 FROM (WITH c AS (SELECT run_id AS y FROM inngest_local.insights_runs(?, ?, p_runs := ` + src(TableRuns) + `, p_metadata := ` + src(TableMetadata) + `))
+					SELECT y FROM c UNION ALL SELECT run_id FROM inngest_local.insights_runs(?, ?, p_runs := ` + src(TableRuns) + `, p_metadata := ` + src(TableMetadata) + `)) x
+				WHERE x.y = s.run_id AND s.output IS NOT NULL)`,
+			want: map[Table][]string{
+				TableSpans:    {"account_id", "attributes", "env_id", "name", "output", "run_id", "span_id"},
+				TableMetadata: {"account_id", "created_at", "env_id", "is_user", "kind", "run_id", "scope", "span_id", "values"},
+				TableRuns:     {"account_id", "ended_at", "env_id", "queued_at", "run_id", "started_at", "status"},
 			},
 		},
 		{
