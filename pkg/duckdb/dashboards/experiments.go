@@ -124,7 +124,10 @@ spans AS (
     v->>'variant' AS variant,
     NULLIF(v->>'selection_strategy', '') AS selection_strategy,
     CASE WHEN json_type(v->'variant_weights') = 'OBJECT'
-      THEN json_transform(v->'variant_weights', '"MAP(VARCHAR, DOUBLE)"') END AS variant_weights
+      THEN json_transform(v->'variant_weights', '"MAP(VARCHAR, DOUBLE)"') END AS variant_weights,
+    -- The selection step is the one w/ available_variants: a stamped step
+    -- may repeat the strategy, but never the weights.
+    json_type(v->'available_variants') = 'ARRAY' AS is_selection
   FROM latest
   WHERE kind = 'experiment' AND v->>'name' = ?::VARCHAR AND COALESCE(v->>'variant', '') <> ''
     AND run_id IN (
@@ -170,13 +173,20 @@ variants AS (
     count(DISTINCT run_id) AS run_count,
     min(run_queued_at) AS first_seen,
     max(run_queued_at) AS last_seen,
-    arg_max(selection_strategy, run_queued_at) FILTER (WHERE selection_strategy IS NOT NULL) AS selection_strategy,
-    to_json(arg_max(variant_weights, run_queued_at) FILTER (WHERE selection_strategy IS NOT NULL))::VARCHAR AS variant_weights,
-    max(run_queued_at) FILTER (WHERE selection_strategy IS NOT NULL) AS strategy_at
+    -- The strategy and its weights from the same (latest) selection step,
+    -- as one struct: arg_max skips a NULL value, so taking the weights on
+    -- their own would keep an older strategy's after a switch to one w/o.
+    arg_max({'strategy': selection_strategy, 'weights': variant_weights}, run_queued_at)
+      FILTER (WHERE is_selection AND selection_strategy IS NOT NULL) AS selection,
+    max(run_queued_at) FILTER (WHERE is_selection AND selection_strategy IS NOT NULL) AS strategy_at
   FROM spans
   GROUP BY variant
 )
-SELECT v.*, m.metrics
+SELECT
+  v.variant, v.run_count, v.first_seen, v.last_seen,
+  v.selection.strategy AS selection_strategy,
+  to_json(v.selection.weights)::VARCHAR AS variant_weights,
+  v.strategy_at, m.metrics
 FROM variants v
 LEFT JOIN variant_metrics m USING (variant)
 ORDER BY v.variant;`
