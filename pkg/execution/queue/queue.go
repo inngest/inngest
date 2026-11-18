@@ -282,6 +282,12 @@ type alwaysRetry struct {
 
 func (a alwaysRetry) AlwaysRetryable() {}
 
+// Unwrap returns the wrapped error, so errors.Is and errors.As find the
+// cause of an error that always retries.
+func (a alwaysRetry) Unwrap() error {
+	return a.error
+}
+
 func IsAlwaysRetryable(err error) bool {
 	var ar alwaysRetry
 	return errors.As(err, &ar)

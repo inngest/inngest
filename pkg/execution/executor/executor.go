@@ -1190,6 +1190,12 @@ func (e *executor) schedule(
 		if err = setLoopSemaphoreKey(metadata.Config.Semaphores, req.Function, loopInput.Key); err != nil {
 			return nil, nil, err
 		}
+		// this runs before the skip checks.  a skipped tick is run again one
+		// tick interval later, and without this order a tick of an ended
+		// instance is skipped and run again for as long as the skip lasts.
+		if err = e.checkLoopInstance(ctx, req, loopInput); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	//
@@ -1318,11 +1324,6 @@ func (e *executor) schedule(
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
 		listenerEvents = e.prepareStateEventsForSyncListeners(&newState)
-		if req.Function.Loop != nil {
-			if err := e.checkLoopInstance(ctx, req, loopInput); err != nil {
-				return nil, nil, err
-			}
-		}
 
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)

@@ -1164,10 +1164,11 @@ func (s *Service) handleCron(ctx context.Context, item queue.Item) error {
 // of the loop record, and the wake id, so the executor derives the input
 // from it like any other run.  the event is published to the event stream
 // the way a cron event is, so the dashboard shows it as the run's trigger.
-// an ended instance, a skipped function, a missing function, and a function
-// that is no longer a loop all drop the item.  an item whose opener is not
-// the opener of the record in the store counts as one for an ended
-// instance.
+// an ended instance, a missing function, and a function that is no longer a
+// loop all drop the item.  an item whose opener is not the opener of the
+// record in the store counts as one for an ended instance.  a skipped wake
+// is dropped.  a tick that is skipped, or that fails on its last attempt,
+// runs again one tick interval later.
 //
 // the event id is random, so a second run of the same item starts a second
 // run of the loop.  the queue runs an item twice when a worker stops after
@@ -1235,9 +1236,16 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 		l.Debug("dropping loop input, instance ended", "key", payload.Key)
 		return nil
 	case errors.Is(err, ErrFunctionSkipped):
+		if payload.Kind == loops.InputTick && conf.Loop.Tick > 0 {
+			return requeueLoopTick(err, conf.Loop.Tick)
+		}
 		return nil
 	default:
-		return fmt.Errorf("error scheduling loop run: %w", err)
+		err = fmt.Errorf("error scheduling loop run: %w", err)
+		if payload.Kind == loops.InputTick && conf.Loop.Tick > 0 && !queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
+			return requeueLoopTick(err, conf.Loop.Tick)
+		}
+		return err
 	}
 
 	// publish the event to pubsub, as the cron handler does.  the publish
@@ -1265,6 +1273,16 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 		}(context.WithoutCancel(ctx))
 	}
 	return nil
+}
+
+// requeueLoopTick returns the error that makes the queue run the same tick
+// item again one tick interval from now.  the attempt count of the item does
+// not go up.  only a run that finishes enqueues the next tick, so without it
+// a tick that started no run is the last tick of the instance until another
+// input arrives.
+func requeueLoopTick(cause error, tick time.Duration) error {
+	at := time.Now().Add(tick)
+	return queue.RetryAtError(queue.AlwaysRetryError(cause), &at)
 }
 
 func (s *Service) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

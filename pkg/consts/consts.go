@@ -59,6 +59,11 @@ const (
 	// longer wakes again from the wake run.
 	MaxLoopIdleTTL = 7 * 24 * time.Hour
 
+	// MinLoopTickTTLGap is how much shorter than the idle_ttl a loop tick
+	// must be.  a commit sets the expiry to the idle_ttl, so this is the
+	// time the queue has to run the tick before the instance expires.
+	MinLoopTickTTLGap = time.Minute
+
 	// DefaultLoopIdleTTL is the idle_ttl of a loop that syncs without one.
 	DefaultLoopIdleTTL = 7 * 24 * time.Hour
 
