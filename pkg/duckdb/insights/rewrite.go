@@ -338,6 +338,12 @@ func (r *exprRewriter) rewrite(expr parser.Expr) parser.Expr {
 		e.X, e.Start, e.Stop, e.Step = r.rewrite(e.X), r.rewrite(e.Start), r.rewrite(e.Stop), r.rewrite(e.Step)
 	case *parser.LambdaExpr:
 		e.Body = r.rewrite(e.Body)
+	case *parser.StarExpr:
+		// A REPLACE entry's expression is rewritten like any other (IE
+		// sessions.id -> its JSON path).
+		for _, rep := range e.Replace {
+			rep.Expr = r.rewrite(rep.Expr)
+		}
 	}
 	return r.hook(r, expr)
 }

@@ -326,8 +326,11 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 		}
 	}
 	for i := range out {
+		// Every entry matches the column's expanded name, so one entry's
+		// rename can't feed another's (DuckDB renames each column once).
+		orig := out[i].name
 		for _, r := range star.Replace {
-			if strings.EqualFold(r.Alias, out[i].name) {
+			if strings.EqualFold(r.Alias, orig) {
 				out[i].col = knownColumn{
 					colType:   inferType(r.Expr, scope),
 					pathHints: exprPathHints(r.Expr, scope),
@@ -336,7 +339,7 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 			}
 		}
 		for _, r := range star.Rename {
-			if x, _, ok := parseStarColumnName(r.From); ok && x.matches(out[i].alias, out[i].name) {
+			if x, _, ok := parseStarColumnName(r.From); ok && x.matches(out[i].alias, orig) {
 				out[i].name = r.To
 			}
 		}

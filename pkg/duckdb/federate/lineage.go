@@ -189,6 +189,18 @@ func (l *lineage) analyze(stmt *parser.SelectStatement, e *env, outer *scope, d 
 		// EXCEPT compare whole rows: every column of both sides.
 		l.analyze(stmt.SetLeft, e, outer, allColumns())
 		l.analyze(stmt.SetRight, e, outer, allColumns())
+		// The combined query's own ORDER BY/LIMIT (and any subquery in
+		// them) read its output, which the operands already read whole.
+		sc := &scope{outer: outer, env: e, rels: []*rel{{
+			cols:  l.outputNames(stmt.SetLeft, e, outer),
+			flush: func(demand) {},
+		}}}
+		if stmt.OrderBy != nil {
+			l.walk(stmt.OrderBy, sc)
+		}
+		if stmt.Limit != nil {
+			l.walk(stmt.Limit, sc)
+		}
 		return
 	}
 	if stmt.Values != nil {
@@ -713,6 +725,12 @@ func (l *lineage) walk(n parser.Node, sc *scope) {
 		return
 	}
 	for _, c := range n.Children() {
+		if sel, ok := c.(*parser.SelectStatement); ok {
+			// A nested query is its own scope (see expr), never read
+			// against sc's tables.
+			l.analyze(sel, sc.env, sc, allColumns())
+			continue
+		}
 		if x, ok := c.(parser.Expr); ok {
 			l.expr(x, sc)
 			continue
@@ -745,6 +763,10 @@ func (l *lineage) expr(x parser.Expr, sc *scope) {
 		l.walk(v, sc)
 	case *parser.SubqueryExpr:
 		l.analyze(v.Select, sc.env, sc, allColumns())
+	case *parser.SelectStatement:
+		// A subquery held directly (IE InExpr.Subquery) rather than in a
+		// SubqueryExpr: its own query, correlated to sc.
+		l.analyze(v, sc.env, sc, allColumns())
 	case *parser.PositionalExpr:
 		// #n is the nth column of the FROM clause: every column of every
 		// rel in scope, rather than counting through them.
