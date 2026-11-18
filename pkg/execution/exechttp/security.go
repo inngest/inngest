@@ -74,18 +74,16 @@ type SecureDialerOpts struct {
 	// dial is a function used to actually dial, allowed to override in testing
 	// for success.
 	dial DialFunc
+
+	// resolver replaces the shared caching resolver in tests.
+	resolver dnscache.DNSResolver
 }
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	// make sure to initialize it if absent
 	resolver := initResolver()
-
-	dial := resolver.Dialer()
-	if o.AllowNAT64 {
-		dial = resolver.DialerWithNAT64Fallback()
-	}
-	if o.dial != nil {
-		dial = o.dial
+	if o.resolver != nil {
+		resolver = o.resolver
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -96,7 +94,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		// "[fe80::1%lo0]:53".
 		//
 		// We always want to ensure we translate the domains to IP addresses.
-		host, _, err := net.SplitHostPort(addr)
+		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +125,12 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 			}
 		}
 
-		return dial(ctx, network, addr)
+		if o.dial != nil {
+			return o.dial(ctx, network, addr)
+		}
+		// dial the addresses checked above.  a second lookup could return
+		// different, unchecked addresses.
+		return resolver.DialIPs(ctx, network, port, ips, o.AllowNAT64)
 	}
 }
 
