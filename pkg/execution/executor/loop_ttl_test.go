@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +62,7 @@ func TestLoopRequestTouch(t *testing.T) {
 		h.req.Function.Loop.IdleTTL = time.Hour
 		committed := h.commitExpiring(t, 2*time.Minute)
 
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
+		_, run := h.scheduleRun(t, h.tick(t))
 		loop, replay, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Nil(t, replay)
@@ -90,7 +91,7 @@ func TestLoopRequestTouch(t *testing.T) {
 		h.req.Function.Loop.IdleTTL = time.Hour
 		committed := h.commitExpiring(t, 2*time.Minute)
 
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")), "step-1")
+		_, run := h.scheduleRun(t, h.tick(t), "step-1")
 		loop, _, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Equal(t, committed.Counter, loop.Version)
@@ -106,7 +107,7 @@ func TestLoopRequestTouch(t *testing.T) {
 		h.req.Function.Loop.IdleTTL = time.Hour
 		committed := h.commitExpiring(t, 6*time.Hour)
 
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
+		_, run := h.scheduleRun(t, h.tick(t))
 		loop, _, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Equal(t, committed.Counter, loop.Version)
@@ -132,7 +133,7 @@ func TestLoopRequestTouch(t *testing.T) {
 				}),
 			},
 		}
-		id, resp, err := h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+		id, resp, err := h.runLoop(t, d, h.tick(t))
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
 		require.Equal(t, committed.Counter, d.seen.Version)
@@ -168,7 +169,7 @@ func TestLoopRequestTouch(t *testing.T) {
 		h := newLoopHarness(t)
 		_, first := h.open(t)
 
-		_, run := h.scheduleRun(t, new(loops.NewTickEvent("user-1")))
+		_, run := h.scheduleRun(t, h.tick(t))
 		loop, _, err := h.e.loopRequest(h.ctx, run)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), loop.Version)
@@ -183,12 +184,17 @@ func TestLoopRequestTouch(t *testing.T) {
 // TestLoopRequestMissingInstance runs inputs whose instance is gone.  a
 // run with saved steps fails without retry.  the first request of a
 // trigger opens a fresh instance, and the first request of a tick is
-// cancelled.
+// cancelled.  a tick whose key has a new instance by then gets the same
+// result, and the new record does not change.
 func TestLoopRequestMissingInstance(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  *event.Event
-		steps  []string
+		name string
+		// tick schedules a tick of the instance in place of a trigger.
+		tick  bool
+		steps []string
+		// reopen opens a new instance of the key after the end, the way a
+		// later trigger does.
+		reopen bool
 		opens  bool
 		cancel bool
 	}{
@@ -198,7 +204,7 @@ func TestLoopRequestMissingInstance(t *testing.T) {
 		},
 		{
 			name:  "tick with saved steps fails",
-			input: new(loops.NewTickEvent("user-1")),
+			tick:  true,
 			steps: []string{"step-1"},
 		},
 		{
@@ -207,7 +213,19 @@ func TestLoopRequestMissingInstance(t *testing.T) {
 		},
 		{
 			name:   "first request of a tick cancels",
-			input:  new(loops.NewTickEvent("user-1")),
+			tick:   true,
+			cancel: true,
+		},
+		{
+			name:   "tick with saved steps fails on a reopened instance",
+			tick:   true,
+			steps:  []string{"step-1"},
+			reopen: true,
+		},
+		{
+			name:   "first request of a tick cancels on a reopened instance",
+			tick:   true,
+			reopen: true,
 			cancel: true,
 		},
 	}
@@ -219,10 +237,19 @@ func TestLoopRequestMissingInstance(t *testing.T) {
 			h.e.driverv1 = map[string]driver.DriverV1{
 				d.Name(): d,
 			}
-			id, _ := h.scheduleRun(t, tt.input, tt.steps...)
+			var input *event.Event
+			if tt.tick {
+				input = h.tick(t)
+			}
+			id, _ := h.scheduleRun(t, input, tt.steps...)
 			snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 			require.NoError(t, err)
 			require.NoError(t, h.store.End(h.ctx, snap))
+			reopener := ulid.Make()
+			if tt.reopen {
+				_, err = h.store.Open(h.ctx, h.loopID("user-1"), reopener)
+				require.NoError(t, err)
+			}
 
 			resp, err := h.execute(t, id)
 			switch {
@@ -243,6 +270,15 @@ func TestLoopRequestMissingInstance(t *testing.T) {
 			}
 			require.Nil(t, resp)
 			require.Equal(t, 0, d.calls)
+			if tt.reopen {
+				// the new instance is as the later trigger opened it.
+				snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+				require.NoError(t, err)
+				require.Equal(t, reopener, snap.OpenedBy)
+				require.Equal(t, int64(0), snap.Counter)
+				require.Nil(t, snap.LastRunID)
+				return
+			}
 			_, err = h.store.Load(h.ctx, h.loopID("user-1"))
 			require.ErrorIs(t, err, loops.ErrNotFound)
 		})

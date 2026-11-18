@@ -1160,12 +1160,14 @@ func (s *Service) handleCron(ctx context.Context, item queue.Item) error {
 }
 
 // handleLoopInput starts one run for a tick or a wake item.  the run's
-// first event is the tick or wake event, which carries the key and the wake
-// id, so the executor derives the input from it like any other run.  the
-// event is published to the event stream the way a cron event is, so the
-// dashboard shows it as the run's trigger.  an ended instance, a skipped
-// function, a missing function, and a function that is no longer a loop
-// all drop the item.
+// first event is the tick or wake event, which carries the key, the opener
+// of the loop record, and the wake id, so the executor derives the input
+// from it like any other run.  the event is published to the event stream
+// the way a cron event is, so the dashboard shows it as the run's trigger.
+// an ended instance, a skipped function, a missing function, and a function
+// that is no longer a loop all drop the item.  an item whose opener is not
+// the opener of the record in the store counts as one for an ended
+// instance.
 //
 // the event id is random, so a second run of the same item starts a second
 // run of the loop.  the queue runs an item twice when a worker stops after
@@ -1203,9 +1205,9 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 	var evt event.Event
 	switch payload.Kind {
 	case loops.InputTick:
-		evt = loops.NewTickEvent(payload.Key)
+		evt = loops.NewTickEvent(payload.Key, payload.OpenedBy)
 	case loops.InputWake:
-		evt = loops.NewWakeEvent(payload.Key, payload.ID)
+		evt = loops.NewWakeEvent(payload.Key, payload.ID, payload.OpenedBy)
 	default:
 		return queue.NeverRetryError(fmt.Errorf("unexpected loop input kind %q", payload.Kind))
 	}

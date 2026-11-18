@@ -168,6 +168,27 @@ func (h *loopHarness) loopID(key string) loops.ID {
 	return loops.NewID(domain.NewTenant(h.req.AccountID, h.req.WorkspaceID), h.req.Function.ID, key)
 }
 
+// opener returns the OpenedBy of the record the harness key has now.  the
+// test fails when the record is gone.
+func (h *loopHarness) opener(t *testing.T) domain.RunID {
+	t.Helper()
+	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+	require.NoError(t, err)
+	return snap.OpenedBy
+}
+
+// tick returns a tick event for the record the harness key has now.
+func (h *loopHarness) tick(t *testing.T) *event.Event {
+	t.Helper()
+	return new(loops.NewTickEvent("user-1", h.opener(t)))
+}
+
+// wake returns a wake event for the record the harness key has now.
+func (h *loopHarness) wake(t *testing.T, wakeID string) *event.Event {
+	t.Helper()
+	return new(loops.NewWakeEvent("user-1", wakeID, h.opener(t)))
+}
+
 // requireStartSemaphore asserts the run's one start item carries the keyed
 // loop semaphore for key.
 func (h *loopHarness) requireStartSemaphore(t *testing.T, id sv2.ID, key string) {
@@ -211,8 +232,12 @@ func TestScheduleLoopTrigger(t *testing.T) {
 
 func TestScheduleLoopInputs(t *testing.T) {
 	tests := []struct {
-		name    string
-		open    bool
+		name string
+		open bool
+		// tick and wake schedule a timer event for the record the harness
+		// key has when the test runs.  wake is the wake id.
+		tick    bool
+		wake    string
 		input   *event.Event
 		data    map[string]any
 		keyExpr string
@@ -222,18 +247,39 @@ func TestScheduleLoopInputs(t *testing.T) {
 	}{
 		{
 			name:    "tick on a missing instance",
-			input:   new(loops.NewTickEvent("user-1")),
+			input:   new(loops.NewTickEvent("user-1", ulid.Make())),
 			wantErr: ErrLoopEnded,
 		},
 		{
-			name:  "tick on an open instance",
-			open:  true,
-			input: new(loops.NewTickEvent("user-1")),
+			name: "tick on an open instance",
+			open: true,
+			tick: true,
 		},
 		{
-			name:  "wake on an open instance",
-			open:  true,
-			input: new(loops.NewWakeEvent("user-1", "wake-1")),
+			name: "wake on an open instance",
+			open: true,
+			wake: "wake-1",
+		},
+		{
+			name:    "tick of another opener on an open instance",
+			open:    true,
+			input:   new(loops.NewTickEvent("user-1", ulid.Make())),
+			wantErr: ErrLoopEnded,
+		},
+		{
+			name:    "wake of another opener on an open instance",
+			open:    true,
+			input:   new(loops.NewWakeEvent("user-1", "wake-1", ulid.Make())),
+			wantErr: ErrLoopEnded,
+		},
+		{
+			name: "tick without an opener on an open instance",
+			open: true,
+			input: &event.Event{
+				Name: loops.EventTick,
+				Data: map[string]any{"key": "user-1"},
+			},
+			wantErr: ErrLoopEnded,
 		},
 		{
 			name: "tick without a key",
@@ -271,7 +317,14 @@ func TestScheduleLoopInputs(t *testing.T) {
 				h.open(t)
 			}
 
-			req, id := h.request(tt.input)
+			input := tt.input
+			switch {
+			case tt.tick:
+				input = h.tick(t)
+			case tt.wake != "":
+				input = h.wake(t, tt.wake)
+			}
+			req, id := h.request(input)
 			if tt.data != nil {
 				evt := req.Events[0].(event.InternalEvent)
 				evt.Event.Data = tt.data
@@ -502,7 +555,7 @@ func TestLoopRequest(t *testing.T) {
 	t.Run("a tick on a missing instance returns ErrLoopEnded", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.open(t)
-		req, id := h.request(new(loops.NewTickEvent("user-1")))
+		req, id := h.request(h.tick(t))
 		_, _, err := h.e.Schedule(h.ctx, req)
 		require.NoError(t, err)
 		md, err := h.e.smv2.LoadMetadata(h.ctx, id)
