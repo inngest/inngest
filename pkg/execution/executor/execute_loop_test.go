@@ -93,7 +93,7 @@ func TestExecuteLoopRequest(t *testing.T) {
 		}
 		h.openAndCommit(t)
 
-		req, id := h.request(new(loops.NewWakeEvent("user-1", "wake-1")))
+		req, id := h.request(h.wake(t, "wake-1"))
 		_, _, err := h.e.Schedule(h.ctx, req)
 		require.NoError(t, err)
 
@@ -124,7 +124,7 @@ func TestExecuteLoopRequest(t *testing.T) {
 		h.e.fl = singletonRetryFunctionLoader{fn: &fn}
 		h.openAndCommit(t)
 
-		req, id := h.request(new(loops.NewTickEvent("user-1")))
+		req, id := h.request(h.tick(t))
 		_, _, err := h.e.Schedule(h.ctx, req)
 		require.NoError(t, err)
 

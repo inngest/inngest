@@ -496,19 +496,24 @@ func TestEvaluateKey(t *testing.T) {
 }
 
 func TestNewLoopEvents(t *testing.T) {
-	tick := NewTickEvent("user-1")
+	opener := ulid.Make()
+	tick := NewTickEvent("user-1", opener)
 	require.Equal(t, EventTick, tick.Name)
-	require.Equal(t, map[string]any{"key": "user-1"}, tick.Data)
+	require.Equal(t, map[string]any{
+		"key":       "user-1",
+		"opened_by": opener.String(),
+	}, tick.Data)
 	_, err := ulid.Parse(tick.ID)
 	require.NoError(t, err)
 	require.WithinDuration(t, time.Now(), time.UnixMilli(tick.Timestamp), 5*time.Second)
 	require.True(t, tick.IsInternal())
 
-	wake := NewWakeEvent("user-1", "wake-1")
+	wake := NewWakeEvent("user-1", "wake-1", opener)
 	require.Equal(t, EventWake, wake.Name)
 	require.Equal(t, map[string]any{
-		"key": "user-1",
-		"id":  "wake-1",
+		"key":       "user-1",
+		"id":        "wake-1",
+		"opened_by": opener.String(),
 	}, wake.Data)
 	_, err = ulid.Parse(wake.ID)
 	require.NoError(t, err)
@@ -517,8 +522,8 @@ func TestNewLoopEvents(t *testing.T) {
 	require.True(t, wake.IsInternal())
 
 	// two events for the same key have different ids.
-	require.NotEqual(t, tick.ID, NewTickEvent("user-1").ID)
-	require.NotEqual(t, wake.ID, NewWakeEvent("user-1", "wake-1").ID)
+	require.NotEqual(t, tick.ID, NewTickEvent("user-1", opener).ID)
+	require.NotEqual(t, wake.ID, NewWakeEvent("user-1", "wake-1", opener).ID)
 }
 
 func TestInputFromEvent(t *testing.T) {
@@ -527,6 +532,13 @@ func TestInputFromEvent(t *testing.T) {
 		Kind: "loop",
 		Key:  "event.data.id",
 	}
+	opener := ulid.Make()
+	// stored is a wake event the way run state returns it, decoded from
+	// JSON.
+	raw, err := json.Marshal(NewWakeEvent("user-1", "wake-1", opener))
+	require.NoError(t, err)
+	stored := map[string]any{}
+	require.NoError(t, json.Unmarshal(raw, &stored))
 	tests := []struct {
 		name    string
 		evt     map[string]any
@@ -554,20 +566,57 @@ func TestInputFromEvent(t *testing.T) {
 			wantErr: ErrNoKey,
 		},
 		{
-			name: "tick reads the key from data",
-			evt:  NewTickEvent("user-1").Map(),
+			name: "tick reads the key and the opener from data",
+			evt:  NewTickEvent("user-1", opener).Map(),
+			want: Input{
+				Kind:     InputTick,
+				Key:      "user-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "wake reads the key, the id, and the opener from data",
+			evt:  NewWakeEvent("user-1", "wake-1", opener).Map(),
+			want: Input{
+				Kind:     InputWake,
+				Key:      "user-1",
+				ID:       "wake-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "wake event read back from run state",
+			evt:  stored,
+			want: Input{
+				Kind:     InputWake,
+				Key:      "user-1",
+				ID:       "wake-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "tick without an opener has a zero opener",
+			evt: map[string]any{
+				"name": EventTick,
+				"data": map[string]any{"key": "user-1"},
+			},
 			want: Input{
 				Kind: InputTick,
 				Key:  "user-1",
 			},
 		},
 		{
-			name: "wake reads the key and the id from data",
-			evt:  NewWakeEvent("user-1", "wake-1").Map(),
+			name: "tick with an invalid opener has a zero opener",
+			evt: map[string]any{
+				"name": EventTick,
+				"data": map[string]any{
+					"key":       "user-1",
+					"opened_by": "not-a-run-id",
+				},
+			},
 			want: Input{
-				Kind: InputWake,
+				Kind: InputTick,
 				Key:  "user-1",
-				ID:   "wake-1",
 			},
 		},
 		{

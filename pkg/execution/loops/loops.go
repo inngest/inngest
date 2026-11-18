@@ -50,7 +50,8 @@ const (
 )
 
 // internal event names that start a tick run and a wake run.  the event
-// data containsd the loop key, and for a wake the wake id.
+// data contains the loop key and the opener of the loop record, and for a
+// wake the wake id.
 const (
 	EventTick = "inngest/loop.tick"
 	EventWake = "inngest/loop.wake"
@@ -63,24 +64,32 @@ type Input struct {
 	Kind string
 	Key  LoopKey
 	ID   string
+	// OpenedBy is the OpenedBy of the record a tick or a wake was enqueued
+	// for.  the executor drops the input when the record in the store has
+	// another opener.  without it a timer of an ended instance is delivered
+	// to a new instance of the same key.  it is zero for a trigger.
+	OpenedBy domain.RunID
 }
 
-// NewTickEvent returns the event that starts a tick run for key.  the
-// event id is random and the timestamp is now, the time the input is
-// handled.
-func NewTickEvent(key LoopKey) event.Event {
+// NewTickEvent returns the event that starts a tick run for key.  openedBy
+// is the OpenedBy of the record the tick was enqueued for.  the event id is
+// random and the timestamp is now, the time the input is handled.
+func NewTickEvent(key LoopKey, openedBy domain.RunID) event.Event {
 	return newLoopEvent(EventTick, map[string]any{
-		"key": key,
+		"key":       key,
+		"opened_by": openedBy.String(),
 	})
 }
 
 // NewWakeEvent returns the event that starts a wake run for key with the
-// wake id.  the event id is random and the timestamp is now, the time the
+// wake id.  openedBy is the OpenedBy of the record the wake was enqueued
+// for.  the event id is random and the timestamp is now, the time the
 // input is handled.
-func NewWakeEvent(key LoopKey, wakeID string) event.Event {
+func NewWakeEvent(key LoopKey, wakeID string, openedBy domain.RunID) event.Event {
 	return newLoopEvent(EventWake, map[string]any{
-		"key": key,
-		"id":  wakeID,
+		"key":       key,
+		"id":        wakeID,
+		"opened_by": openedBy.String(),
 	})
 }
 
@@ -94,9 +103,11 @@ func newLoopEvent(name string, data map[string]any) event.Event {
 }
 
 // InputFromEvent derives the input from the event map of a run's first
-// event.  a tick event and a wake event carry the key and the wake id in
-// their data.  any other event is a trigger, and the key comes from the
-// loop key expression.
+// event.  a tick event and a wake event carry the key, the opener, and the
+// wake id in their data.  any other event is a trigger, and the key comes
+// from the loop key expression.  a tick or a wake event with no valid
+// opener gives a zero OpenedBy.  every record has the id of the run that
+// opened it, so that input matches no record and the executor drops it.
 func InputFromEvent(ctx context.Context, loop inngest.Loop, evt map[string]any) (Input, error) {
 	name, _ := evt["name"].(string)
 	switch name {
@@ -120,6 +131,11 @@ func InputFromEvent(ctx context.Context, loop inngest.Loop, evt map[string]any) 
 	in := Input{
 		Kind: InputTick,
 		Key:  key,
+	}
+	if s, _ := data["opened_by"].(string); s != "" {
+		if openedBy, err := ulid.Parse(s); err == nil {
+			in.OpenedBy = openedBy
+		}
 	}
 	if name == EventWake {
 		in.Kind = InputWake
@@ -206,7 +222,9 @@ type Snapshot struct {
 	ID ID
 	// OpenedBy is the run that created the record.  an end that is replayed
 	// after a crash compares it with the value it saved, so a record that a
-	// later trigger created is left alone.
+	// later trigger created is left alone.  a tick item and a wake item have
+	// it too, so a timer of an ended instance is not delivered to a record
+	// that a later trigger created.
 	OpenedBy domain.RunID
 	// State is the marshalled state for the loop.  the state is one kv
 	// entry.  it is nil until the first commit.
