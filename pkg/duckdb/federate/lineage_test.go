@@ -174,6 +174,26 @@ func TestSourceColumnsRead(t *testing.T) {
 			want:   map[Table][]string{TableSpans: {"output", "span_id"}, TableRuns: {}},
 		},
 		{
+			// IN's subquery is held directly (InExpr.Subquery), not in a
+			// SubqueryExpr: its r is spans, not the outer runs.
+			name:   "IN subquery w/ a shadowing alias",
+			sql:    `SELECT r.run_id, s.span_id FROM runs r JOIN spans s ON r.run_id = s.run_id WHERE r.run_id IN (SELECT r.run_id FROM spans r WHERE r.output IS NOT NULL)`,
+			tables: []Table{TableRuns, TableSpans},
+			want:   map[Table][]string{TableRuns: {"run_id"}, TableSpans: {"output", "run_id", "span_id"}},
+		},
+		{
+			name:   "a set op's LIMIT subquery",
+			sql:    `SELECT span_id FROM spans UNION ALL SELECT span_id FROM spans LIMIT (SELECT count(output) FROM spans)`,
+			tables: []Table{TableSpans},
+			want:   map[Table][]string{TableSpans: {"output", "span_id"}},
+		},
+		{
+			name:   "a set op's ORDER BY its output",
+			sql:    `SELECT span_id FROM spans UNION ALL SELECT kind AS span_id FROM metadata ORDER BY span_id`,
+			tables: []Table{TableSpans, TableMetadata},
+			want:   map[Table][]string{TableSpans: {"span_id"}, TableMetadata: {"kind"}},
+		},
+		{
 			name: "unknown table", sql: `SELECT a FROM somewhere`, tables: []Table{TableSpans},
 		},
 		{
