@@ -251,32 +251,37 @@ func fixturesDevHandler(f *serveFixture) func(http.ResponseWriter, *http.Request
 func TestRunCaseHonorsConfiguredTimeout(t *testing.T) {
 	t.Parallel()
 
-	// Accept the trigger but never dispatch it back to the SDK. The case must
-	// stop at its configured deadline, not the five-second request wait.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(server.Close)
-	eventURL, err := url.Parse(server.URL)
-	require.NoError(t, err)
-	env := &runtimeEnv{
-		client: server.Client(),
-		runtime: conformance.RuntimeConfig{
-			EventURL: eventURL,
-			EventKey: "test",
-			Timeout:  50 * time.Millisecond,
-		},
-		proxy: &proxyServer{},
-		functionsBySlug: map[string]sdk.SDKFunction{
-			"test-suite-simple-fn": {Slug: "test-suite-simple-fn"},
-		},
-	}
+	for _, caseID := range []string{"basic-invoke", "retry-basic"} {
+		t.Run(caseID, func(t *testing.T) {
+			// Accept the trigger but never dispatch it back to the SDK. The case must
+			// stop at its configured deadline, not the five-second request wait.
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			t.Cleanup(server.Close)
+			eventURL, err := url.Parse(server.URL)
+			require.NoError(t, err)
+			runtime, err := (conformance.Config{Timeout: "50ms"}).Runtime()
+			require.NoError(t, err)
+			runtime.EventURL = eventURL
+			runtime.EventKey = "test"
+			env := &runtimeEnv{
+				client:  server.Client(),
+				runtime: runtime,
+				proxy:   &proxyServer{},
+				functionsBySlug: map[string]sdk.SDKFunction{
+					"test-suite-simple-fn":  {Slug: "test-suite-simple-fn"},
+					"test-suite-retry-test": {Slug: "test-suite-retry-test"},
+				},
+			}
 
-	started := time.Now()
-	result := env.runCase(context.Background(), conformance.Case{ID: "basic-invoke", SuiteID: "core"})
-	require.Equal(t, conformance.CaseStatusFailed, result.Status)
-	require.Contains(t, result.Reason, context.DeadlineExceeded.Error())
-	require.Less(t, time.Since(started), time.Second)
+			started := time.Now()
+			result := env.runCase(context.Background(), conformance.Case{ID: caseID, SuiteID: "core"})
+			require.Equal(t, conformance.CaseStatusFailed, result.Status)
+			require.Contains(t, result.Reason, context.DeadlineExceeded.Error())
+			require.Less(t, time.Since(started), time.Second)
+		})
+	}
 }
 
 func TestCaseHarnessWaitsHonorCancellation(t *testing.T) {
