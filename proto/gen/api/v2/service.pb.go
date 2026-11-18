@@ -4356,17 +4356,16 @@ func (*GetAccountUsageRequest) Descriptor() ([]byte, []int) {
 }
 
 type AccountUsage struct {
-	state                    protoimpl.MessageState    `protogen:"open.v1"`
-	Executions               int64                     `protobuf:"varint,1,opt,name=executions,proto3" json:"executions,omitempty"`
-	ExecutionsLimit          *int64                    `protobuf:"varint,2,opt,name=executions_limit,json=executionsLimit,proto3,oneof" json:"executions_limit,omitempty"`
-	PeriodStart              *timestamppb.Timestamp    `protobuf:"bytes,3,opt,name=period_start,json=periodStart,proto3" json:"period_start,omitempty"`
-	PeriodEnd                *timestamppb.Timestamp    `protobuf:"bytes,4,opt,name=period_end,json=periodEnd,proto3" json:"period_end,omitempty"`
-	ExecutionsOverageAllowed bool                      `protobuf:"varint,5,opt,name=executions_overage_allowed,json=executionsOverageAllowed,proto3" json:"executions_overage_allowed,omitempty"`
-	ExecutionCap             *AccountUsageExecutionCap `protobuf:"bytes,6,opt,name=execution_cap,json=executionCap,proto3" json:"execution_cap,omitempty"`
-	Seats                    *AccountUsageSeats        `protobuf:"bytes,7,opt,name=seats,proto3" json:"seats,omitempty"`
-	Limits                   *AccountUsageLimits       `protobuf:"bytes,8,opt,name=limits,proto3" json:"limits,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	state           protoimpl.MessageState    `protogen:"open.v1"`
+	Executions      int64                     `protobuf:"varint,1,opt,name=executions,proto3" json:"executions,omitempty"`
+	ExecutionsLimit *int64                    `protobuf:"varint,2,opt,name=executions_limit,json=executionsLimit,proto3,oneof" json:"executions_limit,omitempty"`
+	PeriodStart     *timestamppb.Timestamp    `protobuf:"bytes,3,opt,name=period_start,json=periodStart,proto3" json:"period_start,omitempty"`
+	PeriodEnd       *timestamppb.Timestamp    `protobuf:"bytes,4,opt,name=period_end,json=periodEnd,proto3" json:"period_end,omitempty"`
+	ExecutionCap    *AccountUsageExecutionCap `protobuf:"bytes,5,opt,name=execution_cap,json=executionCap,proto3" json:"execution_cap,omitempty"`
+	Seats           *AccountUsageSeats        `protobuf:"bytes,6,opt,name=seats,proto3" json:"seats,omitempty"`
+	Limits          *AccountUsageLimits       `protobuf:"bytes,7,opt,name=limits,proto3" json:"limits,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AccountUsage) Reset() {
@@ -4425,13 +4424,6 @@ func (x *AccountUsage) GetPeriodEnd() *timestamppb.Timestamp {
 		return x.PeriodEnd
 	}
 	return nil
-}
-
-func (x *AccountUsage) GetExecutionsOverageAllowed() bool {
-	if x != nil {
-		return x.ExecutionsOverageAllowed
-	}
-	return false
 }
 
 func (x *AccountUsage) GetExecutionCap() *AccountUsageExecutionCap {
@@ -11989,7 +11981,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14FetchAccountResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.AccountR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x18\n" +
-	"\x16GetAccountUsageRequest\"\x8c\b\n" +
+	"\x16GetAccountUsageRequest\"\xdf\x06\n" +
 	"\fAccountUsage\x12}\n" +
 	"\n" +
 	"executions\x18\x01 \x01(\x03B]\x92AZ2XExecutions used in the current period: function runs plus steps, across all environmentsR\n" +
@@ -11997,11 +11989,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x10executions_limit\x18\x02 \x01(\x03B~\x92A{2yExecutions included in the plan for the period. Usage can go past it when the plan allows overage. Omitted when unlimitedH\x00R\x0fexecutionsLimit\x88\x01\x01\x12j\n" +
 	"\fperiod_start\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB+\x92A(2&Start of the current period, inclusiveR\vperiodStart\x12d\n" +
 	"\n" +
-	"period_end\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB)\x92A&2$End of the current period, exclusiveR\tperiodEnd\x12\xaa\x01\n" +
-	"\x1aexecutions_overage_allowed\x18\x05 \x01(\bBl\x92Ai2gWhether the account allows billable execution overages. This is separate from execution-cap enforcementR\x18executionsOverageAllowed\x12\xd2\x01\n" +
-	"\rexecution_cap\x18\x06 \x01(\v2 .api.v2.AccountUsageExecutionCapB\x8a\x01\x92A\x86\x012\x83\x01Configured execution-cap policy. Omitted when no finite cap is configured. Does not report whether the account is currently blockedR\fexecutionCap\x12/\n" +
-	"\x05seats\x18\a \x01(\v2\x19.api.v2.AccountUsageSeatsR\x05seats\x122\n" +
-	"\x06limits\x18\b \x01(\v2\x1a.api.v2.AccountUsageLimitsR\x06limitsB\x13\n" +
+	"period_end\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB)\x92A&2$End of the current period, exclusiveR\tperiodEnd\x12\xd2\x01\n" +
+	"\rexecution_cap\x18\x05 \x01(\v2 .api.v2.AccountUsageExecutionCapB\x8a\x01\x92A\x86\x012\x83\x01Configured execution-cap policy. Omitted when no finite cap is configured. Does not report whether the account is currently blockedR\fexecutionCap\x12/\n" +
+	"\x05seats\x18\x06 \x01(\v2\x19.api.v2.AccountUsageSeatsR\x05seats\x122\n" +
+	"\x06limits\x18\a \x01(\v2\x1a.api.v2.AccountUsageLimitsR\x06limitsB\x13\n" +
 	"\x11_executions_limit\"\x94\x02\n" +
 	"\x18AccountUsageExecutionCap\x12\x98\x01\n" +
 	"\x05limit\x18\x01 \x01(\x03B\x81\x01\x92A~2|Execution threshold for refusing new runs when enforcement is enabled: included allowance plus the configured overage bufferR\x05limit\x12]\n" +
@@ -12730,7 +12721,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xa5\xa9\x02\n" +
+	"\x04INFO\x10\x032\x92\xa9\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12828,9 +12819,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x15\b\x01\x12\x11accounts:read:get\x82\xd3\xe4\x93\x02\n" +
-	"\x12\b/account\x12\xb7\x06\n" +
-	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\xe2\x05\x92A\xad\x05\n" +
-	"\aAccount\x12\x11Get account usage\x1a\xce\x02Returns the account's execution usage and overage policy for the current UTC calendar month, plus current seat usage and effective capacity limits. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage.JC\n" +
+	"\x12\b/account\x12\xa4\x06\n" +
+	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\xcf\x05\x92A\x9a\x05\n" +
+	"\aAccount\x12\x11Get account usage\x1a\xbb\x02Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage.JC\n" +
 	"\x03200\x12<\n" +
 	"\rAccount usage\x12+\n" +
 	")\x1a'#/definitions/v2GetAccountUsageResponseJR\n" +

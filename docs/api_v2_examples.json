@@ -33,7 +33,6 @@
           "executionsLimit": "50000",
           "periodStart": "2026-11-01T00:00:00Z",
           "periodEnd": "2026-12-01T00:00:00Z",
-          "executionsOverageAllowed": false,
           "executionCap": {
             "limit": "50000",
             "enforced": true

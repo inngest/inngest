@@ -1495,7 +1495,7 @@ func TestSubmitFeedbackCommand(t *testing.T) {
 
 func TestGetAccountUsageCommand(t *testing.T) {
 	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
-	const response = `{"data":{"executions":"12500","executionsLimit":"50000","periodStart":"2026-11-01T00:00:00Z","periodEnd":"2026-12-01T00:00:00Z","executionsOverageAllowed":false,"executionCap":{"limit":"50000","enforced":true},"seats":{"used":"2","limit":"5"},"limits":{"concurrentSteps":"5","workers":"3"}}}`
+	const response = `{"data":{"executions":"12500","executionsLimit":"50000","periodStart":"2026-11-01T00:00:00Z","periodEnd":"2026-12-01T00:00:00Z","executionCap":{"limit":"50000","enforced":true},"seats":{"used":"2","limit":"5"},"limits":{"concurrentSteps":"5","workers":"3"}}}`
 	var method, path, env, query, body string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		method, path, env, query = r.Method, r.URL.Path, r.Header.Get("X-Inngest-Env"), r.URL.RawQuery
