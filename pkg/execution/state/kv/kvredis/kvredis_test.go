@@ -157,6 +157,51 @@ func TestStoreTTL(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestStoreExtend(t *testing.T) {
+	ctx := context.Background()
+	s, r := newStore(t, "")
+	key := testKey()
+
+	// a missing key is not created.
+	require.ErrorIs(t, s.Extend(ctx, key, time.Hour), kv.ErrNotFound)
+	require.False(t, r.Exists(key.String()))
+
+	set, err := s.Set(ctx, kv.Entry{Key: key, Value: json.RawMessage(`1`)}, kv.WithTTL(time.Minute))
+	require.NoError(t, err)
+
+	// a later expiry replaces the one the key has.  the value and the
+	// version stay the same.
+	require.NoError(t, s.Extend(ctx, key, time.Hour))
+	require.Equal(t, time.Hour, r.TTL(key.String()))
+	got, err := s.Get(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, set.Version, got.Version)
+	require.Equal(t, json.RawMessage(`1`), got.Value)
+
+	// an earlier expiry changes nothing.
+	require.NoError(t, s.Extend(ctx, key, time.Minute))
+	require.Equal(t, time.Hour, r.TTL(key.String()))
+
+	// the key lives past the expiry it had before the extend.
+	r.FastForward(2 * time.Minute)
+	_, err = s.Get(ctx, key)
+	require.NoError(t, err)
+
+	// a compare and set on the version from before the extend still
+	// applies.
+	_, err = s.Set(ctx, kv.Entry{Key: key, Value: json.RawMessage(`2`)}, kv.WithExpected(set.Version))
+	require.NoError(t, err)
+
+	// a key without an expiry keeps none.
+	require.Zero(t, r.TTL(key.String()))
+	require.NoError(t, s.Extend(ctx, key, time.Minute))
+	require.Zero(t, r.TTL(key.String()))
+
+	bad := key
+	bad.Namespace = "a/b"
+	require.ErrorIs(t, s.Extend(ctx, bad, time.Minute), kv.ErrInvalidNamespace)
+}
+
 func TestStoreConditionalDelete(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newStore(t, "")

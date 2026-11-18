@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/kv"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -122,7 +124,8 @@ func loopReturnOp(t *testing.T, ret state.LoopReturn) *state.GeneratorOpcode {
 }
 
 // runLoop schedules one input and drives its start item through Execute.
-// a nil input schedules the trigger, which opens the instance.
+// a nil input schedules the trigger, and the first request of its run
+// opens the instance.
 func (h *loopHarness) runLoop(t *testing.T, d *loopReturnDriver, input *event.Event) (sv2.ID, *state.DriverResponse, error) {
 	t.Helper()
 	h.e.driverv1 = map[string]driver.DriverV1{
@@ -204,6 +207,21 @@ func (h *loopHarness) finishedResult(t *testing.T) string {
 	}
 }
 
+// loopTTL returns the time left on the kv entry of the loop record.  the
+// expiry is not in the snapshot, so a test reads it from the harness redis.
+func (h *loopHarness) loopTTL(t *testing.T) time.Duration {
+	t.Helper()
+	id := h.loopID("user-1")
+	iid := id.InstanceID()
+	key := kv.Key{
+		Tenant:    id.Tenant,
+		Namespace: loops.Namespace,
+		Key:       hex.EncodeToString(iid[:]),
+	}.String()
+	require.True(t, h.mr.Exists(key))
+	return h.mr.TTL(key)
+}
+
 func (h *loopHarness) wakeJobID(wakeID string) string {
 	return fmt.Sprintf("wake:%s:%s", h.loopID("user-1").InstanceID(), wakeID)
 }
@@ -262,7 +280,7 @@ func TestLoopReturnCommit(t *testing.T) {
 	require.NotNil(t, snap.LastRunID)
 	require.Equal(t, id.RunID, *snap.LastRunID)
 	// the harness function has no idle_ttl, so the commit uses the default.
-	require.WithinDuration(t, time.Now().Add(consts.DefaultLoopIdleTTL), snap.ExpiresAt, 10*time.Second)
+	require.InDelta(t, consts.DefaultLoopIdleTTL, h.loopTTL(t), float64(10*time.Second))
 
 	h.requireRunGone(t, id)
 	require.JSONEq(t, `{"n":1}`, h.finishedResult(t))
@@ -313,9 +331,7 @@ func TestLoopReturnIdleTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 
-	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-	require.NoError(t, err)
-	require.WithinDuration(t, time.Now().Add(time.Hour), snap.ExpiresAt, 10*time.Second)
+	require.InDelta(t, time.Hour, h.loopTTL(t), float64(10*time.Second))
 }
 
 func TestLoopReturnWakeIdleTTL(t *testing.T) {
@@ -362,9 +378,7 @@ func TestLoopReturnWakeIdleTTL(t *testing.T) {
 		require.NoError(t, err)
 		requireWithin(t, time.Now().Add(time.Hour), item.AtMS, 5*time.Second)
 
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.WithinDuration(t, time.Now().Add(2*time.Hour), snap.ExpiresAt, 10*time.Second)
+		require.InDelta(t, 2*time.Hour, h.loopTTL(t), float64(10*time.Second))
 	})
 
 	t.Run("short wake expires one idle ttl after the commit", func(t *testing.T) {
@@ -373,9 +387,7 @@ func TestLoopReturnWakeIdleTTL(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
 
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.WithinDuration(t, time.Now().Add(3*time.Hour), snap.ExpiresAt, 10*time.Second)
+		require.InDelta(t, 3*time.Hour, h.loopTTL(t), float64(10*time.Second))
 	})
 }
 

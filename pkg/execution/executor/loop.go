@@ -38,17 +38,18 @@ func setLoopSemaphoreKey(sems []constraintapi.Semaphore, fn inngest.Function, ke
 	return ErrNoLoopSemaphore
 }
 
-// openLoop makes sure the loop instance exists before the run is created.
-// a trigger opens the instance.  any other input loads it, and a missing
-// instance returns ErrLoopEnded so the input is dropped.
-func (e *executor) openLoop(ctx context.Context, req execution.ScheduleRequest, in loops.Input, runID domain.RunID) error {
-	id := loops.NewID(domain.NewTenant(req.AccountID, req.WorkspaceID), req.Function.ID, in.Key)
+// checkLoopInstance drops a tick or a wake whose instance is gone, before
+// the run is created.  it returns ErrLoopEnded for one.  a trigger is not
+// checked and writes nothing here.  the first request of its run opens the
+// instance in loopRequest, so only the run that has the key creates a
+// record.  a record created here would be found by a run of the same key
+// that is already in progress and whose own record expired, and that run
+// would commit over it.
+func (e *executor) checkLoopInstance(ctx context.Context, req execution.ScheduleRequest, in loops.Input) error {
 	if in.Kind == loops.InputEvent {
-		if _, err := e.loops.Open(ctx, id, runID); err != nil {
-			return fmt.Errorf("error opening loop instance: %w", err)
-		}
 		return nil
 	}
+	id := loops.NewID(domain.NewTenant(req.AccountID, req.WorkspaceID), req.Function.ID, in.Key)
 	_, err := e.loops.Load(ctx, id)
 	switch {
 	case errors.Is(err, loops.ErrNotFound):
@@ -83,20 +84,24 @@ func loopInput(ctx context.Context, fn inngest.Function, events []json.RawMessag
 // its LoopReturn under loops.ReturnStepID first, and a run whose stack
 // names that step is replayed the same way.  run hands the replay to the
 // normal handler, which commits nothing new and finishes the run with the
-// stored state.  a trigger whose instance is gone opens a fresh one, since
-// the instance ended after the trigger was scheduled.  a tick or a wake
-// whose instance is gone returns ErrLoopEnded, and run finishes the run as
-// cancelled without a request.  both apply only to a run with no saved
-// steps.  a run with saved steps whose instance is gone fails without
-// retry, since its steps ran against state that no longer exists.
+// stored state.  a trigger whose instance is missing opens one.  that is
+// the first run of a key, or a run whose instance ended or expired while it
+// was queued.  a tick or a wake whose instance is gone returns
+// ErrLoopEnded, and run finishes the run as cancelled without a request.
+// both apply only to a run with no saved steps.  a run with saved steps
+// whose instance is gone fails without retry, since its steps ran against
+// state that no longer exists.
 //
-// a request of a run with no saved steps moves the expiry to now plus the
-// idle TTL when less than half the TTL is left.  the touch moves the
-// counter, so the SDK receives and echoes the new one.  a record that this
-// run opened and that has no commit keeps the expiry from the open.
+// every request moves the expiry to now plus the idle TTL plus
+// consts.MaxFunctionTimeout, unless the record already expires later.  the
+// touch does not move the counter.  one SDK request runs for at most
+// consts.MaxFunctionTimeout, so the record does not expire while a request
+// is in progress, and a full idle TTL is left when the request returns.  a
+// gap between two requests of one run that is shorter than the idle TTL
+// then does not expire the record.  a commit sets the expiry again, so the
+// extra time only stays on a record whose run did not commit.
 //
-// the record's OpenedBy and a replayed saved return are kept on i for the
-// handler, and i.loopReplay is set for a replay.
+// what the handler of the response needs is set on i.loop.
 func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDKLoopRequest, *state.DriverResponse, error) {
 	md, fn := i.md, i.f
 	if fn.Loop == nil {
@@ -120,8 +125,10 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 		if st == nil {
 			st = json.RawMessage("null")
 		}
-		i.loopReplay = true
-		i.loopOpenedBy = snap.OpenedBy
+		i.loop = loopRequestInfo{
+			replay:   true,
+			openedBy: snap.OpenedBy,
+		}
 		return nil, loopReplay(fn, state.LoopReturn{
 			State:   st,
 			Version: snap.Counter - 1,
@@ -135,8 +142,10 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 		if err != nil {
 			return nil, nil, err
 		}
-		i.loopReplay = true
-		i.loopSaved = &saved
+		i.loop = loopRequestInfo{
+			replay: true,
+			saved:  &saved,
+		}
 		return nil, loopReplay(fn, saved.Return), nil
 	}
 	if !found {
@@ -151,18 +160,12 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 			return nil, nil, fmt.Errorf("error opening loop instance: %w", err)
 		}
 	}
-	opened := snap.OpenedBy == md.ID.RunID && snap.Counter == 0
-	if len(md.Stack) == 0 && !opened && !snap.ExpiresAt.IsZero() {
-		now := e.now()
-		ttl := loopIdleTTL(fn)
-		if snap.ExpiresAt.Sub(now) < ttl/2 {
-			snap, err = e.loops.Touch(ctx, snap, now.Add(ttl))
-			if err != nil {
-				return nil, nil, fmt.Errorf("error moving loop instance expiry: %w", err)
-			}
-		}
+	if err := e.loops.Touch(ctx, id, e.now().Add(loopIdleTTL(fn)+consts.MaxFunctionTimeout)); err != nil {
+		return nil, nil, fmt.Errorf("error moving loop instance expiry: %w", err)
 	}
-	i.loopOpenedBy = snap.OpenedBy
+	i.loop = loopRequestInfo{
+		openedBy: snap.OpenedBy,
+	}
 	return &driver.SDKLoopRequest{
 		State:   snap.State,
 		Version: snap.Counter,
@@ -172,6 +175,22 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 			ID:   in.ID,
 		},
 	}, nil, nil
+}
+
+// loopRequestInfo is what loopRequest found for one request of a loop run.
+// loopRequest sets it on the run instance, and handleGeneratorLoopReturn
+// reads it when it applies the return of the same request.
+type loopRequestInfo struct {
+	// replay is set when the response was built from the loop store or
+	// from the saved loop return in place of an SDK request.  the handler
+	// then enqueues no timer and saves nothing.
+	replay bool
+	// openedBy is the OpenedBy of the loop record the request was built
+	// from.  the handler writes it back on commit and saves it with an
+	// end.  it is zero for a replay of a saved return.
+	openedBy domain.RunID
+	// saved is the saved return a replayed end was built from.
+	saved *savedLoopReturn
 }
 
 // savedLoopReturn is the value a run saves under loops.ReturnStepID before
@@ -353,16 +372,14 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	if err != nil {
 		return queue.NeverRetryError(fmt.Errorf("loop run %s: %w", md.ID.RunID, err))
 	}
-	var (
-		replay   bool
-		openedBy domain.RunID
-		saved    *savedLoopReturn
-	)
+	// a RunContext that is not the executor's own run instance has no
+	// request info.  the return is then handled as a first return, and the
+	// opener is read from the record when it is needed.
+	var info loopRequestInfo
 	if i, ok := runCtx.(*runInstance); ok {
-		replay = i.loopReplay
-		openedBy = i.loopOpenedBy
-		saved = i.loopSaved
+		info = i.loop
 	}
+	replay, openedBy, saved := info.replay, info.openedBy, info.saved
 
 	ret, err := gen.LoopReturn()
 	if err != nil {

@@ -212,12 +212,14 @@ type Snapshot struct {
 	// entry.  it is nil until the first commit.
 	State     json.RawMessage
 	LastRunID *domain.RunID
-	// Counter is the number of commits and touches so far.  it also acts
-	// as a lock for each update.  a record that Open created and no run has
-	// committed or touched is at 0.
+	// Counter is the number of commits so far.  it also acts as a lock for
+	// each commit.  a record that Open created and no run has committed is
+	// at 0.
 	Counter int64
-	// ExpiresAt is when the store drops the instance.  zero means never.
-	ExpiresAt time.Time
+	// UpdatedAt is when the last Open or Commit wrote the record.  a Touch
+	// does not write the record and does not change it.  the snapshot does
+	// not contain the expiry, which only the store knows.
+	UpdatedAt time.Time
 }
 
 // Commit represents a commit to the loops state, which happens at the end of a function

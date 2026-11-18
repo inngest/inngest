@@ -70,14 +70,12 @@ func (h *loopHarness) execute(t *testing.T, id sv2.ID) (*state.DriverResponse, e
 	return h.e.Execute(h.ctx, item.Identifier, item, edge.Edge)
 }
 
-// openAndCommit schedules the trigger run, which opens the instance, and
-// commits one state so the next request carries a version above zero.
+// openAndCommit opens the instance for a scheduled trigger run and commits
+// one state so the next request carries a version above zero.
 func (h *loopHarness) openAndCommit(t *testing.T) {
 	t.Helper()
-	first, firstID := h.request(nil)
-	_, _, err := h.e.Schedule(h.ctx, first)
-	require.NoError(t, err)
-	_, err = h.store.Commit(h.ctx, loops.Commit{
+	_, firstID := h.open(t)
+	_, err := h.store.Commit(h.ctx, loops.Commit{
 		ID:      h.loopID("user-1"),
 		RunID:   firstID.RunID,
 		Counter: 0,
