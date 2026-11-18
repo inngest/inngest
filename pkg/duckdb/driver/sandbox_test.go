@@ -25,7 +25,15 @@ func TestSandboxStmts(t *testing.T) {
 		"SET enable_external_access=false;",
 	}, stmts)
 
-	// A remote warehouse only needs the catalog.
+	// An object store warehouse is allowed by prefix.
+	stmts, err = sandboxStmts(&IcebergOptions{URI: "http://127.0.0.1:1234", DataPath: "s3://bucket/lake/"})
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"SET allowed_directories=['http://127.0.0.1:1234/', 's3://bucket/lake/'];",
+		"SET enable_external_access=false;",
+	}, stmts)
+
+	// A remote warehouse w/o a DataPath only gets the catalog.
 	stmts, err = sandboxStmts(&IcebergOptions{URI: "https://catalog.example.com/"})
 	require.NoError(t, err)
 	require.Equal(t, []string{
