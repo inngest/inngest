@@ -41,6 +41,8 @@ func lineageOf(t *testing.T, sqlText string, tables ...Table) map[Table][]string
 func TestSourceColumnsRead(t *testing.T) {
 	spansCols := physicalColumns(TableSpans)
 	sort.Strings(spansCols)
+	runsCols := physicalColumns(TableRuns)
+	sort.Strings(runsCols)
 	without := func(cols []string, drop ...string) []string {
 		out := []string{}
 		for _, c := range cols {
@@ -138,6 +140,15 @@ func TestSourceColumnsRead(t *testing.T) {
 			// Every column of each operand, which is just its select list.
 			name: "union", sql: `SELECT run_id FROM spans UNION ALL SELECT span_id AS run_id FROM metadata`, tables: []Table{TableSpans, TableMetadata},
 			want: map[Table][]string{TableSpans: {"run_id"}, TableMetadata: {"span_id"}},
+		},
+		{
+			// #n reads every column in scope rather than counting.
+			name: "positional column", sql: `SELECT #13 FROM runs`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: runsCols},
+		},
+		{
+			name: "positional ORDER BY", sql: `SELECT r FROM (SELECT run_id AS r, output FROM runs ORDER BY #2)`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: runsCols},
 		},
 		{
 			name: "unknown table", sql: `SELECT a FROM somewhere`, tables: []Table{TableSpans},

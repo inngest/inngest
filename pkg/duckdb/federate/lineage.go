@@ -294,6 +294,9 @@ func (l *lineage) withCTEs(w *parser.WithClause, e *env) *env {
 // select item by its position.
 func positional(stmt *parser.SelectStatement) bool {
 	isNum := func(x parser.Expr) bool {
+		if _, ok := x.(*parser.PositionalExpr); ok {
+			return true // #n
+		}
 		lit, ok := x.(*parser.Literal)
 		return ok && lit.Kind == parser.LitNumber
 	}
@@ -734,6 +737,12 @@ func (l *lineage) expr(x parser.Expr, sc *scope) {
 		l.walk(v, sc)
 	case *parser.SubqueryExpr:
 		l.analyze(v.Select, sc.env, sc, allColumns())
+	case *parser.PositionalExpr:
+		// #n is the nth column of the FROM clause: every column of every
+		// rel in scope, rather than counting through them.
+		for _, r := range sc.rels {
+			r.need.merge(allColumns())
+		}
 	case *parser.LambdaExpr:
 		// `col -> 'key'` parses as a lambda too (the JSON arrow), so a
 		// parameter that's also a column is read as well.
