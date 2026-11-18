@@ -46,6 +46,9 @@ func TestDeployApp(t *testing.T) {
 		rejected string
 		// deploy is the GetDeploy response, with the deploy ID as {id}.
 		deploy string
+		// syncing makes the first GetDeploy of each deploy report a ready
+		// deploy whose sync is still syncing.
+		syncing bool
 		// wantCalls is the API calls in order.  the API names deploys d1,
 		// d2, and so on.
 		wantCalls []string
@@ -77,7 +80,8 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			wantBuilt:  []string{"inngest"},
 			wantConfig: map[string]string{"inngest": `{"serve":{}}`},
 			deploy:     `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc","sync":{"status":"synced","url":"` + syncURL + `"}}}`,
-			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
+			syncing:    true,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1", "get d1"},
 			output: []string{
 				"Built.  Inngest is starting app inngest to sync its functions...",
 				"App inngest is synced and ready to run functions.\nSee the sync at " + syncURL + "\n",
@@ -90,7 +94,8 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 			wantBuilt:  []string{"inngest"},
 			wantConfig: map[string]string{"inngest": `{"serve":{"port":8080}}`},
 			deploy:     `{"data":{"id":"{id}","status":"ready","artifact_digest":"abc","sync":{"status":"failed","error":"the app exited","url":"` + syncURL + `"}}}`,
-			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1"},
+			syncing:    true,
+			wantCalls:  []string{"create inngest", "upload d1", "commit inngest d1", "get d1", "get d1"},
 			err:        "app inngest did not sync: the app exited\nSee the sync at " + syncURL,
 		},
 		{
@@ -202,6 +207,7 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 				mu    sync.Mutex
 				calls []string
 				ids   int
+				gets  = map[string]int{}
 			)
 			record := func(call string) {
 				mu.Lock()
@@ -241,8 +247,17 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 				_, _ = w.Write([]byte(`{"data":{"id":"` + id + `","status":"uploaded"}}`))
 			})
 			mux.HandleFunc("GET /v2/deploys/{id}", func(w http.ResponseWriter, r *http.Request) {
-				record("get " + r.PathValue("id"))
-				_, _ = w.Write([]byte(strings.ReplaceAll(tc.deploy, "{id}", r.PathValue("id"))))
+				id := r.PathValue("id")
+				record("get " + id)
+				mu.Lock()
+				gets[id]++
+				first := gets[id] == 1
+				mu.Unlock()
+				if tc.syncing && first {
+					_, _ = w.Write([]byte(`{"data":{"id":"` + id + `","status":"ready","artifact_digest":"abc","sync":{"status":"syncing"}}}`))
+					return
+				}
+				_, _ = w.Write([]byte(strings.ReplaceAll(tc.deploy, "{id}", id)))
 			})
 			srv := httptest.NewServer(mux)
 			defer srv.Close()

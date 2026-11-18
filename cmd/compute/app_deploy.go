@@ -200,7 +200,9 @@ func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *cl
 	}
 
 	fmt.Fprintf(stdout, "Inngest is building app %s in deploy %s...\n", name, deployID)
-	d, err = waitForDeploy(ctx, stdout, api, d, deployDone)
+	// the build and the sync share one deployWait.
+	start := time.Now()
+	d, err = waitForDeploy(ctx, stdout, api, d, start, deployDone)
 	if err != nil {
 		return "", err
 	}
@@ -215,7 +217,7 @@ func deployApp(ctx context.Context, stdout io.Writer, dc *docker.Client, api *cl
 	}
 
 	fmt.Fprintf(stdout, "\nBuilt.  Inngest is starting app %s to sync its functions...\n", name)
-	d, err = waitForDeploy(ctx, stdout, api, d, syncDone)
+	d, err = waitForDeploy(ctx, stdout, api, d, start, syncDone)
 	if err != nil {
 		return "", err
 	}
@@ -268,10 +270,9 @@ func syncDone(d *apiv2.Deploy) (bool, error) {
 }
 
 // waitForDeploy polls the deploy until done says it has ended, and says how
-// long it has waited every progressInterval.  stopping the CLI does not stop
-// the deploy.
-func waitForDeploy(ctx context.Context, stdout io.Writer, api *client, d *apiv2.Deploy, done func(*apiv2.Deploy) (bool, error)) (*apiv2.Deploy, error) {
-	start := time.Now()
+// long it has waited since start every progressInterval.  stopping the CLI
+// does not stop the deploy.
+func waitForDeploy(ctx context.Context, stdout io.Writer, api *client, d *apiv2.Deploy, start time.Time, done func(*apiv2.Deploy) (bool, error)) (*apiv2.Deploy, error) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 	progress := time.NewTicker(progressInterval)
