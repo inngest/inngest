@@ -33,8 +33,10 @@ local keyPartitionScavengerIndex  = KEYS[18]
 
 local keyEarliestPeekTime      = KEYS[19]
 
-local keyItemIndexA            = KEYS[20]   -- custom item index 1
-local keyItemIndexB            = KEYS[21]  -- custom item index 2
+local keySingletonMigration    = KEYS[20]
+local keySingletonPending      = KEYS[21]
+local keyItemIndexA            = KEYS[22]   -- custom item index 1
+local keyItemIndexB            = KEYS[23]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -128,10 +130,16 @@ local singletonKey = redis.call("GET", singletonRunKey)
 
 if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
-  local singletonRunID = redis.call("GET", singletonKey)
 
   if tonumber(queueItemsCount) == 0 then
+    -- Local emptiness is not run completion while jobs span migrating shards.
+    -- Keep both mappings until the migrator explicitly reconciles this run.
+    if redis.call("EXISTS", keySingletonMigration) == 1 then
+      redis.call("SADD", keySingletonPending, runID)
+      return 0
+    end
     -- We just dequeued the last step
+     local singletonRunID = redis.call("GET", singletonKey)
      redis.call("DEL", singletonRunKey)
 
      if singletonRunID == runID then

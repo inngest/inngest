@@ -30,8 +30,9 @@ local keyGlobalNormalizeSet              = KEYS[18]
 local singletonRunKey           	  = KEYS[19]
 local singletonKey           	  = KEYS[20]
 
-local keyItemIndexA           	= KEYS[21]          -- custom item index 1
-local keyItemIndexB           	= KEYS[22]          -- custom item index 2
+local keySingletonMigration     = KEYS[21]
+local keyItemIndexA           	= KEYS[22]          -- custom item index 1
+local keyItemIndexB           	= KEYS[23]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -75,11 +76,15 @@ end
 local singletonMigration = ARGV[15] == "1"
 -- Check if the item is a singleton and if an existing item already exists
 if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
+  -- A late ordinary enqueue must retry even if preparation has already
+  -- copied an owner. Returning a singleton conflict would skip its event.
+  if not singletonMigration and redis.call("EXISTS", keySingletonMigration) == 1 then
+    return 3
+  end
   local holder = redis.call("GET", singletonKey)
   if holder and (not singletonMigration or holder ~= runID) then
     return 2
   end
-
 end
 
 -- The script is atomic: once both checks pass, write the item and its ownership.

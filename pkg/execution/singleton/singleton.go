@@ -74,6 +74,9 @@ func singleton(ctx context.Context, shards queue.ShardRegistry, scope queue.Scop
 	if err != nil {
 		return nil, err
 	}
+	if admission, ok := shard.(queue.SingletonAdmissionOperations); ok {
+		return admission.SingletonAdmission(ctx, scope, key, s.Mode)
+	}
 	switch s.Mode {
 	case enums.SingletonModeSkip:
 		return shard.SingletonGetRunID(ctx, scope, key)
