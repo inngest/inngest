@@ -6,8 +6,12 @@ content, upgrade behavior, and navigation are unchanged.
 
 ## Review locally
 
-From `ui/apps/dashboard`, run `pnpm dev:sandbox-verification` and open
+From `ui/apps/dashboard`, run `pnpm preview:sandbox-verification` and open
 <http://127.0.0.1:5175/sandbox-verification-demo.html>.
+
+The preview is opt-in and does not run with `pnpm dev`. Its exact analytics
+alias takes precedence over the dashboard alias, so fixture views and upgrade
+clicks use local no-op functions even when a Segment write key is configured.
 
 The scenario selector covers a free-plan upgrade state and eight paid-plan states:
 not started, partially complete, started with no completed checks, admin required,
@@ -61,7 +65,7 @@ Vite configuration, which rejects production builds.
 Run the checks from `ui/apps/dashboard` with:
 
 ```sh
-pnpm test src/components/Sandboxes/SandboxesVerificationCallout.test.tsx
+pnpm test src/components/Sandboxes/SandboxesVerificationCallout.test.tsx vite.sandbox-verification.config.test.ts
 pnpm type-check
 ```
 

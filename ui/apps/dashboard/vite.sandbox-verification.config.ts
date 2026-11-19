@@ -6,6 +6,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   resolve: {
     alias: {
+      '@/utils/analyticsEvents': path.resolve(
+        __dirname,
+        'src/components/Sandboxes/verification-demo/analytics.ts',
+      ),
       '@inngest/components': path.resolve(
         __dirname,
         '../../packages/components/src',
@@ -20,18 +24,6 @@ export default defineConfig({
     open: '/sandbox-verification-demo.html',
   },
   plugins: [
-    {
-      name: 'sandbox-verification-demo-analytics',
-      enforce: 'pre',
-      resolveId(source) {
-        if (source === '@/utils/analyticsEvents')
-          return '\0sandbox-demo-analytics';
-      },
-      load(id) {
-        if (id === '\0sandbox-demo-analytics')
-          return 'export function trackEmptyStateViewed() {} export function trackEmptyStateUpgradeClicked() {}';
-      },
-    },
     react(),
     {
       name: 'sandbox-verification-demo-development-only',

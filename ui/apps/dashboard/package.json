@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:vite": "vite dev",
-    "dev:sandbox-verification": "vite --config vite.sandbox-verification.config.ts",
+    "preview:sandbox-verification": "vite --config vite.sandbox-verification.config.ts",
     "dev:graphql-codegen": "graphql-codegen -w -r dotenv/config",
     "build": "pnpm build:tsc && pnpm build:graphql-codegen && pnpm build:vite",
     "build:tsc": "tsc --noEmit",
