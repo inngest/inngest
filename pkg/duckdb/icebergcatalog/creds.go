@@ -59,16 +59,6 @@ func (s *Server) tableCredentials(r *http.Request, ident table.Identifier, locat
 	return props, []storageCredential{{Prefix: location, Config: props}}, nil
 }
 
-// tableLocationOf returns a table's location from its metadata file's,
-// which is always `<location>/metadata/<file>` for tables we write.
-func tableLocationOf(metadataLocation string) (string, bool) {
-	i := strings.LastIndex(metadataLocation, "/metadata/")
-	if i <= 0 {
-		return "", false
-	}
-	return metadataLocation[:i], true
-}
-
 func (s *Server) loadCredentials(w http.ResponseWriter, r *http.Request) {
 	if s.opts.Credentials == nil {
 		writeError(w, http.StatusNotFound, "NotFoundException", "this catalog doesn't vend credentials")
