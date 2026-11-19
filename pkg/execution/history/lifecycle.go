@@ -219,6 +219,17 @@ func (l lifecycle) OnFunctionFinished(
 		)
 	}
 
+	// a run that ends with a RunComplete opcode has its output in the opcode
+	// data.  without this the run's row in function_finishes has an empty
+	// output.
+	for _, op := range resp.Generator {
+		if op != nil && op.Op == enums.OpcodeRunComplete {
+			h.Result.Output = string(op.Data)
+			h.Result.SizeBytes = len(op.Data)
+			break
+		}
+	}
+
 	if resp.Err != nil {
 		h.Type = enums.HistoryTypeFunctionFailed.String()
 	}
