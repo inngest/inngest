@@ -31,6 +31,15 @@ func IncrQueueItemProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueItemNotFoundCapacityCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_not_found_capacity_total",
+		Description: "Capacity leases acquired for queue items that were gone at item lease, by outcome",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueArchivedWorkspaceAppSemaphoreBypassCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
