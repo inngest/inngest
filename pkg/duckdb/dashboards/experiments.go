@@ -10,10 +10,16 @@
 // executor stamps it on every step inside the variant callback, and a run
 // scored against an experiment (scoreExperiment, POST .../scores w/ an
 // experiment) gets it on the run itself. A score counts toward a variant
-// only through that shared (run_id, span_id), so a run in two experiments
-// can't count one experiment's scores toward the other. Kinds are stored w/o
-// their inngest. prefix: experiment, score.<name>, or the legacy score kind
-// keyed by name.
+// only through that shared (run_id, span_id).
+//
+// A span can be in more than one experiment: a run scored against two has
+// both on its span, and a nested experiment's selection step also gets the
+// outer one's stamp. So a span's assignments are its latest emission per
+// experiment name, and a score counts toward the experiment written last
+// before it (the experiment is written right before its score), or the
+// span's first if none was (a step scored before the executor stamps it).
+// Kinds are stored w/o their inngest. prefix: experiment, score.<name>, or
+// the legacy score kind keyed by name.
 //
 // Unlike Cloud, which reads assignments from the steps table and scores from
 // steps and runs separately and merges them, both shapes are spans here: a
@@ -43,9 +49,10 @@ const (
 const defaultExperimentWindow = defaultSessionWindow
 
 // experimentsSQL lists experiments, one row per (name, function), most
-// recently seen first. Each span's latest experiment emission wins, and
-// selection_strategy/available_variants are only on the selection step
-// (NULL elsewhere). A run's function never changes across its lifecycle
+// recently seen first. A span's latest emission per experiment name wins,
+// and selection_strategy/available_variants are only on the selection step
+// (NULL elsewhere). A declared variant that isn't a string is dropped. A
+// run's function never changes across its lifecycle
 // rows, so any row will do, and queued_at is run_queued_at, so the same
 // bounds prune both tables. Every NULL-able arg is typed so `? IS NULL`
 // binds.
@@ -56,7 +63,7 @@ WITH latest AS (
   WHERE account_id = ?::UUID AND env_id = ?::UUID
     AND run_queued_at >= ?::TIMESTAMPTZ AND run_queued_at < ?::TIMESTAMPTZ
     AND NOT is_user AND kind = 'experiment'
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id ORDER BY created_at DESC, "values" DESC) = 1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id, v->>'name' ORDER BY created_at DESC, "values" DESC) = 1
 ),
 spans AS (
   SELECT
@@ -66,7 +73,8 @@ spans AS (
     v->>'variant' AS variant,
     NULLIF(v->>'selection_strategy', '') AS selection_strategy,
     CASE WHEN json_type(v->'available_variants') = 'ARRAY'
-      THEN json_transform(v->'available_variants', '["VARCHAR"]') END AS available_variants
+      THEN [x->>'$' FOR x IN json_transform(v->'available_variants', '["JSON"]') IF json_type(x) = 'VARCHAR']
+      END AS available_variants
   FROM latest
   WHERE COALESCE(v->>'name', '') <> '' AND COALESCE(v->>'variant', '') <> ''
 ),
@@ -103,18 +111,28 @@ LIMIT ?;`
 // counts, first and last seen, the selection step's strategy and weights w/
 // when they were recorded (strategy_at, so the latest across variants
 // wins), and the scores on the variant's spans as a JSON list of {key, avg,
-// min, max}. A bool scores as 1/0 and anything else non-numeric is
-// dropped, and a name in both score shapes on one span takes the per-name
-// kind.
+// min, max}.
+//
+// Only a JSON number or bool is a score (a bool scores as 1/0), and only a
+// finite one, so nothing non-finite reaches the JSON text: anything else is
+// dropped, as is a weight that isn't a finite number. A name in both score
+// shapes on one span takes the per-name kind. Each score counts toward the
+// experiment its span was last assigned before it (see the package doc).
 const experimentSQL = `
-WITH latest AS (
-  SELECT run_id, run_queued_at, span_id, kind, "values"::JSON AS v
+WITH base AS (
+  SELECT run_id, run_queued_at, span_id, kind, created_at, "values" AS raw, "values"::JSON AS v
   FROM inngest.run_metadata
   WHERE account_id = ?::UUID AND env_id = ?::UUID
     AND run_queued_at >= ?::TIMESTAMPTZ AND run_queued_at < ?::TIMESTAMPTZ
     AND NOT is_user
     AND (kind = 'experiment' OR kind = 'score' OR starts_with(kind, 'score.'))
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id, kind ORDER BY created_at DESC, "values" DESC) = 1
+),
+-- Every experiment emission, not just a span's latest: a score is matched
+-- to the one written before it.
+experiments AS (
+  SELECT run_id, run_queued_at, span_id, created_at, raw, v, v->>'name' AS name
+  FROM base
+  WHERE kind = 'experiment' AND COALESCE(v->>'name', '') <> '' AND COALESCE(v->>'variant', '') <> ''
 ),
 spans AS (
   SELECT
@@ -124,43 +142,80 @@ spans AS (
     v->>'variant' AS variant,
     NULLIF(v->>'selection_strategy', '') AS selection_strategy,
     CASE WHEN json_type(v->'variant_weights') = 'OBJECT'
-      THEN json_transform(v->'variant_weights', '"MAP(VARCHAR, DOUBLE)"') END AS variant_weights,
+      THEN map_from_entries([
+        {'key': e.key, 'value': TRY_CAST(e.value AS DOUBLE)}
+        FOR e IN map_entries(json_transform(v->'variant_weights', '"MAP(VARCHAR, JSON)"'))
+        IF json_type(e.value) IN ('BIGINT', 'UBIGINT', 'DOUBLE') AND isfinite(TRY_CAST(e.value AS DOUBLE))
+      ]) END AS variant_weights,
     -- The selection step is the one w/ available_variants: a stamped step
     -- may repeat the strategy, but never the weights.
     json_type(v->'available_variants') = 'ARRAY' AS is_selection
-  FROM latest
-  WHERE kind = 'experiment' AND v->>'name' = ?::VARCHAR AND COALESCE(v->>'variant', '') <> ''
+  FROM experiments
+  WHERE name = ?::VARCHAR
     AND run_id IN (
       SELECT run_id FROM inngest.runs
       WHERE account_id = ?::UUID AND env_id = ?::UUID
         AND queued_at >= ?::TIMESTAMPTZ AND queued_at < ?::TIMESTAMPTZ
         AND function_id = ?::UUID
     )
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id ORDER BY created_at DESC, raw DESC) = 1
+),
+latest_scores AS (
+  SELECT run_id, span_id, kind, created_at, v
+  FROM base
+  WHERE kind <> 'experiment'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id, kind ORDER BY created_at DESC, raw DESC) = 1
 ),
 raw_scores AS (
-  SELECT run_id, span_id, substr(kind, 7) AS key, v->'value' AS value, 0 AS precedence
-  FROM latest
+  SELECT run_id, span_id, created_at, substr(kind, 7) AS key, v->'value' AS value, 0 AS precedence
+  FROM latest_scores
   WHERE starts_with(kind, 'score.')
   UNION ALL
-  SELECT run_id, span_id, e.score.key AS key, e.score.value->'value' AS value, 1 AS precedence
-  FROM latest, unnest(map_entries(json_transform(v, '"MAP(VARCHAR, JSON)"'))) AS e(score)
+  SELECT run_id, span_id, created_at, e.score.key AS key, e.score.value->'value' AS value, 1 AS precedence
+  FROM latest_scores, unnest(map_entries(json_transform(v, '"MAP(VARCHAR, JSON)"'))) AS e(score)
   WHERE kind = 'score' AND json_type(v) = 'OBJECT'
 ),
 scores AS (
   SELECT
     run_id,
     span_id,
+    created_at,
     key,
-    CASE json_type(value) WHEN 'BOOLEAN' THEN value::BOOLEAN::DOUBLE ELSE TRY_CAST(value AS DOUBLE) END AS value
+    CASE
+      WHEN json_type(value) = 'BOOLEAN' THEN value::BOOLEAN::DOUBLE
+      WHEN json_type(value) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN TRY_CAST(value AS DOUBLE)
+    END AS value
   FROM raw_scores
   QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, span_id, key ORDER BY precedence) = 1
 ),
-metrics AS (
-  SELECT s.variant, sc.key, avg(sc.value) AS avg, min(sc.value) AS min, max(sc.value) AS max
+-- This experiment's scores: the ones whose span was last assigned to it
+-- before the score, or first assigned to it if the score came first.
+attributed AS (
+  SELECT sc.run_id, sc.span_id, sc.key, sc.value
+  FROM scores sc
+  JOIN experiments e USING (run_id, span_id)
+  WHERE sc.value IS NOT NULL AND isfinite(sc.value)
+  GROUP BY sc.run_id, sc.span_id, sc.key, sc.value, sc.created_at
+  HAVING COALESCE(
+    arg_max(e.name, e.created_at) FILTER (WHERE e.created_at <= sc.created_at),
+    arg_min(e.name, e.created_at)
+  ) = ?::VARCHAR
+),
+variant_scores AS (
+  SELECT s.variant, a.key, a.value, count(*) OVER (PARTITION BY s.variant, a.key) AS n
   FROM spans s
-  JOIN scores sc USING (run_id, span_id)
-  WHERE sc.value IS NOT NULL
-  GROUP BY s.variant, sc.key
+  JOIN attributed a USING (run_id, span_id)
+),
+metrics AS (
+  SELECT
+    variant,
+    key,
+    -- The sum of finite scores can still overflow, their mean can't.
+    CASE WHEN isfinite(avg(value)) THEN avg(value) ELSE sum(value / n) END AS avg,
+    min(value) AS min,
+    max(value) AS max
+  FROM variant_scores
+  GROUP BY variant, key
 ),
 variant_metrics AS (
   SELECT variant, to_json(list({'key': key, 'avg': avg, 'min': min, 'max': max} ORDER BY key))::VARCHAR AS metrics
@@ -231,7 +286,7 @@ func buildExperimentSQL(scope Scope) (string, []any, error) {
 	args := tenantArgs(scope)
 	args = append(args, scope.ExperimentName)
 	args = append(args, tenantArgs(scope)...)
-	args = append(args, scope.FunctionID.String())
+	args = append(args, scope.FunctionID.String(), scope.ExperimentName)
 	return experimentSQL, args, nil
 }
 

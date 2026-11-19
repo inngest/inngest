@@ -269,3 +269,152 @@ func TestGetExperiment_NotFound(t *testing.T) {
 	var invalid *dashboards.InvalidArgumentError
 	require.ErrorAs(t, err, &invalid)
 }
+
+// newExperimentFixture is an empty fixture: seedExperiments w/o its rows.
+func newExperimentFixture(t *testing.T) experimentFixture {
+	db, cleanup := newTestDuckDB(t)
+	t.Cleanup(cleanup)
+	return experimentFixture{
+		db: db, accountID: uuid.New(), envID: uuid.New(), appID: uuid.New(),
+		checkoutFn: uuid.New(), otherFn: uuid.New(),
+		now: time.Now().UTC().Truncate(time.Millisecond),
+	}
+}
+
+func (f experimentFixture) get(t *testing.T, name string) *dashboards.ExperimentDetail {
+	t.Helper()
+	d, err := dashboards.GetExperiment(t.Context(), f.db, f.accountID, f.envID, dashboards.ExperimentOpts{FunctionID: f.checkoutFn, Name: name})
+	require.NoError(t, err)
+	return d
+}
+
+// TestGetExperiment_TwoExperimentsOnOneRun checks run-scoped scores for two
+// experiments on one run: both are on the run's span, and each score counts
+// toward the experiment written w/ it, not whichever was written last.
+func TestGetExperiment_TwoExperimentsOnOneRun(t *testing.T) {
+	f := newExperimentFixture(t)
+	t1 := f.now.Add(-time.Hour)
+	f.run(t, "r7", f.checkoutFn, "app-checkout", t1)
+	run := func(kind string, values any, at time.Duration) {
+		f.md(t, testMetadata{runID: "r7", queuedAt: t1, spanID: "r7-run", scope: "run", kind: kind, values: values, createdAt: t1.Add(at)})
+	}
+	// scoreExperiment(A, qa), scoreExperiment(B, qb), then A again: each
+	// writes the experiment, then the score.
+	run("experiment", map[string]any{"name": "A", "variant": "a1"}, 1*time.Second)
+	run("score.qa", map[string]any{"value": 1}, 2*time.Second)
+	run("experiment", map[string]any{"name": "B", "variant": "b1"}, 3*time.Second)
+	run("score.qb", map[string]any{"value": 2}, 4*time.Second)
+	run("experiment", map[string]any{"name": "A", "variant": "a1"}, 5*time.Second)
+	run("score.qc", map[string]any{"value": 3}, 6*time.Second)
+
+	require.Equal(t, []dashboards.ExperimentVariant{{
+		Name: "a1", RunCount: 1,
+		Metrics: []dashboards.ExperimentMetric{{Key: "qa", Avg: 1, Min: 1, Max: 1}, {Key: "qc", Avg: 3, Min: 3, Max: 3}},
+	}}, f.get(t, "A").Variants)
+	require.Equal(t, []dashboards.ExperimentVariant{{
+		Name: "b1", RunCount: 1,
+		Metrics: []dashboards.ExperimentMetric{{Key: "qb", Avg: 2, Min: 2, Max: 2}},
+	}}, f.get(t, "B").Variants)
+
+	res, err := dashboards.ListExperiments(t.Context(), f.db, f.accountID, f.envID, dashboards.ExperimentsOpts{})
+	require.NoError(t, err)
+	var names []string
+	for _, e := range res.Experiments {
+		names = append(names, e.Name)
+		require.Equal(t, 1, e.TotalRuns)
+	}
+	require.ElementsMatch(t, []string{"A", "B"}, names)
+}
+
+// TestGetExperiment_ScoreBeforeStamp checks a step's score written before
+// the executor stamps the step still counts.
+func TestGetExperiment_ScoreBeforeStamp(t *testing.T) {
+	f := newExperimentFixture(t)
+	t1 := f.now.Add(-time.Hour)
+	f.run(t, "r1", f.checkoutFn, "app-checkout", t1)
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "r1-step", kind: "score.q", values: map[string]any{"value": 4}, createdAt: t1.Add(time.Second)})
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "r1-step", kind: "experiment", values: map[string]any{"name": "A", "variant": "a1"}, createdAt: t1.Add(2 * time.Second)})
+
+	require.Equal(t, []dashboards.ExperimentVariant{{
+		Name: "a1", RunCount: 1, Metrics: []dashboards.ExperimentMetric{{Key: "q", Avg: 4, Min: 4, Max: 4}},
+	}}, f.get(t, "A").Variants)
+}
+
+// TestGetExperiment_NonFiniteScores checks scores that aren't finite
+// numbers, and an average that overflows, don't fail the experiment.
+func TestGetExperiment_NonFiniteScores(t *testing.T) {
+	f := newExperimentFixture(t)
+	t1 := f.now.Add(-time.Hour)
+	f.run(t, "r1", f.checkoutFn, "app-checkout", t1)
+	exp := map[string]any{"name": "A", "variant": "v"}
+	for _, span := range []string{"s1", "s2"} {
+		f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: span, kind: "experiment", values: exp})
+		f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: span, kind: "score.big", values: map[string]any{"value": 1e308}})
+		f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: span, kind: "score.nan", values: map[string]any{"value": "nan"}})
+		f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: span, kind: "score.inf", values: map[string]any{"value": "inf"}})
+		f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: span, kind: "score.str", values: map[string]any{"value": "12"}})
+	}
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "s1", kind: "score.ok", values: map[string]any{"value": 2}})
+
+	require.Equal(t, []dashboards.ExperimentVariant{{
+		Name: "v", RunCount: 1,
+		Metrics: []dashboards.ExperimentMetric{
+			{Key: "big", Avg: 1e308, Min: 1e308, Max: 1e308},
+			{Key: "ok", Avg: 2, Min: 2, Max: 2},
+		},
+	}}, f.get(t, "A").Variants)
+}
+
+// TestExperiments_MalformedSelection checks a selection step w/ variants
+// that aren't strings, or weights that aren't numbers, only loses those.
+func TestExperiments_MalformedSelection(t *testing.T) {
+	f := newExperimentFixture(t)
+	t1 := f.now.Add(-time.Hour)
+	f.run(t, "r1", f.checkoutFn, "app-checkout", t1)
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "r1-select", kind: "experiment", values: map[string]any{
+		"name": "A", "variant": "v", "selection_strategy": "weighted",
+		"available_variants": []any{"v", nil, 3, "w"},
+		"variant_weights":    map[string]any{"v": 1, "w": nil, "x": "abc"},
+	}})
+
+	res, err := dashboards.ListExperiments(t.Context(), f.db, f.accountID, f.envID, dashboards.ExperimentsOpts{})
+	require.NoError(t, err)
+	require.Len(t, res.Experiments, 1)
+	require.Equal(t, []string{"v", "w"}, res.Experiments[0].Variants)
+
+	d := f.get(t, "A")
+	require.Equal(t, "weighted", d.SelectionStrategy)
+	require.Equal(t, []dashboards.ExperimentWeight{{Variant: "v", Weight: 1}}, d.Weights)
+}
+
+// TestExperiments_Nested checks an experiment inside another's variant
+// callback keeps its selection: the executor stamps the outer experiment on
+// the inner one's selection step, after the SDK's own emission.
+func TestExperiments_Nested(t *testing.T) {
+	f := newExperimentFixture(t)
+	t1 := f.now.Add(-time.Hour)
+	f.run(t, "r1", f.checkoutFn, "app-checkout", t1)
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "outer-select", kind: "experiment", values: map[string]any{
+		"name": "outer", "variant": "o1", "selection_strategy": "fixed", "available_variants": []string{"o1", "o2"},
+	}})
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "inner-select", kind: "experiment", createdAt: t1.Add(time.Second), values: map[string]any{
+		"name": "inner", "variant": "i1", "selection_strategy": "weighted", "available_variants": []string{"i1", "i2"},
+		"variant_weights": map[string]float64{"i1": 0.7, "i2": 0.3},
+	}})
+	f.md(t, testMetadata{runID: "r1", queuedAt: t1, spanID: "inner-select", kind: "experiment", createdAt: t1.Add(time.Second + time.Millisecond), values: map[string]any{
+		"name": "outer", "variant": "o1", "selection_strategy": "fixed",
+	}})
+
+	d := f.get(t, "inner")
+	require.Equal(t, "weighted", d.SelectionStrategy)
+	require.Equal(t, []dashboards.ExperimentWeight{{Variant: "i1", Weight: 0.7}, {Variant: "i2", Weight: 0.3}}, d.Weights)
+	require.Equal(t, "fixed", f.get(t, "outer").SelectionStrategy)
+
+	res, err := dashboards.ListExperiments(t.Context(), f.db, f.accountID, f.envID, dashboards.ExperimentsOpts{})
+	require.NoError(t, err)
+	variants := map[string][]string{}
+	for _, e := range res.Experiments {
+		variants[e.Name] = e.Variants
+	}
+	require.Equal(t, map[string][]string{"inner": {"i1", "i2"}, "outer": {"o1", "o2"}}, variants)
+}
