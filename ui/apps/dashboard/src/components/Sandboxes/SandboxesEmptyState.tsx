@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiArrowRightLine, RiLockLine } from '@remixicon/react';
 
 import {
@@ -15,6 +16,11 @@ import {
   INTRO_REST,
   USE_CASES,
 } from './sandboxesContent';
+import {
+  SandboxesVerificationCallout,
+  showsVerificationCallout,
+  type SandboxesVerificationCalloutProps,
+} from './SandboxesVerificationCallout';
 
 const UPGRADE_HREF = pathCreator.billing({
   tab: 'plans',
@@ -35,8 +41,14 @@ function UpgradeButton() {
 }
 
 // Shown to accounts whose plan does not grant sandbox access.
-export default function SandboxesEmptyState() {
+export default function SandboxesEmptyState({
+  verification,
+}: {
+  verification?: SandboxesVerificationCalloutProps;
+} = {}) {
   const hasTrackedViewed = useRef(false);
+  const showVerification =
+    verification && showsVerificationCallout(verification.state);
 
   // Fire the feature-tagged page-view event once per mount.
   useEffect(() => {
@@ -46,73 +58,87 @@ export default function SandboxesEmptyState() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-[816px] px-6 py-16">
-      <div className="flex items-center gap-2">
-        <h1 className="text-basis text-2xl">Sandboxes</h1>
-        <Pill kind="primary" appearance="outlined">
-          Paid plans
-        </Pill>
-      </div>
-      <p className="text-subtle mt-2 text-sm leading-relaxed">
-        <span className="text-basis font-medium">{INTRO_LEAD}</span>
-        {INTRO_REST}
-      </p>
+    <div
+      className={cn(
+        'mx-auto w-full px-6 py-16',
+        showVerification
+          ? 'grid max-w-[1130px] grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_270px] lg:gap-11'
+          : 'max-w-[816px]',
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h1 className="text-basis text-2xl">Sandboxes</h1>
+          <Pill kind="primary" appearance="outlined">
+            Paid plans
+          </Pill>
+        </div>
+        <p className="text-subtle mt-2 text-sm leading-relaxed">
+          <span className="text-basis font-medium">{INTRO_LEAD}</span>
+          {INTRO_REST}
+        </p>
 
-      <div className="border-subtle bg-canvasSubtle mt-6 flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="border-subtle bg-canvasBase text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md border">
-            <RiLockLine className="h-5 w-5" />
+        <div className="border-subtle bg-canvasSubtle mt-6 flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="border-subtle bg-canvasBase text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md border">
+              <RiLockLine className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-basis text-base">
+                Sandboxes are available on paid plans
+              </h2>
+              <p className="text-muted mt-0.5 text-sm">
+                Upgrade to run sandboxes from your workflows, including from the
+                local dev server.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-basis text-base">
-              Sandboxes are available on paid plans
-            </h2>
-            <p className="text-muted mt-0.5 text-sm">
-              Upgrade to run sandboxes from your workflows, including from the
-              local dev server.
-            </p>
+          <div className="shrink-0">
+            <UpgradeButton />
           </div>
         </div>
-        <div className="shrink-0">
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {FEATURES.map(({ Icon, title, description }) => (
+            <div
+              key={title}
+              className="border-subtle bg-canvasBase rounded-md border p-3"
+            >
+              <div className="text-muted flex h-9 w-9 items-center justify-center">
+                <Icon className="h-6 w-6" />
+              </div>
+              <h3 className="text-basis mt-3 text-base">{title}</h3>
+              <p className="text-muted mt-1 text-xs leading-relaxed">
+                {description}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <h2 className="text-basis mt-10 text-base">What can you build?</h2>
+        <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          {USE_CASES.map(({ Icon, title, description }) => (
+            <div key={title} className="flex items-start gap-3">
+              <div className="border-subtle text-muted flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-md border">
+                <Icon className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-basis text-base">{title}</h3>
+                <p className="text-muted mt-0.5 text-xs">{description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10">
           <UpgradeButton />
         </div>
       </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {FEATURES.map(({ Icon, title, description }) => (
-          <div
-            key={title}
-            className="border-subtle bg-canvasBase rounded-md border p-3"
-          >
-            <div className="text-muted flex h-9 w-9 items-center justify-center">
-              <Icon className="h-6 w-6" />
-            </div>
-            <h3 className="text-basis mt-3 text-base">{title}</h3>
-            <p className="text-muted mt-1 text-xs leading-relaxed">
-              {description}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <h2 className="text-basis mt-10 text-base">What can you build?</h2>
-      <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-        {USE_CASES.map(({ Icon, title, description }) => (
-          <div key={title} className="flex items-start gap-3">
-            <div className="border-subtle text-muted flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-md border">
-              <Icon className="h-6 w-6" />
-            </div>
-            <div>
-              <h3 className="text-basis text-base">{title}</h3>
-              <p className="text-muted mt-0.5 text-xs">{description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10">
-        <UpgradeButton />
-      </div>
+      {showVerification && (
+        <aside className="row-start-1 min-w-0 lg:col-start-2">
+          <SandboxesVerificationCallout {...verification} />
+        </aside>
+      )}
     </div>
   );
 }
