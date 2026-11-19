@@ -51,8 +51,9 @@ func addTenantAndDebugAttrs(attrs *meta.SerializableAttrs, md *sv2.Metadata) {
 		return
 	}
 	tracing.AddMetadataTenantAttrs(attrs, md.ID)
-	// TODO: implement this somehow
-	// meta.AddAttr(attrs, meta.Attrs.AppName, inngestgo.Ptr(md.Config.AppName()))
+	if name := md.Config.AppName(); name != "" {
+		meta.AddAttr(attrs, meta.Attrs.AppName, &name)
+	}
 	meta.AddAttr(attrs, meta.Attrs.FunctionSlug, new(md.Config.FunctionSlug()))
 }
 

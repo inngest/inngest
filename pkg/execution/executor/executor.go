@@ -224,6 +224,19 @@ func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	}
 }
 
+// AppNameLoader returns the name (the app ID defined in user code) of an app.
+type AppNameLoader func(ctx context.Context, appID uuid.UUID) (string, error)
+
+// WithAppNameLoader resolves the app name for schedule requests that don't
+// carry one (IE batches and crons, which only have the app's UUID), so every
+// run's state has it.
+func WithAppNameLoader(l AppNameLoader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).appNameLoader = l
+		return nil
+	}
+}
+
 func WithLogger(l logger.Logger) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).log = l
@@ -546,6 +559,7 @@ type executor struct {
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
 	fl                        state.FunctionLoader
+	appNameLoader             AppNameLoader
 	evalFactory               func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler             execution.FinalizePublisher
 	invokeFailHandler         execution.InvokeFailHandler
@@ -1425,6 +1439,9 @@ func (e *executor) schedule(
 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
+	// Nor is the app name, which spans created after scheduling (IE the
+	// duckdb dual-write's) have no other way to get.
+	config.SetAppName(e.resolveAppName(ctx, req))
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
@@ -6920,4 +6937,19 @@ func normalizeRunSessions(pairs meta.EventSessions) (meta.EventSessions, int) {
 	}
 
 	return pairs, dropped
+}
+
+// resolveAppName returns the request's app name, or the one appNameLoader
+// resolves from its app ID if the request doesn't carry one. A failed lookup
+// just leaves the name empty.
+func (e *executor) resolveAppName(ctx context.Context, req execution.ScheduleRequest) string {
+	if req.AppName != "" || e.appNameLoader == nil || req.AppID == uuid.Nil {
+		return req.AppName
+	}
+	name, err := e.appNameLoader(ctx, req.AppID)
+	if err != nil {
+		e.log.Warn("could not resolve app name for run", "app_id", req.AppID, "error", err)
+		return ""
+	}
+	return name
 }
