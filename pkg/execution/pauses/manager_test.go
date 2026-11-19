@@ -434,6 +434,53 @@ func TestConsumePause(t *testing.T) {
 	assert.Equal(t, 1, mockBlockStore.deleteCalled, "Delete should be called once on the blockstore")
 }
 
+func TestDeleteFromOverlappingBlock(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	t.Cleanup(rc.Close)
+	client := redis_state.NewUnshardedClient(rc, "estate", "queue", redis_state.WithWorkspaceScopedPauseKeys())
+	buffer := StateBufferer(redis_state.NewPauseStore(client))
+	bucket := memblob.OpenBucket(nil)
+	t.Cleanup(func() { require.NoError(t, bucket.Close()) })
+	leaser := NewRedisBlockLeaser(rc, "lease", time.Minute)
+	store, err := NewBlockstore(BlockstoreOpts{PauseClient: client.Pauses(), Bufferer: buffer, Bucket: bucket,
+		Leaser: leaser, CompactionLeaser: leaser, CompactionSample: -1,
+		DeleteAfterFlush: func(context.Context, uuid.UUID) bool { return true }})
+	require.NoError(t, err)
+	bs := store.(*blockstore)
+	index := Index{WorkspaceID: uuid.New(), EventName: "overlap"}
+	mgr := NewManager(buffer, store, WithBlockStoreEnabled(alwaysEnabled))
+	var target *state.Pause
+	for _, end := range []int64{20, 30, 100} {
+		p := &state.Pause{ID: uuid.New(), WorkspaceID: index.WorkspaceID, Event: &index.EventName, CreatedAt: time.UnixMilli(16)}
+		block := &Block{ID: ulid.MustNew(uint64(end), nil), Index: index, Pauses: []*state.Pause{p}}
+		byt, err := Serialize(block, 0, 0)
+		require.NoError(t, err)
+		require.NoError(t, bucket.WriteAll(ctx, bs.BlockKey(index, block.ID), byt, nil))
+		require.NoError(t, bs.addBlockIndex(ctx, index, block, &blockMetadata{Timeranges: [2]int64{10, end}, Len: 1}))
+		if end == 100 {
+			target = p
+			locator, err := json.Marshal(state.BlockIndex{BlockID: block.ID.String(), EventName: index.EventName})
+			require.NoError(t, err)
+			r.Set(client.Pauses().KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, p.ID), string(locator))
+		}
+	}
+	require.NoError(t, mgr.Delete(ctx, index, *target))
+	iter, err := mgr.PausesSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	var count int
+	for iter.Next(ctx) {
+		p := iter.Val(ctx)
+		require.NotNil(t, p)
+		require.NotEqual(t, target.ID, p.ID, "timestamp lookup alone misses the wide imported block")
+		count++
+	}
+	require.ErrorIs(t, iter.Error(), context.Canceled)
+	require.Equal(t, 2, count)
+}
+
 func TestDeletePauseByID(t *testing.T) {
 	t.Run("with block store enabled", func(t *testing.T) {
 		mockBufferer := &mockBufferer{}

@@ -370,6 +370,13 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opt
 		}
 	}
 
+	// An imported block may overlap newer blocks. Resolve its exact locator
+	// before buffer deletion removes it; timestamp lookup alone is insufficient.
+	if m.bs != nil {
+		if err := m.bs.DeleteByID(ctx, pause.ID, index.WorkspaceID); err != nil {
+			return err
+		}
+	}
 	err := m.buf.Delete(ctx, index, pause, opts...)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
