@@ -2542,6 +2542,62 @@ func TestDualIteratorBlockRefresh(t *testing.T) {
 	}
 }
 
+func TestCompactionRetainsSharedBlob(t *testing.T) {
+	for _, retained := range []bool{true, false} {
+		t.Run(fmt.Sprint(retained), func(t *testing.T) {
+			ctx := context.Background()
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			bucket := memblob.OpenBucket(nil)
+			t.Cleanup(func() { require.NoError(t, bucket.Close()) })
+			leaser := NewRedisBlockLeaser(rc, "compact", time.Minute)
+			store, err := NewBlockstore(BlockstoreOpts{
+				PauseClient: redis_state.NewPauseClient(rc, redis_state.StateDefaultKey),
+				Bucket:      bucket, Bufferer: &mockBufferer{}, Leaser: leaser, CompactionLeaser: leaser,
+				CompactionSample:      -1,
+				EnableBlockCompaction: func(context.Context, uuid.UUID) bool { return true },
+			})
+			require.NoError(t, err)
+			index := Index{WorkspaceID: uuid.New(), EventName: "shared"}
+			block := &Block{ID: ulid.Make(), Index: index, Pauses: []*state.Pause{
+				{ID: uuid.New(), CreatedAt: time.Unix(1, 0)},
+				{ID: uuid.New(), CreatedAt: time.Unix(2, 0)},
+				{ID: uuid.New(), CreatedAt: time.Unix(3, 0)},
+			}}
+			byt, err := Serialize(block, 0, 0)
+			require.NoError(t, err)
+			bs := store.(*blockstore)
+			require.NoError(t, bucket.WriteAll(ctx, bs.BlockKey(index, block.ID), byt, nil))
+			md, err := bs.blockMetadata(ctx, index, block)
+			require.NoError(t, err)
+			md.RetainBlob = retained
+			require.NoError(t, bs.addBlockIndex(ctx, index, block, md))
+			for _, p := range block.Pauses {
+				require.NoError(t, store.Delete(ctx, index, *p))
+			}
+			require.NoError(t, bs.Compact(ctx, index))
+			ids, err := store.BlocksSince(ctx, index, time.Time{})
+			require.NoError(t, err)
+			if retained {
+				require.Equal(t, []ulid.ULID{block.ID}, ids)
+				got, err := bucket.ReadAll(ctx, bs.BlockKey(index, block.ID))
+				require.NoError(t, err)
+				require.Equal(t, byt, got)
+				deleted, err := store.GetBlockDeleteCount(ctx, index, block.ID)
+				require.NoError(t, err)
+				require.EqualValues(t, 3, deleted)
+			} else {
+				require.Empty(t, ids)
+				exists, err := bucket.Exists(ctx, bs.BlockKey(index, block.ID))
+				require.NoError(t, err)
+				require.False(t, exists)
+			}
+		})
+	}
+}
+
 func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{

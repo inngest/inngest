@@ -846,6 +846,11 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 			l.Error("no metadata found for block", "block_id", blockIDStr)
 			continue
 		}
+		// A second store may still read this exact object with independent
+		// deletion markers. Neither rewriting nor deleting it is safe.
+		if blockMD.RetainBlob {
+			continue
+		}
 
 		// Skip blocks that already have a phantom pause in place: 2 pauses with 1 deleted
 		// means a previous compaction left a deleted pause to maintain the minimum block size.
@@ -1221,6 +1226,11 @@ func (b blockstore) blockDeleteKey(idx Index, blockID ulid.ULID) string {
 }
 
 type blockMetadata struct {
+	// RetainBlob prevents compaction from mutating an object shared by multiple
+	// pause stores. Set under the compaction lease before publishing a copy.
+	// Removing this protection requires a separate, explicit retirement step.
+	RetainBlob bool `json:"retain_blob,omitempty"`
+
 	// Timeranges are the unix millisecond time ranges that this block covers,
 	// in ascending order.  This includes the earliest and latest pauses stored
 	// in the block AT THE TIME OF BLOCK CREATION.
