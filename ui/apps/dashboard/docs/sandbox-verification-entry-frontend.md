@@ -9,9 +9,11 @@ content, upgrade behavior, and navigation are unchanged.
 From `ui/apps/dashboard`, run `pnpm dev:sandbox-verification` and open
 <http://127.0.0.1:5175/sandbox-verification-demo.html>.
 
-The scenario selector covers not started, partially complete, started with no
-completed checks, admin required, loading, error, verified, and not required.
+The scenario selector covers a free-plan upgrade state and eight paid-plan states:
+not started, partially complete, started with no completed checks, admin required,
+loading, error, verified, and not required.
 Scenarios are also directly addressable with `?scenario=resume`, for example.
+Use `?scenario=free` to review the upgrade-only state.
 
 Start/Continue open a development-only handoff preview. Simulate completion to
 return to the same zero state with the callout removed, or return without
@@ -22,9 +24,15 @@ remain in PR #5296 and are not duplicated here.
 
 ## Integration boundary
 
-The host supplies `verification={{ state, onVerify, onRetry }}`. Absence of these
-props preserves the existing zero state. `verified` and `not-required` both hide
-the callout without reserving a sidebar or rendering a success message.
+The host supplies `hasPaidPlan` separately from
+`verification={{ state, onVerify, onRetry }}`. The default `hasPaidPlan={false}`
+preserves the existing upgrade zero state. Free plans never display verification,
+including loading/error/member treatments, even if verification props are supplied.
+
+Paid plans hide the upgrade panel, upgrade buttons, and paid-plan badge. When
+verification is required, show the callout; `verified` and `not-required` both
+hide it without reserving a sidebar or rendering a success message. Existing
+introductory content, features, and use cases are preserved in every state.
 
 `onVerify` is the handoff point for Start and Continue. The host must carry the
 current account/environment and dashboard return path into the agreed route;
@@ -45,7 +53,9 @@ are outside this PR. Do not infer verification requirements from
 
 Focused tests cover CTA handoff, partial and restarted progress, member-only
 treatment, loading/retry, completion/removal, and preservation of the existing
-zero state. The isolated preview is served only by its dedicated development
+zero state. Plan-precedence tests ensure free accounts only see upgrades, paid
+accounts never see upgrade prompts, and switching to a free account removes
+stale verification actions. The isolated preview is served only by its dedicated development
 Vite configuration, which rejects production builds.
 
 Run the checks from `ui/apps/dashboard` with:
@@ -55,7 +65,7 @@ pnpm test src/components/Sandboxes/SandboxesVerificationCallout.test.tsx
 pnpm type-check
 ```
 
-Browser review also covered all eight fixtures, Start/Continue handoff, returning
+Browser review also covered all nine fixtures, Start/Continue handoff, returning
 without completing, simulated completion, keyboard activation, and widths of
 320, 375, 768, 1024, and 1440px without horizontal overflow.
 
@@ -64,3 +74,5 @@ without completing, simulated completion, keyboard activation, and widths of
 ![Desktop: partially completed verification beside the existing zero state](./sandbox-verification-entry/desktop.jpg)
 
 ![Mobile: verification callout stacked above the existing zero state](./sandbox-verification-entry/mobile.jpg)
+
+![Free plan: upgrade-only zero state without verification](./sandbox-verification-entry/free.jpg)

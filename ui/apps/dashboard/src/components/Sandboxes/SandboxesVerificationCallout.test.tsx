@@ -174,16 +174,54 @@ describe('Sandboxes zero-state composition', () => {
     expect(screen.queryByRole('complementary')).toBeNull();
   });
 
-  it('preserves content and upgrade destinations while adding and removing the callout', () => {
+  it.each<SandboxesVerificationState>([
+    initial,
+    { ...initial, started: true, progress: { completed: 1, total: 2 } },
+    { status: 'required', canVerify: false },
+    { status: 'loading' },
+    { status: 'error' },
+    { status: 'verified' },
+  ])(
+    'keeps only the upgrade treatment on a free plan with status $status',
+    (state) => {
+      const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
+      const { container, rerender } = render(<SandboxesEmptyState />);
+      const originalContent = container.firstElementChild?.textContent;
+      const originalLinks = Array.from(
+        container.querySelectorAll('a'),
+        (link) => link.getAttribute('href'),
+      );
+      rerender(
+        <SandboxesEmptyState
+          hasPaidPlan={false}
+          verification={{ state, ...callbacks }}
+        />,
+      );
+      expect(container.firstElementChild?.textContent).toBe(originalContent);
+      expect(
+        Array.from(container.querySelectorAll('a'), (link) =>
+          link.getAttribute('href'),
+        ),
+      ).toEqual(originalLinks);
+      expect(
+        screen.getAllByRole('button', { name: 'Upgrade plan' }),
+      ).toHaveLength(2);
+      expect(screen.queryByRole('complementary')).toBeNull();
+      expect(callbacks.onVerify).not.toHaveBeenCalled();
+      expect(callbacks.onRetry).not.toHaveBeenCalled();
+    },
+  );
+
+  it('shows verification instead of upgrades on a paid plan and hides the gate after completion', () => {
     const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
-    const { container, rerender } = render(<SandboxesEmptyState />);
+    const { container, rerender } = render(<SandboxesEmptyState hasPaidPlan />);
     const originalContent = container.firstElementChild?.textContent;
-    const originalLinks = Array.from(container.querySelectorAll('a'), (link) =>
-      link.getAttribute('href'),
-    );
 
     rerender(
-      <SandboxesEmptyState verification={{ state: initial, ...callbacks }} />,
+      <SandboxesEmptyState
+        hasPaidPlan
+        verification={{ state: initial, ...callbacks }}
+      />,
     );
     expect(screen.getByRole('complementary')).toBeTruthy();
     expect(
@@ -191,18 +229,22 @@ describe('Sandboxes zero-state composition', () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Start verification' }));
     expect(callbacks.onVerify).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Upgrade plan' })).toBeNull();
+    expect(screen.queryByText('Paid plans')).toBeNull();
     expect(
-      Array.from(container.querySelectorAll('a'), (link) =>
-        link.getAttribute('href'),
-      ),
-    ).toEqual(originalLinks);
+      screen.queryByRole('heading', {
+        name: 'Sandboxes are available on paid plans',
+      }),
+    ).toBeNull();
 
     rerender(
       <SandboxesEmptyState
+        hasPaidPlan
         verification={{ state: { status: 'verified' }, ...callbacks }}
       />,
     );
     expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Upgrade plan' })).toBeNull();
     expect(container.firstElementChild?.textContent).toBe(originalContent);
     expect(container.firstElementChild?.className).toContain('max-w-[816px]');
   });
@@ -211,6 +253,7 @@ describe('Sandboxes zero-state composition', () => {
     const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
     const { rerender } = render(
       <SandboxesEmptyState
+        hasPaidPlan
         verification={{
           state: {
             ...initial,
@@ -226,6 +269,7 @@ describe('Sandboxes zero-state composition', () => {
     ).toBeTruthy();
     rerender(
       <SandboxesEmptyState
+        hasPaidPlan
         verification={{
           state: { status: 'required', canVerify: false },
           ...callbacks,
@@ -239,5 +283,26 @@ describe('Sandboxes zero-state composition', () => {
     expect(
       screen.getByRole('heading', { name: 'Ask an admin to verify' }),
     ).toBeTruthy();
+  });
+
+  it('removes stale verification actions when switching from a paid to a free account', () => {
+    const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
+    const verification = { state: initial, ...callbacks };
+    const { rerender } = render(
+      <SandboxesEmptyState hasPaidPlan verification={verification} />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Start verification' }),
+    ).toBeTruthy();
+    rerender(
+      <SandboxesEmptyState hasPaidPlan={false} verification={verification} />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Start verification' }),
+    ).toBeNull();
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(
+      screen.getAllByRole('button', { name: 'Upgrade plan' }),
+    ).toHaveLength(2);
   });
 });

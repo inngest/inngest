@@ -40,15 +40,17 @@ function UpgradeButton() {
   );
 }
 
-// Shown to accounts whose plan does not grant sandbox access.
+// Plan eligibility is supplied separately from verification; default to the existing upgrade state.
 export default function SandboxesEmptyState({
+  hasPaidPlan = false,
   verification,
 }: {
+  hasPaidPlan?: boolean;
   verification?: SandboxesVerificationCalloutProps;
 } = {}) {
   const hasTrackedViewed = useRef(false);
   const showVerification =
-    verification && showsVerificationCallout(verification.state);
+    hasPaidPlan && verification && showsVerificationCallout(verification.state);
 
   // Fire the feature-tagged page-view event once per mount.
   useEffect(() => {
@@ -69,34 +71,38 @@ export default function SandboxesEmptyState({
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h1 className="text-basis text-2xl">Sandboxes</h1>
-          <Pill kind="primary" appearance="outlined">
-            Paid plans
-          </Pill>
+          {!hasPaidPlan && (
+            <Pill kind="primary" appearance="outlined">
+              Paid plans
+            </Pill>
+          )}
         </div>
         <p className="text-subtle mt-2 text-sm leading-relaxed">
           <span className="text-basis font-medium">{INTRO_LEAD}</span>
           {INTRO_REST}
         </p>
 
-        <div className="border-subtle bg-canvasSubtle mt-6 flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="border-subtle bg-canvasBase text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md border">
-              <RiLockLine className="h-5 w-5" />
+        {!hasPaidPlan && (
+          <div className="border-subtle bg-canvasSubtle mt-6 flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="border-subtle bg-canvasBase text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md border">
+                <RiLockLine className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-basis text-base">
+                  Sandboxes are available on paid plans
+                </h2>
+                <p className="text-muted mt-0.5 text-sm">
+                  Upgrade to run sandboxes from your workflows, including from
+                  the local dev server.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-basis text-base">
-                Sandboxes are available on paid plans
-              </h2>
-              <p className="text-muted mt-0.5 text-sm">
-                Upgrade to run sandboxes from your workflows, including from the
-                local dev server.
-              </p>
+            <div className="shrink-0">
+              <UpgradeButton />
             </div>
           </div>
-          <div className="shrink-0">
-            <UpgradeButton />
-          </div>
-        </div>
+        )}
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {FEATURES.map(({ Icon, title, description }) => (
@@ -130,9 +136,11 @@ export default function SandboxesEmptyState({
           ))}
         </div>
 
-        <div className="mt-10">
-          <UpgradeButton />
-        </div>
+        {!hasPaidPlan && (
+          <div className="mt-10">
+            <UpgradeButton />
+          </div>
+        )}
       </div>
       {showVerification && (
         <aside className="row-start-1 min-w-0 lg:col-start-2">

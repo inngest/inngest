@@ -5,8 +5,17 @@ import SandboxesEmptyState from '../SandboxesEmptyState';
 import type { SandboxesVerificationState } from '../SandboxesVerificationCallout';
 
 const scenarios = {
+  free: {
+    label: 'Free plan · upgrade only',
+    state: {
+      status: 'required',
+      canVerify: true,
+      started: false,
+      progress: { completed: 0, total: 2 },
+    },
+  },
   start: {
-    label: 'Not started',
+    label: 'Paid · not started',
     state: {
       status: 'required',
       canVerify: true,
@@ -15,7 +24,7 @@ const scenarios = {
     },
   },
   resume: {
-    label: 'Phone verified · resume card',
+    label: 'Paid · phone verified · resume card',
     state: {
       status: 'required',
       canVerify: true,
@@ -24,7 +33,7 @@ const scenarios = {
     },
   },
   started: {
-    label: 'Started · no checks complete',
+    label: 'Paid · started · no checks complete',
     state: {
       status: 'required',
       canVerify: true,
@@ -33,17 +42,17 @@ const scenarios = {
     },
   },
   member: {
-    label: 'Admin required',
+    label: 'Paid · admin required',
     state: { status: 'required', canVerify: false },
   },
-  loading: { label: 'Loading', state: { status: 'loading' } },
-  error: { label: 'Status error · retry', state: { status: 'error' } },
+  loading: { label: 'Paid · loading', state: { status: 'loading' } },
+  error: { label: 'Paid · status error · retry', state: { status: 'error' } },
   verified: {
-    label: 'Verified · callout hidden',
+    label: 'Paid · verified · no gate',
     state: { status: 'verified' },
   },
   exempt: {
-    label: 'Not required · callout hidden',
+    label: 'Paid · not required · no gate',
     state: { status: 'not-required' },
   },
 } satisfies Record<
@@ -76,7 +85,7 @@ export function SandboxesVerificationDemo() {
     <div className="bg-canvasBase text-basis min-h-screen">
       <header className="border-subtle bg-canvasSubtle flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3 text-sm">
         <p>Development preview · verification entry only</p>
-        <label className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-wrap items-center gap-2">
           Scenario
           <select
             className="border-muted bg-canvasBase max-w-full rounded border px-2 py-1"
@@ -129,6 +138,7 @@ export function SandboxesVerificationDemo() {
           </section>
         ) : (
           <SandboxesEmptyState
+            hasPaidPlan={scenario !== 'free'}
             verification={{
               state: scenarios[scenario].state,
               onVerify: () => setHandoff(true),
