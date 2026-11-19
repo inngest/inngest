@@ -41,6 +41,9 @@ type loopHarness struct {
 	shard    queue.QueueShard
 	req      execution.ScheduleRequest
 	finished []event.Event
+	// mr is the redis all the stores run on.  a test moves its time
+	// forward to expire a loop record.
+	mr *miniredis.Miniredis
 }
 
 func newLoopHarness(t *testing.T) *loopHarness {
@@ -113,6 +116,7 @@ func newLoopHarness(t *testing.T) *loopHarness {
 		q:     q,
 		shard: shard,
 		req:   req,
+		mr:    mr,
 	}
 	e.finishHandler = func(_ context.Context, _ sv2.ID, evts []event.Event) error {
 		h.finished = append(h.finished, evts...)
@@ -147,8 +151,42 @@ func (h *loopHarness) request(input *event.Event) (execution.ScheduleRequest, sv
 	return req, id
 }
 
+// open schedules the trigger and opens the instance with its run id, the
+// way the first request of that run does.  Schedule writes no record for a
+// trigger.
+func (h *loopHarness) open(t *testing.T) (execution.ScheduleRequest, sv2.ID) {
+	t.Helper()
+	req, id := h.request(nil)
+	_, _, err := h.e.Schedule(h.ctx, req)
+	require.NoError(t, err)
+	_, err = h.store.Open(h.ctx, h.loopID("user-1"), id.RunID)
+	require.NoError(t, err)
+	return req, id
+}
+
 func (h *loopHarness) loopID(key string) loops.ID {
 	return loops.NewID(domain.NewTenant(h.req.AccountID, h.req.WorkspaceID), h.req.Function.ID, key)
+}
+
+// opener returns the OpenedBy of the record the harness key has now.  the
+// test fails when the record is gone.
+func (h *loopHarness) opener(t *testing.T) domain.RunID {
+	t.Helper()
+	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+	require.NoError(t, err)
+	return snap.OpenedBy
+}
+
+// tick returns a tick event for the record the harness key has now.
+func (h *loopHarness) tick(t *testing.T) *event.Event {
+	t.Helper()
+	return new(loops.NewTickEvent("user-1", h.opener(t)))
+}
+
+// wake returns a wake event for the record the harness key has now.
+func (h *loopHarness) wake(t *testing.T, wakeID string) *event.Event {
+	t.Helper()
+	return new(loops.NewWakeEvent("user-1", wakeID, h.opener(t)))
 }
 
 // requireStartSemaphore asserts the run's one start item carries the keyed
@@ -182,9 +220,10 @@ func TestScheduleLoopTrigger(t *testing.T) {
 	require.Equal(t, id.RunID, *runID)
 	require.NotNil(t, md)
 
-	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-	require.NoError(t, err)
-	require.Equal(t, int64(0), snap.Counter)
+	// a trigger writes no record at schedule.  the first request of the
+	// run opens it.
+	_, err = h.store.Load(h.ctx, h.loopID("user-1"))
+	require.ErrorIs(t, err, loops.ErrNotFound)
 
 	_, err = h.e.smv2.LoadMetadata(h.ctx, id)
 	require.NoError(t, err)
@@ -193,8 +232,12 @@ func TestScheduleLoopTrigger(t *testing.T) {
 
 func TestScheduleLoopInputs(t *testing.T) {
 	tests := []struct {
-		name    string
-		open    bool
+		name string
+		open bool
+		// tick and wake schedule a timer event for the record the harness
+		// key has when the test runs.  wake is the wake id.
+		tick    bool
+		wake    string
 		input   *event.Event
 		data    map[string]any
 		keyExpr string
@@ -204,18 +247,39 @@ func TestScheduleLoopInputs(t *testing.T) {
 	}{
 		{
 			name:    "tick on a missing instance",
-			input:   new(loops.NewTickEvent("user-1")),
+			input:   new(loops.NewTickEvent("user-1", ulid.Make())),
 			wantErr: ErrLoopEnded,
 		},
 		{
-			name:  "tick on an open instance",
-			open:  true,
-			input: new(loops.NewTickEvent("user-1")),
+			name: "tick on an open instance",
+			open: true,
+			tick: true,
 		},
 		{
-			name:  "wake on an open instance",
-			open:  true,
-			input: new(loops.NewWakeEvent("user-1", "wake-1")),
+			name: "wake on an open instance",
+			open: true,
+			wake: "wake-1",
+		},
+		{
+			name:    "tick of another opener on an open instance",
+			open:    true,
+			input:   new(loops.NewTickEvent("user-1", ulid.Make())),
+			wantErr: ErrLoopEnded,
+		},
+		{
+			name:    "wake of another opener on an open instance",
+			open:    true,
+			input:   new(loops.NewWakeEvent("user-1", "wake-1", ulid.Make())),
+			wantErr: ErrLoopEnded,
+		},
+		{
+			name: "tick without an opener on an open instance",
+			open: true,
+			input: &event.Event{
+				Name: loops.EventTick,
+				Data: map[string]any{"key": "user-1"},
+			},
+			wantErr: ErrLoopEnded,
 		},
 		{
 			name: "tick without a key",
@@ -250,12 +314,17 @@ func TestScheduleLoopInputs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newLoopHarness(t)
 			if tt.open {
-				first, _ := h.request(nil)
-				_, _, err := h.e.Schedule(h.ctx, first)
-				require.NoError(t, err)
+				h.open(t)
 			}
 
-			req, id := h.request(tt.input)
+			input := tt.input
+			switch {
+			case tt.tick:
+				input = h.tick(t)
+			case tt.wake != "":
+				input = h.wake(t, tt.wake)
+			}
+			req, id := h.request(input)
 			if tt.data != nil {
 				evt := req.Events[0].(event.InternalEvent)
 				evt.Event.Data = tt.data
@@ -366,9 +435,7 @@ func TestLoopRequest(t *testing.T) {
 
 	t.Run("a commit by the same run replays the return", func(t *testing.T) {
 		h := newLoopHarness(t)
-		req, id := h.request(nil)
-		_, _, err := h.e.Schedule(h.ctx, req)
-		require.NoError(t, err)
+		req, id := h.open(t)
 		md, err := h.e.smv2.LoadMetadata(h.ctx, id)
 		require.NoError(t, err)
 		evts, err := h.e.smv2.LoadEvents(h.ctx, id)
@@ -401,9 +468,7 @@ func TestLoopRequest(t *testing.T) {
 
 	t.Run("a saved return replays the end", func(t *testing.T) {
 		h := newLoopHarness(t)
-		req, id := h.request(nil)
-		_, _, err := h.e.Schedule(h.ctx, req)
-		require.NoError(t, err)
+		req, id := h.open(t)
 		evts, err := h.e.smv2.LoadEvents(h.ctx, id)
 		require.NoError(t, err)
 		saved, err := json.Marshal(savedLoopReturn{
@@ -463,9 +528,8 @@ func TestLoopRequest(t *testing.T) {
 		require.NoError(t, err)
 		evts, err := h.e.smv2.LoadEvents(h.ctx, id)
 		require.NoError(t, err)
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.NoError(t, h.store.End(h.ctx, snap))
+		_, err = h.store.Load(h.ctx, h.loopID("user-1"))
+		require.ErrorIs(t, err, loops.ErrNotFound)
 
 		loop, replay, err := h.e.loopRequest(h.ctx, &runInstance{
 			md:     md,
@@ -482,18 +546,17 @@ func TestLoopRequest(t *testing.T) {
 				Kind: loops.InputEvent,
 			},
 		}, loop)
-		snap, err = h.store.Load(h.ctx, h.loopID("user-1"))
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.NoError(t, err)
 		require.Equal(t, int64(0), snap.Counter)
+		require.Equal(t, id.RunID, snap.OpenedBy)
 	})
 
 	t.Run("a tick on a missing instance returns ErrLoopEnded", func(t *testing.T) {
 		h := newLoopHarness(t)
-		first, _ := h.request(nil)
-		_, _, err := h.e.Schedule(h.ctx, first)
-		require.NoError(t, err)
-		req, id := h.request(new(loops.NewTickEvent("user-1")))
-		_, _, err = h.e.Schedule(h.ctx, req)
+		h.open(t)
+		req, id := h.request(h.tick(t))
+		_, _, err := h.e.Schedule(h.ctx, req)
 		require.NoError(t, err)
 		md, err := h.e.smv2.LoadMetadata(h.ctx, id)
 		require.NoError(t, err)

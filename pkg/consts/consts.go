@@ -52,12 +52,17 @@ const (
 	MaxLoopStateSize = 512 * 1024
 
 	// MinLoopIdleTTL is the shortest idle_ttl a loop can sync with.
-	MinLoopIdleTTL = time.Minute
+	MinLoopIdleTTL = 5 * time.Minute
 
 	// MaxLoopIdleTTL is the longest idle_ttl a loop can sync with.  it is
 	// also the longest wake a LoopReturn can schedule.  a loop that waits
 	// longer wakes again from the wake run.
 	MaxLoopIdleTTL = 7 * 24 * time.Hour
+
+	// MinLoopTickTTLGap is how much shorter than the idle_ttl a loop tick
+	// must be.  a commit sets the expiry to the idle_ttl, so this is the
+	// time the queue has to run the tick before the instance expires.
+	MinLoopTickTTLGap = time.Minute
 
 	// DefaultLoopIdleTTL is the idle_ttl of a loop that syncs without one.
 	DefaultLoopIdleTTL = 7 * 24 * time.Hour

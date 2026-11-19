@@ -677,10 +677,11 @@ type PayloadLoop struct {
 	Kind string `json:"kind"`
 	// ID is the wake id.  it is empty for a tick.
 	ID string `json:"id,omitempty"`
-	// Nonce is the id of the run that enqueued the item.  the event id of
-	// the run the item starts is derived from it, so every run of the same
-	// item starts the same run.
-	Nonce string `json:"n,omitempty"`
+	// OpenedBy is the OpenedBy of the loop record the item was enqueued
+	// for.  the item is dropped when the record in the store has another
+	// opener, so a timer of an ended instance does not start a run on a
+	// new instance of the same key.  an item without it is dropped.
+	OpenedBy ulid.ULID `json:"opened_by"`
 }
 
 // PayloadPauseFunction represents the queue item payload for the internal system queue for

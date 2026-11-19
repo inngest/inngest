@@ -679,11 +679,10 @@ func (f Function) validateLoop(ctx context.Context) error {
 	if f.Loop.IdleTTL < consts.MinLoopIdleTTL || f.Loop.IdleTTL > consts.MaxLoopIdleTTL {
 		err = multierror.Append(err, fmt.Errorf("The loop idle_ttl of '%s' must be between %s and %s", f.Loop.IdleTTL, consts.MinLoopIdleTTL, consts.MaxLoopIdleTTL))
 	}
-	// each tick run commits and moves the expiry.  a tick at or past the
-	// TTL fires after the instance expired, finds nothing, and the loop
-	// stops.
-	if f.Loop.Tick > 0 && f.Loop.Tick >= f.Loop.IdleTTL {
-		err = multierror.Append(err, fmt.Errorf("The loop tick of '%s' must be less than the idle_ttl of '%s'", f.Loop.Tick, f.Loop.IdleTTL))
+	// each tick run commits and moves the expiry.  a tick that the queue
+	// runs after the instance expired finds nothing, and the loop stops.
+	if f.Loop.Tick > 0 && f.Loop.Tick > f.Loop.IdleTTL-consts.MinLoopTickTTLGap {
+		err = multierror.Append(err, fmt.Errorf("The loop tick of '%s' must be at least %s less than the idle_ttl of '%s'", f.Loop.Tick, consts.MinLoopTickTTLGap, f.Loop.IdleTTL))
 	}
 
 	// a driver metadata type of "sync" selects the httpv2 sync driver.  a

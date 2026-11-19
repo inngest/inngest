@@ -304,6 +304,8 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, "Step not found in original run")
 		case errors.Is(err, ErrRerunStepAmbiguous):
 			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, "Step name matches multiple steps in original run")
+		case errors.Is(err, ErrLoopRerunFromStep):
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, "A loop run cannot be rerun from a step. Rerun the whole run instead")
 		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to rerun run")
 	}

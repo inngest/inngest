@@ -53,6 +53,13 @@ func (s *instrumented) Delete(ctx context.Context, k Key, opts ...Option) error 
 	return err
 }
 
+func (s *instrumented) Extend(ctx context.Context, k Key, d time.Duration) error {
+	start := time.Now()
+	err := s.inner.Extend(ctx, k, d)
+	s.record(ctx, start, k, OpExtend, err, 0)
+	return err
+}
+
 func (s *instrumented) record(ctx context.Context, start time.Time, k Key, op Op, err error, n int64) {
 	res := resultOf(err)
 	metrics.HistogramKVOperationDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
@@ -63,7 +70,7 @@ func (s *instrumented) record(ctx context.Context, start time.Time, k Key, op Op
 			"result":    string(res),
 		},
 	})
-	if res == ResultOK && op != OpDelete {
+	if res == ResultOK && (op == OpGet || op == OpSet) {
 		dir := "read"
 		if op == OpSet {
 			dir = "written"

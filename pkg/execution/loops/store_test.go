@@ -67,7 +67,7 @@ func TestOpenCreatesOnce(t *testing.T) {
 	require.Nil(t, snap.State)
 	require.Nil(t, snap.LastRunID)
 	require.Equal(t, int64(0), snap.Counter)
-	require.WithinDuration(t, time.Now().Add(OpenTTL), snap.ExpiresAt, time.Minute)
+	require.WithinDuration(t, time.Now(), snap.UpdatedAt, time.Minute)
 	require.Equal(t, OpenTTL, r.TTL(id.kvKey().String()))
 
 	// a second open keeps the first opener.
@@ -161,7 +161,8 @@ func TestCommit(t *testing.T) {
 	require.JSONEq(t, `{"n":1}`, string(c1.State))
 	require.NotNil(t, c1.LastRunID)
 	require.Equal(t, run1, *c1.LastRunID)
-	require.True(t, c1.ExpiresAt.IsZero())
+	require.WithinDuration(t, time.Now(), c1.UpdatedAt, time.Minute)
+	require.False(t, c1.UpdatedAt.Before(snap.UpdatedAt))
 
 	loaded, err := s.Load(ctx, id)
 	require.NoError(t, err)
@@ -326,7 +327,6 @@ func TestCommitTTL(t *testing.T) {
 		ExpiresAt: expires,
 	})
 	require.NoError(t, err)
-	require.WithinDuration(t, expires, c1.ExpiresAt, time.Second)
 	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
 
 	r.FastForward(30 * time.Minute)
@@ -340,7 +340,6 @@ func TestCommitTTL(t *testing.T) {
 		Counter: c1.Counter,
 	})
 	require.NoError(t, err)
-	require.True(t, c2.ExpiresAt.IsZero())
 	require.Zero(t, r.TTL(key))
 
 	c3, err := s.Commit(ctx, Commit{
@@ -354,6 +353,77 @@ func TestCommitTTL(t *testing.T) {
 	r.FastForward(2 * time.Minute)
 	_, err = s.Load(ctx, id)
 	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestTouch(t *testing.T) {
+	ctx := context.Background()
+	s, r := newStore(t)
+	id := testID()
+	key := id.kvKey().String()
+
+	opener := ulid.Make()
+	snap, err := s.Open(ctx, id, opener)
+	require.NoError(t, err)
+	run := ulid.Make()
+	committed, err := s.Commit(ctx, Commit{
+		ID:        id,
+		RunID:     run,
+		Counter:   snap.Counter,
+		State:     json.RawMessage(`{"n":1}`),
+		OpenedBy:  snap.OpenedBy,
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	// a touch moves the store's expiry and leaves the record as it is.
+	expires := time.Now().Add(time.Hour)
+	require.NoError(t, s.Touch(ctx, id, expires))
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
+	loaded, err := s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, committed, loaded)
+
+	// an earlier expiry changes nothing.
+	require.NoError(t, s.Touch(ctx, id, time.Now().Add(time.Minute)))
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
+
+	// the record lives past the expiry it had before the touch.
+	r.FastForward(2 * time.Minute)
+	_, err = s.Load(ctx, id)
+	require.NoError(t, err)
+
+	// a commit on the counter from before the touch is the next commit.
+	next, err := s.Commit(ctx, Commit{
+		ID:      id,
+		RunID:   ulid.Make(),
+		Counter: committed.Counter,
+	})
+	require.NoError(t, err)
+	require.Equal(t, committed.Counter+1, next.Counter)
+
+	// a touch on a record that is gone does not create it.
+	require.NoError(t, s.End(ctx, next))
+	require.ErrorIs(t, s.Touch(ctx, id, expires), ErrNotFound)
+	_, err = s.Load(ctx, id)
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestTouchOpened(t *testing.T) {
+	ctx := context.Background()
+	s, r := newStore(t)
+	id := testID()
+	key := id.kvKey().String()
+
+	// a record with no commit stays at counter 0 with its null state.
+	snap, err := s.Open(ctx, id, ulid.Make())
+	require.NoError(t, err)
+	expires := time.Now().Add(2 * OpenTTL)
+	require.NoError(t, s.Touch(ctx, id, expires))
+	require.WithinDuration(t, expires, time.Now().Add(r.TTL(key)), time.Second)
+
+	loaded, err := s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, snap, loaded)
 }
 
 func TestKVIsolation(t *testing.T) {
@@ -426,19 +496,24 @@ func TestEvaluateKey(t *testing.T) {
 }
 
 func TestNewLoopEvents(t *testing.T) {
-	tick := NewTickEvent("user-1")
+	opener := ulid.Make()
+	tick := NewTickEvent("user-1", opener)
 	require.Equal(t, EventTick, tick.Name)
-	require.Equal(t, map[string]any{"key": "user-1"}, tick.Data)
+	require.Equal(t, map[string]any{
+		"key":       "user-1",
+		"opened_by": opener.String(),
+	}, tick.Data)
 	_, err := ulid.Parse(tick.ID)
 	require.NoError(t, err)
 	require.WithinDuration(t, time.Now(), time.UnixMilli(tick.Timestamp), 5*time.Second)
 	require.True(t, tick.IsInternal())
 
-	wake := NewWakeEvent("user-1", "wake-1")
+	wake := NewWakeEvent("user-1", "wake-1", opener)
 	require.Equal(t, EventWake, wake.Name)
 	require.Equal(t, map[string]any{
-		"key": "user-1",
-		"id":  "wake-1",
+		"key":       "user-1",
+		"id":        "wake-1",
+		"opened_by": opener.String(),
 	}, wake.Data)
 	_, err = ulid.Parse(wake.ID)
 	require.NoError(t, err)
@@ -446,23 +521,9 @@ func TestNewLoopEvents(t *testing.T) {
 	require.WithinDuration(t, time.Now(), time.UnixMilli(wake.Timestamp), 5*time.Second)
 	require.True(t, wake.IsInternal())
 
-	// a given id names the event, and the timestamp is still now, not the
-	// time part of the id.
-	old := ulid.MustNew(ulid.Timestamp(time.Now().Add(-time.Hour)), nil)
-	tick = NewTickEventWithID("user-1", old)
-	require.Equal(t, old.String(), tick.ID)
-	require.WithinDuration(t, time.Now(), time.UnixMilli(tick.Timestamp), 5*time.Second)
-	wake = NewWakeEventWithID("user-1", "wake-1", old)
-	require.Equal(t, old.String(), wake.ID)
-	require.WithinDuration(t, time.Now(), time.UnixMilli(wake.Timestamp), 5*time.Second)
-
-	// the timer id is deterministic and its time part is the nonce's.
-	nonce := ulid.MustNew(ulid.Timestamp(time.Now().Add(-time.Hour)), nil)
-	a := TimerEventID("tick:x", nonce.String())
-	require.Equal(t, a, TimerEventID("tick:x", nonce.String()))
-	require.NotEqual(t, a, TimerEventID("tick:x", ulid.Make().String()))
-	require.NotEqual(t, a, TimerEventID("tick:y", nonce.String()))
-	require.Equal(t, nonce.Time(), a.Time())
+	// two events for the same key have different ids.
+	require.NotEqual(t, tick.ID, NewTickEvent("user-1", opener).ID)
+	require.NotEqual(t, wake.ID, NewWakeEvent("user-1", "wake-1", opener).ID)
 }
 
 func TestInputFromEvent(t *testing.T) {
@@ -471,6 +532,13 @@ func TestInputFromEvent(t *testing.T) {
 		Kind: "loop",
 		Key:  "event.data.id",
 	}
+	opener := ulid.Make()
+	// stored is a wake event the way run state returns it, decoded from
+	// JSON.
+	raw, err := json.Marshal(NewWakeEvent("user-1", "wake-1", opener))
+	require.NoError(t, err)
+	stored := map[string]any{}
+	require.NoError(t, json.Unmarshal(raw, &stored))
 	tests := []struct {
 		name    string
 		evt     map[string]any
@@ -498,20 +566,57 @@ func TestInputFromEvent(t *testing.T) {
 			wantErr: ErrNoKey,
 		},
 		{
-			name: "tick reads the key from data",
-			evt:  NewTickEvent("user-1").Map(),
+			name: "tick reads the key and the opener from data",
+			evt:  NewTickEvent("user-1", opener).Map(),
+			want: Input{
+				Kind:     InputTick,
+				Key:      "user-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "wake reads the key, the id, and the opener from data",
+			evt:  NewWakeEvent("user-1", "wake-1", opener).Map(),
+			want: Input{
+				Kind:     InputWake,
+				Key:      "user-1",
+				ID:       "wake-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "wake event read back from run state",
+			evt:  stored,
+			want: Input{
+				Kind:     InputWake,
+				Key:      "user-1",
+				ID:       "wake-1",
+				OpenedBy: opener,
+			},
+		},
+		{
+			name: "tick without an opener has a zero opener",
+			evt: map[string]any{
+				"name": EventTick,
+				"data": map[string]any{"key": "user-1"},
+			},
 			want: Input{
 				Kind: InputTick,
 				Key:  "user-1",
 			},
 		},
 		{
-			name: "wake reads the key and the id from data",
-			evt:  NewWakeEvent("user-1", "wake-1").Map(),
+			name: "tick with an invalid opener has a zero opener",
+			evt: map[string]any{
+				"name": EventTick,
+				"data": map[string]any{
+					"key":       "user-1",
+					"opened_by": "not-a-run-id",
+				},
+			},
 			want: Input{
-				Kind: InputWake,
+				Kind: InputTick,
 				Key:  "user-1",
-				ID:   "wake-1",
 			},
 		},
 		{
