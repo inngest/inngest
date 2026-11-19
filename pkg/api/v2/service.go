@@ -22,25 +22,26 @@ import (
 // Service implements the V2 API service for gRPC with grpc-gateway
 type Service struct {
 	apiv2.UnimplementedV2Server
-	signingKeys    SigningKeysProvider
-	eventKeys      EventKeysProvider
-	apps           AppProvider
-	appSyncs       AppSyncProvider
-	functions      FunctionProvider
-	functionPauser FunctionPauser
-	cancellations  CancellationCreator
-	functionConfig FunctionConfigProvider
-	runs           RunProvider
-	events         EventProvider
-	replays        ReplayProvider
-	traces         FunctionTraceReader
-	executor       FunctionScheduler
-	eventPublisher EventPublisher
-	eventSender    EventSender
-	maxEventSize   int
-	scores         ScoreProvider
-	rateLimiter    RateLimitProvider
-	base           *apiv2base.Base
+	signingKeys      SigningKeysProvider
+	eventKeys        EventKeysProvider
+	apps             AppProvider
+	appSyncs         AppSyncProvider
+	functions        FunctionProvider
+	functionPauser   FunctionPauser
+	functionArchiver FunctionArchiver
+	cancellations    CancellationCreator
+	functionConfig   FunctionConfigProvider
+	runs             RunProvider
+	events           EventProvider
+	replays          ReplayProvider
+	traces           FunctionTraceReader
+	executor         FunctionScheduler
+	eventPublisher   EventPublisher
+	eventSender      EventSender
+	maxEventSize     int
+	scores           ScoreProvider
+	rateLimiter      RateLimitProvider
+	base             *apiv2base.Base
 	// duckDB is the dual-write DuckDB connection QueryInsights runs
 	// against -- nil unless --duckdb dual-write started successfully, same
 	// connection as coreapi.Options.DuckDB / queryResolver.DuckDB
@@ -58,6 +59,7 @@ type ServiceOptions struct {
 	AppSyncs            AppSyncProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
+	FunctionArchiver    FunctionArchiver
 	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
@@ -85,26 +87,27 @@ func NewService(opts ServiceOptions) *Service {
 		maxEventSize = consts.AbsoluteMaxEventSize
 	}
 	return &Service{
-		signingKeys:    opts.SigningKeysProvider,
-		eventKeys:      opts.EventKeysProvider,
-		apps:           opts.Apps,
-		appSyncs:       opts.AppSyncs,
-		functions:      opts.Functions,
-		functionPauser: opts.FunctionPauser,
-		cancellations:  opts.Cancellations,
-		functionConfig: opts.FunctionConfig,
-		runs:           opts.Runs,
-		events:         opts.Events,
-		replays:        opts.Replays,
-		traces:         opts.FunctionTraces,
-		executor:       opts.Executor,
-		eventPublisher: opts.EventPublisher,
-		eventSender:    opts.EventSender,
-		maxEventSize:   maxEventSize,
-		scores:         opts.Scores,
-		rateLimiter:    rateLimiter,
-		base:           apiv2base.NewBase(),
-		duckDB:         opts.DuckDB,
+		signingKeys:      opts.SigningKeysProvider,
+		eventKeys:        opts.EventKeysProvider,
+		apps:             opts.Apps,
+		appSyncs:         opts.AppSyncs,
+		functions:        opts.Functions,
+		functionPauser:   opts.FunctionPauser,
+		functionArchiver: opts.FunctionArchiver,
+		cancellations:    opts.Cancellations,
+		functionConfig:   opts.FunctionConfig,
+		runs:             opts.Runs,
+		events:           opts.Events,
+		replays:          opts.Replays,
+		traces:           opts.FunctionTraces,
+		executor:         opts.Executor,
+		eventPublisher:   opts.EventPublisher,
+		eventSender:      opts.EventSender,
+		maxEventSize:     maxEventSize,
+		scores:           opts.Scores,
+		rateLimiter:      rateLimiter,
+		base:             apiv2base.NewBase(),
+		duckDB:           opts.DuckDB,
 	}
 }
 

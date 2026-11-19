@@ -88,6 +88,69 @@ func (s *Service) ResumeFunction(ctx context.Context, req *apiv2.ResumeFunctionR
 	return &apiv2.ResumeFunctionResponse{Data: data, Metadata: metadata}, nil
 }
 
+func (s *Service) ArchiveFunction(ctx context.Context, req *apiv2.ArchiveFunctionRequest) (*apiv2.ArchiveFunctionResponse, error) {
+	data, metadata, err := s.setFunctionArchived(ctx, req.AppId, req.FunctionId, functionArchiveOperation{
+		action: "archive", title: "Archive", pastAction: "archived",
+		method: apiv2.V2_ArchiveFunction_FullMethodName,
+		apply:  FunctionArchiver.ArchiveFunction,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &apiv2.ArchiveFunctionResponse{Data: data, Metadata: metadata}, nil
+}
+
+func (s *Service) UnarchiveFunction(ctx context.Context, req *apiv2.UnarchiveFunctionRequest) (*apiv2.UnarchiveFunctionResponse, error) {
+	data, metadata, err := s.setFunctionArchived(ctx, req.AppId, req.FunctionId, functionArchiveOperation{
+		action: "unarchive", title: "Unarchive", pastAction: "unarchived",
+		method: apiv2.V2_UnarchiveFunction_FullMethodName,
+		apply:  FunctionArchiver.UnarchiveFunction,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &apiv2.UnarchiveFunctionResponse{Data: data, Metadata: metadata}, nil
+}
+
+type functionArchiveOperation struct {
+	action, title, pastAction, method string
+	apply                             func(FunctionArchiver, context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+}
+
+func (s *Service) setFunctionArchived(ctx context.Context, appID, functionID string, op functionArchiveOperation) (*apiv2.Function, *apiv2.ResponseMetadata, error) {
+	if appID == "" || functionID == "" {
+		return nil, nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
+	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, op.method); result.Limited {
+		return nil, nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no function was "+op.pastAction+".")
+	}
+	if s.functions == nil || s.functionArchiver == nil {
+		return nil, nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, op.title+" function is not yet implemented")
+	}
+
+	appID = decodePathParam(appID)
+	functionID = decodePathParam(functionID)
+	fn, err := s.functions.GetFunctionByApp(ctx, appID, functionID)
+	if err != nil {
+		if !errors.Is(err, ErrFunctionNotFound) {
+			logger.From(ctx).Error("unable to fetch function", "error", err, "app_id", appID, "function_id", functionID, "method", op.method)
+		}
+		return nil, nil, s.getFunctionError(err)
+	}
+	fn, err = op.apply(s.functionArchiver, ctx, fn)
+	if errors.Is(err, ErrFunctionNotFound) {
+		return nil, nil, s.getFunctionError(err)
+	}
+	if err != nil {
+		logger.From(ctx).Error("unable to "+op.action+" function", "error", err, "app_id", appID, "function_id", functionID, "method", op.method)
+		return nil, nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to "+op.action+" function")
+	}
+	fn.AppName = appID
+	fn.Function.Slug = publicFunctionID(appID, functionID, fn)
+	return toFunction(fn, s.planConcurrencyLimit(ctx, fn)), &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()}, nil
+}
+
 func (s *Service) PauseFunctions(ctx context.Context, req *apiv2.PauseFunctionsRequest) (*apiv2.PauseFunctionsResponse, error) {
 	data, metadata, err := s.setFunctionsPaused(ctx, req.AppId, req.FunctionIds, functionPauseOperation{
 		action: "pause", title: "Pause", pastAction: "paused",

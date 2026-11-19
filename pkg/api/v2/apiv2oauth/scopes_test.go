@@ -37,3 +37,19 @@ func TestCLIScopesExcludeNonDelegatableKeys(t *testing.T) {
 	require.NotContains(t, scopes, "event_keys:read:*")
 	require.NotContains(t, scopes, "signing_keys:read:*")
 }
+
+func TestFunctionArchiveScopes(t *testing.T) {
+	for _, method := range []string{"ArchiveFunction", "UnarchiveFunction"} {
+		t.Run(method, func(t *testing.T) {
+			var endpoints []apiv2endpoint.Endpoint
+			for _, endpoint := range apiv2endpoint.Discover() {
+				if endpoint.MethodName == method {
+					endpoints = append(endpoints, endpoint)
+				}
+			}
+			require.Len(t, endpoints, 1)
+			require.Equal(t, []string{"functions:write:*"}, scopesForEndpoints(endpoints, cliExcludedResources))
+			require.Contains(t, CLIScopes(), "functions:write:*")
+		})
+	}
+}

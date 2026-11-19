@@ -117,6 +117,8 @@ const (
 // add Cloud-only endpoints here so all other new REST API v2 endpoints appear
 // in the dev server MCP without extra work.
 var unsupportedDevServerMCPMethods = map[string]struct{}{
+	"ArchiveFunction":            {},
+	"UnarchiveFunction":          {},
 	"CreateEnv":                  {},
 	"CreateSandbox":              {},
 	"CreateScore":                {},
