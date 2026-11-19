@@ -1425,6 +1425,9 @@ func (e *executor) schedule(
 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
+	// Nor is the app name, which spans created after scheduling (IE the
+	// duckdb dual-write's) have no other way to get.
+	config.SetAppName(req.AppName)
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
