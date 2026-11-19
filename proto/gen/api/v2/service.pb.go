@@ -11981,10 +11981,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14FetchAccountResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.AccountR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x18\n" +
-	"\x16GetAccountUsageRequest\"\xdf\x06\n" +
-	"\fAccountUsage\x12}\n" +
+	"\x16GetAccountUsageRequest\"\xce\a\n" +
+	"\fAccountUsage\x12\xeb\x01\n" +
 	"\n" +
-	"executions\x18\x01 \x01(\x03B]\x92AZ2XExecutions used in the current period: function runs plus steps, across all environmentsR\n" +
+	"executions\x18\x01 \x01(\x03B\xca\x01\x92A\xc6\x012\xc3\x01Executions used in the current period: function runs plus steps, across all environments. May lag recent activity; accounts without a finite execution cap may use counts cached for up to 24 hoursR\n" +
 	"executions\x12\xae\x01\n" +
 	"\x10executions_limit\x18\x02 \x01(\x03B~\x92A{2yExecutions included in the plan for the period. Usage can go past it when the plan allows overage. Omitted when unlimitedH\x00R\x0fexecutionsLimit\x88\x01\x01\x12j\n" +
 	"\fperiod_start\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB+\x92A(2&Start of the current period, inclusiveR\vperiodStart\x12d\n" +
@@ -12000,10 +12000,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x11AccountUsageSeats\x12N\n" +
 	"\x04used\x18\x01 \x01(\x03B:\x92A725Current account membership count, not a monthly totalR\x04used\x12y\n" +
 	"\x05limit\x18\x02 \x01(\x03B^\x92A[2YEffective seat allowance, including add-ons and account overrides. Omitted when unlimitedH\x00R\x05limit\x88\x01\x01B\b\n" +
-	"\x06_limit\"\x85\x03\n" +
-	"\x12AccountUsageLimits\x12\xb1\x01\n" +
-	"\x10concurrent_steps\x18\x01 \x01(\x03B\x80\x01\x92A}2{Effective base concurrent-step limit, excluding burst capacity. Omitted when unlimited. Does not report current utilizationH\x00R\x0fconcurrentSteps\x88\x01\x01\x12\x99\x01\n" +
-	"\aworkers\x18\x02 \x01(\x03Bz\x92Aw2uEffective limit on concurrent Connect worker connections. Omitted when unlimited. Does not report current utilizationH\x01R\aworkers\x88\x01\x01B\x13\n" +
+	"\x06_limit\"\x9b\x03\n" +
+	"\x12AccountUsageLimits\x12\xbe\x01\n" +
+	"\x10concurrent_steps\x18\x01 \x01(\x03B\x8d\x01\x92A\x89\x012\x86\x01Effective base concurrent-step limit, including the platform ceiling and excluding burst capacity. Does not report current utilizationH\x00R\x0fconcurrentSteps\x88\x01\x01\x12\xa2\x01\n" +
+	"\aworkers\x18\x02 \x01(\x03B\x82\x01\x92A\x7f2}Effective limit on concurrent Connect worker connections, including the platform ceiling. Does not report current utilizationH\x01R\aworkers\x88\x01\x01B\x13\n" +
 	"\x11_concurrent_stepsB\n" +
 	"\n" +
 	"\b_workers\"y\n" +
@@ -12721,7 +12721,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x92\xa9\x02\n" +
+	"\x04INFO\x10\x032\xb9\xac\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12819,9 +12819,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x15\b\x01\x12\x11accounts:read:get\x82\xd3\xe4\x93\x02\n" +
-	"\x12\b/account\x12\xa4\x06\n" +
-	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\xcf\x05\x92A\x9a\x05\n" +
-	"\aAccount\x12\x11Get account usage\x1a\xbb\x02Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage.JC\n" +
+	"\x12\b/account\x12\xcb\t\n" +
+	"\x0fGetAccountUsage\x12\x1e.api.v2.GetAccountUsageRequest\x1a\x1f.api.v2.GetAccountUsageResponse\"\xf6\b\x92A\xc1\b\n" +
+	"\aAccount\x12\x11Get account usage\x1a\x99\x04Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. For accounts with a finite execution cap, uses the same monthly execution total as the dashboard cap indicator. Other accounts use billing-page usage, which may be cached for up to 24 hours. Usage can lag recent activity. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage.JC\n" +
 	"\x03200\x12<\n" +
 	"\rAccount usage\x12+\n" +
 	")\x1a'#/definitions/v2GetAccountUsageResponseJR\n" +
@@ -12830,9 +12830,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
 	"\x03403\x12I\n" +
 	"$Forbidden - Insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJW\n" +
+	"\x03429\x12P\n" +
+	"+Too Many Requests - API rate limit exceeded\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJn\n" +
+	"\x03501\x12g\n" +
+	"BNot Implemented - account usage is only available in Inngest Cloud\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +

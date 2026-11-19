@@ -429,7 +429,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account usage"
-      description: "Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
+      description: "Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. For accounts with a finite execution cap, uses the same monthly execution total as the dashboard cap indicator. Other accounts use billing-page usage, which may be cached for up to 24 hours. Usage can lag recent activity. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
       tags: "Account"
       security: {
         security_requirement: {
@@ -471,9 +471,31 @@ service V2 {
         }
       }
       responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - API rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Not Implemented - account usage is only available in Inngest Cloud"
           schema: {
             json_schema: {
               ref: "#/definitions/v2ErrorResponse"
@@ -3709,7 +3731,7 @@ message GetAccountUsageRequest {}
 message AccountUsage {
   int64 executions = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Executions used in the current period: function runs plus steps, across all environments"
+      description: "Executions used in the current period: function runs plus steps, across all environments. May lag recent activity; accounts without a finite execution cap may use counts cached for up to 24 hours"
     }
   ];
   optional int64 executions_limit = 2 [
@@ -3765,12 +3787,12 @@ message AccountUsageSeats {
 message AccountUsageLimits {
   optional int64 concurrent_steps = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Effective base concurrent-step limit, excluding burst capacity. Omitted when unlimited. Does not report current utilization"
+      description: "Effective base concurrent-step limit, including the platform ceiling and excluding burst capacity. Does not report current utilization"
     }
   ];
   optional int64 workers = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Effective limit on concurrent Connect worker connections. Omitted when unlimited. Does not report current utilization"
+      description: "Effective limit on concurrent Connect worker connections, including the platform ceiling. Does not report current utilization"
     }
   ];
 }
