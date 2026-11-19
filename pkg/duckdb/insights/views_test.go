@@ -323,3 +323,92 @@ func TestInsightsExtendedTraceSpansFiltersToSDKSpans(t *testing.T) {
 	).Scan(&count))
 	require.Equal(t, 1, count)
 }
+
+// insertScopedMetadataRow is insertMetadataRow w/ a scope.
+func insertScopedMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, spanID, scope, kind string, values string, createdAt time.Time) {
+	t.Helper()
+	_, err := db.ExecContext(t.Context(),
+		`INSERT INTO inngest.run_metadata
+		   (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, true, ?, ?);`,
+		accountID.String(), envID.String(), runID, createdAt, spanID, scope, kind, json.RawMessage(values), createdAt,
+	)
+	require.NoError(t, err)
+}
+
+// step and step_attempt metadata land on the same (finalized step) span.
+// The rollup keeps them apart, so a step_attempt emission doesn't hide the
+// step's metadata from insights_steps/insights_step_attempts.
+func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil).String()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	insertStepSpan(t, db, accountID, envID, runID, "span-1", "step-1", 0, now)
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step", "a", `{"v": 1}`, now)
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "b", `{"v": 2}`, now.Add(time.Second))
+
+	for _, table := range []string{"insights_steps", "insights_step_attempts"} {
+		var count int
+		var md any
+		require.NoError(t, db.QueryRowContext(t.Context(),
+			"SELECT count(*) OVER (), metadata FROM inngest_local."+table+"(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		).Scan(&count, &md), table)
+		require.Equal(t, 1, count, table)
+		require.Equal(t, map[string]any{"a": map[string]any{"v": float64(1)}}, md, table)
+	}
+
+	// insights_metadata has one row per scope of the span.
+	rows, err := db.QueryContext(t.Context(),
+		"SELECT scope, metadata FROM inngest_local.insights_metadata(?, ?) WHERE run_id = ? AND span_id = 'span-1' ORDER BY scope;", accountID.String(), envID.String(), runID)
+	require.NoError(t, err)
+	defer rows.Close()
+	got := map[string]any{}
+	for rows.Next() {
+		var scope string
+		var md any
+		require.NoError(t, rows.Scan(&scope, &md))
+		got[scope] = md
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, map[string]any{
+		"step":         map[string]any{"a": map[string]any{"v": float64(1)}},
+		"step_attempt": map[string]any{"b": map[string]any{"v": float64(2)}},
+	}, got)
+}
+
+// executor.step.planned markers carry no userland step id. They're step
+// attempts rows, but not a step of their own in insights_steps.
+func TestInsightsStepsSkipsSpansWithoutStepID(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil).String()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	insertStepSpan(t, db, accountID, envID, runID, "span-1", "step-1", 0, now)
+	insertStepSpan(t, db, accountID, envID, runID, "span-2", "step-2", 0, now)
+	for i, spanID := range []string{"planned-1", "planned-2"} {
+		at := now.Add(time.Duration(i) * time.Millisecond)
+		_, err := db.ExecContext(t.Context(),
+			`INSERT INTO inngest.run_trace_spans
+			   (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step.planned', ?, ?, ?, ?, ?);`,
+			accountID.String(), envID.String(), runID, now, uuid.New().String(), "test-app", uuid.New().String(), "test-fn",
+			at, at, uuid.New().String(), spanID, json.RawMessage(`{"_inngest.step.name": "a step"}`),
+		)
+		require.NoError(t, err)
+	}
+
+	var count, withoutID int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*), count(*) FILTER (step_id IS NULL) FROM inngest_local.insights_steps(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+	).Scan(&count, &withoutID))
+	require.Equal(t, 2, count)
+	require.Equal(t, 0, withoutID)
+
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*) FROM inngest_local.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+	).Scan(&count))
+	require.Equal(t, 4, count)
+}

@@ -48,9 +48,11 @@ SELECT * REPLACE (event_data::JSON AS event_data, event_meta::JSON AS event_meta
 CREATE OR REPLACE MACRO inngest_local.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 
--- inngest_local.run_metadata_rollup is one row per (run_id, span_id) with the
--- latest emission of each kind as user_metadata/internal_metadata (kind ->
--- values). Every metadata write is a full replace of its kind, so there's no
+-- inngest_local.run_metadata_rollup is one row per (run_id, span_id, scope)
+-- with the latest emission of each kind as user_metadata/internal_metadata
+-- (kind -> values). scope is part of the key because a span can carry more
+-- than one: step and step_attempt metadata both land on the finalized step
+-- span, and a consumer joins on one scope (IE insights_steps on 'step'). Every metadata write is a full replace of its kind, so there's no
 -- merging: an older emission's keys don't survive a newer one, and a null
 -- value is kept as null rather than deleting its key the way
 -- json_merge_patch (RFC 7386) would. kind is stored without its
@@ -77,7 +79,7 @@ SELECT
   run_id,
   max(run_queued_at) as run_queued_at,
   span_id,
-  max(scope) as scope,
+  scope,
   max(step_id) as step_id,
   max(step_index) as step_index,
   max(step_attempt) as step_attempt,
@@ -86,7 +88,7 @@ SELECT
   COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (is_user))), json_object()) as user_metadata,
   COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (NOT is_user))), json_object()) as internal_metadata,
 FROM latest
-GROUP BY account_id, env_id, run_id, span_id
+GROUP BY account_id, env_id, run_id, span_id, scope
 ;
 
 -- Every insights_* logical table is a parameterized table macro, not a
@@ -247,10 +249,13 @@ FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans,
 -- insights_step_attempts to the latest attempt per (run_id, step_id) --
 -- highest step_attempt, tie-broken by start_time -- mirroring the
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
--- Logical tables and views table).
+-- Logical tables and views table). A step span w/o a userland step id
+-- (IE the executor.step.planned markers) isn't a step: they'd all collapse
+-- into one extra NULL step_id row per run.
 CREATE OR REPLACE MACRO inngest_local.insights_steps(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
 FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
+WHERE step_id IS NOT NULL
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
 ) = 1;

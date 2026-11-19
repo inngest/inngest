@@ -208,7 +208,7 @@ var logicalTables = map[string]logicalTable{
 		},
 	},
 	// metadata is backed by the run_metadata_rollup macro: one row per
-	// (run_id, span_id), with the latest emission (by created_at) of each
+	// (run_id, span_id, scope), with the latest emission (by created_at) of each
 	// kind as kind -> values in two JSON objects instead of exposing raw
 	// per-emission rows. Each emission replaces its kind outright, nothing
 	// is merged across emissions. Only the rollup's group key (and
