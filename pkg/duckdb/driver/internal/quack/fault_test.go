@@ -450,3 +450,132 @@ func TestQuackFaultSendDataTruncatedAndHTTPError(t *testing.T) {
 	}
 	requireTransportError(t, s.sendDataRequest(t.Context(), payload), "unexpected response message type")
 }
+
+// TestQuackFaultAppendSendFailureAbandonsStatement: Append giving up on its
+// batch or terminal message must not leave the INSERT running on a session
+// still marked reusable. It cancels the statement, waits for it, and the
+// session comes back Abandoned.
+func TestQuackFaultAppendSendFailureAbandonsStatement(t *testing.T) {
+	for name, failOn := range map[string]int64{"batch": 1, "terminal": 2} {
+		t.Run(name, func(t *testing.T) {
+			ignore := goleak.IgnoreCurrent()
+			f := newFakeQuackServer(t)
+			prepared := make(chan struct{})
+			f.onPrepare = func(_ http.ResponseWriter, r *http.Request, _ string, _ hugeint) {
+				close(prepared)
+				blockUntilClientGone(r)
+			}
+			var sends atomic.Int64
+			f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
+				<-prepared
+				if sends.Add(1) == failOn {
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
+				_, _ = w.Write(encodeMessage(msgSendDataResponse, "", func(*writer) {}))
+			}
+			s := f.session(t)
+
+			start := time.Now()
+			err := s.Append(t.Context(), "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}})
+			requireTransportError(t, err, "HTTP 502")
+			require.Less(t, time.Since(start), 5*time.Second)
+			require.True(t, s.Abandoned(), "the INSERT is still running, so the session can't be reused")
+
+			want := f.lastPrepared()
+			require.Eventually(t, func() bool {
+				ids := f.cancelledIDs()
+				return len(ids) == 1 && ids[0] == want
+			}, 5*time.Second, 10*time.Millisecond, "the INSERT must be cancelled")
+			require.Eventually(t, func() bool {
+				ids := f.disconnectedIDs()
+				return len(ids) == 1 && ids[0] == s.connectionID
+			}, 5*time.Second, 10*time.Millisecond, "the abandoned connection must be disconnected")
+
+			f.srv.Close()
+			verifyNoQuackLeaks(t, ignore)
+		})
+	}
+}
+
+// TestQuackFaultAppendWaitsOutSlowBind: the stream only opens once the
+// INSERT reaches BIND, however long that takes, so Append keeps retrying
+// "no active stream" for as long as the statement is running.
+func TestQuackFaultAppendWaitsOutSlowBind(t *testing.T) {
+	f := newFakeQuackServer(t)
+	open := make(chan struct{})
+	finish := make(chan struct{})
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
+		<-finish
+		_, _ = w.Write(fakePrepareResponse(t, "", 1, false))
+	}
+	var rejected, sends atomic.Int64
+	f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case <-open:
+		default:
+			rejected.Add(1)
+			_, _ = w.Write(fakeErrorResponse(streamNotActiveMessage))
+			return
+		}
+		if sends.Add(1) == 2 {
+			close(finish)
+		}
+		_, _ = w.Write(encodeMessage(msgSendDataResponse, "", func(*writer) {}))
+	}
+	s := f.session(t)
+
+	time.AfterFunc(300*time.Millisecond, func() { close(open) })
+	require.NoError(t, s.Append(t.Context(), "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}}))
+	require.Positive(t, rejected.Load())
+	require.False(t, s.Abandoned())
+}
+
+// TestQuackFaultAppendStatementRejectedBeforeStreamOpens: an INSERT that
+// fails to bind never opens its stream, and its own error is the one
+// returned.
+func TestQuackFaultAppendStatementRejectedBeforeStreamOpens(t *testing.T) {
+	f := newFakeQuackServer(t)
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
+		_, _ = w.Write(fakeErrorResponse("Table with name t does not exist!"))
+	}
+	f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(fakeErrorResponse(streamNotActiveMessage))
+	}
+	s := f.session(t)
+
+	err := s.Append(t.Context(), "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}})
+	require.ErrorIs(t, err, result.ErrStatementFailed)
+	require.ErrorContains(t, err, "does not exist")
+	require.False(t, s.Abandoned(), "the statement ended on its own")
+}
+
+func fakeErrorResponse(msg string) []byte {
+	return encodeMessage(msgErrorResponse, "", func(w *writer) {
+		w.writeStringDefault(1, msg)
+	})
+}
+
+// TestQuackFaultAppendStatementFailsMidStream: when the statement fails on
+// its own and the send fails because of it, the statement's error is the one
+// returned and the session stays usable.
+func TestQuackFaultAppendStatementFailsMidStream(t *testing.T) {
+	f := newFakeQuackServer(t)
+	failed := make(chan struct{})
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
+		_, _ = w.Write(fakeErrorResponse("Constraint Error: duplicate key"))
+		close(failed)
+	}
+	f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
+		<-failed
+		// Give the client time to read the prepare's response first.
+		time.Sleep(50 * time.Millisecond)
+		_, _ = w.Write(fakeErrorResponse("stream was closed"))
+	}
+	s := f.session(t)
+
+	err := s.Append(t.Context(), "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}})
+	require.ErrorIs(t, err, result.ErrStatementFailed)
+	require.ErrorContains(t, err, "duplicate key")
+	require.False(t, s.Abandoned(), "the statement ended on its own")
+}
