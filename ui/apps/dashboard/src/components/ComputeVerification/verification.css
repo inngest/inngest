@@ -1,0 +1,16 @@
+.compute-verification :is(button, input, textarea, a):focus-visible {
+  outline: 2px solid rgb(var(--color-border-active));
+  outline-offset: 2px;
+}
+
+.compute-verification input:disabled {
+  cursor: not-allowed;
+}
+
+.compute-verification :is(input, textarea)[aria-invalid='true'] {
+  border-color: rgb(var(--color-border-error));
+}
+
+.compute-verification :is(input, textarea)[aria-invalid='true']:focus-visible {
+  outline-color: rgb(var(--color-border-error));
+}
