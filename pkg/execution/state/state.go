@@ -54,6 +54,11 @@ var (
 	// ErrTimeoutTooLong is returned when a sleep or wait is scheduled further
 	// into the future than the maximum allowed duration (one year).
 	ErrTimeoutTooLong = fmt.Errorf("timeout exceeds the maximum duration")
+	// ErrLoopInvalid is returned when a loop run's response cannot be
+	// committed, such as a LoopReturn next to other opcodes, a stale
+	// version, or a state over consts.MaxLoopStateSize.  the run fails
+	// without retry.
+	ErrLoopInvalid = fmt.Errorf("loop return is invalid")
 	// Error Connect Retry Errors
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
@@ -85,6 +90,8 @@ const (
 	InngestErrStateOverflowed = "InngestErrStateOverflowed"
 	// InngestErrTimeoutTooLong is the public error code for ErrTimeoutTooLong
 	InngestErrTimeoutTooLong = "InngestErrTimeoutTooLong"
+	// InngestErrLoopInvalid is the public error code for ErrLoopInvalid.
+	InngestErrLoopInvalid = "InngestErrLoopInvalid"
 	// InngestErrInternal is the public error code for runs that can't
 	// continue because of a system error.
 	InngestErrInternal = "InngestErrInternal"

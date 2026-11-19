@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/domain"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -22,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -271,6 +273,8 @@ func (s *Service) Run(ctx context.Context) error {
 			// Function pausing and unpausing is not implemented in the dev server.
 		case queue.KindJobPromote:
 			err = s.handleJobPromote(ctx, item)
+		case queue.KindLoopTick, queue.KindLoopWake:
+			err = s.handleLoopInput(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -1154,6 +1158,117 @@ func (s *Service) handleCron(ctx context.Context, item queue.Item) error {
 	// enqueue the next schedule
 	_, err = s.croner.ScheduleNext(ctx, ci)
 	return err
+}
+
+// handleLoopInput starts one run for a tick or a wake item.  the run's
+// first event is the tick or wake event, which carries the key and the wake
+// id, so the executor derives the input from it like any other run.  the
+// event is published to the event stream the way a cron event is, so the
+// dashboard shows it as the run's trigger.  an ended instance, a skipped
+// function, a missing function, and a function that is no longer a loop
+// all drop the item.
+func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "loop", "item_kind", item.Kind, "fn_id", item.Identifier.WorkflowID)
+
+	payload, ok := item.Payload.(queue.PayloadLoop)
+	if !ok {
+		return queue.NeverRetryError(fmt.Errorf("unexpected loop item payload: %T", item.Payload))
+	}
+
+	fn, err := s.data.GetFunctionByInternalUUID(ctx, item.Identifier.WorkflowID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			l.Warn("dropping loop input, function does not exist")
+			return nil
+		}
+		return fmt.Errorf("error retrieving function for loop input: %w", err)
+	}
+	if fn.IsArchived() {
+		l.Warn("dropping loop input, function is archived")
+		return nil
+	}
+	conf, err := fn.InngestFunction()
+	if err != nil {
+		return fmt.Errorf("error converting function to config: %w", err)
+	}
+	if conf.Loop == nil {
+		l.Warn("dropping loop input, function is no longer a loop")
+		return nil
+	}
+
+	// the event id comes from the item's job id and nonce, so a second run
+	// of the same item builds the same id and the schedule idempotency key
+	// drops it.
+	loopID := loops.NewID(domain.NewTenant(item.Identifier.AccountID, item.Identifier.WorkspaceID), item.Identifier.WorkflowID, payload.Key)
+	evtID := loops.TimerEventID(loopTimerJobID(loopID, payload.Kind, payload.ID), payload.Nonce)
+	var evt event.Event
+	switch payload.Kind {
+	case loops.InputTick:
+		evt = loops.NewTickEventWithID(payload.Key, evtID)
+	case loops.InputWake:
+		evt = loops.NewWakeEventWithID(payload.Key, payload.ID, evtID)
+	default:
+		return queue.NeverRetryError(fmt.Errorf("unexpected loop input kind %q", payload.Kind))
+	}
+	tracked := event.NewBaseTrackedEventWithID(evt, evtID)
+	idempotencyKey := evtID.String()
+
+	_, _, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
+		AccountID:      item.Identifier.AccountID,
+		WorkspaceID:    item.Identifier.WorkspaceID,
+		AppID:          item.Identifier.AppID,
+		Function:       *conf,
+		Events:         []event.TrackedEvent{tracked},
+		IdempotencyKey: &idempotencyKey,
+	})
+
+	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"type":   "loop",
+			"status": ScheduleStatus(err),
+		},
+	})
+
+	switch {
+	case err == nil, errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
+		// the run exists, from this call or from an earlier run of the
+		// same item.
+	case errors.Is(err, ErrLoopEnded):
+		l.Debug("dropping loop input, instance ended", "key", payload.Key)
+		return nil
+	case errors.Is(err, ErrFunctionSkipped):
+		return nil
+	default:
+		return fmt.Errorf("error scheduling loop run: %w", err)
+	}
+
+	// publish the event to pubsub, as the cron handler does.  the publish
+	// runs after the handler returns and uses a context the queue cannot
+	// cancel.  the event is published once the run exists, and again on a
+	// rerun of the item, so a crash before the publish still leaves the
+	// event recorded.  a dropped input publishes nothing.
+	if s.publisher != nil {
+		go func(ctx context.Context) {
+			byt, err := json.Marshal(tracked)
+			if err != nil {
+				l.Error("error marshalling loop event", "error", err)
+				return
+			}
+			if err = s.publisher.Publish(
+				ctx,
+				s.config.EventStream.Service.TopicName(),
+				pubsub.Message{
+					Name:      event.EventReceivedName,
+					Data:      string(byt),
+					Timestamp: time.Now(),
+				},
+			); err != nil {
+				l.Error("error publishing loop event", "error", err)
+			}
+		}(context.WithoutCancel(ctx))
+	}
+	return nil
 }
 
 func (s *Service) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {

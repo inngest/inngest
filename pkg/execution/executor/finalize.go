@@ -86,6 +86,11 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 	}
 
+	// a loop run that finishes as failed or cancelled still ticks, so the
+	// instance does not stall.  the key comes from the run's events, which
+	// are gone once the state is deleted below.
+	e.loopTickOnFinalize(ctx, opts.Metadata, status, opts.Optional.InputEvents)
+
 	// release the function concurrency slot of a run that has StartedAt in
 	// run metadata.  a run that was cancelled while queued has no StartedAt
 	// and no slot.  this runs before state deletion because StartedAt is in
