@@ -64,6 +64,14 @@ func (sq *sqliteQuerier) GetAppByID(ctx context.Context, id uuid.UUID) (*db.App,
 	return appFromSQLite(r), nil
 }
 
+func (sq *sqliteQuerier) GetAppsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.App, error) {
+	rows, err := sq.q.GetAppsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, appFromSQLite), nil
+}
+
 func (sq *sqliteQuerier) GetAppByName(ctx context.Context, name string) (*db.App, error) {
 	r, err := sq.q.GetAppByName(ctx, name)
 	if err != nil {
@@ -203,6 +211,14 @@ func (sq *sqliteQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db
 		return nil, err
 	}
 	return functionFromSQLite(r), nil
+}
+
+func (sq *sqliteQuerier) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
 }
 
 func (sq *sqliteQuerier) GetFunctionBySlug(ctx context.Context, slug string) (*db.Function, error) {

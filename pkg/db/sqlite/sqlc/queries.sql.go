@@ -420,6 +420,58 @@ func (q *Queries) GetApps(ctx context.Context, arg GetAppsParams) ([]*App, error
 	return items, nil
 }
 
+const getAppsByIDs = `-- name: GetAppsByIDs :many
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) GetAppsByIDs(ctx context.Context, ids []uuid.UUID) ([]*App, error) {
+	query := getAppsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*App
+	for rows.Next() {
+		var i App
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.SdkLanguage,
+			&i.SdkVersion,
+			&i.Framework,
+			&i.Metadata,
+			&i.Status,
+			&i.Error,
+			&i.Checksum,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+			&i.Url,
+			&i.Method,
+			&i.AppVersion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEventBatchByRunID = `-- name: GetEventBatchByRunID :one
 SELECT id, account_id, workspace_id, app_id, workflow_id, run_id, started_at, executed_at, event_ids FROM event_batches WHERE run_id = ?
 `
@@ -1123,6 +1175,51 @@ func (q *Queries) GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppPa
 		arg.Cursor,
 		arg.LimitRows,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Function
+	for rows.Next() {
+		var i Function
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Name,
+			&i.Slug,
+			&i.Config,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFunctionsByIDs = `-- name: GetFunctionsByIDs :many
+SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) GetFunctionsByIDs(ctx context.Context, ids []uuid.UUID) ([]*Function, error) {
+	query := getFunctionsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
