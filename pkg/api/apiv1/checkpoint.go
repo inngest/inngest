@@ -209,6 +209,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		AccountID:      auth.AccountID(),
 		WorkspaceID:    auth.WorkspaceID(),
 		AppID:          input.AppID(auth.WorkspaceID()),
+		AppName:        input.AppSlug(),
 		RunMode:        enums.RunModeSync,
 		Events:         []event.TrackedEvent{evt},
 		URL:            input.URL(),
