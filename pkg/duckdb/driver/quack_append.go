@@ -30,7 +30,7 @@ const (
 // NewQuackAppender's doc comment for why concurrent *appenders*, each on its
 // own instance, are fine).
 type QuackAppender struct {
-	session *quack.Session
+	session quackAppenderSession
 	schema  string
 	table   string
 	columns []QuackColumnKind
@@ -107,11 +107,48 @@ func NewQuackAppenderFromConn(ctx context.Context, driverConn driver.Conn, catal
 // NewQuackAppenderFromConn share: resolve driverConn to its underlying
 // quack.Session, optionally switch catalog, construct the QuackAppender.
 func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
-	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, schema, "quack appender")
+	sess, err := newQuackAppenderSession(ctx, driverConn, catalog, schema, "quack appender")
 	if err != nil {
 		return nil, err
 	}
 	return &QuackAppender{session: sess, schema: schema, table: table, columns: columns}, nil
+}
+
+// quackAppenderSession is the quack session an appender flushes on. It's
+// resolved again whenever the last one was abandoned: a Flush whose ctx ends
+// mid-statement abandons its session (see quack.Session.Abandoned), which is
+// then disconnected server-side, so every later Flush on it would fail.
+type quackAppenderSession struct {
+	driverConn any
+	catalog    string
+	schema     string
+	errPrefix  string
+
+	sess *quack.Session
+}
+
+func newQuackAppenderSession(ctx context.Context, driverConn any, catalog, schema, errPrefix string) (quackAppenderSession, error) {
+	s := quackAppenderSession{driverConn: driverConn, catalog: catalog, schema: schema, errPrefix: errPrefix}
+	_, err := s.current(ctx)
+	return s, err
+}
+
+// current returns the session to flush on, resolving a new one (and
+// selecting the appender's catalog on it again) if the last was abandoned.
+// The appender owns driverConn until Close (see NewQuackAppender), so
+// nothing else replaces its session in between. A bare *quack.Session
+// connection has nothing to re-handshake with, so there this keeps failing
+// w/ resolveQuackSessionForAppender's "abandoned" error.
+func (s *quackAppenderSession) current(ctx context.Context) (*quack.Session, error) {
+	if s.sess != nil && !s.sess.Abandoned() {
+		return s.sess, nil
+	}
+	sess, err := resolveQuackSessionForAppender(ctx, s.driverConn, s.catalog, s.schema, s.errPrefix)
+	if err != nil {
+		return nil, err
+	}
+	s.sess = sess
+	return sess, nil
 }
 
 // resolveQuackSessionForAppender resolves driverConn to its underlying
@@ -189,12 +226,20 @@ func (a *QuackAppender) AppendRow(vals ...any) error {
 }
 
 // Flush sends every buffered row as one SEND_DATA_REQUEST batch and clears
-// the buffer. A no-op if nothing is buffered.
+// the buffer. A no-op if nothing is buffered. The rows stay buffered when it
+// fails, so calling Flush again re-sends them (on a new session, if this
+// one's ctx ended mid-statement). NOTE: a Flush that failed w/ its ctx's
+// error may still have inserted its rows, since the cancel races the
+// INSERT's commit.
 func (a *QuackAppender) Flush(ctx context.Context) error {
 	if len(a.rows) == 0 {
 		return nil
 	}
-	if err := a.session.Append(ctx, a.schema, a.table, a.columns, a.rows); err != nil {
+	sess, err := a.session.current(ctx)
+	if err != nil {
+		return err
+	}
+	if err := sess.Append(ctx, a.schema, a.table, a.columns, a.rows); err != nil {
 		return err
 	}
 	a.rows = a.rows[:0]

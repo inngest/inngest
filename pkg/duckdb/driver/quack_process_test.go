@@ -265,13 +265,13 @@ func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
 			start := time.Now()
 			require.ErrorIs(t, slow.Flush(ctx), context.DeadlineExceeded)
 			require.Less(t, time.Since(start), 2*time.Second, "an abandoned append must not block its caller on the cancel")
-			require.True(t, slow.session.Abandoned())
+			require.True(t, slow.session.sess.Abandoned())
 
 			start = time.Now()
 			appender, err := NewQuackAppenderFromConn(t.Context(), driverConn, "memory", "main", "append_t", []QuackColumnKind{QuackColumnVarchar})
 			require.NoError(t, err)
-			require.NotNil(t, appender.session)
-			require.False(t, appender.session.Abandoned())
+			require.NotNil(t, appender.session.sess)
+			require.False(t, appender.session.sess.Abandoned())
 			require.NoError(t, appender.AppendRow(name))
 			require.NoError(t, appender.Close(t.Context()))
 
