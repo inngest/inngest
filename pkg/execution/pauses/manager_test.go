@@ -464,7 +464,7 @@ func TestDeleteFromOverlappingBlock(t *testing.T) {
 			target = p
 			locator, err := json.Marshal(state.BlockIndex{BlockID: block.ID.String(), EventName: index.EventName})
 			require.NoError(t, err)
-			r.Set(client.Pauses().KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, p.ID), string(locator))
+			require.NoError(t, r.Set(client.Pauses().KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, p.ID), string(locator)))
 		}
 	}
 	require.NoError(t, mgr.Delete(ctx, index, *target))
