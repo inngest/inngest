@@ -100,6 +100,16 @@ func (q *queueProcessor) ProcessItem(
 	defer q.wg.Done()
 
 	errCh := make(chan error, 1)
+	// sendErr never blocks: ProcessItem reads errCh once, so a second error
+	// (lease renewal, capacity renewal and the job can all fail together when
+	// the state store goes away) must not block its goroutine. A blocked
+	// item-lease goroutine stops ProcessItem in stopItemLeaseRenewal forever.
+	sendErr := func(err error) {
+		select {
+		case errCh <- err:
+		default:
+		}
+	}
 
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobDone := context.WithCancel(context.WithoutCancel(ctx))
@@ -140,7 +150,7 @@ func (q *queueProcessor) ProcessItem(
 				if current == nil {
 					l.Error("cannot extend lease since lease ID is nil", "qi", qi)
 					// Don't extend lease since one doesn't exist
-					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
+					sendErr(fmt.Errorf("cannot extend lease since lease ID is nil"))
 					return
 				}
 
@@ -163,7 +173,7 @@ func (q *queueProcessor) ProcessItem(
 					// does not use up an attempt.  on the last attempt a plain error
 					// dequeues the item with no finalize, and the run keeps its
 					// function concurrency slot with nothing left to end it.
-					errCh <- AlwaysRetryError(fmt.Errorf("error extending lease while processing: %w", err))
+					sendErr(AlwaysRetryError(fmt.Errorf("error extending lease while processing: %w", err)))
 					return
 				}
 				setLeaseID(nextLeaseID)
@@ -330,7 +340,7 @@ func (q *queueProcessor) ProcessItem(
 					if currentCapacityLease == nil {
 						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi)
 						// Don't extend lease since one doesn't exist
-						errCh <- AlwaysRetryError(fmt.Errorf("cannot extend capacity lease since lease ID is nil"))
+						sendErr(AlwaysRetryError(fmt.Errorf("cannot extend capacity lease since lease ID is nil")))
 						return
 					}
 
@@ -371,7 +381,7 @@ func (q *queueProcessor) ProcessItem(
 						)
 
 						// always stop processing the queue item if lease cannot be extended
-						errCh <- AlwaysRetryError(fmt.Errorf("error extending capacity lease while processing: %w", err))
+						sendErr(AlwaysRetryError(fmt.Errorf("error extending capacity lease while processing: %w", err)))
 						return
 					}
 
@@ -386,7 +396,7 @@ func (q *queueProcessor) ProcessItem(
 
 						// Lease could not be extended
 						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi)
-						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))
+						sendErr(AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received")))
 						return
 					}
 
@@ -436,7 +446,7 @@ func (q *queueProcessor) ProcessItem(
 				// Always retry this job.
 				stack := debug.Stack()
 				l.Error("job panicked", "error", fmt.Errorf("%v", r), "stack", string(stack))
-				errCh <- AlwaysRetryError(fmt.Errorf("job panicked: %v", r))
+				sendErr(AlwaysRetryError(fmt.Errorf("job panicked: %v", r)))
 			}
 		}()
 
@@ -563,7 +573,7 @@ func (q *queueProcessor) ProcessItem(
 		status := "completed"
 		if err != nil {
 			status = "errored"
-			errCh <- err
+			sendErr(err)
 		}
 
 		metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
