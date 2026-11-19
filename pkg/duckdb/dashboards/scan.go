@@ -140,19 +140,21 @@ func asStrings(v any, col string) ([]string, error) {
 
 // asWeights decodes variant weights selected as JSON text (an object of
 // variant -> weight), NULL as nil, sorted by variant so the order is
-// stable.
+// stable. A null weight is skipped, not read as 0.
 func asWeights(v any) ([]ExperimentWeight, error) {
 	s, err := asNullableString(v)
 	if err != nil || s == "" || s == "null" {
 		return nil, err
 	}
-	var weights map[string]float64
+	var weights map[string]*float64
 	if err := json.Unmarshal([]byte(s), &weights); err != nil {
 		return nil, fmt.Errorf("parsing variant weights: %w", err)
 	}
 	out := make([]ExperimentWeight, 0, len(weights))
 	for _, k := range slices.Sorted(maps.Keys(weights)) {
-		out = append(out, ExperimentWeight{Variant: k, Weight: weights[k]})
+		if w := weights[k]; w != nil {
+			out = append(out, ExperimentWeight{Variant: k, Weight: *w})
+		}
 	}
 	return out, nil
 }

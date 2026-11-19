@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -136,4 +138,38 @@ func TestGetExperiment(t *testing.T) {
 
 	_, err = service.GetExperiment(ctx, &apiv2.GetExperimentRequest{AppId: "app", FunctionId: "fn"})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// TestGetExperiment_HTTPPathDecoding checks an experiment ID is decoded
+// once: the gateway matches on the already-decoded URL path, so a name w/ a
+// literal % (or a /, since the param is multi-segment) arrives as is.
+func TestGetExperiment_HTTPPathDecoding(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	t.Cleanup(cleanup)
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	insertExperimentRun(t, db, appID, functionID, "r1", "20%faster", "a", nil, now.Add(-2*time.Hour))
+	insertExperimentRun(t, db, appID, functionID, "r2", "team/checkout", "b", nil, now.Add(-time.Hour))
+
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunctionByApp", mock.Anything, "app", "fn").Return(inngest.DeployedFunction{ID: functionID}, nil)
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{DuckDB: db, Functions: functions}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	for path, want := range map[string]string{
+		"/v2/apps/app/functions/fn/experiments/20%25faster":     "20%faster",
+		"/v2/apps/app/functions/fn/experiments/team/checkout":   "team/checkout",
+		"/v2/apps/app/functions/fn/experiments/team%2Fcheckout": "team/checkout",
+	} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		require.Equal(t, http.StatusOK, rec.Code, "%s: %s", path, rec.Body.String())
+		var resp struct {
+			Data struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+		require.Equal(t, want, resp.Data.ID, path)
+	}
 }

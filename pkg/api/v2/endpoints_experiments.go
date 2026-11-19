@@ -83,7 +83,10 @@ func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentReq
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments requires dual-write (--duckdb) to be enabled")
 	}
 
-	opts := dashboards.ExperimentOpts{Name: decodePathParam(req.ExperimentId)}
+	// The ID is used as is, like a session ID: the gateway matches on the
+	// decoded URL path, and {experiment_id=**} needs no double encoding for
+	// a /, so decoding again would mangle a name w/ a literal %.
+	opts := dashboards.ExperimentOpts{Name: req.ExperimentId}
 	var err error
 	if opts.From, opts.Until, err = experimentTimeRange(req.From, req.Until); err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
