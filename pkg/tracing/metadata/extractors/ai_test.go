@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -550,4 +551,33 @@ func TestExtractAIOutputMetadata_TypicalStepOutput(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, md, "Non-AI step output should return nil: %s", string(output))
 	}
+}
+
+func TestExtractAIGatewayMetadata_AnthropicCacheTokens(t *testing.T) {
+	req := aigateway.Request{
+		URL:    "https://api.anthropic.com/v1/messages",
+		Format: aigateway.FormatAnthropic,
+		Body:   json.RawMessage(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]}`),
+	}
+	resp := []byte(`{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":12,"output_tokens":34,"cache_creation_input_tokens":560,"cache_read_input_tokens":7800}}`)
+
+	out, err := ExtractAIGatewayMetadata(req, 200, resp, 0)
+	require.NoError(t, err)
+	require.NotEmpty(t, out)
+
+	md, ok := out[0].(*AIMetadata)
+	require.True(t, ok)
+	assert.Equal(t, int64(12), md.InputTokens)
+	require.NotNil(t, md.CacheReadTokens)
+	assert.Equal(t, int64(7800), *md.CacheReadTokens)
+	require.NotNil(t, md.CacheCreationTokens)
+	assert.Equal(t, int64(560), *md.CacheCreationTokens)
+
+	// Without cache usage the fields stay absent.
+	resp = []byte(`{"id":"msg_2","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`)
+	out, err = ExtractAIGatewayMetadata(req, 200, resp, 0)
+	require.NoError(t, err)
+	md = out[0].(*AIMetadata)
+	assert.Nil(t, md.CacheReadTokens)
+	assert.Nil(t, md.CacheCreationTokens)
 }

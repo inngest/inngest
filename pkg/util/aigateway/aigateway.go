@@ -34,14 +34,18 @@ type ParsedInferenceRequest struct {
 
 // ParsedInferenceResponse represents the parsed output for a given inference request.
 type ParsedInferenceResponse struct {
-	ID         string            `json:"id"`
+	ID string `json:"id"`
 	// Model is the model that actually served the request, as reported by the
 	// provider. This may differ from the requested model (e.g. a dated snapshot).
-	Model      string            `json:"model,omitempty"`
-	TokensIn   int32             `json:"tokens_in"`
-	TokensOut  int32             `json:"tokens_out"`
-	StopReason string            `json:"stop_reason,omitempty"`
-	Tools      []ToolUseResponse `json:"tools,omitempty"`
+	Model     string `json:"model,omitempty"`
+	TokensIn  int32  `json:"tokens_in"`
+	TokensOut int32  `json:"tokens_out"`
+	// CacheReadTokens and CacheCreationTokens report prompt cache usage, when
+	// the provider returns it. They are reported separately from TokensIn.
+	CacheReadTokens     int32             `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens int32             `json:"cache_creation_tokens,omitempty"`
+	StopReason          string            `json:"stop_reason,omitempty"`
+	Tools               []ToolUseResponse `json:"tools,omitempty"`
 	// XXX: We do not yet extract content, just like we do not yet extract prompts.
 	Error string `json:"error,omitempty"`
 }
@@ -181,12 +185,14 @@ func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error
 		}
 
 		return ParsedInferenceResponse{
-			ID:         r.ID,
-			Model:      string(r.Model),
-			TokensIn:   int32(r.Usage.InputTokens),
-			TokensOut:  int32(r.Usage.OutputTokens),
-			StopReason: string(r.StopReason),
-			Tools:      tools,
+			ID:                  r.ID,
+			Model:               string(r.Model),
+			TokensIn:            int32(r.Usage.InputTokens),
+			TokensOut:           int32(r.Usage.OutputTokens),
+			CacheReadTokens:     int32(r.Usage.CacheReadInputTokens),
+			CacheCreationTokens: int32(r.Usage.CacheCreationInputTokens),
+			StopReason:          string(r.StopReason),
+			Tools:               tools,
 		}, nil
 	case FormatOpenAIChat:
 		fallthrough

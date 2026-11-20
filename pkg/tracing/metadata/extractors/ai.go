@@ -116,6 +116,12 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		TotalTokens:  &totalTokens,
 		LatencyMs:    latencyMs,
 	}
+	if parsedOutput.CacheReadTokens > 0 {
+		aiMd.CacheReadTokens = new(int64(parsedOutput.CacheReadTokens))
+	}
+	if parsedOutput.CacheCreationTokens > 0 {
+		aiMd.CacheCreationTokens = new(int64(parsedOutput.CacheCreationTokens))
+	}
 	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{
