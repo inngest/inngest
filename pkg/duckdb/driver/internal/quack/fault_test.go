@@ -500,13 +500,19 @@ func TestQuackFaultAppendSendFailureAbandonsStatement(t *testing.T) {
 
 // TestQuackFaultAppendWaitsOutSlowBind: the stream only opens once the
 // INSERT reaches BIND, however long that takes, so Append keeps retrying
-// "no active stream" for as long as the statement is running.
+// "no active stream" for as long as the statement is running. The stream
+// stays closed past the 5s deadline Append used to give up at.
 func TestQuackFaultAppendWaitsOutSlowBind(t *testing.T) {
+	t.Parallel()
 	f := newFakeQuackServer(t)
 	open := make(chan struct{})
 	finish := make(chan struct{})
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
-		<-finish
+	f.onPrepare = func(w http.ResponseWriter, r *http.Request, _ string, _ hugeint) {
+		select {
+		case <-finish:
+		case <-r.Context().Done():
+			return
+		}
 		_, _ = w.Write(fakePrepareResponse(t, "", 1, false))
 	}
 	var rejected, sends atomic.Int64
@@ -525,8 +531,10 @@ func TestQuackFaultAppendWaitsOutSlowBind(t *testing.T) {
 	}
 	s := f.session(t)
 
-	time.AfterFunc(300*time.Millisecond, func() { close(open) })
-	require.NoError(t, s.Append(t.Context(), "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}}))
+	time.AfterFunc(6*time.Second, func() { close(open) })
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	require.NoError(t, s.Append(ctx, "main", "t", []ColumnKind{ColumnVarchar}, [][]any{{"a"}}))
 	require.Positive(t, rejected.Load())
 	require.False(t, s.Abandoned())
 }
