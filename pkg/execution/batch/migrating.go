@@ -95,6 +95,7 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, f
 	result, err = fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
 	recordFallback(ctx, fallbackRead{
 		op:         "start_execution",
+		reason:     "batch metadata missing in primary cluster",
 		primary:    primary,
 		fallback:   fallback,
 		accountID:  accountID,
@@ -116,6 +117,7 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 	items, err = fallback.RetrieveItems(ctx, accountID, functionID, batchID)
 	recordFallback(ctx, fallbackRead{
 		op:         "retrieve_items",
+		reason:     "batch has no items in primary cluster",
 		primary:    primary,
 		fallback:   fallback,
 		accountID:  accountID,
@@ -129,6 +131,7 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 // cluster and was retried on the fallback cluster.
 type fallbackRead struct {
 	op         string
+	reason     string
 	primary    BatchManager
 	fallback   BatchManager
 	accountID  uuid.UUID
@@ -136,8 +139,9 @@ type fallbackRead struct {
 	batchID    ulid.ULID
 }
 
-// recordFallback counts a fallback read and logs what the fallback cluster
-// returned. found reports whether the fallback cluster held the batch.
+// recordFallback counts a fallback read and logs why the primary cluster
+// missed and what the fallback cluster returned. found reports whether the
+// fallback cluster held the batch.
 //
 // The log says which batches still reach the fallback cluster. Once a
 // migration has drained, the fallback cluster holds no batches, so a fallback
@@ -163,7 +167,7 @@ func recordFallback(ctx context.Context, r fallbackRead, found bool, err error) 
 	if err != nil {
 		args = append(args, "error", err)
 	}
-	logger.StdlibLogger(ctx).Info("batch missed primary cluster, checked fallback cluster", args...)
+	logger.StdlibLogger(ctx).Info(r.reason+", checked fallback cluster", args...)
 }
 
 // ScheduleExecution doesn't touch either store; it only enqueues the
@@ -187,6 +191,7 @@ func (m *migratingBatchManager) DeleteKeys(ctx context.Context, accountID, funct
 	existed, err = fallback.DeleteKeys(ctx, accountID, functionID, batchID)
 	recordFallback(ctx, fallbackRead{
 		op:         "delete_keys",
+		reason:     "batch not found in primary cluster",
 		primary:    primary,
 		fallback:   fallback,
 		accountID:  accountID,

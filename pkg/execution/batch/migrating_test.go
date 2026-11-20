@@ -920,6 +920,11 @@ func TestMigratingIntegration_DebugAPIErrorsNameFailingCluster(t *testing.T) {
 // back to the other cluster logs, at Info, which batch it was and whether the
 // other cluster held it.
 func TestMigratingIntegration_FallbackLogsOutcome(t *testing.T) {
+	messages := map[string]string{
+		"start_execution": "batch metadata missing in primary cluster, checked fallback cluster",
+		"retrieve_items":  "batch has no items in primary cluster, checked fallback cluster",
+		"delete_keys":     "batch not found in primary cluster, checked fallback cluster",
+	}
 	ops := map[string]func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error{
 		"start_execution": func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error {
 			pointer := env.bcNext.KeyGenerator().BatchPointer(ctx, fnID)
@@ -958,7 +963,7 @@ func TestMigratingIntegration_FallbackLogsOutcome(t *testing.T) {
 				for _, line := range bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n")) {
 					var e map[string]any
 					require.NoError(t, json.Unmarshal(line, &e))
-					if e["msg"] == "batch missed primary cluster, checked fallback cluster" {
+					if e["msg"] == messages[op] {
 						require.Nil(t, entry, "expected one fallback log line")
 						entry = e
 					}
