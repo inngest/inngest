@@ -1,0 +1,15 @@
+.cloud-deploy-prompt::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cloud-deploy-prompt::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border-muted));
+  border: 2px solid rgb(var(--color-background-canvas-subtle));
+  border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cloud-deploy-switch > div {
+    transition: opacity 160ms ease-in-out;
+  }
+}
