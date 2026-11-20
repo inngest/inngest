@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,4 +80,32 @@ func TestSplitLegacy(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestScopedUpdateReadsStepAttemptAsStep(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		scope string
+		want  Scope
+	}{
+		{scope: "step_attempt", want: enums.MetadataScopeStep},
+		{scope: "step", want: enums.MetadataScopeStep},
+		{scope: "run", want: enums.MetadataScopeRun},
+		{scope: "extended_trace", want: enums.MetadataScopeExtendedTrace},
+	} {
+		t.Run(tc.scope, func(t *testing.T) {
+			t.Parallel()
+
+			var u ScopedUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"scope":"`+tc.scope+`","kind":"userland.foo","op":"merge","values":{"a":1}}`), &u))
+			require.Equal(t, tc.want, u.Scope)
+			require.Equal(t, Kind("userland.foo"), u.Kind())
+			require.Equal(t, enums.MetadataOpcodeMerge, u.Op())
+			require.Equal(t, Values{"a": json.RawMessage(`1`)}, u.Values)
+		})
+	}
+
+	var u ScopedUpdate
+	require.Error(t, json.Unmarshal([]byte(`{"scope":"nope","kind":"userland.foo"}`), &u))
 }

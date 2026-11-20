@@ -124,3 +124,36 @@ func TestHandleGeneratorMetadata_DropsOnlyInvalidEntries(t *testing.T) {
 
 	require.Equal(t, []metadata.Kind{"userland.custom", "inngest.timing"}, writtenMetadataKinds(t, tp))
 }
+
+// Server-generated extra metadata is step scoped, and so is SDK metadata
+// sent w/ the legacy step_attempt scope.
+func TestHandleGeneratorMetadata_WritesStepScope(t *testing.T) {
+	tp := newRecordingTracerProvider()
+	e := &executor{
+		log:            logger.From(context.Background()),
+		tracerProvider: tp,
+	}
+	var gen state.GeneratorOpcode
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"id": "step-1",
+		"op": "StepRun",
+		"metadata": [{"scope": "step_attempt", "kind": "userland.custom", "op": "merge", "values": {"k": "v"}}]
+	}`), &gen))
+	extra := &mockStructured{
+		kind:   "inngest.ai",
+		values: metadata.Values{"k": json.RawMessage(`"v"`)},
+	}
+
+	e.handleGeneratorMetadata(context.Background(), newTestRunContext(), &gen, extra)
+
+	var scopes []enums.MetadataScope
+	for _, call := range tp.createCalls {
+		if call.name != meta.SpanNameMetadata {
+			continue
+		}
+		scope, ok := meta.GetAttr(call.opts.Attributes, meta.Attrs.MetadataScope)
+		require.True(t, ok, "metadata span missing scope attribute")
+		scopes = append(scopes, *scope)
+	}
+	require.Equal(t, []enums.MetadataScope{enums.MetadataScopeStep, enums.MetadataScopeStep}, scopes)
+}
