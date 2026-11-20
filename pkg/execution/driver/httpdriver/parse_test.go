@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
@@ -82,4 +85,23 @@ func TestParseGeneratorAllowsExplicitStepRun(t *testing.T) {
 	require.Len(t, ops, 1)
 	require.Equal(t, enums.OpcodeStepRun, ops[0].Op)
 	require.Equal(t, "step-1", ops[0].ID)
+}
+
+func TestParseRetryZero(t *testing.T) {
+	before := time.Now().UTC().Truncate(time.Second).Add(consts.MinRetryDuration)
+	at, err := ParseRetry("0")
+	after := time.Now().UTC().Truncate(time.Second).Add(consts.MinRetryDuration)
+
+	require.NoError(t, err)
+	require.False(t, at.Before(before))
+	require.False(t, at.After(after))
+}
+
+func TestParseRetryInvalid(t *testing.T) {
+	for _, value := range []string{"", "invalid", "-1", "-0", "+0", "0.5", " 0 "} {
+		t.Run(value, func(t *testing.T) {
+			_, err := ParseRetry(value)
+			require.Error(t, err)
+		})
+	}
 }

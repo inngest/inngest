@@ -436,3 +436,23 @@ func gzipCompressedJSON(t *testing.T, input string) []byte {
 
 	return buf.Bytes()
 }
+
+func TestRetryAfterZeroResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":true}`))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	before := time.Now().UTC().Truncate(time.Second).Add(consts.MinRetryDuration)
+	res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: []byte(`{}`)})
+	after := time.Now().UTC().Truncate(time.Second).Add(consts.MinRetryDuration)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	require.NotNil(t, res.RetryAt)
+	require.False(t, res.RetryAt.Before(before))
+	require.False(t, res.RetryAt.After(after))
+}
