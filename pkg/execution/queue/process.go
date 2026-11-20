@@ -230,8 +230,13 @@ func (q *queueProcessor) ProcessItem(
 		leaseIssuedAt := capacityLeaseID.issuedAt()
 
 		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-			AccountID:      accountID,
-			IdempotencyKey: capacityReleaseItem.ID,
+			AccountID: accountID,
+			// Use the lease ID as the operation idempotency key. The queue item
+			// ID is shared by every attempt of the same item, so two attempts
+			// would release different leases under the same key, and the second
+			// release would return the first one's cached result without
+			// releasing the lease it was given.
+			IdempotencyKey: currentLeaseID.String(),
 			LeaseID:        *currentLeaseID,
 			Source: constraintapi.LeaseSource{
 				Location:          constraintapi.CallerLocationItemLease,
