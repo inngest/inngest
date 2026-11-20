@@ -35,6 +35,10 @@ func partitionRequeueExtensionWithJitter() time.Duration {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
+	return q.processPartition(ctx, p, continuationCount, randomOffset, dispatch)
+}
+
+func (q *queueProcessor) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc, leaseOpts ...PartitionLeaseOpt) error {
 	l := logger.StdlibLogger(ctx)
 	shard := q.Shard()
 
@@ -67,7 +71,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// processing the partition by N seconds, meaning the latency is increased by
 	// up to this period for scheduled items behind the concurrency limits.
 	_, err := Duration(ctx, shard.Name(), "partition_lease", q.Clock().Now(), func(ctx context.Context) (any, error) {
-		l, err := shard.PartitionLease(ctx, p, PartitionLeaseDuration)
+		l, err := shard.PartitionLease(ctx, p, PartitionLeaseDuration, leaseOpts...)
 		p.LeaseID = l
 		return nil, err
 	})
@@ -92,6 +96,9 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		span.SetAttributes(attribute.String("status", "partition_gone"))
+		return nil
+	}
+	if errors.Is(err, ErrPartitionNoLongerEligible) {
 		return nil
 	}
 	if errors.Is(err, ErrPartitionPaused) {

@@ -76,6 +76,10 @@ var (
 	ErrRoleAlreadyLeased             = fmt.Errorf("role already leased")
 	ErrRoleLeaseExceedsLimits        = fmt.Errorf("role lease duration exceeds the maximum of %d seconds", int(RoleLeaseMax.Seconds()))
 
+	// ErrPartitionNoLongerEligible indicates that the partition was parked or
+	// locked for migration between peek and lease.
+	ErrPartitionNoLongerEligible = fmt.Errorf("partition is no longer eligible")
+
 	ErrAllShardsAlreadyLeased  = fmt.Errorf("all shards in the group are fully allocated")
 	ErrShardLeaseNotFound      = fmt.Errorf("shard lease not found")
 	ErrShardLeaseExpired       = fmt.Errorf("cannot renew expired shard lease")
