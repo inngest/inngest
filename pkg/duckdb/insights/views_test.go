@@ -336,10 +336,12 @@ func insertScopedMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUI
 	require.NoError(t, err)
 }
 
-// step and step_attempt metadata land on the same (finalized step) span.
-// The rollup keeps them apart, so a newer step_attempt emission of the same
-// kind doesn't hide the step's metadata from insights_steps/insights_step_attempts.
-func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
+// step_attempt metadata is legacy step metadata (the executor still writes
+// its own extra metadata, IE inngest.ai, as step_attempt), so it rolls up
+// w/ the step's: a newer step_attempt emission of a kind replaces the
+// step's. A different scope on the same span (extended_trace here) stays
+// apart even for the same kind.
+func TestInsightsStepsReadStepAttemptMetadataAsStep(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 	accountID, envID := uuid.New(), uuid.New()
@@ -347,8 +349,14 @@ func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	insertStepSpan(t, db, accountID, envID, runID, "span-1", "step-1", 0, now)
 	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step", "a", `{"v": 1}`, now)
-	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "a", `{"v": 2}`, now.Add(time.Second))
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "b", `{"v": 2}`, now.Add(time.Second))
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "a", `{"v": 3}`, now.Add(2*time.Second))
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "extended_trace", "a", `{"v": 4}`, now.Add(3*time.Second))
 
+	stepMD := map[string]any{
+		"a": map[string]any{"v": float64(3)},
+		"b": map[string]any{"v": float64(2)},
+	}
 	for _, table := range []string{"insights_steps", "insights_step_attempts"} {
 		var count int
 		var md any
@@ -356,7 +364,7 @@ func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 			"SELECT count(*) OVER (), metadata FROM inngest_local."+table+"(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 		).Scan(&count, &md), table)
 		require.Equal(t, 1, count, table)
-		require.Equal(t, map[string]any{"a": map[string]any{"v": float64(1)}}, md, table)
+		require.Equal(t, stepMD, md, table)
 	}
 
 	// insights_metadata has one row per scope of the span.
@@ -373,8 +381,8 @@ func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 	}
 	require.NoError(t, rows.Err())
 	require.Equal(t, map[string]any{
-		"step":         map[string]any{"a": map[string]any{"v": float64(1)}},
-		"step_attempt": map[string]any{"a": map[string]any{"v": float64(2)}},
+		"step":           stepMD,
+		"extended_trace": map[string]any{"a": map[string]any{"v": float64(4)}},
 	}, got)
 }
 

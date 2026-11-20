@@ -30,7 +30,7 @@ const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_ti
 //
 // Metadata (inngest.run_metadata) is aggregated in SQL rather than a
 // second round trip: the latest_metadata CTE LEFT JOINs it and collapses
-// multiple emissions of the same (span_id, scope, is_user, kind) to the latest by
+// multiple emissions of the same (span_id, scope, is_user, kind) (w/ step_attempt read as step) to the latest by
 // created_at via QUALIFY, then the outer query GROUPs BY every span column
 // and aggregates metadata into one LIST(STRUCT(...)) column per span. The
 // ordering (values text breaks created_at ties) matches
@@ -45,7 +45,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		    AND m.run_id = s.run_id AND m.span_id = s.span_id
 		   WHERE s.run_id = ?
 		   QUALIFY m.kind IS NULL OR ROW_NUMBER() OVER (
-		     PARTITION BY m.span_id, m.scope, m.is_user, m.kind
+		     PARTITION BY m.span_id, CASE m.scope WHEN 'step_attempt' THEN 'step' ELSE m.scope END, m.is_user, m.kind
 		     ORDER BY m.created_at DESC, m.values DESC NULLS LAST
 		   ) = 1
 		 )

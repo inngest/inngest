@@ -52,13 +52,15 @@ SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 -- with the latest emission of each kind as user_metadata/internal_metadata
 -- (kind -> values). scope is part of the key because a span can carry more
 -- than one: step and step_attempt metadata both land on the finalized step
--- span, and a consumer joins on one scope (IE insights_steps on 'step'). Every metadata write is a full replace of its kind, so there's no
+-- span, and a consumer joins on one scope (IE insights_steps on 'step').
+-- step_attempt is legacy and read as step (see enums.MetadataScopeStepAttempt),
+-- which the executor still writes its own extra metadata (IE inngest.ai) as. Every metadata write is a full replace of its kind, so there's no
 -- merging: an older emission's keys don't survive a newer one, and a null
 -- value is kept as null rather than deleting its key the way
 -- json_merge_patch (RFC 7386) would. kind is stored without its
 -- userland/inngest prefix, so is_user is part of the collapse key or a user
--- "foo" and an internal "foo" would clobber each other (and scope is too, or
--- a step_attempt "foo" would hide the step's "foo"). Ties on created_at
+-- "foo" and an internal "foo" would clobber each other (and scope is too,
+-- so the same kind on two scopes of one span stays apart). Ties on created_at
 -- fall back to the values text so the winner is deterministic;
 -- pkg/duckdb/query's GetSpansByRunID collapses with the same ordering.
 --
@@ -66,9 +68,13 @@ SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 -- so a federated executor can roll up lake + buffer emissions together: a
 -- span's latest emission of a kind may be on either side.
 CREATE OR REPLACE MACRO inngest_local.run_metadata_rollup(p_metadata := 'inngest.run_metadata') AS TABLE
-WITH latest AS (
-  SELECT *
+WITH emissions AS (
+  SELECT * REPLACE (CASE scope WHEN 'step_attempt' THEN 'step' ELSE scope END AS scope)
   FROM query_table(p_metadata)
+),
+latest AS (
+  SELECT *
+  FROM emissions
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY account_id, env_id, run_id, span_id, scope, is_user, kind
     ORDER BY created_at DESC, values DESC NULLS LAST
