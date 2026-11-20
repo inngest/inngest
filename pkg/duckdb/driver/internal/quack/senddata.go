@@ -133,6 +133,10 @@ func isStreamNotActiveErr(err error) bool {
 	return errors.Is(err, result.ErrStatementFailed) && strings.Contains(err.Error(), streamNotActiveMessage)
 }
 
+// sendDataStatementEndGrace bounds how long sendDataDrive waits for a
+// statement whose send was rejected to end on its own before cancelling it.
+const sendDataStatementEndGrace = time.Second
+
 // sendDataStreamReadyMinBackoff/MaxBackoff bound sendWhenActive's retry
 // backoff.
 const (
@@ -231,9 +235,20 @@ func (s *Session) sendDataDrive(ctx context.Context, sql, streamID string, colum
 		return errors.New("duckdb: quack appender: prepare completed without the stream ever accepting data")
 	}
 
+	if errors.Is(sendErr, result.ErrStatementFailed) {
+		// A statement-level rejection of the send is usually the statement's
+		// own error (IE the INSERT failed on the rows), and its PrepareRequest
+		// is answering w/ the same error. Cancelling now would abandon a
+		// statement that already ended, so let it finish first.
+		select {
+		case <-done:
+		case <-ctx.Done():
+		case <-time.After(sendDataStatementEndGrace):
+		}
+	}
 	// The statement may still be waiting on its stream. Exec returns as
 	// soon as its ctx ends (the cancel itself runs in the background), so
-	// this wait can't hang on the server.
+	// this wait can't hang on the server. Once done is closed this is a no-op.
 	cancel()
 	<-done
 	if errors.Is(prepErr, result.ErrStatementFailed) {

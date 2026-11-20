@@ -565,20 +565,23 @@ func fakeErrorResponse(msg string) []byte {
 }
 
 // TestQuackFaultAppendStatementFailsMidStream: when the statement fails on
-// its own and the send fails because of it, the statement's error is the one
-// returned and the session stays usable.
+// its own, the server answers the send w/ the statement's own error too
+// (what 2.0.0 does), possibly before the client reads the prepare's
+// response. The statement's error is the one returned and the session stays
+// usable, since the statement already ended.
 func TestQuackFaultAppendStatementFailsMidStream(t *testing.T) {
 	f := newFakeQuackServer(t)
-	failed := make(chan struct{})
+	const msg = "Constraint Error: duplicate key"
+	sent := make(chan struct{})
 	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
-		_, _ = w.Write(fakeErrorResponse("Constraint Error: duplicate key"))
-		close(failed)
+		// Answer the prepare only once the send has its error, so the send's
+		// error is always the one the client sees first.
+		<-sent
+		_, _ = w.Write(fakeErrorResponse(msg))
 	}
 	f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
-		<-failed
-		// Give the client time to read the prepare's response first.
-		time.Sleep(50 * time.Millisecond)
-		_, _ = w.Write(fakeErrorResponse("stream was closed"))
+		_, _ = w.Write(fakeErrorResponse(msg))
+		close(sent)
 	}
 	s := f.session(t)
 
