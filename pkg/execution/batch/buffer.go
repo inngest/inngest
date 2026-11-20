@@ -503,7 +503,7 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 	// we might still write the event to a redis batch and return an error, which leads to not scheduling the batch for execution ever.
 	// This results in stuck batches.
 	//
-	// To avoid that, we always schedule the batch for execution when any of the events are duplicates.
+	// To avoid that, we schedule the batch for execution when any of the events are duplicates, unless the batch is empty.
 	// While this scheduling attempt is only required if the retried event was the first event in a new batch, it is hard to distinguish
 	// that case because we bulk append. So we just schedule a job every time there are _any_ duplicate elements in a batch.
 	// This is safe because batcher.ScheduleExecution is idempotent for a given batchID, so if a job already exists, the schedule call is a no-op.
