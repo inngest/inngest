@@ -126,6 +126,22 @@ type ScopedUpdate struct {
 	Update
 }
 
+// UnmarshalJSON reads a legacy step_attempt scope as step (see
+// enums.MetadataScopeStepAttempt): inngest-js sent it for attempt-targeted
+// step metadata before 4.1.1.
+func (m *ScopedUpdate) UnmarshalJSON(data []byte) error {
+	type scopedUpdate ScopedUpdate
+	var u scopedUpdate
+	if err := json.Unmarshal(data, &u); err != nil {
+		return err
+	}
+	if u.Scope == enums.MetadataScopeStepAttempt {
+		u.Scope = enums.MetadataScopeStep
+	}
+	*m = ScopedUpdate(u)
+	return nil
+}
+
 type Update struct {
 	RawUpdate
 }
