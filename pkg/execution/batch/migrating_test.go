@@ -1,8 +1,12 @@
 package batch
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -12,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -908,5 +913,67 @@ func TestMigratingIntegration_DebugAPIErrorsNameFailingCluster(t *testing.T) {
 			_, err = env.migBM.DeleteBatch(ctx, fnID, "")
 			checkErr(t, err)
 		})
+	}
+}
+
+// TestMigratingIntegration_FallbackLogsOutcome checks that every read falling
+// back to the other cluster logs, at Info, which batch it was and whether the
+// other cluster held it.
+func TestMigratingIntegration_FallbackLogsOutcome(t *testing.T) {
+	ops := map[string]func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error{
+		"start_execution": func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error {
+			pointer := env.bcNext.KeyGenerator().BatchPointer(ctx, fnID)
+			_, err := env.migBM.StartExecution(ctx, uuid.Nil, fnID, batchID, pointer)
+			return err
+		},
+		"retrieve_items": func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error {
+			_, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
+			return err
+		},
+		"delete_keys": func(ctx context.Context, env *migratingTestEnv, fnID uuid.UUID, batchID ulid.ULID) error {
+			_, err := env.migBM.DeleteKeys(ctx, uuid.Nil, fnID, batchID)
+			return err
+		},
+	}
+
+	for op, call := range ops {
+		for _, inFallback := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/in_fallback=%t", op, inFallback), func(t *testing.T) {
+				var output bytes.Buffer
+				log := logger.FromSlog(slog.New(slog.NewJSONHandler(&output, nil)), slog.LevelInfo)
+				ctx := logger.WithStdlib(context.Background(), log)
+
+				// Every append goes to current, so next is the fallback cluster.
+				env := newMigratingTestEnv(t)
+				fnID := uuid.New()
+				batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+				if inFallback {
+					res, _ := appendItem(ctx, t, env.bmNext, fnID, newFunction(fnID))
+					batchID = ulid.MustParse(res.BatchID)
+				}
+
+				require.NoError(t, call(ctx, env, fnID, batchID))
+
+				var entry map[string]any
+				for _, line := range bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n")) {
+					var e map[string]any
+					require.NoError(t, json.Unmarshal(line, &e))
+					if e["msg"] == "batch missed primary cluster, checked fallback cluster" {
+						require.Nil(t, entry, "expected one fallback log line")
+						entry = e
+					}
+				}
+				require.NotNil(t, entry, "missing fallback log line in %q", output.String())
+				require.Equal(t, "INFO", entry["level"])
+				require.Equal(t, op, entry["op"])
+				require.Equal(t, "current", entry["primary"])
+				require.Equal(t, "next", entry["fallback"])
+				require.Equal(t, fnID.String(), entry["function_id"])
+				require.Equal(t, batchID.String(), entry["batch_id"])
+				require.Equal(t, inFallback, entry["found"])
+				require.GreaterOrEqual(t, entry["batch_age_ms"], float64(0))
+				require.NotContains(t, entry, "error")
+			})
+		}
 	}
 }

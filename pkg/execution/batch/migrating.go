@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -91,14 +92,16 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, f
 	if err != nil || result != enums.BatchStatusAbsent.String() {
 		return result, err
 	}
-	logger.StdlibLogger(ctx).Debug("batch absent in primary cluster, falling back for StartExecution",
-		"account_id", accountID,
-		"function_id", functionID,
-		"batch_id", batchID,
-		"primary", primary.Name(),
-	)
-	recordFallback(ctx, "start_execution")
-	return fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
+	result, err = fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
+	recordFallback(ctx, fallbackRead{
+		op:         "start_execution",
+		primary:    primary,
+		fallback:   fallback,
+		accountID:  accountID,
+		functionID: functionID,
+		batchID:    batchID,
+	}, err == nil && result != enums.BatchStatusAbsent.String(), err)
+	return result, err
 }
 
 // RetrieveItems checks the fallback cluster only when the primary returns no items.
@@ -110,23 +113,57 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 	if err != nil || len(items) > 0 {
 		return items, err
 	}
-	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for RetrieveItems",
-		"account_id", accountID,
-		"function_id", functionID,
-		"batch_id", batchID,
-		"primary", primary.Name(),
-	)
-	recordFallback(ctx, "retrieve_items")
-	return fallback.RetrieveItems(ctx, accountID, functionID, batchID)
+	items, err = fallback.RetrieveItems(ctx, accountID, functionID, batchID)
+	recordFallback(ctx, fallbackRead{
+		op:         "retrieve_items",
+		primary:    primary,
+		fallback:   fallback,
+		accountID:  accountID,
+		functionID: functionID,
+		batchID:    batchID,
+	}, len(items) > 0, err)
+	return items, err
 }
 
-// recordFallback counts a read that missed the primary store and is retried
-// on the fallback store.
-func recordFallback(ctx context.Context, op string) {
+// fallbackRead identifies a batch operation that missed the account's primary
+// cluster and was retried on the fallback cluster.
+type fallbackRead struct {
+	op         string
+	primary    BatchManager
+	fallback   BatchManager
+	accountID  uuid.UUID
+	functionID uuid.UUID
+	batchID    ulid.ULID
+}
+
+// recordFallback counts a fallback read and logs what the fallback cluster
+// returned. found reports whether the fallback cluster held the batch.
+//
+// The log says which batches still reach the fallback cluster. Once a
+// migration has drained, the fallback cluster holds no batches, so a fallback
+// that finds nothing means the batch is gone from both clusters. batch_age_ms
+// tells a batch that is still draining apart from a job for a batch that was
+// already handled.
+func recordFallback(ctx context.Context, r fallbackRead, found bool, err error) {
 	metrics.IncrBatchMigrationFallbackCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"op": op},
+		Tags:    map[string]any{"op": r.op},
 	})
+
+	args := []any{
+		"op", r.op,
+		"primary", r.primary.Name(),
+		"fallback", r.fallback.Name(),
+		"account_id", r.accountID,
+		"function_id", r.functionID,
+		"batch_id", r.batchID,
+		"batch_age_ms", time.Since(time.UnixMilli(int64(r.batchID.Time()))).Milliseconds(),
+		"found", found,
+	}
+	if err != nil {
+		args = append(args, "error", err)
+	}
+	logger.StdlibLogger(ctx).Info("batch missed primary cluster, checked fallback cluster", args...)
 }
 
 // ScheduleExecution doesn't touch either store; it only enqueues the
@@ -147,14 +184,16 @@ func (m *migratingBatchManager) DeleteKeys(ctx context.Context, accountID, funct
 	if err != nil || existed {
 		return existed, err
 	}
-	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for DeleteKeys",
-		"account_id", accountID,
-		"function_id", functionID,
-		"batch_id", batchID,
-		"primary", primary.Name(),
-	)
-	recordFallback(ctx, "delete_keys")
-	return fallback.DeleteKeys(ctx, accountID, functionID, batchID)
+	existed, err = fallback.DeleteKeys(ctx, accountID, functionID, batchID)
+	recordFallback(ctx, fallbackRead{
+		op:         "delete_keys",
+		primary:    primary,
+		fallback:   fallback,
+		accountID:  accountID,
+		functionID: functionID,
+		batchID:    batchID,
+	}, existed, err)
+	return existed, err
 }
 
 // GetBatchInfo returns the current batch in each cluster, current first. Both
