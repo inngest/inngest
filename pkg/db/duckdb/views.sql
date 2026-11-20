@@ -57,7 +57,8 @@ SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 -- value is kept as null rather than deleting its key the way
 -- json_merge_patch (RFC 7386) would. kind is stored without its
 -- userland/inngest prefix, so is_user is part of the collapse key or a user
--- "foo" and an internal "foo" would clobber each other. Ties on created_at
+-- "foo" and an internal "foo" would clobber each other (and scope is too, or
+-- a step_attempt "foo" would hide the step's "foo"). Ties on created_at
 -- fall back to the values text so the winner is deterministic;
 -- pkg/duckdb/query's GetSpansByRunID collapses with the same ordering.
 --
@@ -69,7 +70,7 @@ WITH latest AS (
   SELECT *
   FROM query_table(p_metadata)
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_id, env_id, run_id, span_id, is_user, kind
+    PARTITION BY account_id, env_id, run_id, span_id, scope, is_user, kind
     ORDER BY created_at DESC, values DESC NULLS LAST
   ) = 1
 )

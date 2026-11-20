@@ -337,8 +337,8 @@ func insertScopedMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUI
 }
 
 // step and step_attempt metadata land on the same (finalized step) span.
-// The rollup keeps them apart, so a step_attempt emission doesn't hide the
-// step's metadata from insights_steps/insights_step_attempts.
+// The rollup keeps them apart, so a newer step_attempt emission of the same
+// kind doesn't hide the step's metadata from insights_steps/insights_step_attempts.
 func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
@@ -347,7 +347,7 @@ func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	insertStepSpan(t, db, accountID, envID, runID, "span-1", "step-1", 0, now)
 	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step", "a", `{"v": 1}`, now)
-	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "b", `{"v": 2}`, now.Add(time.Second))
+	insertScopedMetadataRow(t, db, accountID, envID, runID, "span-1", "step_attempt", "a", `{"v": 2}`, now.Add(time.Second))
 
 	for _, table := range []string{"insights_steps", "insights_step_attempts"} {
 		var count int
@@ -374,7 +374,7 @@ func TestInsightsStepsKeepStepMetadataNextToStepAttemptMetadata(t *testing.T) {
 	require.NoError(t, rows.Err())
 	require.Equal(t, map[string]any{
 		"step":         map[string]any{"a": map[string]any{"v": float64(1)}},
-		"step_attempt": map[string]any{"b": map[string]any{"v": float64(2)}},
+		"step_attempt": map[string]any{"a": map[string]any{"v": float64(2)}},
 	}, got)
 }
 
