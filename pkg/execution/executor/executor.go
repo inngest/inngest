@@ -6652,8 +6652,11 @@ func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution
 
 	for _, ex := range extra {
 		// TODO: maybe make all metadata have a Scope() method?
-		// For now, we hardcode extra metadata to be step attempt-scoped, as that's the only place we use it and it makes the most sense for it to be tied to the specific attempt that emitted it.
-		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata.extra", ex, enums.MetadataScopeStepAttempt, gen); err != nil {
+		// For now, extra metadata is always step scoped. step_attempt is
+		// legacy (see enums.MetadataScopeStepAttempt), and the attempt that
+		// emitted it is still on the span (createMetadataSpan parents a
+		// retryable error's metadata on its retry span).
+		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata.extra", ex, enums.MetadataScopeStep, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator extra metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}
 	}
