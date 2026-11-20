@@ -26,6 +26,7 @@ const (
 	V2_CreateEnv_FullMethodName                  = "/api.v2.V2/CreateEnv"
 	V2_FetchPartnerAccounts_FullMethodName       = "/api.v2.V2/FetchPartnerAccounts"
 	V2_FetchAccount_FullMethodName               = "/api.v2.V2/FetchAccount"
+	V2_GetAccountUsage_FullMethodName            = "/api.v2.V2/GetAccountUsage"
 	V2_FetchAccountEnvs_FullMethodName           = "/api.v2.V2/FetchAccountEnvs"
 	V2_FetchAccountEventKeys_FullMethodName      = "/api.v2.V2/FetchAccountEventKeys"
 	V2_FetchAccountSigningKeys_FullMethodName    = "/api.v2.V2/FetchAccountSigningKeys"
@@ -114,6 +115,7 @@ type V2Client interface {
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
+	GetAccountUsage(ctx context.Context, in *GetAccountUsageRequest, opts ...grpc.CallOption) (*GetAccountUsageResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(ctx context.Context, in *FetchAccountEventKeysRequest, opts ...grpc.CallOption) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
@@ -251,6 +253,16 @@ func (c *v2Client) FetchAccount(ctx context.Context, in *FetchAccountRequest, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchAccountResponse)
 	err := c.cc.Invoke(ctx, V2_FetchAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetAccountUsage(ctx context.Context, in *GetAccountUsageRequest, opts ...grpc.CallOption) (*GetAccountUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountUsageResponse)
+	err := c.cc.Invoke(ctx, V2_GetAccountUsage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1027,6 +1039,7 @@ type V2Server interface {
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
+	GetAccountUsage(context.Context, *GetAccountUsageRequest) (*GetAccountUsageResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
@@ -1127,6 +1140,9 @@ func (UnimplementedV2Server) FetchPartnerAccounts(context.Context, *FetchAccount
 }
 func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchAccount not implemented")
+}
+func (UnimplementedV2Server) GetAccountUsage(context.Context, *GetAccountUsageRequest) (*GetAccountUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccountUsage not implemented")
 }
 func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchAccountEnvs not implemented")
@@ -1472,6 +1488,24 @@ func _V2_FetchAccount_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).FetchAccount(ctx, req.(*FetchAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetAccountUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetAccountUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetAccountUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetAccountUsage(ctx, req.(*GetAccountUsageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2799,6 +2833,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchAccount",
 			Handler:    _V2_FetchAccount_Handler,
+		},
+		{
+			MethodName: "GetAccountUsage",
+			Handler:    _V2_GetAccountUsage_Handler,
 		},
 		{
 			MethodName: "FetchAccountEnvs",
