@@ -576,3 +576,17 @@ func TestExecutorPrunedJoinKeepsFilteredRows(t *testing.T) {
 		}
 	})
 }
+
+// TestExecutorUnreadUnnestKeepsDeltaRows checks an unnest the outer query
+// never reads still streams its column: over the delta's NULL stand-in it'd
+// produce no rows.
+func TestExecutorUnreadUnnestKeepsDeltaRows(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		done := f.base.Add(time.Minute)
+		f.deltaRun("run-A", "Completed", f.base, &done, "")
+		f.deltaRun("run-B", "Running", f.base, nil, "")
+
+		got := f.query(t, []Table{TableRuns}, nil, `SELECT 'n', count(*)::VARCHAR FROM (SELECT unnest(event_ids) FROM runs)`)
+		require.Equal(t, map[string]string{"n": "2"}, got)
+	})
+}
