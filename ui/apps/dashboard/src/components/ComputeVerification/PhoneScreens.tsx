@@ -9,8 +9,8 @@ import {
   Heading,
   Panel,
   useAction,
-  VerificationIcon,
 } from './shared';
+import { VerificationSteps } from './VerificationSteps';
 import { OTPInput } from './OTPInput';
 import type { VerificationActions, VerificationState } from './types';
 
@@ -34,7 +34,7 @@ export function PhoneScreen({
     (!edited && state.phoneError ? phoneErrors[state.phoneError] : undefined);
   return (
     <Panel>
-      <VerificationIcon kind="phone" />
+      <VerificationSteps phone={state.phone} card={state.card} />
       <Heading step={1} title="Verify your phone">
         Use a US mobile number. VoIP numbers are unsupported.
       </Heading>
@@ -124,7 +124,7 @@ export function CodeScreen({ state, actions }: Props) {
   const destination = state.destinationPhone ?? 'your mobile number';
   return (
     <Panel>
-      <VerificationIcon kind="phone" />
+      <VerificationSteps phone={state.phone} card={state.card} />
       <Heading step={1} title="Enter your verification code">
         <div className="flex flex-wrap items-center gap-x-0.5 gap-y-1">
           <p>

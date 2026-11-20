@@ -5,8 +5,8 @@ import {
   Heading,
   Panel,
   useAction,
-  VerificationIcon,
 } from './shared';
+import { VerificationSteps } from './VerificationSteps';
 import type { VerificationProps } from './types';
 
 export function CardScreen({
@@ -20,7 +20,7 @@ export function CardScreen({
     action.error ?? (state.cardError ? cardErrors[state.cardError] : undefined);
   return (
     <Panel>
-      <VerificationIcon kind="card" />
+      <VerificationSteps phone={state.phone} card={state.card} />
       <Heading step={2} title="Verify a card">
         Use a US credit or debit card for verification. It becomes your default
         payment method but can be changed later.
