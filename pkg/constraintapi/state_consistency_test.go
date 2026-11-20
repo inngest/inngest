@@ -74,7 +74,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		_, _, _, fingerprint, err := buildRequestState(acquireReq)
+	_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 		require.NoError(t, err)
 		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
 
@@ -379,7 +379,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		_, _, _, fingerprint, err := buildRequestState(acquireReq)
+		_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 		require.NoError(t, err)
 		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
 
@@ -478,7 +478,7 @@ func TestStateConsistency_LeaseOperations(t *testing.T) {
 			},
 		}
 
-		_, _, _, fingerprint, err := buildRequestState(acquireReq)
+		_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 		require.NoError(t, err)
 		acquireIdempotencyKey := fmt.Sprintf("%s-%s", acquireReq.IdempotencyKey, fingerprint)
 

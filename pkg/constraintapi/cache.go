@@ -37,6 +37,7 @@ type constraintCache struct {
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableCache                          EnableConstraintCacheFn
 	shouldCache                          ShouldCacheConstraintFn
+	shouldCacheForAccount                EnableAcquireCacheFn
 }
 
 type constraintCacheItem struct {
@@ -111,6 +112,19 @@ func WithConstraintCacheShouldCache(fn ShouldCacheConstraintFn) ConstraintCacheO
 	}
 }
 
+// WithConstraintCacheShouldCacheForAccount adds an account-aware constraint
+// filter, alongside WithConstraintCacheShouldCache. Both must allow caching.
+func WithConstraintCacheShouldCacheForAccount(fn EnableAcquireCacheFn) ConstraintCacheOption {
+	return func(c *constraintCache) { c.shouldCacheForAccount = fn }
+}
+
+func (l *constraintCache) cacheable(ctx context.Context, req *CapacityAcquireRequest, ci ConstraintItem) bool {
+	if l.shouldCache != nil && !l.shouldCache(ci) {
+		return false
+	}
+	return l.shouldCacheForAccount == nil || l.shouldCacheForAccount(ctx, req.AccountID, req.EnvID, req.FunctionID, ci)
+}
+
 func WithConstraintCacheMaxSize(maxSize int64) ConstraintCacheOption {
 	return func(c *constraintCache) {
 		c.maxSize = maxSize
@@ -150,7 +164,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	// Return immediately on first cache hit since any exhausted constraint blocks the request
 	for _, ci := range req.Constraints {
 		// Skip constraints that don't pass the filter
-		if l.shouldCache != nil && !l.shouldCache(ci) {
+		if !l.cacheable(ctx, req, ci) {
 			continue
 		}
 
@@ -275,7 +289,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	// Exhausted constraints mean no further requests can succeed until capacity is freed.
 	for _, ci := range res.ExhaustedConstraints {
 		// Skip constraints that don't pass the filter
-		if l.shouldCache != nil && !l.shouldCache(ci) {
+		if !l.cacheable(ctx, req, ci) {
 			continue
 		}
 

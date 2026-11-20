@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,12 @@ import (
 
 const (
 	semaphoreIdempotencyTTL = 60 * time.Second
+	// Expiry never permits another decrement: after this window an uncertain
+	// retry fails closed instead. Held ownership records have no expiry.
+	semaphoreOwnershipRetention = 7 * 24 * time.Hour
 )
+
+var ErrSemaphoreOwnershipUnknown = errors.New("manual semaphore ownership is unknown")
 
 // SetResult describes the outcome of SetCapacity. Applied is false when the
 // call was an idempotent replay of a previously-seen idempotency key; callers
@@ -173,13 +179,18 @@ func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID 
 	keys := []string{
 		semaphoreUsageKey(accountID, name, evaluatedKeyHash),
 		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
+		semaphoreUsageKey(accountID, name, evaluatedKeyHash) + ":owner:" + idempotencyKey,
 	}
 	args := []string{
 		fmt.Sprintf("%d", weight),
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%d", int(semaphoreOwnershipRetention.Seconds())),
 	}
 
-	err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+	result, err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).AsInt64()
+	if err == nil && result == -1 {
+		err = fmt.Errorf("%w: %s", ErrSemaphoreOwnershipUnknown, name)
+	}
 
 	m.recordMetrics(ctx, "release", start, err)
 

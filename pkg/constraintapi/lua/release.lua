@@ -112,6 +112,33 @@ end
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
 
+-- $include(helper/manual_owner.lua)
+
+-- Validate all tracked manual holds before mutating any constraint. Redis
+-- scripts do not roll back earlier writes when a later command fails.
+local manualHolds = {}
+local runID
+if requestDetails.mso then
+	runID = call("HGET", keyLeaseDetails, "rid")
+	for index, c in ipairs(constraints) do
+		if c.k == 4 and c.sem.rel == 1 then
+			local owned = call("GET", c.sem.k .. ":owner:" .. runID)
+			if owned == false then return redis.error_reply("ERR manual semaphore ownership is unknown") end
+			local held, claim = decodeManualOwner(owned)
+			if held == nil then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if forceReleaseSemaphores and (tonumber(call("GET", c.sem.k)) or 0) < held then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if held > 0 and claim ~= requestID then
+				return redis.error_reply("ERR manual semaphore claim belongs to another request")
+			end
+			manualHolds[index] = held
+		end
+	end
+end
+
 for index, c in ipairs(constraints) do
 	-- for concurrency constraints
 	if c.k == 2 then
@@ -119,8 +146,13 @@ for index, c in ipairs(constraints) do
 		call("ZREM", c.c.ilk, currentLeaseID)
 		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
-		-- semaphore: decrement for auto-release, or when force-released by the scavenger
-		if c.sem.rel == 0 or forceReleaseSemaphores then
+		if c.sem.rel == 1 and requestDetails.mso then
+			-- Expiry ends an attempt, not the run. Retain its admission so a
+			-- crashed start can retry; only finalization consumes this hold.
+			if manualHolds[index] > 0 then
+				call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
+			end
+		elseif c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w
 			if not weight or weight <= 0 then
 				weight = 1

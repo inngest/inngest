@@ -178,8 +178,8 @@ type ItemLeaseConstraintCheckResult struct {
 
 	RetryAfter time.Time
 
-	// ExhaustedSemaphores lists the semaphores that had no capacity when no
-	// lease was granted.  empty when a lease was granted.
+	// ExhaustedSemaphores lists shared exhaustion safe to memoize for later
+	// items. Owned manual permits are omitted: another run may reuse its hold.
 	ExhaustedSemaphores []constraintapi.SemaphoreConstraint
 }
 
@@ -635,6 +635,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	constraint := enums.QueueConstraintNotLimited
 	if len(res.ExhaustedConstraints) > 0 {
 		constraint = ConvertLimitingConstraint(constraints, res.ExhaustedConstraints)
+	} else if len(res.Leases) == 0 {
+		// A run-specific refusal is limiting without shared exhaustion.
+		constraint = ConvertLimitingConstraint(constraints, res.LimitingConstraints)
 	}
 
 	span.SetAttributes(attribute.String("limiting_constraint", constraint.String()))
@@ -644,7 +647,8 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 		result.LimitingConstraint = constraint
 		result.RetryAfter = res.RetryAfter
-		result.ExhaustedSemaphores = exhaustedSemaphores(res.ExhaustedConstraints)
+		ownedManual := q.ManualSemaphoreOwnership != nil && q.ManualSemaphoreOwnership(*shadowPart.AccountID)
+		result.ExhaustedSemaphores = exhaustedSemaphores(res.ExhaustedConstraints, ownedManual)
 		return result, nil
 	}
 
@@ -659,12 +663,14 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	return result, nil
 }
 
-// exhaustedSemaphores returns the semaphore constraints in the given exhausted
-// constraint list.
-func exhaustedSemaphores(exhausted []constraintapi.ConstraintItem) []constraintapi.SemaphoreConstraint {
+// exhaustedSemaphores returns exhaustion that applies to other runs too.
+func exhaustedSemaphores(exhausted []constraintapi.ConstraintItem, ownedManual bool) []constraintapi.SemaphoreConstraint {
 	var sems []constraintapi.SemaphoreConstraint
 	for _, ci := range exhausted {
 		if ci.Kind != constraintapi.ConstraintKindSemaphore || ci.Semaphore == nil {
+			continue
+		}
+		if ownedManual && ci.Semaphore.Release == constraintapi.SemaphoreReleaseManual {
 			continue
 		}
 		sems = append(sems, *ci.Semaphore)

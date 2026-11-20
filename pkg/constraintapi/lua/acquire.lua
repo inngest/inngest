@@ -93,6 +93,7 @@ local function addConstraintUsage(target, index, limit, used)
 end
 
 -- $include(helper/gcra.lua)
+-- $include(helper/manual_owner.lua)
 
 ---@type integer
 local requested = requestDetails.r
@@ -161,6 +162,11 @@ local retryAt = 0
 ---@type table<integer, integer>
 local concurrencyUsageCache = {}
 
+-- Owned manual acquisitions contain one job. Preflight all holds before writes.
+local manualReuse = {}
+local manualOwnerKeys = {}
+local semaphoreCapacityCache = {}
+
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
 
@@ -226,6 +232,7 @@ for index, value in ipairs(constraints) do
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
+	local runLimited = false
 	if skipGCRA and (value.k == 1 or value.k == 3) then
 		-- skip constraint, don't mark as exhausted
 		constraintCapacity = math.max(availableCapacity, 1)
@@ -254,21 +261,33 @@ for index, value in ipairs(constraints) do
 		-- semaphore
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		semaphoreCapacityCache[index] = capacity
 		local weight = toInteger(value.sem.w)
 		if not weight or weight <= 0 then
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if remaining < weight then
-			constraintCapacity = 0
-		else
-			constraintCapacity = math.floor(remaining / weight)
+		constraintCapacity = math.max(math.floor(remaining / weight), 0)
+		if requestDetails.mso and value.sem.rel == 1 then
+			local ownerKey = value.sem.k .. ":owner:" .. requestDetails.lri[requestDetails.lik[1]]
+			manualOwnerKeys[index] = ownerKey
+			local owned = call("GET", ownerKey)
+			if owned ~= false then
+				local held, claim = decodeManualOwner(owned)
+				if held == nil or usage < held then
+					return redis.error_reply("ERR manual semaphore ownership is invalid")
+				end
+				manualReuse[index] = held == weight and claim == ""
+				constraintCapacity = manualReuse[index] and 1 or 0
+				runLimited = not manualReuse[index]
+			end
 		end
 		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
 
-	-- Track if constraint is exhausted before granting
-	if constraintCapacity <= 0 then
+	-- A run-specific refusal limits this request, but is not shared exhaustion:
+	-- caching it would block unrelated runs that can still acquire this key.
+	if constraintCapacity <= 0 and not runLimited then
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
@@ -383,8 +402,20 @@ for i, value in ipairs(constraints) do
 		if not weight or weight <= 0 then
 			weight = 1
 		end
-		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
-		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		local acquired = manualReuse[i] and 0 or granted
+		local newUsage
+		if acquired > 0 then
+			newUsage = call("INCRBY", value.sem.k, toInteger(weight * acquired))
+		else
+			newUsage = tonumber(call("GET", value.sem.k)) or 0
+		end
+		if manualOwnerKeys[i] then
+			-- Once a key uses ownership, a missing owner must never fall back
+			-- to a legacy decrement, even after released tombstones expire.
+			-- The existing request ID remains stable across lease renewal.
+			call("MSET", value.sem.k .. ":ownership", "1", manualOwnerKeys[i], tostring(toInteger(weight)) .. ":" .. requestID)
+		end
+		local capacity = semaphoreCapacityCache[i]
 		local remaining = capacity - newUsage
 		if remaining < weight then
 			constraintCapacity = 0
