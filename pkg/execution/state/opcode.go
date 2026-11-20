@@ -606,6 +606,57 @@ func (d *DeferAddOpts) UnmarshalAny(a any) error {
 	return nil
 }
 
+// LoopReturn is the data of an OpcodeLoopReturn.  durations in Wake.After
+// and Subscribe[].TTL are str2duration strings such as "30s".
+type LoopReturn struct {
+	// State is the loop state to commit.  it is always present.
+	State json.RawMessage `json:"state"`
+	// Version is copied unchanged from the request's loop block.
+	Version     int64           `json:"version"`
+	Wake        *LoopWake       `json:"wake,omitempty"`
+	End         bool            `json:"end"`
+	Subscribe   []LoopSubscribe `json:"subscribe,omitempty"`
+	Unsubscribe []string        `json:"unsubscribe,omitempty"`
+}
+
+// LoopWake starts a new run of the loop after the given duration.
+type LoopWake struct {
+	ID    string `json:"id"`
+	After string `json:"after"`
+}
+
+// LoopSubscribe waits for an event that matches If, for at most TTL.
+type LoopSubscribe struct {
+	ID    string `json:"id"`
+	Event string `json:"event"`
+	If    string `json:"if,omitempty"`
+	TTL   string `json:"ttl,omitempty"`
+}
+
+func (g GeneratorOpcode) LoopReturn() (*LoopReturn, error) {
+	if g.Op != enums.OpcodeLoopReturn {
+		return nil, fmt.Errorf("unable to return loop data for opcode %s", g.Op.String())
+	}
+	// the state and version keys must be present.  a null state and a
+	// zero version are allowed, so the raw keys are checked before
+	// decoding into the struct.
+	keys := map[string]json.RawMessage{}
+	if err := json.Unmarshal(g.Data, &keys); err != nil {
+		return nil, err
+	}
+	if _, ok := keys["state"]; !ok {
+		return nil, fmt.Errorf("loop return data is missing the state key")
+	}
+	if _, ok := keys["version"]; !ok {
+		return nil, fmt.Errorf("loop return data is missing the version key")
+	}
+	ret := &LoopReturn{}
+	if err := json.Unmarshal(g.Data, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 func (g GeneratorOpcode) DeferAbortOpts() (*DeferAbortOpts, error) {
 	opts := &DeferAbortOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {

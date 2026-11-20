@@ -421,3 +421,115 @@ func TestGenericOptsMalformedSpanKeepsStackLine(t *testing.T) {
 	assert.Empty(t, opts.Span.Value)
 	assert.Empty(t, opts.Origin.Value)
 }
+
+func TestGeneratorOpcode_LoopReturn(t *testing.T) {
+	t.Run("decodes the data", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			ID:   "hash",
+			Name: "loop",
+			Data: json.RawMessage(`{
+				"state": {"n": 1},
+				"version": 7,
+				"wake": {"id": "soak", "after": "30s"},
+				"end": false,
+				"subscribe": [{"id": "pr-review", "event": "github/pr.reviewed", "if": "event.data.pr == 123", "ttl": "7d"}],
+				"unsubscribe": ["stale"]
+			}`),
+		}
+
+		ret, err := op.LoopReturn()
+		require.NoError(t, err)
+		require.JSONEq(t, `{"n": 1}`, string(ret.State))
+		require.Equal(t, int64(7), ret.Version)
+		require.Equal(t, &LoopWake{
+			ID:    "soak",
+			After: "30s",
+		}, ret.Wake)
+		require.False(t, ret.End)
+		require.Equal(t, []LoopSubscribe{
+			{
+				ID:    "pr-review",
+				Event: "github/pr.reviewed",
+				If:    "event.data.pr == 123",
+				TTL:   "7d",
+			},
+		}, ret.Subscribe)
+		require.Equal(t, []string{"stale"}, ret.Unsubscribe)
+	})
+
+	t.Run("minimal data with a null state", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			Data: json.RawMessage(`{"state": null, "version": 0, "end": true}`),
+		}
+		ret, err := op.LoopReturn()
+		require.NoError(t, err)
+		require.Equal(t, int64(0), ret.Version)
+		require.True(t, ret.End)
+		require.Nil(t, ret.Wake)
+		require.Empty(t, ret.Subscribe)
+		require.Empty(t, ret.Unsubscribe)
+	})
+
+	t.Run("rejects a missing state key", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			Data: json.RawMessage(`{"version": 1, "end": true}`),
+		}
+		_, err := op.LoopReturn()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "missing the state key")
+	})
+
+	t.Run("rejects a missing version key", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			Data: json.RawMessage(`{"state": null, "end": true}`),
+		}
+		_, err := op.LoopReturn()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "missing the version key")
+	})
+
+	t.Run("round trips through json", func(t *testing.T) {
+		in := LoopReturn{
+			State:   json.RawMessage(`{"n":1}`),
+			Version: 42,
+			Wake: &LoopWake{
+				ID:    "soak",
+				After: "30s",
+			},
+		}
+		byt, err := json.Marshal(in)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"state":{"n":1},"version":42,"wake":{"id":"soak","after":"30s"},"end":false}`, string(byt))
+
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			Data: byt,
+		}
+		out, err := op.LoopReturn()
+		require.NoError(t, err)
+		require.Equal(t, int64(42), out.Version)
+	})
+
+	t.Run("rejects other opcodes", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"state": {}}`),
+		}
+		_, err := op.LoopReturn()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "StepRun")
+	})
+
+	t.Run("rejects invalid data", func(t *testing.T) {
+		op := GeneratorOpcode{
+			Op:   enums.OpcodeLoopReturn,
+			Data: json.RawMessage(`not json`),
+		}
+		_, err := op.LoopReturn()
+		require.Error(t, err)
+	})
+}

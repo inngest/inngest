@@ -161,6 +161,7 @@ func MarshalV1(
 		Events:  evts,
 		Actions: map[string]any{},
 		Defers:  deferEntries,
+		Loop:    LoopFromContext(ctx),
 		Context: &SDKRequestContext{
 			UseAPI:       true,
 			FunctionID:   md.ID.FunctionID,
