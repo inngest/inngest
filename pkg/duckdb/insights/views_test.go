@@ -420,3 +420,46 @@ func TestInsightsStepsSkipsSpansWithoutStepID(t *testing.T) {
 	).Scan(&count))
 	require.Equal(t, 4, count)
 }
+
+// A resumed wait/invoke span only carries the hashed step id (the pause
+// doesn't know the userland one), so its userland id comes from the run's
+// pause-started span w/ the same hashed id.
+func TestInsightsStepsResumedPauseKeepsUserlandStepID(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil).String()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	insert := func(name, spanID string, end time.Time, attrs string) {
+		t.Helper()
+		_, err := db.ExecContext(t.Context(),
+			`INSERT INTO inngest.run_trace_spans
+			   (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, attributes)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+			accountID.String(), envID.String(), runID, now, uuid.New().String(), "test-app", uuid.New().String(), "test-fn",
+			name, now, end, uuid.New().String(), spanID, json.RawMessage(attrs),
+		)
+		require.NoError(t, err)
+	}
+	insert("executor.step.pause_started", "started", now,
+		`{"_inngest.step.id": "hashed-1", "_inngest.step.userland.id": "wait-1", "_inngest.step.userland.index": 0, "_inngest.step.attempt": 0}`)
+	insert("executor.step", "resumed", now.Add(5*time.Second),
+		`{"_inngest.step.id": "hashed-1", "_inngest.dynamic.status": "Completed"}`)
+
+	var spanID, stepID, status string
+	var count int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*) OVER (), span_id, step_id, status FROM inngest_local.insights_steps(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+	).Scan(&count, &spanID, &stepID, &status))
+	require.Equal(t, 1, count)
+	require.Equal(t, "resumed", spanID, "the resumed span is the step's latest state")
+	require.Equal(t, "wait-1", stepID)
+	require.Equal(t, "Completed", status)
+
+	var withoutID int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*), count(*) FILTER (step_id IS DISTINCT FROM 'wait-1') FROM inngest_local.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+	).Scan(&count, &withoutID))
+	require.Equal(t, 2, count)
+	require.Equal(t, 0, withoutID)
+}

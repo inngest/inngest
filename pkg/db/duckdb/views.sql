@@ -235,8 +235,17 @@ SELECT
   rts.error as error,
   rts.input as input,
   rts.attributes,
-  rts.attributes->>'$."_inngest.step.userland.id"' AS step_id,
-  TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER) AS step_index,
+  -- A resumed wait/invoke span only carries the hashed step id (the pause
+  -- doesn't know the userland one), so it takes its userland id/index from
+  -- the run's other spans of that hashed id (its pause_started span).
+  COALESCE(
+    rts.attributes->>'$."_inngest.step.userland.id"',
+    CASE WHEN rts.attributes->>'$."_inngest.step.id"' IS NOT NULL THEN max(rts.attributes->>'$."_inngest.step.userland.id"') OVER hashed_step END
+  ) AS step_id,
+  COALESCE(
+    TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER),
+    CASE WHEN rts.attributes->>'$."_inngest.step.id"' IS NOT NULL THEN max(TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER)) OVER hashed_step END
+  ) AS step_index,
   TRY_CAST(rts.attributes->>'$."_inngest.step.attempt"' AS INTEGER) AS step_attempt,
   TRY_CAST(rts.attributes->>'$."_inngest.step.max_attempts"' AS INTEGER) AS step_max_attempts,
   rts.attributes->>'$."_inngest.step.type"' AS step_type,
@@ -246,7 +255,8 @@ SELECT
 FROM query_table(p_spans) rts
 LEFT JOIN inngest_local.run_metadata_rollup(p_metadata := p_metadata) rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'step'
 WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
-  AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned');
+  AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned')
+WINDOW hashed_step AS (PARTITION BY rts.run_id, rts.attributes->>'$."_inngest.step.id"');
 
 CREATE OR REPLACE MACRO inngest_local.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
@@ -254,7 +264,8 @@ FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans,
 
 -- inngest_local.insights_steps(p_account_id, p_env_id) collapses
 -- insights_step_attempts to the latest attempt per (run_id, step_id) --
--- highest step_attempt, tie-broken by start_time -- mirroring the
+-- highest step_attempt, tie-broken by start_time then end_time (a resumed
+-- pause span starts when its pause_started span does) -- mirroring the
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
 -- Logical tables and views table). A step span w/o a userland step id
 -- (IE the executor.step.planned markers) isn't a step: they'd all collapse
@@ -264,5 +275,5 @@ SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS i
 FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
 WHERE step_id IS NOT NULL
 QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
+  PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC, end_time DESC NULLS LAST
 ) = 1;
