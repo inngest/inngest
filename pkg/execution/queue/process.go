@@ -100,10 +100,6 @@ func (q *queueProcessor) ProcessItem(
 	defer q.wg.Done()
 
 	errCh := make(chan error, 1)
-	// sendErr never blocks: ProcessItem reads errCh once, so a second error
-	// (lease renewal, capacity renewal and the job can all fail together when
-	// the state store goes away) must not block its goroutine. A blocked
-	// item-lease goroutine stops ProcessItem in stopItemLeaseRenewal forever.
 	sendErr := func(err error) {
 		select {
 		case errCh <- err:
