@@ -60,8 +60,7 @@ func functionRunFromPG(s *sqlc.FunctionRun) *db.FunctionRun {
 		RunID: s.RunID, RunStartedAt: s.RunStartedAt, FunctionID: s.FunctionID,
 		FunctionVersion: int64(s.FunctionVersion), TriggerType: s.TriggerType,
 		EventID: s.EventID, BatchID: s.BatchID, OriginalRunID: s.OriginalRunID,
-		Cron: s.Cron,
-		// Postgres FunctionRun doesn't have WorkspaceID; leave zero value.
+		Cron: s.Cron, WorkspaceID: s.WorkspaceID,
 	}
 }
 

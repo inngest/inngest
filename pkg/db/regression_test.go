@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	gqlloader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	gqlmodels "github.com/inngest/inngest/pkg/coreapi/graph/models"
 	gqlresolvers "github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
@@ -19,9 +21,11 @@ import (
 	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
+	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -286,6 +290,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 	now := time.Now().UTC()
 	finishedAt := now.Add(2 * time.Second)
 
+	workspaceID := uuid.New()
 	require.NoError(t, q.InsertFunctionRun(ctx, db.InsertFunctionRunParams{
 		RunID:           runID,
 		RunStartedAt:    now,
@@ -294,7 +299,7 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 		TriggerType:     "event",
 		EventID:         eventID,
 		Cron:            sql.NullString{},
-		WorkspaceID:     uuid.New(),
+		WorkspaceID:     workspaceID,
 	}))
 
 	require.NoError(t, q.InsertFunctionFinish(ctx, db.InsertFunctionFinishParams{
@@ -310,11 +315,49 @@ func TestFunctionRunRoundTrip(t *testing.T) {
 
 	assert.Equal(t, runID, got.FunctionRun.RunID)
 	assert.Equal(t, eventID, got.FunctionRun.EventID)
+	assert.Equal(t, workspaceID, got.FunctionRun.WorkspaceID)
 	assert.Equal(t, int64(3), got.FunctionRun.FunctionVersion)
 	assert.Equal(t, "completed", got.FunctionFinish.Status.String)
 	assert.JSONEq(t, `{"ok":true}`, got.FunctionFinish.Output.String)
 	assert.Equal(t, int64(4), got.FunctionFinish.CompletedStepCount.Int64)
 	assert.WithinDuration(t, finishedAt, got.FunctionFinish.CreatedAt.Time, time.Second)
+}
+
+// TestFunctionRunWorkspaceIDBackfill checks that Postgres migration 000011
+// assigns runs stored before function_runs.workspace_id existed to the dev
+// server environment, so DELETE /v1/runs/{runID} can still cancel them.
+func TestFunctionRunWorkspaceIDBackfill(t *testing.T) {
+	if os.Getenv(envTestDatabase) != "postgres" {
+		t.Skip("Postgres-only migration")
+	}
+
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	conn := adapter.Conn()
+
+	migrations, err := fs.Sub(dbpostgres.MigrationsFS, "migrations")
+	require.NoError(t, err)
+	provider, err := goose.NewProvider(goose.DialectPostgres, conn, migrations)
+	require.NoError(t, err)
+
+	_, err = provider.DownTo(ctx, 10)
+	require.NoError(t, err)
+
+	runID := ulid.Make()
+	_, err = conn.ExecContext(ctx, `INSERT INTO function_runs
+		(run_id, run_started_at, function_id, function_version, trigger_type, event_id)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		runID, time.Now().UTC(), uuid.New(), 1, "event", ulid.Make())
+	require.NoError(t, err)
+
+	_, err = provider.Up(ctx)
+	require.NoError(t, err)
+
+	got, err := adapter.Q().GetFunctionRun(ctx, runID)
+	require.NoError(t, err)
+	assert.Equal(t, consts.DevServerEnvID, got.FunctionRun.WorkspaceID)
 }
 
 // TestFunctionRunWithoutFinish guards the read path for a run that has been
@@ -2447,9 +2490,6 @@ func toLogicalSchema(schema map[string][]schemaColumn) map[string][]logicalColum
 			continue
 		}
 		for _, column := range columns {
-			if tableName == "function_runs" && column.Name == "workspace_id" {
-				continue
-			}
 			result[tableName] = append(result[tableName], logicalColumn{
 				Name: column.Name,
 				Type: logicalType(column.Name, column.Type),
