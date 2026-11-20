@@ -115,9 +115,10 @@ func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog
 }
 
 // quackAppenderSession is the quack session an appender flushes on. It's
-// resolved again whenever the last one was abandoned: a Flush whose ctx ends
+// resolved from driverConn again on every Flush: a Flush whose ctx ends
 // mid-statement abandons its session (see quack.Session.Abandoned), which is
-// then disconnected server-side, so every later Flush on it would fail.
+// then disconnected server-side, and a subprocess restart replaces the
+// session outright, so either way a cached one would fail every later Flush.
 type quackAppenderSession struct {
 	driverConn any
 	catalog    string
@@ -133,37 +134,32 @@ func newQuackAppenderSession(ctx context.Context, driverConn any, catalog, schem
 	return s, err
 }
 
-// current returns the session to flush on, resolving a new one (and
-// selecting the appender's catalog on it again) if the last was abandoned.
-// The appender owns driverConn until Close (see NewQuackAppender), so
-// nothing else replaces its session in between. A bare *quack.Session
-// connection has nothing to re-handshake with, so there this keeps failing
-// w/ resolveQuackSessionForAppender's "abandoned" error.
+// current returns the session to flush on, selecting the appender's catalog
+// on it again only when it isn't the one the last call returned. The
+// appender owns driverConn until Close (see NewQuackAppender), so nothing
+// else uses (or USEs) its session in between. A bare *quack.Session
+// connection has nothing to re-handshake with, so once abandoned this keeps
+// failing w/ resolveQuackSession's "abandoned" error.
 func (s *quackAppenderSession) current(ctx context.Context) (*quack.Session, error) {
-	if s.sess != nil && !s.sess.Abandoned() {
-		return s.sess, nil
-	}
-	sess, err := resolveQuackSessionForAppender(ctx, s.driverConn, s.catalog, s.schema, s.errPrefix)
+	sess, err := resolveQuackSession(ctx, s.driverConn, s.errPrefix)
 	if err != nil {
+		return nil, err
+	}
+	if sess == s.sess {
+		return sess, nil
+	}
+	if err := selectQuackAppenderCatalog(ctx, sess, s.catalog, s.schema, s.errPrefix); err != nil {
 		return nil, err
 	}
 	s.sess = sess
 	return sess, nil
 }
 
-// resolveQuackSessionForAppender resolves driverConn to its underlying
-// quack.Session and, if catalog is non-empty, switches that session's default
-// catalog — the logic every *Appender constructor (QuackAppender,
-// QuackMergeAppender) shares. errPrefix names the caller in error messages
-// (e.g. "quack appender", "quack merge appender").
-//
-// The wire protocol has no catalog field: it resolves schema.table against
-// the target connection's own default catalog, which is per-connection, not
-// shared with the bootstrapping CLI session. So when catalog is non-empty,
-// this issues "USE <catalog>.<schema>;" once on the resolved session before
-// returning. This is a real, global mutation of that session's default
-// catalog for every later statement (see NewQuackAppender's NOTE).
-func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog, schema, errPrefix string) (*quack.Session, error) {
+// resolveQuackSession resolves driverConn to its current underlying
+// quack.Session, replacing an abandoned one where the transport can. errPrefix
+// names the caller in error messages (e.g. "quack appender", "quack merge
+// appender").
+func resolveQuackSession(ctx context.Context, driverConn any, errPrefix string) (*quack.Session, error) {
 	c, ok := driverConn.(*conn)
 	if !ok {
 		return nil, fmt.Errorf("duckdb: %s: unexpected driver connection type %T", errPrefix, driverConn)
@@ -174,44 +170,46 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 	// > 1 is a *pooledQuackConn. Either way the appender drives the current
 	// *quack.Session directly, so a crash mid-append surfaces as a plain
 	// error rather than a transparent retry.
-	var sess *quack.Session
 	switch s := c.sess.(type) {
 	case *quack.Session:
 		if s.Abandoned() {
 			return nil, fmt.Errorf("duckdb: %s: quack session was abandoned mid-statement", errPrefix)
 		}
-		sess = s
+		return s, nil
 	case *pooledQuackConn:
-		var err error
-		sess, err = s.currentSession(ctx)
-		if err != nil {
-			return nil, err
-		}
+		return s.currentSession(ctx)
 	case *process:
-		var err error
-		sess, err = s.currentQuackSession(ctx)
-		if err != nil {
-			return nil, err
-		}
+		return s.currentQuackSession(ctx)
 	default:
 		return nil, fmt.Errorf("duckdb: %s: unexpected transport %T", errPrefix, c.sess)
 	}
+}
 
-	if catalog != "" {
-		// USE catalog.schema rather than just the catalog: on an Iceberg
-		// catalog (no default schema of its own) a bare `USE "inngest"`
-		// leaves 2-part `inngest.<table>` names on the session binding as
-		// schema "inngest" and failing.
-		target := quack.Identifier(catalog)
-		if schema != "" {
-			target += "." + quack.Identifier(schema)
-		}
-		if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", target)); err != nil {
-			return nil, fmt.Errorf("duckdb: %s: switching to catalog %q: %w", errPrefix, catalog, err)
-		}
+// selectQuackAppenderCatalog switches sess's default catalog when catalog is
+// non-empty.
+//
+// The wire protocol has no catalog field: it resolves schema.table against
+// the target connection's own default catalog, which is per-connection, not
+// shared with the bootstrapping CLI session. So this issues
+// "USE <catalog>.<schema>;" on the session. This is a real, global mutation
+// of that session's default catalog for every later statement (see
+// NewQuackAppender's NOTE).
+func selectQuackAppenderCatalog(ctx context.Context, sess *quack.Session, catalog, schema, errPrefix string) error {
+	if catalog == "" {
+		return nil
 	}
-
-	return sess, nil
+	// USE catalog.schema rather than just the catalog: on an Iceberg
+	// catalog (no default schema of its own) a bare `USE "inngest"`
+	// leaves 2-part `inngest.<table>` names on the session binding as
+	// schema "inngest" and failing.
+	target := quack.Identifier(catalog)
+	if schema != "" {
+		target += "." + quack.Identifier(schema)
+	}
+	if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", target)); err != nil {
+		return fmt.Errorf("duckdb: %s: switching to catalog %q: %w", errPrefix, catalog, err)
+	}
+	return nil
 }
 
 // AppendRow buffers one row. len(vals) must equal len(columns) from
