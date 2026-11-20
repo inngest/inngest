@@ -215,8 +215,8 @@ const exampleConfig = `# inngest.toml configures ` + "`inngest deploy`" + `.  Pu
 # Set exactly one of serve or connect.
 #
 # serve runs the app as an HTTP server that Inngest calls.
-#   port: the port the app listens on.  When omitted, Inngest uses a port
-#         that the image exposes.
+#   port: the port the app listens on.  When omitted, Inngest tries each
+#         port that the app listens on.
 #   path: the path of the Inngest endpoint.  Defaults to /api/inngest.
 serve = { port = 8080, path = "/api/inngest" }
 
@@ -240,6 +240,8 @@ serve = { port = 8080, path = "/api/inngest" }
 # dockerfile = "./Dockerfile"
 
 # Optional.  The machine for each instance: memory in MiB and cpu in vCPUs.
-# Defaults to 1 vCPU and 2048 MiB, or your plan's limit when it is lower.
+# cpu is 1, 2, 4, 8, or 16, and memory is 1024, 2048, or 4096 MiB per vCPU.
+# cpu defaults to 1.  memory defaults to 1024 MiB per vCPU and at least
+# 2048 MiB, or to your plan's limit when it is lower.
 # spec = { memory = 2048, cpu = 1 }
 `
