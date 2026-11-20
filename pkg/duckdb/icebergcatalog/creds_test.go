@@ -91,19 +91,6 @@ func TestVendedCredentials(t *testing.T) {
 	require.Equal(t, wantCreds, body["storage-credentials"], "refresh vends")
 }
 
-func TestTableLocationOf(t *testing.T) {
-	for in, want := range map[string]string{
-		"s3://b/wh/app.db/t/metadata/00001-x.metadata.json": "s3://b/wh/app.db/t",
-		"/wh/app.db/t/metadata/00001-x.metadata.json":       "/wh/app.db/t",
-		"/metadata/x.json": "",
-		"nope":             "",
-	} {
-		got, ok := tableLocationOf(in)
-		require.Equal(t, want, got, in)
-		require.Equal(t, want != "", ok, in)
-	}
-}
-
 func TestReadOnly(t *testing.T) {
 	dir := t.TempDir()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
@@ -122,12 +109,16 @@ func TestReadOnly(t *testing.T) {
 	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
 	status, _ = do(t, rw, "POST", "/v1/namespaces/app/tables", `{"name":"t","schema":`+schema+`}`)
 	require.Equal(t, 200, status)
+	// A table named like the metrics report's last path segment.
+	status, _ = do(t, rw, "POST", "/v1/namespaces/app/tables", `{"name":"metrics","schema":`+schema+`}`)
+	require.Equal(t, 200, status)
 
 	for _, c := range []struct{ method, path, body string }{
 		{"GET", "/v1/namespaces/app/tables/t", ""},
 		{"HEAD", "/v1/namespaces/app/tables/t", ""},
 		{"GET", "/v1/namespaces", ""},
 		{"POST", "/v1/namespaces/app/tables/t/metrics", `{}`},
+		{"POST", "/v1/namespaces/app/tables/metrics/metrics", `{}`},
 	} {
 		status, _ := do(t, ro, c.method, c.path, c.body)
 		require.NotEqual(t, 403, status, "%s %s", c.method, c.path)
@@ -136,11 +127,69 @@ func TestReadOnly(t *testing.T) {
 		{"POST", "/v1/namespaces", `{"namespace":["x"]}`},
 		{"POST", "/v1/namespaces/app/tables", `{"name":"u","schema":` + schema + `}`},
 		{"POST", "/v1/namespaces/app/tables/t", `{"requirements":[],"updates":[]}`},
+		// A commit, not a metrics report.
+		{"POST", "/v1/namespaces/app/tables/metrics", `{"requirements":[],"updates":[{"action":"set-properties","updates":{"k":"v"}}]}`},
+		{"POST", "/v1/namespaces/app/tables/metrics/", `{"requirements":[],"updates":[]}`},
+		{"POST", "/v1/namespaces/metrics", `{}`},
 		{"DELETE", "/v1/namespaces/app/tables/t", ""},
 		{"POST", "/v1/tables/rename", `{}`},
 		{"POST", "/v1/namespaces/app/properties", `{}`},
 	} {
 		status, body := do(t, ro, c.method, c.path, c.body)
 		require.Equal(t, 403, status, "%s %s: %v", c.method, c.path, body)
+	}
+	tbl, err := cat.LoadTable(t.Context(), table.Identifier{"app", "metrics"})
+	require.NoError(t, err)
+	require.NotContains(t, tbl.Properties(), "k", "read-only catalog took a commit")
+}
+
+// Creds are scoped to the table's location, also for a load served from
+// the table cache of a table whose metadata lives elsewhere.
+func TestVendedCredentialsMetadataPath(t *testing.T) {
+	dir := t.TempDir()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	wh := filepath.Join(dir, "warehouse")
+	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	require.NoError(t, err)
+	vendor := &fakeVendor{}
+	ts := httptest.NewServer(New(cat, Options{Warehouse: wh, CatalogDB: testCatalogDB(db, wh), Credentials: vendor}))
+	t.Cleanup(ts.Close)
+
+	req := func(method, path, body string) (int, map[string]any) {
+		t.Helper()
+		r, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		r.Header.Set(accessDelegationHeader, "vended-credentials")
+		resp, err := http.DefaultClient.Do(r)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	loc := filepath.Join(wh, "app.db", "t")
+	metaPath := filepath.Join(wh, "meta", "metadata", "t")
+
+	status, _ := req("POST", "/v1/namespaces", `{"namespace":["app"]}`)
+	require.Equal(t, 200, status)
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+	props, _ := json.Marshal(map[string]string{"write.metadata.path": metaPath})
+	status, body := req("POST", "/v1/namespaces/app/tables", `{"name":"t","schema":`+schema+`,"properties":`+string(props)+`}`)
+	require.Equal(t, 200, status, body)
+	// A commit, so the current metadata.json is under write.metadata.path.
+	status, body = req("POST", "/v1/namespaces/app/tables/t", `{"requirements":[],"updates":[{"action":"set-properties","updates":{"k":"v"}}]}`)
+	require.Equal(t, 200, status, body)
+	require.Contains(t, body["metadata-location"], metaPath+"/")
+
+	for i := range 3 {
+		status, body = req("GET", "/v1/namespaces/app/tables/t", "")
+		require.Equal(t, 200, status, body)
+		require.Contains(t, body["metadata-location"], metaPath+"/")
+		creds := body["storage-credentials"].([]any)
+		require.Equal(t, loc, creds[0].(map[string]any)["prefix"], "load %d", i)
+	}
+	for _, c := range vendor.calls {
+		require.Equal(t, "app.t@"+loc, c)
 	}
 }
