@@ -339,11 +339,15 @@ func (e *runtimeEnv) runCase(ctx context.Context, testCase conformance.Case) con
 		}
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, e.runtime.Timeout)
+	defer cancel()
+
 	tap := e.proxy.newTap()
 	e.proxy.setTap(tap)
 	defer e.proxy.clearTap(tap)
 
 	harness := &caseHarness{
+		ctx:          ctx,
 		client:       e.client,
 		runtime:      e.runtime,
 		requests:     tap.requests,
@@ -351,7 +355,11 @@ func (e *runtimeEnv) runCase(ctx context.Context, testCase conformance.Case) con
 		requestSteps: map[string]any{},
 	}
 
-	if err := executor.run(ctx, harness); err != nil {
+	err := executor.run(ctx, harness)
+	if err == nil {
+		err = ctx.Err()
+	}
+	if err != nil {
 		return conformance.CaseResult{
 			CaseID:     testCase.ID,
 			SuiteID:    testCase.SuiteID,
@@ -651,6 +659,7 @@ func (p *proxyServer) handle(w http.ResponseWriter, r *http.Request) {
 // useful for portable conformance execution, but uses explicit errors rather
 // than testing helpers so it can run in the CLI and in normal Go tests.
 type caseHarness struct {
+	ctx     context.Context
 	client  *http.Client
 	runtime conformance.RuntimeConfig
 
@@ -732,8 +741,19 @@ func (h *caseHarness) sendEvent(ctx context.Context, event inngestgo.Event) erro
 	return nil
 }
 
+func (h *caseHarness) wait(duration time.Duration) error {
+	select {
+	case <-h.ctx.Done():
+		return h.ctx.Err()
+	case <-time.After(duration):
+		return nil
+	}
+}
+
 func (h *caseHarness) expectNoRequests(duration time.Duration) error {
 	select {
+	case <-h.ctx.Done():
+		return h.ctx.Err()
 	case req := <-h.requests:
 		return fmt.Errorf("expected no executor request, but received %s %s", req.Request.Method, req.Request.URL.String())
 	case <-time.After(duration):
@@ -743,6 +763,8 @@ func (h *caseHarness) expectNoRequests(duration time.Duration) error {
 
 func (h *caseHarness) expectRequest(timeout time.Duration, queryStepID string, modifiers ...func(*driver.SDKRequestContext)) error {
 	select {
+	case <-h.ctx.Done():
+		return h.ctx.Err()
 	case req := <-h.requests:
 		if got := req.Request.URL.Query().Get("stepId"); got != queryStepID {
 			return fmt.Errorf("expected stepId %q, got %q", queryStepID, got)
@@ -865,6 +887,8 @@ func (h *caseHarness) expectGeneratorResponse(expected []state.GeneratorOpcode, 
 
 func (h *caseHarness) expectResponse(status int, timeout time.Duration, validate func([]byte) error) error {
 	select {
+	case <-h.ctx.Done():
+		return h.ctx.Err()
 	case resp := <-h.responses:
 		if resp.StatusCode != status {
 			return fmt.Errorf("expected status %d, got %d", status, resp.StatusCode)
@@ -1163,7 +1187,9 @@ func runCancelBasic(ctx context.Context, h *caseHarness) error {
 		return err
 	}
 
-	time.Sleep(1 * time.Second)
+	if err := h.wait(time.Second); err != nil {
+		return err
+	}
 	if err := h.sendEvent(ctx, inngestgo.Event{
 		Name: "cancel/please",
 		Data: map[string]any{
@@ -1228,7 +1254,9 @@ func runWaitForEventBasic(ctx context.Context, h *caseHarness) error {
 		return err
 	}
 
-	time.Sleep(1 * time.Second)
+	if err := h.wait(time.Second); err != nil {
+		return err
+	}
 	if err := h.sendEvent(ctx, inngestgo.Event{
 		Name: "test/resume",
 		Data: map[string]any{
@@ -1238,7 +1266,9 @@ func runWaitForEventBasic(ctx context.Context, h *caseHarness) error {
 		return err
 	}
 
-	time.Sleep(1 * time.Second)
+	if err := h.wait(time.Second); err != nil {
+		return err
+	}
 	if err := h.sendEvent(ctx, resume); err != nil {
 		return err
 	}
