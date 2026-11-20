@@ -507,6 +507,15 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 	// While this scheduling attempt is only required if the retried event was the first event in a new batch, it is hard to distinguish
 	// that case because we bulk append. So we just schedule a job every time there are _any_ duplicate elements in a batch.
 	// This is safe because batcher.ScheduleExecution is idempotent for a given batchID, so if a job already exists, the schedule call is a no-op.
+	if result.Status == "itemexists" && result.BatchSize == 0 {
+		ab.log.Info("all buffered events were already batched and the current batch is empty, not scheduling it",
+			"function_id", fn.ID,
+			"account_id", firstItem.AccountID,
+			"batch_id", result.BatchID,
+			"duplicates", result.Duplicates,
+		)
+		return nil
+	}
 	if result.Status == "new" || result.Duplicates > 0 {
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now().Add(timeout), "new"); err != nil {
 			return err
