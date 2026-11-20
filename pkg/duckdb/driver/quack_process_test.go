@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -265,13 +266,13 @@ func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
 			start := time.Now()
 			require.ErrorIs(t, slow.Flush(ctx), context.DeadlineExceeded)
 			require.Less(t, time.Since(start), 2*time.Second, "an abandoned append must not block its caller on the cancel")
-			require.True(t, slow.session.Abandoned())
+			require.True(t, slow.session.sess.Abandoned())
 
 			start = time.Now()
 			appender, err := NewQuackAppenderFromConn(t.Context(), driverConn, "memory", "main", "append_t", []QuackColumnKind{QuackColumnVarchar})
 			require.NoError(t, err)
-			require.NotNil(t, appender.session)
-			require.False(t, appender.session.Abandoned())
+			require.NotNil(t, appender.session.sess)
+			require.False(t, appender.session.sess.Abandoned())
 			require.NoError(t, appender.AppendRow(name))
 			require.NoError(t, appender.Close(t.Context()))
 
@@ -281,6 +282,39 @@ func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
 			require.Less(t, time.Since(start), 2*time.Second, "the next append must not queue behind the abandoned one")
 		})
 	}
+}
+
+// TestQuackAppenderFlushesAfterRestart pins that an appender whose session a
+// subprocess restart replaced flushes on the new one (w/ its catalog selected
+// again) the first time, rather than failing once on the stale one: the stale
+// session isn't abandoned, just gone.
+func TestQuackAppenderFlushesAfterRestart(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithLake(t.Context(), binPath, filepath.Join(t.TempDir(), "lake.duckdb"), nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE lake.main.append_t (id VARCHAR);")
+	require.NoError(t, err)
+
+	appender, err := NewQuackAppenderFromConn(t.Context(), &conn{sess: p}, "lake", "main", "append_t", []QuackColumnKind{QuackColumnVarchar})
+	require.NoError(t, err)
+	stale := appender.session.sess
+
+	require.NoError(t, p.cmd.Process.Kill())
+	_, _ = p.cmd.Process.Wait()
+	require.NoError(t, p.restart(t.Context()))
+
+	require.NoError(t, appender.AppendRow("a"))
+	require.NoError(t, appender.Flush(t.Context()))
+	require.NotSame(t, stale, appender.session.sess)
+
+	_, _, rows, err := p.Query(t.Context(), "SELECT id FROM lake.main.append_t;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
 }
 
 // TestQuackAbandonedStatementsAreCapped pins Options.MaxAbandonedStatements:

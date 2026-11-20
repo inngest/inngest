@@ -163,6 +163,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 		return nil
 	case ulid.ULID:
 		nv.Value = v.String()
+		return nil
 	case []string:
 		// Not one of driver.Value's standard kinds, but encodeLiteral (see
 		// literal.go) handles it directly as a DuckDB array literal — this
