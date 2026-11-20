@@ -163,6 +163,7 @@ func TestArchivedWorkspaceAppSemaphoreBypassPreservesOtherSemaphores(t *testing.
 
 type archivedWorkspaceCapacityManager struct {
 	acquireRequests []*constraintapi.CapacityAcquireRequest
+	releaseRequests []*constraintapi.CapacityReleaseRequest
 }
 
 func (m *archivedWorkspaceCapacityManager) Check(context.Context, *constraintapi.CapacityCheckRequest) (*constraintapi.CapacityCheckResponse, errs.UserError, errs.InternalError) {
@@ -183,6 +184,7 @@ func (m *archivedWorkspaceCapacityManager) ExtendLease(context.Context, *constra
 	return nil, nil
 }
 
-func (m *archivedWorkspaceCapacityManager) Release(context.Context, *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+func (m *archivedWorkspaceCapacityManager) Release(_ context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+	m.releaseRequests = append(m.releaseRequests, req)
 	return nil, nil
 }
