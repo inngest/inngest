@@ -43,7 +43,27 @@ var (
 		Name: "inngest_sdk_req_ended_total",
 		Help: "The total number of SDK invocation/step execution ended",
 	}, []string{"fn", "status"})
+
+	functionRunQueueDelay = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "inngest_function_run_queue_delay_seconds",
+		Help:    "Time function runs waited in the queue between being due and starting",
+		Buckets: queueDelayBuckets,
+	}, []string{"fn"})
+
+	sdkReqQueueDelay = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "inngest_sdk_req_queue_delay_seconds",
+		Help:    "Time SDK invocations/step executions waited in the queue between being due and starting",
+		Buckets: queueDelayBuckets,
+	}, []string{"fn"})
 )
+
+// queueDelayBuckets covers delays from a few milliseconds, when the queue keeps
+// up, to an hour, when runs are held back by concurrency or throttle limits.
+var queueDelayBuckets = []float64{
+	0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, // < 1s
+	1, 2.5, 5, 10, 30, // < 1m
+	60, 300, 600, 1800, 3600, // <= 1h
+}
 
 func init() {
 	registry.MustRegister(
@@ -53,6 +73,8 @@ func init() {
 		sdkReqScheduled,
 		sdkReqStarted,
 		sdkReqEnded,
+		functionRunQueueDelay,
+		sdkReqQueueDelay,
 	)
 }
 
@@ -82,6 +104,17 @@ func fnLabel(md statev2.Metadata) string {
 	return "unknown"
 }
 
+// observeQueueDelay records how long the queue item being processed waited
+// between being due and starting.  Work that did not come from the queue
+// carries no start latency and is not recorded.
+func observeQueueDelay(ctx context.Context, h *prometheus.HistogramVec, md statev2.Metadata) {
+	delay, ok := queue.GetItemStartLatency(ctx)
+	if !ok {
+		return
+	}
+	h.WithLabelValues(fnLabel(md)).Observe(delay.Seconds())
+}
+
 func (l *PrometheusLifecycleListener) OnFunctionScheduled(
 	_ context.Context,
 	md statev2.Metadata,
@@ -92,12 +125,13 @@ func (l *PrometheusLifecycleListener) OnFunctionScheduled(
 }
 
 func (l *PrometheusLifecycleListener) OnFunctionStarted(
-	_ context.Context,
+	ctx context.Context,
 	md statev2.Metadata,
 	_ queue.Item,
 	_ []json.RawMessage,
 ) {
 	functionRunStarted.WithLabelValues(fnLabel(md)).Inc()
+	observeQueueDelay(ctx, functionRunQueueDelay, md)
 }
 
 func (l *PrometheusLifecycleListener) OnFunctionFinished(
@@ -133,13 +167,14 @@ func (l *PrometheusLifecycleListener) OnStepScheduled(
 }
 
 func (l *PrometheusLifecycleListener) OnStepStarted(
-	_ context.Context,
+	ctx context.Context,
 	md statev2.Metadata,
 	_ queue.Item,
 	_ inngest.Edge,
 	_ string,
 ) {
 	sdkReqStarted.WithLabelValues(fnLabel(md)).Inc()
+	observeQueueDelay(ctx, sdkReqQueueDelay, md)
 }
 
 func (l *PrometheusLifecycleListener) OnStepFinished(
