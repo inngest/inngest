@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.54.1] - 2026-11-21
+
+### 🐛 Bug Fixes
+
+- *(duckdb)* Fix the Iceberg catalog's read-only check, commit cleanup and cached creds scope (#5300)
+- *(duckdb)* Always read unnest select items in federated lineage (#5301)
+- *(batch)* Don't create or schedule empty batches on duplicate events (#5309)
+
 ## [v1.54.0] - 2026-11-20
 
 ### 🚀 Features
@@ -42,6 +50,7 @@ All notable changes to this project will be documented in this file.
 
 - *(execution)* Change return type of schedule with routing errors (#5251)
 - Refactor to use fx (#5252)
+- *(release)* V1.54.0 (#5250)
 
 ## [v1.53.0] - 2026-11-12
 
