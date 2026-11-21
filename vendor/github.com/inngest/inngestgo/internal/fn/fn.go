@@ -49,9 +49,9 @@ type FunctionOpts struct {
 	// Name represents a human-readable function name.
 	Name string
 
-	// Checkpoint configues checkpointing for the current function.  Checkpointing
-	// allows each step.Run result to be stored via an API call, lowering latency between
-	// steps.
+	// Checkpoint sets the default for functions created with this client.  nil
+	// uses safe checkpointing.  set Disable to true to disable checkpointing,
+	// forcing a new request for each step.
 	Checkpoint *checkpoint.Config
 
 	// Priority allows you to specify priority options for the function.
