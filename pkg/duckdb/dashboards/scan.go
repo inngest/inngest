@@ -1,7 +1,10 @@
 package dashboards
 
 import (
+	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,6 +113,74 @@ func asFunctionRefs(v any) ([]FunctionRef, error) {
 			return nil, err
 		}
 		out[i] = FunctionRef{Slug: slug, AppID: appID, AppName: appName}
+	}
+	return out, nil
+}
+
+// asStrings decodes a LIST(VARCHAR) column (a []any of strings), NULL as
+// nil.
+func asStrings(v any, col string) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	items, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("expected list for column %q, got %T (%v)", col, v, v)
+	}
+	out := make([]string, len(items))
+	for i, item := range items {
+		s, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string for %s[%d], got %T (%v)", col, i, item, item)
+		}
+		out[i] = s
+	}
+	return out, nil
+}
+
+// asWeights decodes variant weights selected as JSON text (an object of
+// variant -> weight), NULL as nil, sorted by variant so the order is
+// stable. A null weight is skipped, not read as 0.
+func asWeights(v any) ([]ExperimentWeight, error) {
+	s, err := asNullableString(v)
+	if err != nil || s == "" || s == "null" {
+		return nil, err
+	}
+	var weights map[string]*float64
+	if err := json.Unmarshal([]byte(s), &weights); err != nil {
+		return nil, fmt.Errorf("parsing variant weights: %w", err)
+	}
+	out := make([]ExperimentWeight, 0, len(weights))
+	for _, k := range slices.Sorted(maps.Keys(weights)) {
+		if w := weights[k]; w != nil {
+			out = append(out, ExperimentWeight{Variant: k, Weight: *w})
+		}
+	}
+	return out, nil
+}
+
+// asMetrics decodes a variant's metrics, selected as a JSON list of {key,
+// avg, min, max} (NULL for a variant w/o scores, decoded as empty).
+func asMetrics(v any) ([]ExperimentMetric, error) {
+	s, err := asNullableString(v)
+	if err != nil {
+		return nil, err
+	}
+	out := []ExperimentMetric{}
+	if s == "" || s == "null" {
+		return out, nil
+	}
+	var metrics []struct {
+		Key string  `json:"key"`
+		Avg float64 `json:"avg"`
+		Min float64 `json:"min"`
+		Max float64 `json:"max"`
+	}
+	if err := json.Unmarshal([]byte(s), &metrics); err != nil {
+		return nil, fmt.Errorf("parsing metrics: %w", err)
+	}
+	for _, m := range metrics {
+		out = append(out, ExperimentMetric{Key: m.Key, Avg: m.Avg, Min: m.Min, Max: m.Max})
 	}
 	return out, nil
 }
