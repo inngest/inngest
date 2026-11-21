@@ -4,4 +4,10 @@ export {
   type SendEventConfig,
   type SharedSendEventModalProps,
 } from './SendEventModal';
-export { generateSDKCode, generateCurlCode, copyToClipboard, type EventPayload } from './utils';
+export {
+  generateSDKCode,
+  generateCurlCode,
+  shellQuote,
+  copyToClipboard,
+  type EventPayload,
+} from './utils';
