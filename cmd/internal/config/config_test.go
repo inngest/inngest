@@ -831,3 +831,29 @@ func TestNonDefaultFlags(t *testing.T) {
 		"sdk-url": true,
 	}, got)
 }
+
+func TestSDKURLListFormats(t *testing.T) {
+	const first = "http://localhost:3001/api/inngest"
+	const second = "http://localhost:3002/api/inngest?name=hello%20world"
+	for _, tc := range []struct {
+		name string
+		env  string
+		want []string
+	}{
+		{"legacy whitespace", first + " \t " + second, []string{first, second}},
+		{"comma and surrounding whitespace", " " + first + ", " + second + " ", []string{first, second}},
+		{"single URL", second, []string{second}},
+		{"empty value", "", []string{""}},
+		{"whitespace-only value", " \t ", []string{" \t "}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupTest()
+			t.Setenv("INNGEST_SDK_URL", tc.env)
+			require.NoError(t, loadEnvironmentVariables())
+			require.NoError(t, unmarshalConfig())
+
+			require.Equal(t, tc.want, GetStringSlice(&cli.Command{}, "sdk-url"))
+			require.Equal(t, tc.want, GetConfig().SdkURL)
+		})
+	}
+}

@@ -210,8 +210,23 @@ func loadEnvironmentVariables() error {
 			configKey = strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 		}
 
-		// Handle array fields - convert single values and comma-separated values to arrays
-		if configKey == "sdk-url" || configKey == "event-key" {
+		if configKey == "sdk-url" {
+			// Accept legacy space-separated SDK URLs as well as comma-separated lists.
+			if !strings.Contains(value, ",") {
+				if urls := strings.Fields(value); len(urls) > 0 {
+					return configKey, urls
+				}
+				return configKey, []string{value}
+			}
+			urls := strings.Split(value, ",")
+			for i, url := range urls {
+				urls[i] = strings.TrimSpace(url)
+			}
+			return configKey, urls
+		}
+
+		// Handle single or comma-separated event keys.
+		if configKey == "event-key" {
 			if strings.Contains(value, ",") {
 				return configKey, strings.Split(value, ",")
 			}
