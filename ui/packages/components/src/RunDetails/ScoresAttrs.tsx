@@ -74,6 +74,29 @@ function isScoreValue(raw: unknown): raw is { value: number | boolean } {
   return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value));
 }
 
+// Digits after the millisecond in an RFC 3339 timestamp, as a number
+// (".123456789" -> 456789). Date.parse drops them.
+function subMillisecond(timestamp: string): number {
+  const fraction = /\.(\d+)/.exec(timestamp)?.[1] ?? '';
+  return Number(fraction.padEnd(9, '0').slice(3, 9));
+}
+
+// Whether timestamp `a` is the same instant as `b` or a later one. The API
+// omits trailing zeros in the fractional seconds ("...09Z", "...09.5Z"), so the
+// strings can't be compared as text. Falls back to a text comparison when
+// either one isn't a parseable date.
+function isSameOrLater(a: string, b: string): boolean {
+  const aTime = Date.parse(a);
+  const bTime = Date.parse(b);
+  if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+    return a >= b;
+  }
+  if (aTime !== bTime) {
+    return aTime > bTime;
+  }
+  return subMillisecond(a) >= subMillisecond(b);
+}
+
 export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   const latest = new Map<string, ScoreRow>();
 
@@ -83,7 +106,7 @@ export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
         continue;
       }
       const prev = latest.get(name);
-      if (!prev || md.updatedAt >= prev.updatedAt) {
+      if (!prev || isSameOrLater(md.updatedAt, prev.updatedAt)) {
         latest.set(name, { name, value: raw.value, updatedAt: md.updatedAt });
       }
     }
