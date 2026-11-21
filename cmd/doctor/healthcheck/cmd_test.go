@@ -204,3 +204,79 @@ func splitURL(t *testing.T, raw string) (string, int) {
 	}
 	return host, port
 }
+
+func TestRun_IPv6(t *testing.T) {
+	newServer := func(path string) *httptest.Server {
+		t.Helper()
+		l, err := net.Listen("tcp6", "[::1]:0")
+		if err != nil {
+			t.Skipf("IPv6 loopback unavailable: %v", err)
+		}
+		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != path {
+				http.NotFound(w, r)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		srv.Listener.Close()
+		srv.Listener = l
+		srv.Start()
+		t.Cleanup(srv.Close)
+		return srv
+	}
+
+	apiHost, apiPort := splitURL(t, newServer(api.HealthPath).URL)
+	_, gwPort := splitURL(t, newServer(connect.ReadyPath).URL)
+
+	for _, tt := range []struct {
+		name string
+		host string
+		env  bool
+	}{
+		{name: "bare address flag", host: apiHost},
+		{name: "bare address environment", host: apiHost, env: true},
+		{name: "bracketed address flag", host: "[" + apiHost + "]"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			args := []string{
+				"healthcheck",
+				"--port=" + strconv.Itoa(apiPort),
+				"--connect-gateway-port=" + strconv.Itoa(gwPort),
+				"--timeout=2s",
+			}
+			if tt.env {
+				t.Setenv("INNGEST_HOST", tt.host)
+			} else {
+				args = append(args, "--host="+tt.host)
+			}
+			var stderr bytes.Buffer
+			cmd := Command()
+			cmd.ErrWriter = &stderr
+			if err := cmd.Run(context.Background(), args); err != nil {
+				t.Fatalf("expected both IPv6 probes to succeed, got %v:\n%s", err, stderr.String())
+			}
+		})
+	}
+}
+
+func TestProbeURL(t *testing.T) {
+	for _, tt := range []struct {
+		host string
+		want string
+	}{
+		{host: "devbox.local", want: "https://devbox.local:8288/health"},
+		{host: "127.0.0.1", want: "https://127.0.0.1:8288/health"},
+		{host: "::1", want: "https://[::1]:8288/health"},
+		{host: "[::1]", want: "https://[::1]:8288/health"},
+		{host: "fe80::1%eth0", want: "https://[fe80::1%25eth0]:8288/health"},
+		{host: "[fe80::1%eth0]", want: "https://[fe80::1%25eth0]:8288/health"},
+		{host: "[fe80::1%25eth0]", want: "https://[fe80::1%25eth0]:8288/health"},
+	} {
+		t.Run(tt.host, func(t *testing.T) {
+			if got := probeURL("https", tt.host, 8288, "/health"); got != tt.want {
+				t.Fatalf("probeURL: got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
