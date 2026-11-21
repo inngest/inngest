@@ -47,12 +47,6 @@ local idemKeyFmt = "%s:batch_idem:%s"
 local batchKey = string.format(keyfmt, prefix, batchID)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
--- set the batch status if it doesn't exist but don't overwrite
--- this is necessary for functions that never enabled batch before
-if is_status_empty(batchMetadataKey) then
-  set_batch_status(batchMetadataKey, batchStatusAppending)
-end
-
 -- Dedup: per-event SET keys (O(1))
 local eventsToAdd = {}
 local duplicateCount = 0
@@ -82,8 +76,15 @@ if #eventsToAdd == 0 then
     batchPointerKey = batchPointerKey,
     committed = 0,
     duplicates = duplicateCount,
-    committedBytes = 0
+    committedBytes = 0,
+    batchSize = redis.call("LLEN", batchKey)
   })
+end
+
+-- set the batch status if it doesn't exist but don't overwrite
+-- this is necessary for functions that never enabled batch before
+if is_status_empty(batchMetadataKey) then
+  set_batch_status(batchMetadataKey, batchStatusAppending)
 end
 
 -- Get current batch length
@@ -175,5 +176,6 @@ return cjson.encode({
   duplicates = duplicateCount,
   nextBatchID = nextBatchID,
   overflowCount = overflowCount,
-  committedBytes = committedBytes
+  committedBytes = committedBytes,
+  batchSize = finalLen
 })
