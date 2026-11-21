@@ -1,7 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
+import type {
+  RunDeferSummary,
+  RunDeferredFromSummary,
+  RunInvokedFromSummary,
+} from '../SharedContext/useGetRunLinkage';
 import { LinkedRuns } from './LinkedRuns';
 
 // @inngest/components/* self-imports don't resolve in vitest without a workspace
@@ -115,6 +119,50 @@ describe('LinkedRuns', () => {
     const links = screen.getAllByRole('link');
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/runs/01PARENT01']);
     expect(screen.queryByText('Parent Fn')).toBeNull();
+  });
+
+  it('renders the invoking run for a run started by step.invoke', () => {
+    const invokedFrom: RunInvokedFromSummary = {
+      runID: '01INVOKER0',
+      function: { name: 'Invoker Fn', slug: 'invoker-fn' },
+      run: { id: '01INVOKER0', status: 'RUNNING' },
+    };
+    render(<LinkedRuns invokedFrom={invokedFrom} />);
+    expect(screen.getByText('Invoked by')).toBeTruthy();
+    expect(screen.getByText('RUNNING')).toBeTruthy();
+    expect(screen.getByText('Invoker Fn')).toBeTruthy();
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/runs/01INVOKER0',
+      '/functions/invoker-fn',
+    ]);
+    expect(screen.queryByText('Parent run')).toBeNull();
+    expect(screen.queryByText('Deferred runs')).toBeNull();
+  });
+
+  it('links to the invoking run when its function and run are unavailable', () => {
+    render(<LinkedRuns invokedFrom={{ runID: '01INVOKER0', function: null, run: null }} />);
+    expect(screen.getByText('Invoked by')).toBeTruthy();
+    const links = screen.getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/runs/01INVOKER0']);
+  });
+
+  it('skips the Invoked by section when the run was not invoked', () => {
+    render(<LinkedRuns invokedFrom={null} defers={[makeDefer()]} />);
+    expect(screen.queryByText('Invoked by')).toBeNull();
+    expect(screen.getByText('Deferred runs')).toBeTruthy();
+  });
+
+  it('renders both the invoking run and the run defers', () => {
+    render(
+      <LinkedRuns
+        invokedFrom={{ runID: '01INVOKER0', function: null, run: null }}
+        defers={[makeDefer({ userlandDeferID: 'order-7' })]}
+      />
+    );
+    expect(screen.getByText('Invoked by')).toBeTruthy();
+    expect(screen.getByText('Deferred runs')).toBeTruthy();
+    expect(screen.getByText('order-7')).toBeTruthy();
   });
 
   it('parallel defers are passed in directly and exclude the current run', () => {

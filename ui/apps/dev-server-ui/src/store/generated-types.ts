@@ -371,6 +371,7 @@ export type FunctionRunV2 = {
   functionID: Scalars['UUID'];
   hasAI: Scalars['Boolean'];
   id: Scalars['ULID'];
+  invokedFrom: Maybe<RunInvokedFrom>;
   isBatch: Scalars['Boolean'];
   isDeferred: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
@@ -824,6 +825,13 @@ export type RunHistoryWaitResult = {
   __typename?: 'RunHistoryWaitResult';
   eventID: Maybe<Scalars['ULID']>;
   timeout: Scalars['Boolean'];
+};
+
+export type RunInvokedFrom = {
+  __typename?: 'RunInvokedFrom';
+  function: Maybe<Function>;
+  run: Maybe<FunctionRunV2>;
+  runID: Scalars['ULID'];
 };
 
 export type RunStep = {
@@ -2315,6 +2323,16 @@ export type GetRunLinkageQuery = {
         status: FunctionRunStatus;
       } | null;
     }>;
+    invokedFrom: {
+      __typename?: 'RunInvokedFrom';
+      runID: any;
+      function: { __typename?: 'Function'; name: string; slug: string } | null;
+      run: {
+        __typename?: 'FunctionRunV2';
+        id: any;
+        status: FunctionRunStatus;
+      } | null;
+    } | null;
   } | null;
 };
 

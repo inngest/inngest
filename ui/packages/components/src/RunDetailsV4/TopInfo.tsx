@@ -16,7 +16,11 @@ import {
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
 import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
-import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
+import type {
+  RunDeferSummary,
+  RunDeferredFromSummary,
+  RunInvokedFromSummary,
+} from '../SharedContext/useGetRunLinkage';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -43,6 +47,7 @@ type TopInfoProps = {
   defers?: RunDeferSummary[];
   siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
+  invokedFrom?: RunInvokedFromSummary | null;
 };
 
 export type Trigger = {
@@ -105,6 +110,7 @@ export const TopInfo = ({
   defers,
   siblingDefers,
   deferredFrom,
+  invokedFrom,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -151,6 +157,7 @@ export const TopInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   const hasLinkedRuns =
+    Boolean(invokedFrom) ||
     (deferredFrom?.length ?? 0) > 0 ||
     (siblingDefers?.length ?? 0) > 0 ||
     (defers?.length ?? 0) > 0;
@@ -396,6 +403,7 @@ export const TopInfo = ({
                         defers={defers}
                         siblingDefers={siblingDefers}
                         deferredFrom={deferredFrom}
+                        invokedFrom={invokedFrom}
                       />
                     ),
                   },

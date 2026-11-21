@@ -514,6 +514,9 @@ type FunctionRunV2 {
   siblingDefers: [RunDefer!]!
   deferredFrom: [RunDeferredFrom!]!
   isDeferred: Boolean!
+  # The run that started this run with step.invoke. Null when this run was
+  # not started by step.invoke.
+  invokedFrom: RunInvokedFrom
 }
 
 type RunsV2Connection {
@@ -554,6 +557,16 @@ enum RunDeferStatus {
 type RunDeferredFrom {
   runID: ULID!
   function: Function!
+  run: FunctionRunV2
+}
+
+type RunInvokedFrom {
+  runID: ULID!
+
+  # Null if the invoking function no longer exists.
+  function: Function
+
+  # Null if the invoking run can no longer be found.
   run: FunctionRunV2
 }
 

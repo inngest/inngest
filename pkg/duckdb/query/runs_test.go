@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
@@ -77,6 +78,15 @@ func TestGetTraceRunReturnsLatestRowForRun(t *testing.T) {
 	// TraceRun.Output re-wraps the split output/error columns in the
 	// envelope every other backend returns.
 	require.Equal(t, out, string(run.Output))
+}
+
+func TestGetTraceRunMissingRunReturnsErrNoRows(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	m := Wrap(nil, db).(*Manager)
+
+	_, err := m.GetTraceRun(t.Context(), cqrs.TraceRunIdentifier{RunID: ulid.MustNew(ulid.Now(), rand.Reader)})
+	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
 func TestGetTraceRunParsesEventIDsArray(t *testing.T) {

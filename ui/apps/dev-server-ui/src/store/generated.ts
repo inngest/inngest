@@ -367,6 +367,7 @@ export type FunctionRunV2 = {
   functionID: Scalars['UUID'];
   hasAI: Scalars['Boolean'];
   id: Scalars['ULID'];
+  invokedFrom: Maybe<RunInvokedFrom>;
   isBatch: Scalars['Boolean'];
   isDeferred: Scalars['Boolean'];
   output: Maybe<Scalars['Bytes']>;
@@ -849,6 +850,13 @@ export type RunHistoryWaitResult = {
   timeout: Scalars['Boolean'];
 };
 
+export type RunInvokedFrom = {
+  __typename?: 'RunInvokedFrom';
+  function: Maybe<Function>;
+  run: Maybe<FunctionRunV2>;
+  runID: Scalars['ULID'];
+};
+
 export type RunStep = {
   __typename?: 'RunStep';
   name: Scalars['String'];
@@ -1328,7 +1336,7 @@ export type GetRunLinkageQueryVariables = Exact<{
 }>;
 
 
-export type GetRunLinkageQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', defers: Array<{ __typename?: 'RunDefer', hashedDeferID: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, function: { __typename?: 'Function', name: string, slug: string } | null, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }>, siblingDefers: Array<{ __typename?: 'RunDefer', hashedDeferID: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, function: { __typename?: 'Function', name: string, slug: string } | null, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }>, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', runID: any, function: { __typename?: 'Function', name: string, slug: string }, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }> } | null };
+export type GetRunLinkageQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', defers: Array<{ __typename?: 'RunDefer', hashedDeferID: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, function: { __typename?: 'Function', name: string, slug: string } | null, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }>, siblingDefers: Array<{ __typename?: 'RunDefer', hashedDeferID: string, userlandDeferID: string, fnSlug: string, status: RunDeferStatus, function: { __typename?: 'Function', name: string, slug: string } | null, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }>, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', runID: any, function: { __typename?: 'Function', name: string, slug: string }, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null }>, invokedFrom: { __typename?: 'RunInvokedFrom', runID: any, function: { __typename?: 'Function', name: string, slug: string } | null, run: { __typename?: 'FunctionRunV2', id: any, status: FunctionRunStatus } | null } | null } | null };
 
 export type GetRunTraceQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -1863,6 +1871,17 @@ export const GetRunLinkageDocument = `
       ...RunDeferSummaryFields
     }
     deferredFrom {
+      runID
+      function {
+        name
+        slug
+      }
+      run {
+        id
+        status
+      }
+    }
+    invokedFrom {
       runID
       function {
         name
