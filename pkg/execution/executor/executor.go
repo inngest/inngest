@@ -3461,17 +3461,9 @@ func (e *executor) handlePause(
 				return fmt.Errorf("error cancelling function: %w", err)
 			}
 
-			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-			// NOTE: cleanup closure is ignored here since there's already another one that will be called
-			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
-				Data: nil,
-			})
-			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-				atomic.AddInt32(&res[1], 1)
-				cleanup(ctx)
-				return nil
-			}
-			return fmt.Errorf("error consuming pause after cancel: %w", err)
+			atomic.AddInt32(&res[1], 1)
+			cleanup(ctx)
+			return nil
 		}
 
 		resumeData := pause.GetResumeData(evt.GetEvent())
