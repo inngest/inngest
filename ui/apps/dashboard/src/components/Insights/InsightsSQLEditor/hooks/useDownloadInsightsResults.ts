@@ -84,18 +84,21 @@ function transformDownloadData(data: InsightsFetchResult): DownloadData {
   return { headers, rows };
 }
 
+function toCSVCell(value: string): string {
+  return needsCSVQuoting(value) ? escapeCSVValue(value) : value;
+}
+
 function presentCSV({ headers, rows }: DownloadData): string {
-  const csvRows = [headers.join(',')];
+  // Column names can be arbitrary expressions or aliases, so they need the
+  // same quoting as the values.
+  const csvRows = [headers.map(toCSVCell).join(',')];
 
   rows.forEach((row) => {
     const values = headers.map((header) => {
       const value = row[header];
       if (value === null || value === undefined) return '';
 
-      const stringValue = String(value);
-      return needsCSVQuoting(stringValue)
-        ? escapeCSVValue(stringValue)
-        : stringValue;
+      return toCSVCell(String(value));
     });
 
     csvRows.push(values.join(','));
