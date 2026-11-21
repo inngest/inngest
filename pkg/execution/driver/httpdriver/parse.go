@@ -58,6 +58,10 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 	case '{':
 		gen := &state.GeneratorOpcode{}
 		if err = json.Unmarshal(trimmed, gen); err != nil {
+			if ue := unknownOpcodeErr(trimmed); ue != nil {
+				err = ue
+				return
+			}
 			err = fmt.Errorf("error reading generator opcode response: %w", err)
 			return
 		}
@@ -66,6 +70,10 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 	case '[':
 		gen := []*state.GeneratorOpcode{}
 		if err = json.Unmarshal(trimmed, &gen); err != nil {
+			if ue := unknownOpcodeErr(trimmed); ue != nil {
+				err = ue
+				return
+			}
 			err = fmt.Errorf("error reading generator opcode response: %w", err)
 			return
 		}
@@ -99,6 +107,44 @@ func parseGenerator(ctx context.Context, byt []byte, noRetry bool) (ops []*state
 	}
 
 	return
+}
+
+// unknownOpcodeErr re-scans a 206 body that failed to decode, returning an
+// *enums.UnknownOpcodeError if the cause was an opcode this server doesn't
+// recognize, or nil for any other decode failure.
+func unknownOpcodeErr(trimmed []byte) error {
+	var p fastjson.Parser
+	v, err := p.ParseBytes(trimmed)
+	if err != nil {
+		return nil
+	}
+
+	check := func(item *fastjson.Value) error {
+		op := item.Get("op")
+		if op == nil {
+			return nil
+		}
+		name, err := op.StringBytes()
+		if err != nil || len(name) == 0 {
+			return nil
+		}
+		if _, err := enums.ParseOpcode(string(name)); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	switch v.Type() {
+	case fastjson.TypeObject:
+		return check(v)
+	case fastjson.TypeArray:
+		for _, item := range v.GetArray() {
+			if ue := check(item); ue != nil {
+				return ue
+			}
+		}
+	}
+	return nil
 }
 
 func ParseStream(resp []byte) (*StreamResponse, error) {

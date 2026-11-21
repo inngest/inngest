@@ -3,9 +3,11 @@ package httpdriver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,6 +66,30 @@ func TestParseGeneratorRejectsInvalidJSON(t *testing.T) {
 	_, err := ParseGenerator(context.Background(), []byte("not-json"), false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error reading generator opcode response")
+}
+
+func TestParseGeneratorUnknownOpcodePromptsUpgrade(t *testing.T) {
+	t.Parallel()
+
+	// An opcode a future SDK might return, in both the single-object and array
+	// response shapes.
+	for _, body := range []string{
+		`{"op":"SomeFutureOpcode","id":"x"}`,
+		`[{"op":"SomeFutureOpcode","id":"x"}]`,
+	} {
+		_, err := ParseGenerator(context.Background(), []byte(body), false)
+		require.Error(t, err)
+
+		require.Contains(t, err.Error(), "update your Inngest server")
+		require.NotContains(t, err.Error(), "error reading generator opcode response")
+
+		var ue *enums.UnknownOpcodeError
+		require.True(t, errors.As(err, &ue))
+		require.Equal(t, "SomeFutureOpcode", ue.Opcode)
+
+		// Non-retriable: version skew is deterministic.
+		require.False(t, queue.ShouldRetry(err, 0, 10))
+	}
 }
 
 func TestParseGeneratorRejectsNullArrayItem(t *testing.T) {
