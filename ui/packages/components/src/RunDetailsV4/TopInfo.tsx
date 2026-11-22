@@ -313,6 +313,7 @@ export const TopInfo = ({
           defaultActive={
             result?.error ? 'error' : prettyPayload ? 'input' : prettyOutput ? 'output' : ''
           }
+          label="Run data"
           tabs={[
             ...(prettyPayload
               ? [
