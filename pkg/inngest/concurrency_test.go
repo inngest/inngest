@@ -151,6 +151,24 @@ func TestConcurrencyLimits_Unmarshal(t *testing.T) {
 				},
 			},
 		},
+		// Legacy numeric form: 5
+		{
+			input: []byte(`5`),
+			expected: ConcurrencyLimits{
+				Step: []StepConcurrency{
+					{
+						Scope: enums.ConcurrencyScopeFn,
+						Limit: 5,
+					},
+				},
+				Limits: []StepConcurrency{
+					{
+						Scope: enums.ConcurrencyScopeFn,
+						Limit: 5,
+					},
+				},
+			},
+		},
 		// New format: {"fn": [...], "step": [...]}
 		{
 			input: []byte(`{"fn": [{"limit": 5}], "step": [{"limit": 10, "key": "event.data.userId", "scope": "fn"}]}`),
