@@ -278,6 +278,7 @@ func (b *batcher[T]) run(ctx context.Context) {
 
 		items := buf
 		var err error
+		var failedRows, disabledRows int
 		if resume != nil {
 			// Usually the final flush, but a non-final one can get here too
 			// if run took another item off b.in (and hit maxSize) before
@@ -288,6 +289,12 @@ func (b *batcher[T]) run(ctx context.Context) {
 				resume = rest
 				return
 			}
+			if resumeErr != nil {
+				failedRows += resumeN
+				if errors.Is(resumeErr, driver.ErrDisabled) {
+					disabledRows += resumeN
+				}
+			}
 			items, resume, err = buf[resumeN:], nil, resumeErr
 		}
 		if len(items) > 0 {
@@ -296,19 +303,25 @@ func (b *batcher[T]) run(ctx context.Context) {
 				resume, resumeN = rest, len(buf)
 				return
 			}
+			if itemsErr != nil {
+				failedRows += len(items)
+				if errors.Is(itemsErr, driver.ErrDisabled) {
+					disabledRows += len(items)
+				}
+			}
 			err = errors.Join(err, itemsErr)
 		}
 		if err != nil {
 			// driver.ErrDisabled is a temporary restart cooldown; drop this
 			// batch and keep the batcher running so dual-write resumes once
 			// the driver recovers.
-			if errors.Is(err, driver.ErrDisabled) {
+			if disabledRows > 0 {
 				if b.opts.dropped != nil {
-					b.opts.dropped.Add(int64(len(buf)))
+					b.opts.dropped.Add(int64(disabledRows))
 				}
-				b.opts.disabled.warn(ctx, b.name, len(buf), err)
+				b.opts.disabled.warn(ctx, b.name, disabledRows, err)
 			} else {
-				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "entity", b.name, "error", err, "rows", len(buf))
+				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "entity", b.name, "error", err, "rows", failedRows)
 			}
 		}
 		buf = buf[:0]
