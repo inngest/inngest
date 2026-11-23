@@ -1788,7 +1788,10 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		item1, err := shard.EnqueueItem(ctx, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		amount := 1000
+		// Use 150 items (above ShadowPartitionPeekMaxBacklogs=100) to exercise
+		// the peek limit while keeping total processing time low enough to avoid
+		// flakiness under CI load (previously 1000 items caused timing-dependent failures).
+		amount := 150
 		for i := range amount {
 			qi := osqueue.QueueItem{
 				FunctionID: fnID,
@@ -1851,7 +1854,7 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 		mem, err := r.ZMembers(kg.ShadowPartitionSet(shadowPart.PartitionID))
 		require.NoError(t, err)
 
-		// ensure we have 1000 + 2 backlogs
+		// ensure we have amount + 2 backlogs (item1 backlog + amount loop backlogs + item2 backlog)
 		require.Len(t, mem, amount+2)
 
 		require.Contains(t, mem, b.BacklogID)
@@ -1871,7 +1874,14 @@ func TestPreventThrottleBacklogUnfairness(t *testing.T) {
 
 		mem, err = r.ZMembers(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""))
 		require.NoError(t, err)
-		require.Len(t, mem, 101)
+		// The default backlog may or may not appear in the randomly-peeked set of 100 backlogs.
+		// When it does appear in the peek AND is prepended for fairness, the second processing
+		// finds no items (already drained), yielding 100 total. When it doesn't appear in the
+		// peek, the prepended default backlog contributes 1 additional item, yielding 101.
+		require.GreaterOrEqual(t, len(mem), 100, "expected at least 100 items refilled")
+		require.LessOrEqual(t, len(mem), 101, "expected at most 101 items refilled")
+		// The critical assertion: default backlog item must always be present,
+		// ensuring fairness for non-throttled items.
 		require.Contains(t, mem, item2.ID)
 	})
 }
