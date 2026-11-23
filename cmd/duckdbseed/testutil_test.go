@@ -9,6 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func requireDuckDBOnPath(t *testing.T) {
+	t.Helper()
+	binPath := driver.RequireDuckDBBinary(t)
+	t.Setenv("DUCKDB_BINARY", binPath)
+}
+
+func requireQuackExtension(t *testing.T) {
+	t.Helper()
+	requireDuckDBOnPath(t)
+}
+
 // newTestDB opens a fresh DuckDB worker (Iceberg lake attached, schema
 // migrated, with parallelism connections) rooted at a temp
 // directory, and returns both the connector (needed for additional
@@ -16,8 +27,7 @@ import (
 // ordinary querying). Both are closed automatically at test cleanup.
 func newTestDB(t *testing.T, parallelism int) (*driver.Connector, *sql.DB) {
 	t.Helper()
-	binPath := driver.RequireDuckDBBinary(t)
-	t.Setenv("DUCKDB_BINARY", binPath)
+	requireDuckDBOnPath(t)
 	dir := t.TempDir()
 
 	connector, db, closeDB, err := openDuckDB(t.Context(), dir, parallelism)
