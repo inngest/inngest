@@ -277,9 +277,9 @@ func TestBatcherResumesAfterDriverCooldown(t *testing.T) {
 	ch <- testEvent("1", "a")
 
 	require.Eventually(t, func() bool {
-		return drv.attempts.Load() >= 1 && dropped.Load() == 1
+		return drv.attempts.Load() >= 1 && dropped.Load() == 1 &&
+			strings.Contains(logs.String(), "dualwrite: duckdb temporarily unavailable in restart cooldown")
 	}, 2*time.Second, 10*time.Millisecond)
-	require.Contains(t, logs.String(), "dualwrite: duckdb temporarily unavailable in restart cooldown")
 
 	// Batcher must still be running (not permanently exited).
 	select {
