@@ -72,10 +72,11 @@ type process struct {
 	workerEP    atomic.Pointer[workerEndpoint]
 	quackGen    uint64
 	redactor    *secretRedactor
-	started     bool
+	started       bool
+	closed        bool
 	disabledUntil time.Time
 	restartFails  int
-	now         func() time.Time
+	now           func() time.Time
 }
 
 func (p *process) clockNow() time.Time {
@@ -83,6 +84,10 @@ func (p *process) clockNow() time.Time {
 		return p.now()
 	}
 	return time.Now()
+}
+
+func (p *process) isClosedLocked() bool {
+	return p.closed || (p.procCtx != nil && p.procCtx.Err() != nil)
 }
 
 func (p *process) isDisabledLocked() bool {
@@ -304,14 +309,26 @@ func (p *process) openPooledQuackConn(ctx context.Context, gated bool) (sqlExece
 	return c, nil
 }
 
-func (p *process) currentWorkerEndpoint() (*workerEndpoint, error) {
+func (p *process) currentWorkerEndpoint(ctx context.Context) (*workerEndpoint, error) {
 	if ep := p.workerEP.Load(); ep != nil {
 		return ep, nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.isClosedLocked() {
+		return nil, errQuackUnavailable
+	}
 	if p.isDisabledLocked() {
 		return nil, ErrDisabled
+	}
+	if ep := p.workerEP.Load(); ep != nil {
+		return ep, nil
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err := p.restartAfterFailureLocked(ctx, errQuackUnavailable); err != nil {
+		return nil, err
 	}
 	if ep := p.workerEP.Load(); ep != nil {
 		return ep, nil
@@ -322,6 +339,9 @@ func (p *process) currentWorkerEndpoint() (*workerEndpoint, error) {
 func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.isClosedLocked() {
+		return errQuackUnavailable
+	}
 	if p.isDisabledLocked() {
 		return ErrDisabled
 	}
@@ -554,6 +574,9 @@ func onceOnly(fn func(*workerSessionExecer) error) func(*workerSessionExecer) er
 }
 
 func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) error {
+	if p.isClosedLocked() {
+		return errQuackUnavailable
+	}
 	var err error
 	if !p.started {
 		err = errors.New("duckdb: subprocess not running")
@@ -664,6 +687,7 @@ func (p *process) closeLocked(ctx context.Context) error {
 func (p *process) close(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.closed = true
 	return p.closeLocked(ctx)
 }
 
