@@ -23,7 +23,7 @@ export type BacklogTimeSeries =
 
 export type ConcurrencyBands = Pick<
   ConcurrencyTimeSeries,
-  'baseLimit' | 'buckets' | 'limitHits'
+  'baseLimit' | 'burstLimit' | 'buckets' | 'limitHits'
 >;
 
 export type TimeRange = { from: string; to: string };
@@ -142,25 +142,29 @@ function hourPoints(
 function bandSeries(bands: ConcurrencyBands, range: TimeRange, dark: boolean) {
   const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
   const limitHitAreaColor = resolveColor(borderColor.error, dark, '#CB2A1D');
-  const burstRanges = widenRanges(
-    mergeHourRanges(bands.buckets, (value) => value > bands.baseLimit),
-    range,
-  );
+  const burstRanges =
+    bands.burstLimit == null
+      ? []
+      : widenRanges(
+          mergeHourRanges(bands.buckets, (value) => value > bands.baseLimit),
+          range,
+        );
   const limitHitRanges = widenRanges(
     mergeHourRanges(bands.limitHits, (value) => value > 0),
     range,
   );
+  const burstSeries = {
+    name: seriesNames.bursts,
+    data: [],
+    type: 'line' as const,
+    itemStyle: { color: burstAreaColor, opacity: BAND_OPACITY },
+    lineStyle: { color: burstAreaColor },
+    markArea: markArea(burstRanges, burstAreaColor),
+  };
   return {
     burstRanges,
     series: [
-      {
-        name: seriesNames.bursts,
-        data: [],
-        type: 'line' as const,
-        itemStyle: { color: burstAreaColor, opacity: BAND_OPACITY },
-        lineStyle: { color: burstAreaColor },
-        markArea: markArea(burstRanges, burstAreaColor),
-      },
+      ...(bands.burstLimit == null ? [] : [burstSeries]),
       {
         name: seriesNames.limitHits,
         data: [],
@@ -286,7 +290,7 @@ export function createConcurrencyChartOptions(
       [
         seriesNames.concurrentSteps,
         { name: seriesNames.limit, icon: 'path://M0,4 L10,4 L10,6 L0,6 Z' },
-        seriesNames.bursts,
+        ...(series.burstLimit == null ? [] : [seriesNames.bursts]),
         seriesNames.limitHits,
       ],
       dark,
@@ -338,7 +342,11 @@ export function createBacklogChartOptions(
     ...baseChartOptions(
       range,
       niceCeiling(dataMax),
-      [seriesNames.backlog, seriesNames.bursts, seriesNames.limitHits],
+      [
+        seriesNames.backlog,
+        ...(bands.burstLimit == null ? [] : [seriesNames.bursts]),
+        seriesNames.limitHits,
+      ],
       dark,
     ),
     series: [
