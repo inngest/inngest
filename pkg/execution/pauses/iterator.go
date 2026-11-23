@@ -151,7 +151,9 @@ func (d *dualIter) Next(ctx context.Context) bool {
 
 	if quit {
 		// We are done!  There are no pauses downloaded or inflight.
-		d.err = context.Canceled
+		if d.err == nil {
+			d.err = context.Canceled
+		}
 
 		// If no blocks were fetched then a buffer only iterator was used
 		if len(d.fetchedBlocks) > 0 {
