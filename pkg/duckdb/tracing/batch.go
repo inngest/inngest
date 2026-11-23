@@ -12,34 +12,50 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// disabledState tracks the driver's terminal state — driver.ErrDisabled, i.e.
-// the subprocess died, its one restart attempt failed, and it will never be
-// respawned. It is shared by every batcher so the warning is logged once for
-// the whole dual-write path, not once per table per flush.
+const disabledWarnInterval = 30 * time.Second
+
+// disabledState rate-limits warnings while the driver is in a restart cooldown
+// (driver.ErrDisabled). It is shared by every batcher so warnings share one
+// log budget across all tables rather than spamming on every flush.
 type disabledState struct {
-	flag atomic.Bool
-	once sync.Once
+	mu           sync.Mutex
+	lastWarn     time.Time
+	warnInterval time.Duration
 }
 
-func (d *disabledState) disable(ctx context.Context, err error) {
-	d.flag.Store(true)
-	d.once.Do(func() {
+func (d *disabledState) warn(ctx context.Context, entity string, rows int, err error) {
+	d.mu.Lock()
+	interval := d.warnInterval
+	if interval <= 0 {
+		interval = disabledWarnInterval
+	}
+	now := time.Now()
+	shouldLog := d.lastWarn.IsZero() || now.Sub(d.lastWarn) >= interval
+	if shouldLog {
+		d.lastWarn = now
+	}
+	d.mu.Unlock()
+
+	if shouldLog {
 		logger.StdlibLogger(ctx).Warn(
-			"dualwrite: duckdb dual-write permanently disabled for this process's lifetime; no further rows will be staged",
+			"dualwrite: duckdb temporarily unavailable in restart cooldown; dropping batch until driver recovers",
+			"entity", entity,
+			"rows", rows,
 			"error", err,
 		)
-	})
+	}
 }
-
-func (d *disabledState) disabled() bool { return d.flag.Load() }
 
 type batcherOpts struct {
 	maxSize       int
 	flushInterval time.Duration
-	// disabled is shared across every table's batcher (NewListener passes one
-	// instance to all of them); left nil, each batcher gets its own, which is
-	// fine for tests but not production.
+	// disabled is shared across every table's batcher (NewBatchingSink passes
+	// one instance to all of them) to rate-limit cooldown warnings; left nil,
+	// each batcher gets its own.
 	disabled *disabledState
+	// dropped, when non-nil, is incremented by the batch size when a batch is
+	// dropped while the driver is in restart cooldown (driver.ErrDisabled).
+	dropped *atomic.Int64
 
 	// Retry bounds (see flushWithRetry); zero means the package default.
 	// Only tests override these.
@@ -54,9 +70,10 @@ type batcherOpts struct {
 // that fails w/ an error that definitely didn't commit (see
 // retryableFlushError) is retried w/ bounded backoff; any other failure
 // (or running out of attempts) is logged and the batch is dropped -- it is
-// never surfaced to the channel's senders. driver.ErrDisabled is terminal,
-// so it stops the batcher for good (see run) instead of being re-logged on
-// every flush.
+// never surfaced to the channel's senders. On driver.ErrDisabled (temporary
+// restart cooldown), the batch is dropped and counted with a rate-limited
+// warning, and the batcher stays running so dual-write resumes automatically
+// once DuckDB recovers.
 type batcher[T any] struct {
 	// name identifies the entity in logs (e.g. "events").
 	name  string
@@ -249,10 +266,6 @@ func (b *batcher[T]) run(ctx context.Context) {
 		if len(buf) == 0 {
 			return
 		}
-		if b.opts.disabled.disabled() {
-			buf, resume = buf[:0], nil
-			return
-		}
 		logger.StdlibLogger(ctx).Debug("dualwrite: flushing batch", "entity", b.name, "rows", len(buf))
 		base := context.WithoutCancel(ctx)
 		stopc := b.stopc
@@ -286,10 +299,14 @@ func (b *batcher[T]) run(ctx context.Context) {
 			err = errors.Join(err, itemsErr)
 		}
 		if err != nil {
-			// driver.ErrDisabled is terminal, so record it (logging once
-			// across all tables) instead of warning on every flush forever.
+			// driver.ErrDisabled is a temporary restart cooldown; drop this
+			// batch and keep the batcher running so dual-write resumes once
+			// the driver recovers.
 			if errors.Is(err, driver.ErrDisabled) {
-				b.opts.disabled.disable(ctx, err)
+				if b.opts.dropped != nil {
+					b.opts.dropped.Add(int64(len(buf)))
+				}
+				b.opts.disabled.warn(ctx, b.name, len(buf), err)
 			} else {
 				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "entity", b.name, "error", err, "rows", len(buf))
 			}
@@ -314,14 +331,6 @@ func (b *batcher[T]) run(ctx context.Context) {
 	}
 
 	for {
-		// Terminal state: stop draining and flushing entirely rather than
-		// building INSERTs for a subprocess that no longer exists. The
-		// listener's hooks keep working untouched — their channels simply
-		// fill up and each send takes the drop-and-count path instead.
-		if b.opts.disabled.disabled() {
-			return
-		}
-
 		select {
 		case item := <-b.in:
 			buf = append(buf, item)
