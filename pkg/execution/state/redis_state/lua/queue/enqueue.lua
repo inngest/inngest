@@ -74,6 +74,12 @@ if is_normalize then
   if current.leaseID ~= nil and current.leaseID ~= cjson.null and decode_ulid_time(current.leaseID) > nowMS then
     return -2
   end
+  -- A refill/worker retry may have restored the same backlog membership after
+  -- the snapshot was read. Never roll its attempt, generation or schedule back.
+  local snapshotGeneration = tonumber(ARGV[16])
+  if snapshotGeneration == nil or (tonumber(current.genID) or 0) ~= snapshotGeneration then
+    return -1
+  end
 end
 
 -- Check idempotency exists
