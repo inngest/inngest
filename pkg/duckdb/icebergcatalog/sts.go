@@ -90,14 +90,16 @@ func (v *STSVendor) VendCredentials(ctx context.Context, ident table.Identifier,
 		return maps.Clone(c.props), nil
 	}
 
-	res, err, _ := v.sf.Do(location, func() (any, error) {
+	ch := v.sf.DoChan(location, func() (any, error) {
 		v.mu.Lock()
 		c, ok := v.cache[location]
 		v.mu.Unlock()
 		if ok && now().Before(c.refresh) {
 			return c.props, nil
 		}
-		props, exp, err := v.assumeRole(ctx, ident, location)
+		sfCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		props, exp, err := v.assumeRole(sfCtx, ident, location)
 		if err != nil {
 			return nil, err
 		}
@@ -124,10 +126,15 @@ func (v *STSVendor) VendCredentials(ctx context.Context, ident table.Identifier,
 		v.mu.Unlock()
 		return props, nil
 	})
-	if err != nil {
-		return nil, err
+	select {
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return maps.Clone(res.Val.(iceberg.Properties)), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	return maps.Clone(res.(iceberg.Properties)), nil
 }
 
 func (v *STSVendor) assumeRole(ctx context.Context, ident table.Identifier, location string) (iceberg.Properties, time.Time, error) {

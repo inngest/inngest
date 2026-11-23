@@ -119,7 +119,10 @@ func (c *ioCache) get(ctx context.Context, props iceberg.Properties, loc string)
 	if ioProps == nil {
 		ioProps = iceberg.Properties{}
 	}
-	fsys, err := loader(ctx, ioProps, loc)
+	// Use context.Background() rather than the caller's request ctx so the
+	// cached FileIO (e.g. an S3 client) isn't bound to the first HTTP
+	// request's lifetime and doesn't fail subsequent writes once it ends.
+	fsys, err := loader(context.Background(), ioProps, loc)
 	if err != nil {
 		return nil, err
 	}

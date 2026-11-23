@@ -497,13 +497,24 @@ func (s *Server) locationInUse(ctx context.Context, loc string) (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			other, err := s.checkLocation(tbl.Metadata().Location())
-			if err != nil {
-				// Not under the warehouse, so it can't overlap loc.
-				continue
+			md := tbl.Metadata()
+			candidates := make([]string, 0, 1+len(locationProperties))
+			candidates = append(candidates, md.Location())
+			props := md.Properties()
+			for _, k := range locationProperties {
+				if v := props[k]; v != "" {
+					candidates = append(candidates, v)
+				}
 			}
-			if other == loc || underRoot(other, loc, sep) || underRoot(loc, other, sep) {
-				return true, nil
+			for _, raw := range candidates {
+				other, err := s.checkLocation(raw)
+				if err != nil {
+					// Not under the warehouse, so it can't overlap loc.
+					continue
+				}
+				if other == loc || underRoot(other, loc, sep) || underRoot(loc, other, sep) {
+					return true, nil
+				}
 			}
 		}
 	}

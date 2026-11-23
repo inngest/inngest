@@ -450,3 +450,41 @@ func TestFastPathCachesFileIO(t *testing.T) {
 		t.Fatalf("expected FileIO to be loaded once across fast-path commits, got %d", got)
 	}
 }
+
+func TestIOCacheDetachesRequestContext(t *testing.T) {
+	dir := t.TempDir()
+	var loaderCtxErr error
+	var cache ioCache
+	cache.loadFS = func(ctx context.Context, props map[string]string, loc string) (icebergio.IO, error) {
+		loaderCtxErr = ctx.Err()
+		return icebergio.LoadFS(ctx, props, loc)
+	}
+
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	fsys, err := cache.get(canceledCtx, iceberg.Properties{}, filepath.Join(dir, "a.json"))
+	if err != nil {
+		t.Fatalf("ioCache.get with canceled caller ctx failed: %v", err)
+	}
+	if loaderCtxErr != nil {
+		t.Fatalf("expected loader to receive uncanceled context, got %v", loaderCtxErr)
+	}
+
+	// Cached FileIO remains usable for subsequent writes.
+	wfs, ok := fsys.(icebergio.WriteFileIO)
+	if !ok {
+		t.Fatalf("expected WriteFileIO, got %T", fsys)
+	}
+	target := filepath.Join(dir, "test.txt")
+	f, err := wfs.Create(target)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if _, err := f.Write([]byte("ok")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+}
