@@ -64,6 +64,12 @@ type Session struct {
 	done      chan struct{}
 	closeOnce sync.Once
 
+	// drain switches readLoop from pushing into s.lines to draining out to
+	// io.Discard until EOF, used when the process switches transport to quack
+	// while keeping the CLI subprocess alive.
+	drain     chan struct{}
+	drainOnce sync.Once
+
 	// desynced is set by exec when it abandons an in-flight statement.
 	// Guarded by mu.
 	desynced bool
@@ -80,6 +86,7 @@ func NewSession(stdin io.Writer, out io.Reader) *Session {
 		stdin: stdin,
 		lines: make(chan []byte, 64),
 		done:  make(chan struct{}),
+		drain: make(chan struct{}),
 	}
 	go s.readLoop(out)
 	return s
@@ -91,12 +98,29 @@ func (s *Session) Close() {
 	s.closeOnce.Do(func() { close(s.done) })
 }
 
+// Drain switches the session's reader goroutine out of framing mode and into
+// draining the subprocess's merged stdout+stderr pipe until EOF, so the
+// subprocess cannot deadlock on a full OS pipe buffer after the driver swaps
+// to quack transport. Safe to call more than once.
+func (s *Session) Drain() {
+	s.drainOnce.Do(func() { close(s.drain) })
+}
+
 func (s *Session) readLoop(out io.Reader) {
 	defer close(s.lines)
 
 	sc := bufio.NewScanner(out)
 	sc.Buffer(make([]byte, 0, 64*1024), maxLineBytes)
 	for sc.Scan() {
+		select {
+		case <-s.drain:
+			_, _ = io.Copy(io.Discard, out)
+			return
+		case <-s.done:
+			return
+		default:
+		}
+
 		// Scanner reuses its token buffer between Scan calls, so the line
 		// has to be copied before it crosses the channel.
 		line := make([]byte, len(sc.Bytes()))
@@ -104,9 +128,20 @@ func (s *Session) readLoop(out io.Reader) {
 
 		select {
 		case s.lines <- line:
+		case <-s.drain:
+			_, _ = io.Copy(io.Discard, out)
+			return
 		case <-s.done:
 			return
 		}
+	}
+	// If Drain was called after a scanner error (e.g. an over-long line),
+	// keep draining raw bytes until EOF so the subprocess never blocks.
+	select {
+	case <-s.drain:
+		_, _ = io.Copy(io.Discard, out)
+		return
+	default:
 	}
 	s.scanErr = sc.Err()
 }

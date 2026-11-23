@@ -16,7 +16,7 @@ import (
 )
 
 func TestValidateName(t *testing.T) {
-	for _, name := range []string{"", "a/b", `a\b`, "..", "a..b", "a\x00b", "a\nb", "a\x7fb"} {
+	for _, name := range []string{"", "a/b", `a\b`, "..", "a..b", "a\x00b", "a\nb", "a\x7fb", "a*b", "a?b", "a$b", "a{b", "a}b"} {
 		if err := validateName(name); err == nil {
 			t.Errorf("expected %q to be rejected", name)
 		}
@@ -50,7 +50,7 @@ func TestCheckLocation(t *testing.T) {
 		want string // empty means rejected
 	}{
 		{"local table", local, filepath.Join(wh, "app.db", "runs"), filepath.Join(wh, "app.db", "runs")},
-		{"local warehouse itself", local, wh, wh},
+		{"local warehouse itself", local, wh, ""},
 		{"local file url", local, "file://" + filepath.Join(wh, "x"), filepath.Join(wh, "x")},
 		{"local double slash", local, wh + "//app.db/runs", filepath.Join(wh, "app.db", "runs")},
 		{"local dot segment", local, wh + "/app.db/./runs", ""},
@@ -62,9 +62,12 @@ func TestCheckLocation(t *testing.T) {
 		{"local symlink escape", local, filepath.Join(wh, "escape", "runs"), ""},
 		{"local file url encoded dotdot", local, "file://" + filepath.Join(wh, "escape") + "/%2e%2e", ""},
 		{"local file url encoded dot", local, "file://" + wh + "/app.db/%2e/runs", ""},
+		{"local file url userinfo", local, "file://user@" + filepath.Join(wh, "x"), ""},
+		{"local wildcard", local, filepath.Join(wh, "app.db", "runs*"), ""},
 		{"local to s3", local, "s3://bucket/wh/x", ""},
 		{"local nul", local, wh + "/a\x00b", ""},
 		{"s3 table", s3, "s3://bucket/wh/app.db/runs", "s3://bucket/wh/app.db/runs"},
+		{"s3 warehouse itself", s3, "s3://bucket/wh", ""},
 		{"s3 dotdot inside", s3, "s3://bucket/wh/a/../b", ""},
 		{"s3 dotdot escape", s3, "s3://bucket/wh/../other", ""},
 		{"s3 encoded dotdot", s3, "s3://bucket/wh/a/%2e%2e/b", ""},
@@ -72,6 +75,10 @@ func TestCheckLocation(t *testing.T) {
 		{"s3 other bucket", s3, "s3://evil/wh/x", ""},
 		{"s3 other scheme", s3, "gs://bucket/wh/x", ""},
 		{"s3 local path", s3, "/bucket/wh/x", ""},
+		{"s3 userinfo", s3, "s3://user:pass@bucket/wh/app.db/runs", ""},
+		{"s3 wildcard", s3, "s3://bucket/wh/app.db/runs*", ""},
+		{"s3 encoded wildcard", s3, "s3://bucket/wh/app.db/runs%2a", ""},
+		{"s3 iam var", s3, "s3://bucket/wh/app.db/${aws:username}", ""},
 		{"no warehouse", none, "/tmp/x", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -193,6 +200,12 @@ func TestCommitValidation(t *testing.T) {
 		{"duplicate action keys", []string{`{"action":"set-properties","action":"set-location","location":"/tmp/evil","updates":{}}`}},
 		{"case variant duplicate", []string{`{"action":"set-properties","ACTION":"set-location","location":"/tmp/evil","updates":{}}`}},
 		{"set-location outside", []string{`{"action":"set-location","location":"/tmp/evil"}`}},
+		{"set-location inside warehouse", []string{`{"action":"set-location","location":"` + filepath.Dir(loc) + `/other"}`}},
+		{"forbidden s3 property", []string{`{"action":"set-properties","updates":{"s3.endpoint":"http://169.254.169.254"}}`}},
+		{"forbidden gcs property", []string{`{"action":"set-properties","updates":{"gcs.oauth2.token":"x"}}`}},
+		{"forbidden adls property", []string{`{"action":"set-properties","updates":{"adls.sas-token":"x"}}`}},
+		{"forbidden client property", []string{`{"action":"set-properties","updates":{"client.region":"us-east-1"}}`}},
+		{"forbidden http property", []string{`{"action":"set-properties","updates":{"http.header.x":"y"}}`}},
 		{"manifest-list outside", []string{snapshot(2, "/tmp/evil/snap-2.avro")}},
 		{"manifest-list in another table", []string{snapshot(2, filepath.Dir(loc)+"/other/snap-2.avro")}},
 		{"statistics outside", []string{stats("/tmp/evil/1.stats")}},
@@ -260,15 +273,12 @@ func TestPurge(t *testing.T) {
 		t.Fatalf("purge touched a sibling: %v", err)
 	}
 
-	// A table located at the warehouse root can't be purged.
-	if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"root","location":"`+wh+`","schema":`+schema+`}`); status != 200 {
-		t.Fatalf("create root table: %d %v", status, body)
-	}
-	if status, _ := do(t, ts, "DELETE", "/v1/namespaces/app/tables/root?purgeRequested=true", ""); status != http.StatusBadRequest {
-		t.Fatalf("expected root purge to 400, got %d", status)
+	// A table cannot be located at the warehouse root itself.
+	if status, _ := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"root","location":"`+wh+`","schema":`+schema+`}`); status != http.StatusBadRequest {
+		t.Fatalf("expected root table create to 400, got %d", status)
 	}
 	if _, err := os.Stat(sibling); err != nil {
-		t.Fatalf("warehouse was purged: %v", err)
+		t.Fatalf("warehouse was modified: %v", err)
 	}
 }
 

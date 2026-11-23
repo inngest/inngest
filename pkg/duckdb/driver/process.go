@@ -23,17 +23,22 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// ErrDisabled is returned once a process has been permanently disabled after
-// a failed restart attempt. Per the "one restart attempt; if that also
-// fails, permanently disable" policy, callers must treat this as
-// "dual-write disabled for this process's lifetime" and stop issuing
-// statements — a disabled process never attempts to respawn again, so every
-// subsequent call fails identically.
+// ErrDisabled is returned while a process is in a restart cooldown after a
+// failed restart attempt. Callers must treat this as "subprocess temporarily
+// unavailable" and back off until the cooldown expires (10s -> 30s -> 60s),
+// after which the next statement retries spawning a fresh subprocess.
 //
-// It is exported so pkg/duckdb/tracing can observe the terminal state
-// instead of retrying forever: the very first error that disables the process
-// wraps this too, so a caller never has to fail twice to notice.
-var ErrDisabled = errors.New("duckdb: subprocess permanently disabled after a failed restart attempt")
+// It is exported so pkg/duckdb/tracing can observe the cooldown state: the
+// very first error that enters cooldown wraps this too.
+var ErrDisabled = errors.New("duckdb: subprocess disabled in cooldown after a failed restart attempt")
+
+// restartCooldowns is the exponential backoff schedule after consecutive
+// failed restart attempts.
+var restartCooldowns = []time.Duration{
+	10 * time.Second,
+	30 * time.Second,
+	60 * time.Second,
+}
 
 // ErrStatementFailed marks an error duckdb itself reported for a statement
 // (the server answered, it just rejected it), as opposed to a transport
@@ -135,9 +140,39 @@ type process struct {
 	stdin    io.WriteCloser
 	// out is the read end of the subprocess's merged stdout+stderr pipe —
 	// see spawnLocked for why they are merged.
-	out      *os.File
-	started  bool
-	disabled bool
+	out           *os.File
+	jlSess        *jsonlines.Session
+	started       bool
+	disabledUntil time.Time
+	restartFails  int
+	// now overrides time.Now for tests exercising restart cooldown backoff.
+	now func() time.Time
+}
+
+func (p *process) clockNow() time.Time {
+	if p.now != nil {
+		return p.now()
+	}
+	return time.Now()
+}
+
+// isDisabledLocked assumes mu is held and reports whether the process is
+// currently within a post-failed-restart cooldown window.
+func (p *process) isDisabledLocked() bool {
+	return !p.disabledUntil.IsZero() && p.clockNow().Before(p.disabledUntil)
+}
+
+// subprocessEnv constructs a minimal environment allowlist for the duckdb CLI
+// subprocess so ambient host secrets (DATABASE_URL, AWS_*, HTTP_PROXY, signing
+// keys, etc.) are never inherited.
+func subprocessEnv() []string {
+	env := []string{"TZ=UTC"}
+	for _, key := range []string{"PATH", "HOME", "TMPDIR", "LANG", "LC_ALL"} {
+		if val, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+val)
+		}
+	}
+	return env
 }
 
 // startProcess spawns the subprocess and health-checks it before returning,
@@ -233,6 +268,7 @@ func (p *process) spawnLocked() error {
 		args = append(args, "-unsigned")
 	}
 	cmd := exec.CommandContext(p.procCtx, p.binaryPath, args...)
+	cmd.Env = subprocessEnv()
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -281,6 +317,7 @@ func (p *process) spawnLocked() error {
 	p.out = outR
 	sess := jsonlines.NewSession(stdin, outR)
 	sess.Redact = p.redactor.redact
+	p.jlSess = sess
 	p.sess = sess
 	p.started = true
 	return nil
@@ -433,6 +470,12 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
 	}
+	// Retire the jsonlines session's channel framing and drain outR until EOF
+	// so subprocess stdout/stderr writes cannot fill s.lines (size 64) and
+	// deadlock the OS pipe while quack is serving traffic.
+	if p.jlSess != nil {
+		p.jlSess.Drain()
+	}
 	p.sess = quackSess
 	p.quackGen++
 	p.quackEP.Store(&quackEndpoint{listenURL: listenURL, token: token, gen: p.quackGen})
@@ -505,7 +548,7 @@ func (p *process) currentQuackEndpoint() (*quackEndpoint, error) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.disabled {
+	if p.isDisabledLocked() {
 		return nil, ErrDisabled
 	}
 	if ep := p.quackEP.Load(); ep != nil {
@@ -523,7 +566,7 @@ func (p *process) currentQuackEndpoint() (*quackEndpoint, error) {
 func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.disabled {
+	if p.isDisabledLocked() {
 		return ErrDisabled
 	}
 	if p.quackGen != gen {
@@ -600,8 +643,12 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 	}
 	homeDir := filepath.Join(p.stateDir, "duckdb")
 	extDir := filepath.Join(homeDir, "extensions")
+	tmpDir := filepath.Join(p.stateDir, "tmp")
 	if err := os.MkdirAll(extDir, 0o755); err != nil {
 		return fmt.Errorf("duckdb: creating extension directory %q: %w", extDir, err)
+	}
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		return fmt.Errorf("duckdb: creating temp directory %q: %w", tmpDir, err)
 	}
 
 	homeLiteral, err := encodeLiteral(homeDir)
@@ -611,6 +658,10 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 	extLiteral, err := encodeLiteral(extDir)
 	if err != nil {
 		return fmt.Errorf("duckdb: encoding extension directory: %w", err)
+	}
+	tmpLiteral, err := encodeLiteral(tmpDir)
+	if err != nil {
+		return fmt.Errorf("duckdb: encoding temp directory: %w", err)
 	}
 
 	stmts := []string{
@@ -623,6 +674,7 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 		// that risk at the source rather than relying solely on the parser
 		// tolerating it.
 		fmt.Sprintf("SET extension_directories=[%s];", extLiteral),
+		fmt.Sprintf("SET temp_directory=%s;", tmpLiteral),
 	}
 	return p.bootstrapExecLocked(ctx, "state dir", stmts)
 }
@@ -766,7 +818,7 @@ func (p *process) Exec(ctx context.Context, sqlText string) (cols []string, rows
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.disabled {
+	if p.isDisabledLocked() {
 		return nil, nil, ErrDisabled
 	}
 
@@ -789,7 +841,7 @@ func (p *process) Query(ctx context.Context, sqlText string) (cols []string, typ
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.disabled {
+	if p.isDisabledLocked() {
 		return nil, nil, nil, ErrDisabled
 	}
 
@@ -813,7 +865,7 @@ func (p *process) QueryWithStreams(ctx context.Context, sqlText string, streams 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.disabled {
+	if p.isDisabledLocked() {
 		return nil, nil, nil, ErrDisabled
 	}
 
@@ -873,9 +925,14 @@ func onceOnly(fn func(*quack.Session) error) func(*quack.Session) error {
 // tearing down the pool while this call is in flight) can never observe or
 // produce a half-restarted process.
 func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) error {
-	err := p.replaceAbandonedQuackSessionLocked(ctx)
-	if err == nil {
-		err = fn()
+	var err error
+	if !p.started {
+		err = errors.New("duckdb: subprocess not running")
+	} else {
+		err = p.replaceAbandonedQuackSessionLocked(ctx)
+		if err == nil {
+			err = fn()
+		}
 	}
 	if err == nil {
 		return nil
@@ -991,10 +1048,23 @@ func (p *process) restartAfterFailureLocked(ctx context.Context, err error) erro
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), restartHealthTimeout)
 	defer cancel()
 	if restartErr := p.restartLocked(rctx); restartErr != nil {
-		p.disabled = true
-		l.Error("duckdb: subprocess restart failed; permanently disabling dual-write for this process", "exec_error", err, "restart_error", restartErr)
-		return fmt.Errorf("%w (exec error: %v; restart error: %v)", ErrDisabled, err, restartErr)
+		idx := p.restartFails
+		if idx >= len(restartCooldowns) {
+			idx = len(restartCooldowns) - 1
+		}
+		cooldown := restartCooldowns[idx]
+		p.restartFails++
+		p.disabledUntil = p.clockNow().Add(cooldown)
+		l.Error("duckdb: subprocess restart failed; entering cooldown before retry",
+			"cooldown", cooldown,
+			"consecutive_failures", p.restartFails,
+			"exec_error", err,
+			"restart_error", restartErr,
+		)
+		return fmt.Errorf("%w (cooldown %s; exec error: %v; restart error: %v)", ErrDisabled, cooldown, err, restartErr)
 	}
+	p.restartFails = 0
+	p.disabledUntil = time.Time{}
 	l.Info("duckdb: subprocess restarted successfully after a crash", "new_generation", p.quackGen)
 	return nil
 }
@@ -1010,10 +1080,11 @@ func (p *process) closeLocked(ctx context.Context) error {
 	p.quackEP.Store(nil)
 
 	// Retire the jsonlines session's reader goroutine first so it can never
-	// block handing a line to an exec that will never run again. A
-	// quack.Session (see startQuackLocked) has no such goroutine — it's a
-	// plain HTTP client — so this is a no-op once the transport has been
-	// swapped.
+	// block handing a line to an exec that will never run again.
+	if p.jlSess != nil {
+		p.jlSess.Close()
+		p.jlSess = nil
+	}
 	if closer, ok := p.sess.(interface{ Close() }); ok {
 		closer.Close()
 	}

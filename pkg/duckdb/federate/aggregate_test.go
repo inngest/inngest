@@ -192,3 +192,19 @@ func TestValidateAggregate(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyListTimeBucketUsesExplicitUTCOrigin(t *testing.T) {
+	items := keyList(AggregateQuery{
+		GroupBy: []GroupKey{{Column: "queued_at", Bucket: 30 * time.Minute, As: "period"}},
+	})
+	require.Len(t, items, 1)
+	sqlText, err := render(sel("SELECT 1"))
+	require.NoError(t, err)
+	_ = sqlText
+
+	stmt := sel("SELECT 1")
+	stmt.Columns = items
+	rendered, err := render(stmt)
+	require.NoError(t, err)
+	require.Contains(t, rendered, "time_bucket(INTERVAL 1800 SECOND, queued_at, TIMESTAMPTZ '1970-01-01 00:00:00+00:00')")
+}

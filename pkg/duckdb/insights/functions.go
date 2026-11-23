@@ -334,42 +334,63 @@ func literalColumnType(kind parser.LiteralKind) ColumnType {
 	}
 }
 
+// allowedListAggregates is the explicit allowlist of safe aggregate functions
+// permitted as the second argument to list_aggregate / array_aggregate.
+// Requiring a literal string from this set prevents bypassing allowedFunctions
+// via dynamic dispatch (e.g. calling disallowed aggregates like histogram).
+var allowedListAggregates = map[string]bool{
+	"sum":           true,
+	"min":           true,
+	"max":           true,
+	"avg":           true,
+	"mean":          true,
+	"count":         true,
+	"first":         true,
+	"last":          true,
+	"product":       true,
+	"bit_and":       true,
+	"bit_or":        true,
+	"bit_xor":       true,
+	"bool_and":      true,
+	"bool_or":       true,
+	"string_agg":    true,
+	"median":        true,
+	"mode":          true,
+	"stddev":        true,
+	"quantile_cont": true,
+}
+
 // listAggregateReturnType is LIST_AGGREGATE/ARRAY_AGGREGATE's returnType:
 // list_aggregate(list, name) applies the aggregate named by args[1] (e.g.
-// 'sum', 'string_agg', 'bit_and') to args[0] -- statically typeable only
-// when that name is a literal string constant (by far the common case:
-// written directly in the query, not built from an expression). Recurses
-// into functionReturnType with the resolved name and args w/o the name, so
-// e.g. list_aggregate(x, 'string_agg', ',') reports the same type
-// STRING_AGG(x, ',') would, reusing that function's own returnType instead of duplicating it.
-//
-// A dynamic (non-literal) name is genuinely unknowable without asking
-// DuckDB -- reported as ColumnTypeUnknown with no diagnostic, not guessed.
-// A *literal* of the wrong kind (a NUMBER/BOOLEAN/NULL where DuckDB
-// requires VARCHAR) is a different situation: confirmed empirically
-// ("SELECT list_aggregate([1,2,3], 123);" -> Binder Error, no candidate
-// function matches a non-VARCHAR second argument), so that case is
-// rejected outright rather than reported as unknown. A literal string that
-// doesn't match any known aggregate name (e.g. 'not_a_real_aggregate')
-// stays unknown too, not rejected -- this package's own allowlist isn't
-// necessarily DuckDB's complete aggregate list, so absence here doesn't
-// prove DuckDB would also reject it. Assumes len(args) >= 2 --
-// allowedFunctions' "list_aggregate"/"array_aggregate" entries wrap this in
-// withArity(2, -1, listAggregateReturnType), confirmed empirically to be
-// this function's real minimum (a 1-argument call is a Binder Error) with
-// no real maximum (extra arguments are forwarded to the named aggregate,
-// e.g. list_aggregate(x, 'string_agg', ',')).
+// 'sum', 'string_agg', 'bit_and') to args[0]. To prevent bypassing the
+// function allowlist via dynamic dispatch, args[1] must be a string literal
+// naming an aggregate in allowedListAggregates. Recurses into
+// functionReturnType with the resolved name and args w/o the name, so e.g.
+// list_aggregate(x, 'string_agg', ',') reports the same type STRING_AGG(x, ',')
+// would.
 func listAggregateReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 	lit, ok := args[1].(*parser.Literal)
 	if !ok {
-		return ColumnTypeUnknown, nil, nil
+		return ColumnTypeUnknown, nil, []Diagnostic{{
+			Severity: DiagnosticError,
+			Code:     "disallowed-list-aggregate",
+			Message:  fmt.Sprintf("%s's argument 2 must be a string literal naming an allowed aggregate function", strings.ToUpper(name)),
+		}}
 	}
 	if lit.Kind != parser.LitString {
 		return ColumnTypeUnknown, nil, []Diagnostic{wrongArgTypeDiagnostic(name, 2, ColumnTypeString, literalColumnType(lit.Kind))}
 	}
+	aggName := strings.ToLower(lit.Text)
+	if !allowedListAggregates[aggName] {
+		return ColumnTypeUnknown, nil, []Diagnostic{{
+			Severity: DiagnosticError,
+			Code:     "disallowed-list-aggregate",
+			Message:  fmt.Sprintf("%s aggregate %q is not allowed", strings.ToUpper(name), lit.Text),
+		}}
+	}
 	// The list and any arguments after the name are the aggregate's own.
 	aggArgs := append([]parser.Expr{args[0]}, args[2:]...)
-	return functionReturnType(strings.ToLower(lit.Text), aggArgs, scope)
+	return functionReturnType(aggName, aggArgs, scope)
 }
 
 // allowedFunctions is the conservative starting function allowlist. Keys

@@ -220,14 +220,37 @@ func TestValidateRejectsListAggregateNameTypeMismatch(t *testing.T) {
 func TestValidateAcceptsListAggregateNameVariants(t *testing.T) {
 	cases := []string{
 		"SELECT list_aggregate(event_ids, 'count') FROM runs",
-		"SELECT list_aggregate(event_ids, 'not_a_real_aggregate') FROM runs", // unrecognized but string-shaped: stays accepted
-		"SELECT list_aggregate(event_ids, LOWER('SUM')) FROM runs",           // dynamic name: can't be checked statically
+		"SELECT list_aggregate(event_ids, 'SUM') FROM runs",
+		"SELECT array_aggregate(event_ids, 'min') FROM runs",
+		"SELECT list_aggregate(event_ids, 'string_agg', ',') FROM runs",
 	}
 	for _, sql := range cases {
 		t.Run(sql, func(t *testing.T) {
 			stmt := mustParse(t, sql)
 			_, _, _, err := validate(stmt, productCatalog)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateRejectsDisallowedOrDynamicListAggregate(t *testing.T) {
+	cases := []struct {
+		name    string
+		sql     string
+		wantSub string
+	}{
+		{"disallowed histogram", "SELECT list_aggregate(event_ids, 'histogram') FROM runs", `aggregate "histogram" is not allowed`},
+		{"disallowed via array_aggregate", "SELECT array_aggregate(event_ids, 'histogram') FROM runs", `aggregate "histogram" is not allowed`},
+		{"unknown aggregate", "SELECT list_aggregate(event_ids, 'not_a_real_aggregate') FROM runs", `aggregate "not_a_real_aggregate" is not allowed`},
+		{"dynamic expression", "SELECT list_aggregate(event_ids, LOWER('SUM')) FROM runs", "must be a string literal"},
+		{"dynamic column", "SELECT array_aggregate(event_ids, status) FROM runs", "must be a string literal"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			stmt := mustParse(t, tc.sql)
+			_, _, _, err := validate(stmt, productCatalog)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantSub)
 		})
 	}
 }

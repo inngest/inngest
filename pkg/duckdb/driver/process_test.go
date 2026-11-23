@@ -162,7 +162,7 @@ func TestExecTriggersRestartAfterCrash(t *testing.T) {
 	require.NoError(t, err)
 
 	c.proc.mu.Lock()
-	disabled := c.proc.disabled
+	disabled := c.proc.isDisabledLocked()
 	c.proc.mu.Unlock()
 	require.False(t, disabled, "a successful restart must not disable the process")
 }
@@ -277,7 +277,7 @@ func TestExecLogsWhenRestartFails(t *testing.T) {
 	output := buf.String()
 	require.Contains(t, output, "subprocess crashed", "must log a warning identifying the crash")
 	require.Contains(t, output, "restart failed", "must log that the restart itself failed")
-	require.Contains(t, output, "permanently disabling", "must make the terminal disabled state loud")
+	require.Contains(t, output, "entering cooldown", "must make the cooldown state loud")
 }
 
 // TestProcessHealthCheckAndRestartAreRaceFree covers review finding #4
@@ -457,7 +457,7 @@ func TestExecStatementErrorDoesNotRestartSubprocess(t *testing.T) {
 	require.Equal(t, pidBefore, c.proc.cmd.Process.Pid,
 		"a rejected statement must not respawn the subprocess")
 	c.proc.mu.Lock()
-	disabled := c.proc.disabled
+	disabled := c.proc.isDisabledLocked()
 	c.proc.mu.Unlock()
 	require.False(t, disabled)
 }
@@ -550,4 +550,73 @@ func TestExecFailedRestartWrapsErrDisabledImmediately(t *testing.T) {
 
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
 	require.ErrorIs(t, err, ErrDisabled, "the disabling error itself must be observable as ErrDisabled")
+}
+
+// TestExecRestartCooldownAndRecovery verifies that a failed restart enters a
+// bounded exponential backoff cooldown (10s -> 30s -> 60s) rather than
+// permanently disabling the process, and recovers once the cooldown expires.
+func TestExecRestartCooldownAndRecovery(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	c.proc.mu.Lock()
+	c.proc.now = func() time.Time { return now }
+	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.mu.Unlock()
+
+	require.NoError(t, c.proc.cmd.Process.Kill())
+	_, _ = c.proc.cmd.Process.Wait()
+
+	// Failure 1 -> 10s cooldown.
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+
+	// Still in cooldown at +9s.
+	now = now.Add(9 * time.Second)
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+
+	// Cooldown expires at +10s; failure 2 -> 30s cooldown.
+	now = now.Add(1 * time.Second)
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+	c.proc.mu.Lock()
+	require.Equal(t, 2, c.proc.restartFails)
+	require.Equal(t, now.Add(30*time.Second), c.proc.disabledUntil)
+	c.proc.mu.Unlock()
+
+	// Restore binary and advance past the 30s cooldown: next Exec recovers.
+	c.proc.mu.Lock()
+	c.proc.binaryPath = binPath
+	c.proc.mu.Unlock()
+	now = now.Add(30 * time.Second)
+
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+	c.proc.mu.Lock()
+	require.Equal(t, 0, c.proc.restartFails)
+	require.True(t, c.proc.disabledUntil.IsZero())
+	c.proc.mu.Unlock()
+}
+
+func TestSubprocessEnvAllowlist(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://secret")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret")
+	t.Setenv("HTTP_PROXY", "http://proxy.internal:8080")
+
+	env := subprocessEnv()
+	require.Contains(t, env, "TZ=UTC")
+	for _, kv := range env {
+		require.NotContains(t, kv, "DATABASE_URL")
+		require.NotContains(t, kv, "AWS_SECRET_ACCESS_KEY")
+		require.NotContains(t, kv, "HTTP_PROXY")
+	}
 }
