@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.54.0] - 2026-11-20
+
+### 🚀 Features
+
+- *(pauses)* Opt into event body field expiry (#5255)
+- *(exechttp)* Preserve opt-in HTTP trace on TCP resets (#5256)
+- *(api)* Update a webhook via v2 api, cli & mcp (#5223)
+- *(duckdb)* Add an embedded Iceberg REST catalog (#5178)
+- *(duckdb)* Move the lake from DuckLake to Iceberg (#5187)
+- *(duckdb)* Vend storage credentials from the embedded Iceberg catalog (#5276)
+- *(federate)* Prune delta columns for multi-table Iceberg queries (#5281)
+- *(api)* Get account usage and limits via v2 api, cli & mcp (#5280)
+
+### 🐛 Bug Fixes
+
+- *(constraintapi)* Add retry support for fn level concurrency (#5236)
+- *(ui)* Read parsed boolean search parameters (#5214)
+- *(executor)* Stop invalid function timeouts from panicking runs (#5210)
+- *(util)* Return an error when a crit section panics (#4834)
+- *(connect)* Don't route new requests to a draining gateway (#5034)
+- *(executor)* Add worker concurrency semaphores to planned step items (#5023)
+- *(connect)* Restore routing test compilation (#5274)
+- *(duckdb)* Retry failed dual-write flushes and build run rows from the batch (#5203)
+- *(httpdriver)* Cut DNS lookups from the executor (#5285)
+- *(federate)* Read nested subqueries and set op clauses in the delta lineage, and fix star REPLACE/RENAME gaps (#5291)
+- *(duckdb)* Store the app name in run state and add it to the dual-write's spans (#5292)
+- *(queue)* Don't block ProcessItem goroutines on a full errCh (#5295)
+
+### ⚡ Performance
+
+- *(executor)* Reuse serialized event payloads across fan-out (#4967)
+
+### 🧪 Testing
+
+- *(util)* Synchronize critical context timeout test (#5173)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(execution)* Change return type of schedule with routing errors (#5251)
+- Refactor to use fx (#5252)
+
 ## [v1.53.0] - 2026-11-12
 
 ### 🚀 Features
@@ -18,6 +59,10 @@ All notable changes to this project will be documented in this file.
 ### ⚡ Performance
 
 - *(duckdbseed)* Write each table from its own appender (#5207)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.53.0 (#5242)
 
 ## [v1.52.0] - 2026-11-10
 

@@ -72,6 +72,19 @@ func TestSourceColumnsRead(t *testing.T) {
 			want: map[Table][]string{TableSpans: {}},
 		},
 		{
+			// An unnest multiplies the rows, read or not.
+			name: "unread unnest", sql: `SELECT count(*) FROM (SELECT unnest(event_ids) FROM runs)`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"event_ids"}},
+		},
+		{
+			name: "unread unnest in an expression", sql: `SELECT run_id FROM (SELECT run_id, upper(unnest(event_ids)) AS e FROM runs)`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"event_ids", "run_id"}},
+		},
+		{
+			name: "unread unnest in a CTE", sql: `WITH c AS (SELECT run_id, unnest(event_ids) AS e, status FROM runs) SELECT count(*) FROM c`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"event_ids"}},
+		},
+		{
 			// A filter literal naming another table's column is just a
 			// value (the old plan-based attribution misread it).
 			name:   "join w/ a literal naming a column",

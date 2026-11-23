@@ -170,7 +170,7 @@ func (s *Server) routes() {
 	s.handle("HEAD /v1/namespaces/{ns}/tables/{table}", s.headTable)
 	s.handle("POST /v1/namespaces/{ns}/tables/{table}", s.commitTable)
 	s.handle("DELETE /v1/namespaces/{ns}/tables/{table}", s.dropTable)
-	s.handle("POST /v1/namespaces/{ns}/tables/{table}/metrics", s.reportMetrics)
+	s.handle(metricsRoute, s.reportMetrics)
 	s.handle("GET /v1/namespaces/{ns}/tables/{table}/credentials", s.loadCredentials)
 	s.mux.HandleFunc("POST /v1/tables/rename", s.renameTable)
 
@@ -202,21 +202,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(rec, http.StatusUnauthorized, "NotAuthorizedException", "missing or invalid bearer token")
 		return
 	}
-	if s.opts.ReadOnly && !readOnlyRequest(r) {
+	if s.opts.ReadOnly && !s.readOnlyRequest(r) {
 		writeError(rec, http.StatusForbidden, "ForbiddenException", "this catalog is read-only")
 		return
 	}
 	s.mux.ServeHTTP(rec, r)
 }
 
+const metricsRoute = "POST /v1/namespaces/{ns}/tables/{table}/metrics"
+
 // readOnlyRequest reports whether r can't change the catalog. A metrics
-// report is a POST but only gets logged.
-func readOnlyRequest(r *http.Request) bool {
+// report is a POST but only gets logged. NOTE: that's decided on the route
+// r matches, not its path: a commit to a table named `metrics` ends in
+// /metrics too.
+func (s *Server) readOnlyRequest(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
 		return true
 	case http.MethodPost:
-		return strings.HasSuffix(r.URL.Path, "/metrics")
+		_, pattern := s.mux.Handler(r)
+		return pattern == metricsRoute
 	}
 	return false
 }
@@ -586,20 +591,20 @@ func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 	// `snapshots=refs` is ignored, we always return all snapshots.
 	ident := pathTable(r)
 	if c, ok := s.cachedCurrent(r.Context(), ident); ok {
-		if loc, ok := tableLocationOf(c.loc); ok {
-			cfg, creds, err := s.tableCredentials(r, ident, loc)
-			if err != nil {
-				writeVendError(w, err)
-				return
-			}
-			writeJSON(w, http.StatusOK, loadTableResponse{
-				MetadataLocation:   c.loc,
-				Metadata:           c.body,
-				Config:             cfg,
-				StorageCredentials: creds,
-			})
+		// NOTE: the table's own location, not c.loc's parent: the two differ
+		// w/ `write.metadata.path` set or after a set-location commit.
+		cfg, creds, err := s.tableCredentials(r, ident, c.md.Location())
+		if err != nil {
+			writeVendError(w, err)
 			return
 		}
+		writeJSON(w, http.StatusOK, loadTableResponse{
+			MetadataLocation:   c.loc,
+			Metadata:           c.body,
+			Config:             cfg,
+			StorageCredentials: creds,
+		})
+		return
 	}
 	tbl, err := s.cat.LoadTable(r.Context(), ident)
 	if err != nil {

@@ -419,6 +419,93 @@ service V2 {
     };
   }
 
+  rpc GetAccountUsage(GetAccountUsageRequest) returns (GetAccountUsageResponse) {
+    option (google.api.http) = {
+      get: "/account/usage"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "accounts:read:usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get account usage"
+      description: "Returns the account's execution usage for the current UTC calendar month, plus current seat usage and effective capacity limits. For accounts with a finite execution cap, uses the same monthly execution total as the dashboard cap indicator. Other accounts use billing-page usage, which may be cached for up to 24 hours. Usage can lag recent activity. Includes configured execution-cap policy, not live blocked status. Only available in Inngest Cloud. The dev server returns 501 with guidance to run: inngest api --prod get-account-usage."
+      tags: "Account"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Account usage"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2GetAccountUsageResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - Insufficient permissions"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - API rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Not Implemented - account usage is only available in Inngest Cloud"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
     option (google.api.http) = {
       get: "/envs"
@@ -3636,6 +3723,82 @@ message FetchAccountsResponse {
 
 message FetchAccountResponse {
   Account data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message GetAccountUsageRequest {}
+
+message AccountUsage {
+  int64 executions = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Executions used in the current period: function runs plus steps, across all environments. May lag recent activity; accounts without a finite execution cap may use counts cached for up to 24 hours"
+    }
+  ];
+  optional int64 executions_limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Executions included in the plan for the period. Usage can go past it when the plan allows overage. Omitted when unlimited"
+    }
+  ];
+  google.protobuf.Timestamp period_start = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Start of the current period, inclusive"
+    }
+  ];
+  google.protobuf.Timestamp period_end = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "End of the current period, exclusive"
+    }
+  ];
+  AccountUsageExecutionCap execution_cap = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Configured execution-cap policy. Omitted when no finite cap is configured. Does not report whether the account is currently blocked"
+    }
+  ];
+  AccountUsageSeats seats = 6;
+  AccountUsageLimits limits = 7;
+}
+
+message AccountUsageExecutionCap {
+  int64 limit = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Execution threshold for refusing new runs when enforcement is enabled: included allowance plus the configured overage buffer"
+    }
+  ];
+  bool enforced = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether execution-cap enforcement is enabled for the account"
+    }
+  ];
+}
+
+message AccountUsageSeats {
+  int64 used = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Current account membership count, not a monthly total"
+    }
+  ];
+  optional int64 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective seat allowance, including add-ons and account overrides. Omitted when unlimited"
+    }
+  ];
+}
+
+message AccountUsageLimits {
+  optional int64 concurrent_steps = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective base concurrent-step limit, including the platform ceiling and excluding burst capacity. Does not report current utilization"
+    }
+  ];
+  optional int64 workers = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Effective limit on concurrent Connect worker connections, including the platform ceiling. Does not report current utilization"
+    }
+  ];
+}
+
+message GetAccountUsageResponse {
+  AccountUsage data = 1;
   ResponseMetadata metadata = 2;
 }
 

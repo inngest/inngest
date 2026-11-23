@@ -237,7 +237,9 @@ func (l *lineage) analyze(stmt *parser.SelectStatement, e *env, outer *scope, d 
 		if o.name == "" {
 			unnamed = append(unnamed, o)
 		}
-		if whole || d.names[o.name] {
+		// An unnest decides the rows too: read w/o its column, the delta's
+		// typed NULL stand-in would unnest to no rows at all.
+		if whole || d.names[o.name] || unnests(o.expr) {
 			l.output(o, sc)
 			matched[o.name] = true
 		}
@@ -287,6 +289,26 @@ func (l *lineage) analyze(stmt *parser.SelectStatement, e *env, outer *scope, d 
 		}
 		sc.rels[i].flush(sc.rels[i].need)
 	}
+}
+
+// unnests reports whether x calls unnest, outside of any subquery (whose
+// rows are its own).
+func unnests(x parser.Node) bool {
+	if x == nil {
+		return false
+	}
+	if _, ok := x.(*parser.SelectStatement); ok {
+		return false
+	}
+	if f, ok := x.(*parser.FunctionExpr); ok && len(f.Name) > 0 && strings.EqualFold(f.Name[len(f.Name)-1], "unnest") {
+		return true
+	}
+	for _, c := range x.Children() {
+		if unnests(c) {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lineage) withCTEs(w *parser.WithClause, e *env) *env {
