@@ -1,4 +1,5 @@
 import { graphql } from '@/gql';
+import { allowsSandboxList } from '@/components/ComputeVerification/adapter';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { createServerFn } from '@tanstack/react-start';
 
@@ -33,6 +34,7 @@ const sandboxEntitlementsDocument = graphql(`
   query SandboxEntitlements {
     account {
       id
+      computeVerification { status }
       entitlements: ents {
         sandboxes {
           enabled
@@ -42,11 +44,14 @@ const sandboxEntitlementsDocument = graphql(`
   }
 `);
 
-// Whether the account's current plan grants sandbox access.
+// UI access: verification takes precedence; legacy accounts retain their entitlement gate.
 export const getSandboxesEnabled = createServerFn({
   method: 'GET',
 }).handler(async () => {
   const response = await graphqlAPI.request(sandboxEntitlementsDocument);
 
-  return response.account.entitlements.sandboxes.enabled;
+  return allowsSandboxList(
+    response.account.computeVerification?.status,
+    response.account.entitlements.sandboxes.enabled,
+  );
 });

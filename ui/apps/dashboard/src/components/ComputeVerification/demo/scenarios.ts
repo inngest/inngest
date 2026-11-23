@@ -35,6 +35,7 @@ const code = {
 } as const;
 const card = { phone: 'complete', verifiedPhone: '+1 ••• ••• 0132' } as const;
 const complete = {
+  status: 'complete',
   ...card,
   card: 'complete',
   verifiedCard: 'Visa •••• 4242',

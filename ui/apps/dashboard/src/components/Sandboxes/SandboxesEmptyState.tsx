@@ -42,15 +42,17 @@ function UpgradeButton() {
 
 // Plan eligibility is supplied separately from verification; default to the existing upgrade state.
 export default function SandboxesEmptyState({
-  hasPaidPlan = false,
+  requiresUpgrade = true,
   verification,
 }: {
-  hasPaidPlan?: boolean;
+  requiresUpgrade?: boolean;
   verification?: SandboxesVerificationCalloutProps;
 } = {}) {
   const hasTrackedViewed = useRef(false);
   const showVerification =
-    hasPaidPlan && verification && showsVerificationCallout(verification.state);
+    !requiresUpgrade &&
+    verification &&
+    showsVerificationCallout(verification.state);
 
   // Fire the feature-tagged page-view event once per mount.
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function SandboxesEmptyState({
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h1 className="text-basis text-2xl">Sandboxes</h1>
-          {!hasPaidPlan && (
+          {requiresUpgrade && (
             <Pill kind="primary" appearance="outlined">
               Paid plans
             </Pill>
@@ -82,7 +84,7 @@ export default function SandboxesEmptyState({
           {INTRO_REST}
         </p>
 
-        {!hasPaidPlan && (
+        {requiresUpgrade && (
           <div className="border-subtle bg-canvasSubtle mt-6 flex flex-col gap-4 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="border-subtle bg-canvasBase text-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md border">
@@ -136,7 +138,7 @@ export default function SandboxesEmptyState({
           ))}
         </div>
 
-        {!hasPaidPlan && (
+        {requiresUpgrade && (
           <div className="mt-10">
             <UpgradeButton />
           </div>

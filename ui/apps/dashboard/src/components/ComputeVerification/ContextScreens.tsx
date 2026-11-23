@@ -120,6 +120,20 @@ export function CompletionScreen({ state, actions }: Props) {
 }
 
 const blockedCopy = {
+  'rate-limited': {
+    icon: 'timer',
+    title: 'Too many verification attempts',
+    description:
+      'Too many attempts. Try again later. Your completed checks are saved.',
+    label: 'Try again',
+  },
+  finalizing: {
+    icon: 'timer',
+    title: 'Finish verification',
+    description:
+      'Your checks have passed, but account verification has not completed. Try again to finish.',
+    label: 'Finish verification',
+  },
   'early-access-unavailable': {
     icon: 'calendar',
     title: 'Early access isn’t available yet',
@@ -165,7 +179,7 @@ export function BlockedScreen({
   const handler =
     screen === 'early-access-unavailable'
       ? actions.onReturn
-      : screen === 'unavailable'
+      : ['unavailable', 'rate-limited', 'finalizing'].includes(screen)
       ? actions.onRetry
       : screen === 'admin-required'
       ? actions.onReturn

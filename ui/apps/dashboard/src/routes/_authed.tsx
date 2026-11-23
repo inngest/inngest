@@ -54,7 +54,7 @@ export const Route = createFileRoute('/_authed')({
   },
 });
 
-function Authed() {
+function Authed(): JSX.Element {
   const { navCollapsed, profile } = Route.useLoaderData();
   const Layout = useNavigationV2() ? LayoutV2 : LayoutV1;
   const activeEnv = useMatch({
@@ -70,7 +70,11 @@ function Authed() {
     from: '/_authed/oauth/authorize/',
     shouldThrow: false,
   });
-  if (oauthApproval || mcpApproval) {
+  const verification = useMatch({
+    from: '/_authed/verify',
+    shouldThrow: false,
+  });
+  if (oauthApproval || mcpApproval || verification) {
     return <Outlet />;
   }
 

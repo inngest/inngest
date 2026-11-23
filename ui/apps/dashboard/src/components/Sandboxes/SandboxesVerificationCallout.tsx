@@ -6,6 +6,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 
 // Supplied by the parent. An access entitlement alone cannot determine this state.
 export type SandboxesVerificationState =
+  | { status: 'blocked' }
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'verified' | 'not-required' }
@@ -42,7 +43,16 @@ export function SandboxesVerificationCallout({
       aria-labelledby={headingID}
       className="border-subtle bg-canvasBase flex flex-col items-start gap-4 rounded-lg border px-4 py-3 shadow-sm"
     >
-      {state.status === 'loading' ? (
+      {state.status === 'blocked' ? (
+        <>
+          <h2 id={headingID} className="text-basis text-base font-medium">
+            Compute and Sandboxes are suspended
+          </h2>
+          <p className="text-muted text-sm">
+            Contact support to review this account’s access.
+          </p>
+        </>
+      ) : state.status === 'loading' ? (
         <div role="status" aria-busy="true" className="w-full">
           <h2 id={headingID} className="sr-only">
             Account verification

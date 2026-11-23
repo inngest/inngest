@@ -1,8 +1,8 @@
 # Sandboxes verification entry frontend
 
-Adds an optional verification callout to the existing `SandboxesEmptyState`.
-The production route does not supply verification props yet, so its current
-content, upgrade behavior, and navigation are unchanged.
+The production sandbox page now reads account verification through URQL. See
+[production integration](./compute-verification-integration.md) for setup and backend dependencies.
+The isolated preview remains available for visual review.
 
 ## Review locally
 
@@ -28,15 +28,12 @@ remain in PR #5296 and are not duplicated here.
 
 ## Integration boundary
 
-The host supplies `hasPaidPlan` separately from
-`verification={{ state, onVerify, onRetry }}`. The default `hasPaidPlan={false}`
-preserves the existing upgrade zero state. Free plans never display verification,
-including loading/error/member treatments, even if verification props are supplied.
-
-Paid plans hide the upgrade panel, upgrade buttons, and paid-plan badge. When
-verification is required, show the callout; `verified` and `not-required` both
-hide it without reserving a sidebar or rendering a success message. Existing
-introductory content, features, and use cases are preserved in every state.
+The presentation component accepts `requiresUpgrade` separately from
+`verification={{ state, onVerify, onRetry }}`. Its default preserves the existing
+upgrade zero state. The production host uses authoritative backend eligibility,
+not paid-plan status: eligible free and paid accounts can verify, ineligible
+accounts retain existing entitlement/upgrade behavior, and suspended accounts
+are blocked. Verified/exempt accounts see no callout.
 
 `onVerify` is the handoff point for Start and Continue. The host must carry the
 current account/environment and dashboard return path into the agreed route;
@@ -49,8 +46,8 @@ phone/card checks; the component does not assume the design's three segments
 or hardcode 50%. The final check count remains a product/integration decision.
 The admin-required card never exposes progress or a verification action.
 
-Backend status/permission queries, persistence, SMS/Stripe, and access enforcement
-are outside this PR. Do not infer verification requirements from
+The standalone preview does not use backend status queries or SMS/Stripe.
+The production host is wired separately. Do not infer verification requirements from
 `sandboxes.enabled`: false can represent an existing plan restriction.
 
 ## Validation

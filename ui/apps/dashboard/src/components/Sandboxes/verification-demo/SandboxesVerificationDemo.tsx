@@ -6,7 +6,7 @@ import type { SandboxesVerificationState } from '../SandboxesVerificationCallout
 
 const scenarios = {
   free: {
-    label: 'Free plan · upgrade only',
+    label: 'Not eligible · upgrade only',
     state: {
       status: 'required',
       canVerify: true,
@@ -15,7 +15,7 @@ const scenarios = {
     },
   },
   start: {
-    label: 'Paid · not started',
+    label: 'Eligible · not started',
     state: {
       status: 'required',
       canVerify: true,
@@ -24,7 +24,7 @@ const scenarios = {
     },
   },
   resume: {
-    label: 'Paid · phone verified · resume card',
+    label: 'Eligible · phone verified · resume card',
     state: {
       status: 'required',
       canVerify: true,
@@ -33,7 +33,7 @@ const scenarios = {
     },
   },
   started: {
-    label: 'Paid · started · no checks complete',
+    label: 'Eligible · started · no checks complete',
     state: {
       status: 'required',
       canVerify: true,
@@ -42,17 +42,20 @@ const scenarios = {
     },
   },
   member: {
-    label: 'Paid · admin required',
+    label: 'Eligible · admin required',
     state: { status: 'required', canVerify: false },
   },
-  loading: { label: 'Paid · loading', state: { status: 'loading' } },
-  error: { label: 'Paid · status error · retry', state: { status: 'error' } },
+  loading: { label: 'Eligible · loading', state: { status: 'loading' } },
+  error: {
+    label: 'Eligible · status error · retry',
+    state: { status: 'error' },
+  },
   verified: {
-    label: 'Paid · verified · no gate',
+    label: 'Verified · no gate',
     state: { status: 'verified' },
   },
   exempt: {
-    label: 'Paid · not required · no gate',
+    label: 'Exempt · no gate',
     state: { status: 'not-required' },
   },
 } satisfies Record<
@@ -138,7 +141,7 @@ export function SandboxesVerificationDemo() {
           </section>
         ) : (
           <SandboxesEmptyState
-            hasPaidPlan={scenario !== 'free'}
+            requiresUpgrade={scenario === 'free'}
             verification={{
               state: scenarios[scenario].state,
               onVerify: () => setHandoff(true),

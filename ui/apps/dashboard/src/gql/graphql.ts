@@ -124,6 +124,8 @@ export type Account = {
   billingEmail: Scalars['String']['output'];
   /** Burst concurrency for the current period. Null when burst is off for the account. */
   burstConcurrency: Maybe<AccountBurstConcurrency>;
+  /** Compute early access verification, which new free and self-serve accounts pass before they use hosted compute or sandboxes. */
+  computeVerification: Maybe<ComputeVerification>;
   /** Recent account concurrency limit hits. */
   concurrencyStatus: Maybe<AccountConcurrencyStatus>;
   /** Hourly account concurrency for hours overlapping [from, to), at most 30 days. Reads ClickHouse; select only where needed. */
@@ -595,6 +597,80 @@ export type CodedError = {
   data: Maybe<Scalars['JSON']['output']>;
   message: Scalars['String']['output'];
 };
+
+export type ComputeVerification = {
+  __typename?: 'ComputeVerification';
+  /** Whether the current user can verify the account.  Only account admins can. */
+  canVerify: Scalars['Boolean']['output'];
+  /** The checks the account must pass, all of them required. */
+  checks: Array<ComputeVerificationCheck>;
+  status: ComputeVerificationStatus;
+};
+
+export type ComputeVerificationCheck = {
+  __typename?: 'ComputeVerificationCheck';
+  /** What was verified, safe to show, such as the email or +1 ••• ••• 4421.  Null until the check passes. */
+  display: Maybe<Scalars['String']['output']>;
+  kind: ComputeVerificationCheckKind;
+  passed: Scalars['Boolean']['output'];
+};
+
+export enum ComputeVerificationCheckKind {
+  Card = 'CARD',
+  Email = 'EMAIL',
+  Phone = 'PHONE'
+}
+
+export enum ComputeVerificationError {
+  /** The bank declined the card, its CVC or ZIP check failed, or 3D Secure failed.  Try another card. */
+  CardDeclined = 'CARD_DECLINED',
+  /** Another account verified with this card. */
+  CardInUse = 'CARD_IN_USE',
+  /** The card form needs the name on the card. */
+  CardNameRequired = 'CARD_NAME_REQUIRED',
+  /** The card wasn't issued in the US. */
+  CardNotUs = 'CARD_NOT_US',
+  /** Prepaid cards, and cards Stripe can't tell are credit or debit, can't verify.  Support can look at the latter. */
+  CardPrepaid = 'CARD_PREPAID',
+  /** The code expired or was never sent.  Send a new one. */
+  CodeExpired = 'CODE_EXPIRED',
+  CodeIncorrect = 'CODE_INCORRECT',
+  EmailDisposable = 'EMAIL_DISPOSABLE',
+  EmailUnverified = 'EMAIL_UNVERIFIED',
+  NotAdmin = 'NOT_ADMIN',
+  /** The account isn't in REQUIRED status, so there's nothing to verify. */
+  NotEligible = 'NOT_ELIGIBLE',
+  PhoneInvalid = 'PHONE_INVALID',
+  /** Another account verified with this number. */
+  PhoneInUse = 'PHONE_IN_USE',
+  PhoneNotMobile = 'PHONE_NOT_MOBILE',
+  PhoneNotUs = 'PHONE_NOT_US',
+  RateLimited = 'RATE_LIMITED',
+  /** A vendor or our backend failed.  Try again later. */
+  Unavailable = 'UNAVAILABLE'
+}
+
+export type ComputeVerificationResult = {
+  __typename?: 'ComputeVerificationResult';
+  /**
+   * Set when the bank wants 3D Secure for the card.  Finish it with Stripe.js
+   * handleNextAction, then call checkComputeVerificationCard.
+   */
+  cardClientSecret: Maybe<Scalars['String']['output']>;
+  /** Why the step failed.  Null when it passed. */
+  error: Maybe<ComputeVerificationError>;
+  verification: Maybe<ComputeVerification>;
+};
+
+export enum ComputeVerificationStatus {
+  /** Staff let the account through without verifying. */
+  Exempt = 'EXEMPT',
+  /** Verification doesn't apply: an existing, enterprise or partner child account, or a new one outside early access. */
+  NotEligible = 'NOT_ELIGIBLE',
+  Required = 'REQUIRED',
+  Suspended = 'SUSPENDED',
+  Verified = 'VERIFIED'
+}
 
 export type ConcurrencyBurst = {
   __typename?: 'ConcurrencyBurst';
@@ -1457,6 +1533,8 @@ export enum MetricsScope {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  /** Saves a card from Stripe Elements to the account's customer, never charging it, and records the card check. */
+  addComputeVerificationCard: ComputeVerificationResult;
   archiveApp: App;
   archiveEnvSecret: Scalars['Boolean']['output'];
   archiveEnvironment: Workspace;
@@ -1469,6 +1547,10 @@ export type Mutation = {
   cdcTestCredentials: CdcSetupResponse;
   cdcTestLogicalReplication: CdcSetupResponse;
   cdcTestSetup: CdcSetupResponse;
+  /** Records the card check once the page finished 3D Secure for addComputeVerificationCard's SetupIntent. */
+  checkComputeVerificationCard: ComputeVerificationResult;
+  checkComputeVerificationCode: ComputeVerificationResult;
+  checkComputeVerificationEmail: ComputeVerificationResult;
   claimSignupConversion: Scalars['Boolean']['output'];
   completeAWSMarketplaceSetup: Maybe<AwsMarketplaceSetupResponse>;
   confirmSubscriptionUpgrade: ConfirmSubscriptionUpgradeResponse;
@@ -1505,6 +1587,7 @@ export type Mutation = {
   retryWorkflowRun: Maybe<StartWorkflowResponse>;
   revokeAPICredential: Scalars['Boolean']['output'];
   rotateSigningKey: SigningKey;
+  sendComputeVerificationCode: ComputeVerificationResult;
   setAccountEntitlement: Scalars['UUID']['output'];
   setUpAccount: Maybe<SetUpAccountPayload>;
   setV2RestrictedAuth: Scalars['Boolean']['output'];
@@ -1524,6 +1607,11 @@ export type Mutation = {
   updatePaymentMethod: Maybe<Array<PaymentMethod>>;
   updatePlan: Account;
   updateVercelApp: Maybe<UpdateVercelAppResponse>;
+};
+
+
+export type MutationAddComputeVerificationCardArgs = {
+  paymentMethodID: Scalars['String']['input'];
 };
 
 
@@ -1593,6 +1681,17 @@ export type MutationCdcTestLogicalReplicationArgs = {
 export type MutationCdcTestSetupArgs = {
   envID: Scalars['UUID']['input'];
   input: CdcConnectionInput;
+};
+
+
+export type MutationCheckComputeVerificationCardArgs = {
+  setupIntentID: Scalars['String']['input'];
+};
+
+
+export type MutationCheckComputeVerificationCodeArgs = {
+  code: Scalars['String']['input'];
+  phoneNumber: Scalars['String']['input'];
 };
 
 
@@ -1780,6 +1879,11 @@ export type MutationRevokeApiCredentialArgs = {
 
 export type MutationRotateSigningKeyArgs = {
   envID: Scalars['UUID']['input'];
+};
+
+
+export type MutationSendComputeVerificationCodeArgs = {
+  phoneNumber: Scalars['String']['input'];
 };
 
 
@@ -2424,7 +2528,6 @@ export type RunTraceSpan = {
   stepInfo: Maybe<StepInfo>;
   stepOp: Maybe<StepOp>;
   stepType: Scalars['String']['output'];
-  ticks: Array<SpanTick>;
   traceID: Scalars['String']['output'];
   userlandSpan: Maybe<UserlandSpan>;
   workspace: Workspace;
@@ -2797,14 +2900,6 @@ export type SpanMetadata = {
   values: Scalars['SpanMetadataValues']['output'];
 };
 
-export type SpanTick = {
-  __typename?: 'SpanTick';
-  at: Scalars['Time']['output'];
-  id: Scalars['String']['output'];
-  readAt: Maybe<Scalars['Time']['output']>;
-  sources: Array<Scalars['String']['output']>;
-};
-
 export type StartWorkflowInput = {
   workflowID: Scalars['ID']['input'];
   workflowVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -2828,11 +2923,9 @@ export type StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo;
 
 export enum StepOp {
   AiGateway = 'AI_GATEWAY',
-  InboxRead = 'INBOX_READ',
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',
-  Subscribe = 'SUBSCRIBE',
   WaitForEvent = 'WAIT_FOR_EVENT'
 }
 
@@ -2944,6 +3037,7 @@ export type Usage = {
 export type UsageInput = {
   from?: InputMaybe<Scalars['Time']['input']>;
   period?: InputMaybe<Scalars['Period']['input']>;
+  /** @deprecated Field no longer supported */
   range?: InputMaybe<Scalars['Timerange']['input']>;
   to?: InputMaybe<Scalars['Time']['input']>;
 };
@@ -3121,6 +3215,7 @@ export type Workflow = {
   slug: Scalars['String']['output'];
   triggers: Array<FunctionTrigger>;
   url: Scalars['String']['output'];
+  /** @deprecated Field no longer supported */
   usage: Usage;
 };
 
@@ -3195,6 +3290,7 @@ export type Workspace = {
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
   eventV2: EventV2;
+  /** @deprecated Field no longer supported */
   events: PaginatedEvents;
   eventsV2: EventsConnection;
   functionCount: Scalars['Int']['output'];
@@ -3658,6 +3754,45 @@ export type GetBillingInfoQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetBillingInfoQuery = { __typename?: 'Query', account: { __typename?: 'Account', entitlements: { __typename?: 'AccountEntitlements', executions: { __typename?: 'EntitlementWithOverage', limit: number | null }, stepCount: { __typename?: 'EntitlementWithOverage', limit: number | null }, runCount: { __typename?: 'EntitlementWithOverage', limit: number | null } }, plan: { __typename?: 'BillingPlan', slug: string } | null } };
+
+export type ComputeVerificationQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ComputeVerificationQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, name: null | string | null, computeVerification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null, ents: { __typename?: 'AccountEntitlements', sandboxes: { __typename?: 'EntitlementBool', enabled: boolean } } } };
+
+export type CheckVerificationEmailMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type CheckVerificationEmailMutation = { __typename?: 'Mutation', checkComputeVerificationEmail: { __typename?: 'ComputeVerificationResult', error: ComputeVerificationError | null, cardClientSecret: string | null, verification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null } };
+
+export type SendVerificationCodeMutationVariables = Exact<{
+  phoneNumber: Scalars['String']['input'];
+}>;
+
+
+export type SendVerificationCodeMutation = { __typename?: 'Mutation', sendComputeVerificationCode: { __typename?: 'ComputeVerificationResult', error: ComputeVerificationError | null, cardClientSecret: string | null, verification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null } };
+
+export type CheckVerificationCodeMutationVariables = Exact<{
+  phoneNumber: Scalars['String']['input'];
+  code: Scalars['String']['input'];
+}>;
+
+
+export type CheckVerificationCodeMutation = { __typename?: 'Mutation', checkComputeVerificationCode: { __typename?: 'ComputeVerificationResult', error: ComputeVerificationError | null, cardClientSecret: string | null, verification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null } };
+
+export type AddVerificationCardMutationVariables = Exact<{
+  paymentMethodID: Scalars['String']['input'];
+}>;
+
+
+export type AddVerificationCardMutation = { __typename?: 'Mutation', addComputeVerificationCard: { __typename?: 'ComputeVerificationResult', error: ComputeVerificationError | null, cardClientSecret: string | null, verification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null } };
+
+export type CheckVerificationCardMutationVariables = Exact<{
+  setupIntentID: Scalars['String']['input'];
+}>;
+
+
+export type CheckVerificationCardMutation = { __typename?: 'Mutation', checkComputeVerificationCard: { __typename?: 'ComputeVerificationResult', error: ComputeVerificationError | null, cardClientSecret: string | null, verification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus, canVerify: boolean, checks: Array<{ __typename?: 'ComputeVerificationCheck', kind: ComputeVerificationCheckKind, passed: boolean, display: string | null }> } | null } };
 
 export type ConcurrencyAlertCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4618,7 +4753,7 @@ export type MetricsEntitlementsQuery = { __typename?: 'Query', account: { __type
 export type SandboxEntitlementsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SandboxEntitlementsQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, entitlements: { __typename?: 'AccountEntitlements', sandboxes: { __typename?: 'EntitlementBool', enabled: boolean } } } };
+export type SandboxEntitlementsQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, computeVerification: { __typename?: 'ComputeVerification', status: ComputeVerificationStatus } | null, entitlements: { __typename?: 'AccountEntitlements', sandboxes: { __typename?: 'EntitlementBool', enabled: boolean } } } };
 
 export type GetProductionWorkspaceQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4870,6 +5005,12 @@ export const GetBillableStepsDocument = {"kind":"Document","definitions":[{"kind
 export const GetBillableRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillableRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"month"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"year"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"usage"},"name":{"kind":"Name","value":"runCountTimeSeries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"timeOptions"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"month"},"value":{"kind":"Variable","name":{"kind":"Name","value":"month"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"year"},"value":{"kind":"Variable","name":{"kind":"Name","value":"year"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillableRunsQuery, GetBillableRunsQueryVariables>;
 export const GetBillableExecutionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillableExecutions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"month"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"year"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"usage"},"name":{"kind":"Name","value":"executionTimeSeries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"timeOptions"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"month"},"value":{"kind":"Variable","name":{"kind":"Name","value":"month"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"year"},"value":{"kind":"Variable","name":{"kind":"Name","value":"year"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillableExecutionsQuery, GetBillableExecutionsQueryVariables>;
 export const GetBillingInfoDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillingInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"executions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"runCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillingInfoQuery, GetBillingInfoQueryVariables>;
+export const ComputeVerificationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ComputeVerification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"computeVerification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sandboxes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ComputeVerificationQuery, ComputeVerificationQueryVariables>;
+export const CheckVerificationEmailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CheckVerificationEmail"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"checkComputeVerificationEmail"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"cardClientSecret"}},{"kind":"Field","name":{"kind":"Name","value":"verification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CheckVerificationEmailMutation, CheckVerificationEmailMutationVariables>;
+export const SendVerificationCodeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendVerificationCode"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendComputeVerificationCode"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"phoneNumber"},"value":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"cardClientSecret"}},{"kind":"Field","name":{"kind":"Name","value":"verification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SendVerificationCodeMutation, SendVerificationCodeMutationVariables>;
+export const CheckVerificationCodeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CheckVerificationCode"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"code"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"checkComputeVerificationCode"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"phoneNumber"},"value":{"kind":"Variable","name":{"kind":"Name","value":"phoneNumber"}}},{"kind":"Argument","name":{"kind":"Name","value":"code"},"value":{"kind":"Variable","name":{"kind":"Name","value":"code"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"cardClientSecret"}},{"kind":"Field","name":{"kind":"Name","value":"verification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CheckVerificationCodeMutation, CheckVerificationCodeMutationVariables>;
+export const AddVerificationCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AddVerificationCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"paymentMethodID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"addComputeVerificationCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"paymentMethodID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"paymentMethodID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"cardClientSecret"}},{"kind":"Field","name":{"kind":"Name","value":"verification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}}]}}]}}]} as unknown as DocumentNode<AddVerificationCardMutation, AddVerificationCardMutationVariables>;
+export const CheckVerificationCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CheckVerificationCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"setupIntentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"checkComputeVerificationCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"setupIntentID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"setupIntentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"cardClientSecret"}},{"kind":"Field","name":{"kind":"Name","value":"verification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"canVerify"}},{"kind":"Field","name":{"kind":"Name","value":"checks"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"passed"}},{"kind":"Field","name":{"kind":"Name","value":"display"}}]}}]}}]}}]}}]} as unknown as DocumentNode<CheckVerificationCardMutation, CheckVerificationCardMutationVariables>;
 export const ConcurrencyAlertCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ConcurrencyAlertCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"burstConcurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"budgetMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"bursting"}}]}},{"kind":"Field","name":{"kind":"Name","value":"concurrencyStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limitReached"}},{"kind":"Field","name":{"kind":"Name","value":"minutesWithHits"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"concurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ConcurrencyAlertCheckQuery, ConcurrencyAlertCheckQueryVariables>;
 export const ConcurrencyBurstUsageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ConcurrencyBurstUsage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"burstConcurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"usage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"minutesRemaining"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ConcurrencyBurstUsageQuery, ConcurrencyBurstUsageQueryVariables>;
 export const CreateEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createWorkspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
@@ -4989,7 +5130,7 @@ export const GetCurrentPlanDocument = {"kind":"Document","definitions":[{"kind":
 export const GetBillingDetailsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillingDetails"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"billingEmail"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"paymentMethods"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"brand"}},{"kind":"Field","name":{"kind":"Name","value":"last4"}},{"kind":"Field","name":{"kind":"Name","value":"expMonth"}},{"kind":"Field","name":{"kind":"Name","value":"expYear"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"default"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillingDetailsQuery, GetBillingDetailsQueryVariables>;
 export const GetPlansDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetPlans"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"plans"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"isLegacy"}},{"kind":"Field","name":{"kind":"Name","value":"isFree"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"amount"}},{"kind":"Field","name":{"kind":"Name","value":"billingPeriod"}},{"kind":"Field","name":{"kind":"Name","value":"addons"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"concurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"available"}},{"kind":"Field","name":{"kind":"Name","value":"baseValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxValue"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"price"}},{"kind":"Field","name":{"kind":"Name","value":"purchaseCount"}},{"kind":"Field","name":{"kind":"Name","value":"quantityPer"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"concurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"eventSize"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"executions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"runCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetPlansQuery, GetPlansQueryVariables>;
 export const MetricsEntitlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"MetricsEntitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"metricsExport"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"metricsExportFreshness"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"metricsExportGranularity"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<MetricsEntitlementsQuery, MetricsEntitlementsQueryVariables>;
-export const SandboxEntitlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SandboxEntitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sandboxes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SandboxEntitlementsQuery, SandboxEntitlementsQueryVariables>;
+export const SandboxEntitlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SandboxEntitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"computeVerification"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sandboxes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SandboxEntitlementsQuery, SandboxEntitlementsQueryVariables>;
 export const GetProductionWorkspaceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetProductionWorkspace"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"defaultEnv"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"parentID"}},{"kind":"Field","name":{"kind":"Name","value":"test"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"lastDeployedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isArchived"}},{"kind":"Field","name":{"kind":"Name","value":"isAutoArchiveEnabled"}},{"kind":"Field","name":{"kind":"Name","value":"webhookSigningKey"}}]}}]}}]} as unknown as DocumentNode<GetProductionWorkspaceQuery, GetProductionWorkspaceQueryVariables>;
 export const GetPostgresIntegrationsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"getPostgresIntegrations"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cdcConnections"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"statusDetail"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode<GetPostgresIntegrationsQuery, GetPostgresIntegrationsQueryVariables>;
 export const TestCredentialsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"testCredentials"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CDCConnectionInput"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cdcTestCredentials"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}},{"kind":"Argument","name":{"kind":"Name","value":"envID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"steps"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<TestCredentialsMutation, TestCredentialsMutationVariables>;

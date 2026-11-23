@@ -182,7 +182,7 @@ describe('Sandboxes zero-state composition', () => {
     { status: 'error' },
     { status: 'verified' },
   ])(
-    'keeps only the upgrade treatment on a free plan with status $status',
+    'keeps only the upgrade treatment when an upgrade is required with status $status',
     (state) => {
       const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
       const { container, rerender } = render(<SandboxesEmptyState />);
@@ -193,7 +193,7 @@ describe('Sandboxes zero-state composition', () => {
       );
       rerender(
         <SandboxesEmptyState
-          hasPaidPlan={false}
+          requiresUpgrade
           verification={{ state, ...callbacks }}
         />,
       );
@@ -212,14 +212,16 @@ describe('Sandboxes zero-state composition', () => {
     },
   );
 
-  it('shows verification instead of upgrades on a paid plan and hides the gate after completion', () => {
+  it('shows verification instead of upgrades when verification is required and hides the gate after completion', () => {
     const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
-    const { container, rerender } = render(<SandboxesEmptyState hasPaidPlan />);
+    const { container, rerender } = render(
+      <SandboxesEmptyState requiresUpgrade={false} />,
+    );
     const originalContent = container.firstElementChild?.textContent;
 
     rerender(
       <SandboxesEmptyState
-        hasPaidPlan
+        requiresUpgrade={false}
         verification={{ state: initial, ...callbacks }}
       />,
     );
@@ -239,7 +241,7 @@ describe('Sandboxes zero-state composition', () => {
 
     rerender(
       <SandboxesEmptyState
-        hasPaidPlan
+        requiresUpgrade={false}
         verification={{ state: { status: 'verified' }, ...callbacks }}
       />,
     );
@@ -253,7 +255,7 @@ describe('Sandboxes zero-state composition', () => {
     const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
     const { rerender } = render(
       <SandboxesEmptyState
-        hasPaidPlan
+        requiresUpgrade={false}
         verification={{
           state: {
             ...initial,
@@ -269,7 +271,7 @@ describe('Sandboxes zero-state composition', () => {
     ).toBeTruthy();
     rerender(
       <SandboxesEmptyState
-        hasPaidPlan
+        requiresUpgrade={false}
         verification={{
           state: { status: 'required', canVerify: false },
           ...callbacks,
@@ -285,17 +287,20 @@ describe('Sandboxes zero-state composition', () => {
     ).toBeTruthy();
   });
 
-  it('removes stale verification actions when switching from a paid to a free account', () => {
+  it('removes stale verification actions when switching to an account that requires an upgrade', () => {
     const callbacks = { onVerify: vi.fn(), onRetry: vi.fn() };
     const verification = { state: initial, ...callbacks };
     const { rerender } = render(
-      <SandboxesEmptyState hasPaidPlan verification={verification} />,
+      <SandboxesEmptyState
+        requiresUpgrade={false}
+        verification={verification}
+      />,
     );
     expect(
       screen.getByRole('button', { name: 'Start verification' }),
     ).toBeTruthy();
     rerender(
-      <SandboxesEmptyState hasPaidPlan={false} verification={verification} />,
+      <SandboxesEmptyState requiresUpgrade verification={verification} />,
     );
     expect(
       screen.queryByRole('button', { name: 'Start verification' }),

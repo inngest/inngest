@@ -10,13 +10,6 @@ export function getVerificationScreen(state: VerificationState) {
   )
     return 'mismatch';
   if (state.status !== 'verification') return state.status;
-  if (
-    state.email === 'complete' &&
-    state.phone === 'complete' &&
-    state.card === 'complete'
-  ) {
-    return 'complete';
-  }
   if (!state.canVerify) return 'admin-required';
   if (state.email === 'needs-attention') return 'email';
   if (state.phone === 'code-sent') return 'code';
