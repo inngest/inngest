@@ -491,6 +491,7 @@ type QueueOptions struct {
 	lifecycles QueueLifecycleListeners
 
 	AllowKeyQueues                  AllowKeyQueues
+	AllowKeyQueueRefill             AllowKeyQueueRefill
 	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
@@ -653,6 +654,17 @@ type AllowKeyQueues func(ctx context.Context, acctID, envID, fnID uuid.UUID) boo
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AllowKeyQueues = kq
+	}
+}
+
+// AllowKeyQueueRefill controls backlog admission independently of key-queue routing,
+// ready-item execution, and backlog normalization. Returning false pauses all
+// refills for the function, including subsequent steps of existing runs.
+type AllowKeyQueueRefill func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
+
+func WithAllowKeyQueueRefill(allow AllowKeyQueueRefill) QueueOpt {
+	return func(q *QueueOptions) {
+		q.AllowKeyQueueRefill = allow
 	}
 }
 
@@ -997,6 +1009,9 @@ func NewQueueOptions(
 		},
 		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
+		},
+		AllowKeyQueueRefill: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
+			return true
 		},
 		QueueItemEarliestPeekTimeEnabled: func(ctx context.Context, shardName string, acctID, envID, fnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
 			return QueueItemEarliestPeekTimeConfig{}

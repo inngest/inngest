@@ -331,6 +331,20 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 		}
 	}
 
+	if !shadowPart.KeyQueueRefillAllowed(ctx, q.QueueOptions) {
+		// Keep normalization discovery running while refill is paused, but avoid
+		// spinning on continuations. Recheck soon so lifting the pause is prompt.
+		q.removeShadowContinue(ctx, shadowPart, false)
+		requeueAt := q.Clock().Now().Add(BacklogDefaultRequeueExtension)
+		_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
+			return nil, shard.ShadowPartitionRequeue(ctx, shadowPart, &requeueAt)
+		}, map[string]any{"reason": "refill_paused"})
+		if err != nil && !errors.Is(err, ErrShadowPartitionNotFound) {
+			return fmt.Errorf("could not requeue refill-paused shadow partition: %w", err)
+		}
+		return nil
+	}
+
 	metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
@@ -459,6 +473,12 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 			return nil, enums.QueueConstraintNotLimited, nil
 		}
 
+		return nil, enums.QueueConstraintNotLimited, nil
+	}
+
+	// Outdated backlogs must still be prepared for normalization during a pause.
+	// Check before peeking items or acquiring capacity, including on continuations.
+	if !shadowPart.KeyQueueRefillAllowed(ctx, q.QueueOptions) {
 		return nil, enums.QueueConstraintNotLimited, nil
 	}
 
