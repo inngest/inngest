@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/tests/client"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,9 +82,23 @@ func TestDurableEndpoint_SyncToAsyncResponseRecorded(t *testing.T) {
 	require.NotEmpty(t, runID)
 
 	// 2. Poll the redirect URL for the final response.
-	final, finalBody := mustRequest(t, http.MethodGet, pollURL, nil)
-	require.Equal(t, 200, final.StatusCode)
-	require.Contains(t, final.Header.Get("content-type"), "application/json")
+	// Use a retry loop instead of a single blocking call to avoid consuming
+	// the full 5-minute server-side timeout under CI load.
+	var final *http.Response
+	var finalBody []byte
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		resp, body := mustRequest(t, http.MethodGet, pollURL, nil)
+		if resp.StatusCode == http.StatusAccepted {
+			// Server says "still running", retry on next tick.
+			assert.Fail(ct, "run not yet complete (202)")
+			return
+		}
+		assert.Equal(ct, 200, resp.StatusCode)
+		assert.Contains(ct, resp.Header.Get("content-type"), "application/json")
+		final = resp
+		finalBody = body
+	}, 60*time.Second, 2*time.Second)
+	require.NotNil(t, final, "polling loop should have received a 200 response")
 
 	// In async mode the SDK JSON-stringifies the user's body before
 	// checkpointing (so the wire body is a JSON-encoded string of the
