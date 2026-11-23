@@ -629,3 +629,187 @@ func DecodeBatch(blob []byte) ([]DecodedChunk, error) {
 	}
 	return out, nil
 }
+
+// EncodeChunks re-encodes decoded chunks into the binary stream batch format.
+func EncodeChunks(chunks []DecodedChunk) ([]byte, error) {
+	if len(chunks) == 0 {
+		return nil, nil
+	}
+	totalSize := 4
+	for _, ch := range chunks {
+		totalSize += encodedChunkSize(ch)
+	}
+	buf := make([]byte, 4, totalSize)
+	binary.LittleEndian.PutUint32(buf[0:4], uint32(len(chunks)))
+
+	for _, ch := range chunks {
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(ch.RowCount))
+		buf = binary.LittleEndian.AppendUint16(buf, uint16(len(ch.Columns)))
+		for _, col := range ch.Columns {
+			buf = append(buf, byte(col.Kind))
+			hasNulls := false
+			for i := 0; i < ch.RowCount && i < len(col.Nulls); i++ {
+				if col.Nulls[i] {
+					hasNulls = true
+					break
+				}
+			}
+			if hasNulls {
+				buf = append(buf, 1)
+				maskLen := (ch.RowCount + 7) / 8
+				maskOff := len(buf)
+				buf = append(buf, make([]byte, maskLen)...)
+				for i := 0; i < ch.RowCount; i++ {
+					if col.Nulls[i] {
+						buf[maskOff+i/8] |= 1 << uint(i%8)
+					}
+				}
+			} else {
+				buf = append(buf, 0)
+			}
+			switch col.Kind {
+			case StreamColumnUUID:
+				for i := 0; i < ch.RowCount; i++ {
+					buf = append(buf, col.UUIDs[i][:]...)
+				}
+			case StreamColumnTimestampTZ, StreamColumnBigint:
+				for i := 0; i < ch.RowCount; i++ {
+					buf = binary.LittleEndian.AppendUint64(buf, uint64(col.Int64s[i]))
+				}
+			case StreamColumnBool:
+				for i := 0; i < ch.RowCount; i++ {
+					if col.Bools[i] {
+						buf = append(buf, 1)
+					} else {
+						buf = append(buf, 0)
+					}
+				}
+			case StreamColumnVarchar, StreamColumnJSON:
+				buf = binary.LittleEndian.AppendUint32(buf, uint32(len(col.Bytes)))
+				for i := 0; i < ch.RowCount; i++ {
+					buf = binary.LittleEndian.AppendUint32(buf, col.Ends[i])
+				}
+				buf = append(buf, col.Bytes...)
+			default:
+				return nil, fmt.Errorf("worker: unsupported stream column kind %d", col.Kind)
+			}
+		}
+	}
+	return buf, nil
+}
+
+func encodedChunkSize(ch DecodedChunk) int {
+	sz := 6
+	for _, col := range ch.Columns {
+		sz += 2
+		for i := 0; i < ch.RowCount && i < len(col.Nulls); i++ {
+			if col.Nulls[i] {
+				sz += (ch.RowCount + 7) / 8
+				break
+			}
+		}
+		switch col.Kind {
+		case StreamColumnUUID:
+			sz += ch.RowCount * 16
+		case StreamColumnTimestampTZ, StreamColumnBigint:
+			sz += ch.RowCount * 8
+		case StreamColumnBool:
+			sz += ch.RowCount
+		case StreamColumnVarchar, StreamColumnJSON:
+			sz += 4 + ch.RowCount*4 + len(col.Bytes)
+		}
+	}
+	return sz
+}
+
+func sliceDecodedChunk(ch DecodedChunk, start, end int) DecodedChunk {
+	n := end - start
+	cols := make([]DecodedColumn, len(ch.Columns))
+	for i, col := range ch.Columns {
+		dc := DecodedColumn{Kind: col.Kind}
+		if col.Nulls != nil {
+			dc.Nulls = col.Nulls[start:end]
+		}
+		switch col.Kind {
+		case StreamColumnUUID:
+			dc.UUIDs = col.UUIDs[start:end]
+		case StreamColumnTimestampTZ, StreamColumnBigint:
+			dc.Int64s = col.Int64s[start:end]
+		case StreamColumnBool:
+			dc.Bools = col.Bools[start:end]
+		case StreamColumnVarchar, StreamColumnJSON:
+			var from uint32
+			if start > 0 {
+				from = col.Ends[start-1]
+			}
+			var to uint32
+			if n > 0 {
+				to = col.Ends[end-1]
+			}
+			dc.Bytes = col.Bytes[from:to]
+			dc.Ends = make([]uint32, n)
+			for j := 0; j < n; j++ {
+				dc.Ends[j] = col.Ends[start+j] - from
+			}
+		}
+		cols[i] = dc
+	}
+	return DecodedChunk{RowCount: n, Columns: cols}
+}
+
+func splitOversizedChunk(ch DecodedChunk, maxChunkBytes int, out *[]DecodedChunk) {
+	if encodedChunkSize(ch) <= maxChunkBytes || ch.RowCount <= 1 {
+		*out = append(*out, ch)
+		return
+	}
+	mid := ch.RowCount / 2
+	splitOversizedChunk(sliceDecodedChunk(ch, 0, mid), maxChunkBytes, out)
+	splitOversizedChunk(sliceDecodedChunk(ch, mid, ch.RowCount), maxChunkBytes, out)
+}
+
+// splitBatchBlob splits a binary stream batch blob larger than maxBytes into
+// multiple valid batch blobs, each <= maxBytes (unless a single row exceeds
+// maxBytes on its own).
+func splitBatchBlob(blob []byte, maxBytes int) ([][]byte, error) {
+	if len(blob) <= maxBytes || maxBytes <= 4 {
+		return [][]byte{blob}, nil
+	}
+	decoded, err := DecodeBatch(blob)
+	if err != nil {
+		return nil, err
+	}
+	if len(decoded) == 0 {
+		return nil, nil
+	}
+
+	maxChunkBytes := maxBytes - 4
+	sized := make([]DecodedChunk, 0, len(decoded))
+	for _, ch := range decoded {
+		splitOversizedChunk(ch, maxChunkBytes, &sized)
+	}
+
+	var parts [][]byte
+	start := 0
+	curSize := 4
+	for i, ch := range sized {
+		chSize := encodedChunkSize(ch)
+		if i > start && curSize+chSize > maxBytes {
+			part, err := EncodeChunks(sized[start:i])
+			if err != nil {
+				return nil, err
+			}
+			parts = append(parts, part)
+			start = i
+			curSize = 4
+		}
+		curSize += chSize
+	}
+	if start < len(sized) {
+		part, err := EncodeChunks(sized[start:])
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, part)
+	}
+	return parts, nil
+}

@@ -39,9 +39,10 @@ type StreamColumn struct {
 
 // StreamChunk is one DuckDB-sized chunk (<= 2048 rows) pushed into a Stream.
 type StreamChunk struct {
-	RowCount int
-	Columns  []StreamColumn
-	Err      error
+	RowCount    int
+	Columns     []StreamColumn
+	CreditBytes int64
+	Err         error
 }
 
 // DefaultMaxStreamQueueBytes bounds how much decoded chunk data a single Stream
@@ -93,6 +94,7 @@ type Stream struct {
 	queue         []StreamChunk
 	queuedBytes   int64
 	maxQueueBytes int64
+	onConsume     func(bytes int64)
 	closed        bool
 	err           error
 }
@@ -101,6 +103,14 @@ type Stream struct {
 func (s *Stream) SetMaxQueueBytes(limit int64) {
 	s.mu.Lock()
 	s.maxQueueBytes = limit
+	s.mu.Unlock()
+}
+
+// SetOnConsume registers a callback invoked with the consumed byte count each
+// time Next dequeues a chunk. Called without holding the stream mutex.
+func (s *Stream) SetOnConsume(fn func(bytes int64)) {
+	s.mu.Lock()
+	s.onConsume = fn
 	s.mu.Unlock()
 }
 
@@ -157,7 +167,6 @@ func (s *Stream) CloseWithError(err error) {
 // Next pops the next chunk, waiting until one arrives or the stream closes.
 func (s *Stream) Next() (StreamChunk, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for len(s.queue) == 0 && !s.closed {
 		s.cond.Wait()
 	}
@@ -165,17 +174,29 @@ func (s *Stream) Next() (StreamChunk, bool) {
 		chunk := s.queue[0]
 		s.queue[0] = StreamChunk{}
 		s.queue = s.queue[1:]
-		s.queuedBytes -= chunk.approxBytes()
+		sz := chunk.approxBytes()
+		s.queuedBytes -= sz
 		if s.queuedBytes < 0 {
 			s.queuedBytes = 0
+		}
+		onConsume := s.onConsume
+		s.mu.Unlock()
+		if onConsume != nil {
+			credit := chunk.CreditBytes
+			if credit <= 0 {
+				credit = sz
+			}
+			onConsume(credit)
 		}
 		return chunk, true
 	}
 	if s.err != nil {
 		err := s.err
 		s.err = nil
+		s.mu.Unlock()
 		return StreamChunk{Err: err}, true
 	}
+	s.mu.Unlock()
 	return StreamChunk{}, false
 }
 

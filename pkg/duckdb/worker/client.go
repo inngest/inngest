@@ -454,31 +454,36 @@ func (s *Session) startCancelWatcher(ctx context.Context, conn net.Conn, reqID u
 	done := make(chan struct{})
 	exited := make(chan struct{})
 	var triggered atomic.Bool
+	abandon := func() {
+		if !s.abandoned.CompareAndSwap(false, true) {
+			return
+		}
+		if s.abandonedCounter != nil {
+			s.abandonedCounter.Add(1)
+		}
+		go func() {
+			if s.abandonedCounter != nil {
+				defer s.abandonedCounter.Add(-1)
+			}
+			// Interrupt this specific request and close the abandoned
+			// session; OpCloseSession waits for the in-flight DuckDB query
+			// to finish before returning, keeping abandonedCounter accurate.
+			intCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_ = s.interruptRequest(intCtx, reqID)
+			cancel()
+			_ = s.Close(context.Background())
+		}()
+	}
 	go func() {
 		defer close(exited)
 		select {
 		case <-ctx.Done():
 			triggered.Store(true)
-			s.abandoned.Store(true)
-			if s.abandonedCounter != nil {
-				s.abandonedCounter.Add(1)
-			}
 			// Unblock any ReadFrame waiting on the stuck server immediately.
 			if conn != nil {
 				_ = conn.SetDeadline(time.Now())
 			}
-			go func() {
-				if s.abandonedCounter != nil {
-					defer s.abandonedCounter.Add(-1)
-				}
-				// Interrupt this specific request and close the abandoned
-				// session; OpCloseSession waits for the in-flight DuckDB query
-				// to finish before returning, keeping abandonedCounter accurate.
-				intCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				_ = s.interruptRequest(intCtx, reqID)
-				cancel()
-				_ = s.Close(context.Background())
-			}()
+			abandon()
 		case <-done:
 		}
 	}()
@@ -487,10 +492,10 @@ func (s *Session) startCancelWatcher(ctx context.Context, conn net.Conn, reqID u
 		once.Do(func() {
 			close(done)
 			<-exited
-			// If ctx ended right as the call returned, ensure abandoned is marked
-			// before returning to the caller.
+			// If ctx ended right as the call returned, run the same abandon
+			// cleanup so the session is closed on the worker and not leaked.
 			if !triggered.Load() && ctx.Err() != nil {
-				s.abandoned.Store(true)
+				abandon()
 			}
 		})
 	}
@@ -542,6 +547,7 @@ type QueryStream struct {
 	ctx       context.Context
 	conn      net.Conn
 	cols      []ColumnInfo
+	credits   map[string]*streamCredit
 	stopWatch func()
 	cleanup   func()
 	bytesRead int64
@@ -565,31 +571,39 @@ func (q *QueryStream) NextChunk() ([][]any, error) {
 	if q.done {
 		return nil, nil
 	}
-	var resp Response
-	n, err := ReadFrameWithSize(q.conn, &resp)
-	q.bytesRead += n
-	if err != nil {
-		q.Close()
-		if q.ctx.Err() != nil {
-			return nil, q.ctx.Err()
+	for {
+		var resp Response
+		n, err := ReadFrameWithSize(q.conn, &resp)
+		if err != nil {
+			q.Close()
+			if q.ctx.Err() != nil {
+				return nil, q.ctx.Err()
+			}
+			return nil, err
 		}
-		return nil, err
-	}
-	switch resp.Kind {
-	case KindChunk:
-		return DecodeRows(q.cols, resp.Rows)
-	case KindDone:
-		q.Close()
-		return nil, nil
-	case KindError:
-		q.Close()
-		if q.ctx.Err() != nil {
-			return nil, fmt.Errorf("%w: %s", q.ctx.Err(), resp.Error)
+		if resp.Kind == KindStreamCredit {
+			if sc := q.credits[resp.StreamID]; sc != nil {
+				sc.add(resp.Bytes)
+			}
+			continue
 		}
-		return nil, wrapResponseError(resp)
-	default:
-		q.Close()
-		return nil, fmt.Errorf("worker: unexpected response kind %q", resp.Kind)
+		q.bytesRead += n
+		switch resp.Kind {
+		case KindChunk:
+			return DecodeRows(q.cols, resp.Rows)
+		case KindDone:
+			q.Close()
+			return nil, nil
+		case KindError:
+			q.Close()
+			if q.ctx.Err() != nil {
+				return nil, fmt.Errorf("%w: %s", q.ctx.Err(), resp.Error)
+			}
+			return nil, wrapResponseError(resp)
+		default:
+			q.Close()
+			return nil, fmt.Errorf("worker: unexpected response kind %q", resp.Kind)
+		}
 	}
 }
 
@@ -673,6 +687,56 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 	}, nil
 }
 
+// defaultStreamWindowBytes is the per-stream unacknowledged byte budget in
+// QueryWithStreams. Kept well below libduckdb.DefaultMaxStreamQueueBytes
+// (256 MiB) so fast producers throttle rather than overflowing the worker queue.
+var defaultStreamWindowBytes int64 = 64 << 20
+
+type streamCredit struct {
+	mu     sync.Mutex
+	budget int64
+	notify chan struct{}
+}
+
+func newStreamCredit(window int64) *streamCredit {
+	return &streamCredit{
+		budget: window,
+		notify: make(chan struct{}, 1),
+	}
+}
+
+func (sc *streamCredit) wait(ctx context.Context) bool {
+	for {
+		sc.mu.Lock()
+		if sc.budget > 0 {
+			sc.mu.Unlock()
+			return true
+		}
+		sc.mu.Unlock()
+		select {
+		case <-sc.notify:
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
+
+func (sc *streamCredit) consume(n int64) {
+	sc.mu.Lock()
+	sc.budget -= n
+	sc.mu.Unlock()
+}
+
+func (sc *streamCredit) add(n int64) {
+	sc.mu.Lock()
+	sc.budget += n
+	sc.mu.Unlock()
+	select {
+	case sc.notify <- struct{}{}:
+	default:
+	}
+}
+
 // QueryWithStreams executes sql while concurrently feeding all streams over the
 // full-duplex UDS connection into the worker's `scan_data_from_quack_client`
 // table function.
@@ -683,8 +747,11 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 	}
 
 	streamIDs := make([]string, len(streams))
+	credits := make(map[string]*streamCredit, len(streams))
+	window := defaultStreamWindowBytes
 	for i, st := range streams {
 		streamIDs[i] = st.ID
+		credits[st.ID] = newStreamCredit(window)
 	}
 
 	var writeMu sync.Mutex
@@ -742,8 +809,9 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 
 	var wg sync.WaitGroup
 	for _, st := range streams {
+		sc := credits[st.ID]
 		wg.Add(1)
-		go func(st SendStream) {
+		go func(st SendStream, sc *streamCredit) {
 			defer wg.Done()
 			for {
 				var blob []byte
@@ -782,14 +850,30 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 				if len(blob) == 0 {
 					continue
 				}
-				if werr := writeFrame(Request{Op: OpStreamData, StreamID: st.ID, Blob: blob}); werr != nil {
-					recordWriteErr(werr)
+				parts, splitErr := splitBatchBlob(blob, maxSingleStreamRawBytes)
+				if splitErr != nil {
+					recordSourceErr(splitErr)
 					feedCancel()
-					_ = conn.Close()
+					if werr := writeFrame(Request{Op: OpStreamError, StreamID: st.ID, Error: splitErr.Error()}); werr != nil {
+						recordWriteErr(werr)
+						_ = conn.Close()
+					}
 					return
 				}
+				for _, part := range parts {
+					if !sc.wait(feedCtx) {
+						return
+					}
+					sc.consume(int64(len(part)))
+					if werr := writeFrame(Request{Op: OpStreamData, StreamID: st.ID, Blob: part}); werr != nil {
+						recordWriteErr(werr)
+						feedCancel()
+						_ = conn.Close()
+						return
+					}
+				}
 			}
-		}(st)
+		}(st, sc)
 	}
 
 	cleanup := func() {
@@ -799,7 +883,24 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 	}
 
 	var meta Response
-	n, err := ReadFrameWithSize(conn, &meta)
+	var n int64
+	for {
+		meta = Response{}
+		var readErr error
+		n, readErr = ReadFrameWithSize(conn, &meta)
+		if readErr != nil {
+			err = readErr
+			break
+		}
+		if meta.Kind == KindStreamCredit {
+			if sc := credits[meta.StreamID]; sc != nil {
+				sc.add(meta.Bytes)
+			}
+			continue
+		}
+		err = nil
+		break
+	}
 	if err != nil {
 		stopWatch()
 		_ = conn.Close()
@@ -846,6 +947,7 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 		ctx:       ctx,
 		conn:      conn,
 		cols:      cols,
+		credits:   credits,
 		stopWatch: stopWatch,
 		cleanup:   cleanup,
 		bytesRead: n,

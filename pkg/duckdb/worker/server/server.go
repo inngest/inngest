@@ -593,9 +593,33 @@ func (s *Server) streamQueryResult(c net.Conn, sess *session, sql string) bool {
 }
 
 func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Request) bool {
+	var writeMu sync.Mutex
+	var writeClosed bool
+	writeResp := func(resp worker.Response, terminal bool) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if writeClosed {
+			return net.ErrClosed
+		}
+		err := worker.WriteFrame(c, resp)
+		if terminal || err != nil {
+			writeClosed = true
+		}
+		return err
+	}
+
 	streams := make(map[string]*libduckdb.Stream, len(req.StreamIDs))
 	for _, id := range req.StreamIDs {
-		streams[id] = libduckdb.RegisterStream(id)
+		st := libduckdb.RegisterStream(id)
+		streamID := id
+		st.SetOnConsume(func(n int64) {
+			_ = writeResp(worker.Response{
+				Kind:     worker.KindStreamCredit,
+				StreamID: streamID,
+				Bytes:    n,
+			}, false)
+		})
+		streams[id] = st
 	}
 	defer func() {
 		for _, id := range req.StreamIDs {
@@ -630,7 +654,17 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 					sess.conn.Interrupt()
 					return
 				}
-				for _, ch := range chunks {
+				blobBytes := int64(len(frame.Blob))
+				if len(chunks) == 0 && blobBytes > 0 {
+					_ = writeResp(worker.Response{
+						Kind:     worker.KindStreamCredit,
+						StreamID: frame.StreamID,
+						Bytes:    blobBytes,
+					}, false)
+					continue
+				}
+				perChunkCredit := blobBytes / int64(len(chunks))
+				for ci, ch := range chunks {
 					libCols := make([]libduckdb.StreamColumn, len(ch.Columns))
 					for i, col := range ch.Columns {
 						libCols[i] = libduckdb.StreamColumn{
@@ -643,7 +677,11 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 							Ends:   col.Ends,
 						}
 					}
-					if err := st.Push(libduckdb.StreamChunk{RowCount: ch.RowCount, Columns: libCols}); err != nil {
+					credit := perChunkCredit
+					if ci == len(chunks)-1 {
+						credit = blobBytes - perChunkCredit*int64(len(chunks)-1)
+					}
+					if err := st.Push(libduckdb.StreamChunk{RowCount: ch.RowCount, Columns: libCols, CreditBytes: credit}); err != nil {
 						if errors.Is(err, libduckdb.ErrStreamQueueOverflow) {
 							for _, other := range streams {
 								other.CloseWithError(err)
@@ -677,7 +715,7 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 		if sourceFailed.Load() {
 			code = worker.ErrCodeStreamSource
 		}
-		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()})
+		_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()}, true)
 		return false
 	}
 	defer res.Close()
@@ -691,7 +729,7 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 			TypeName: col.TypeName,
 		}
 	}
-	if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindMeta, Columns: wireCols}); err != nil {
+	if err := writeResp(worker.Response{Kind: worker.KindMeta, Columns: wireCols}, false); err != nil {
 		return false
 	}
 
@@ -702,24 +740,27 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 			if sourceFailed.Load() {
 				code = worker.ErrCodeStreamSource
 			}
-			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()})
+			_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()}, true)
 			return false
 		}
 		if rows == nil {
 			break
 		}
-		if err := worker.WriteFrame(c, worker.Response{
+		if err := writeResp(worker.Response{
 			Kind: worker.KindChunk,
 			Rows: worker.EncodeRows(wireCols, rows),
-		}); err != nil {
+		}, false); err != nil {
 			if errors.Is(err, worker.ErrFrameTooLarge) {
-				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+				writeMu.Lock()
+				writeClosed = false
+				writeMu.Unlock()
+				_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()}, true)
 				return true
 			}
 			return false
 		}
 	}
-	_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindDone})
+	_ = writeResp(worker.Response{Kind: worker.KindDone}, true)
 	return false
 }
 

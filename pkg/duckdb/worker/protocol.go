@@ -111,11 +111,12 @@ const (
 type ResponseKind string
 
 const (
-	KindOK    ResponseKind = "ok"
-	KindMeta  ResponseKind = "meta"
-	KindChunk ResponseKind = "chunk"
-	KindDone  ResponseKind = "done"
-	KindError ResponseKind = "error"
+	KindOK           ResponseKind = "ok"
+	KindMeta         ResponseKind = "meta"
+	KindChunk        ResponseKind = "chunk"
+	KindDone         ResponseKind = "done"
+	KindError        ResponseKind = "error"
+	KindStreamCredit ResponseKind = "stream_credit"
 )
 
 // Request is a single client-to-worker RPC message.
@@ -135,12 +136,14 @@ type Request struct {
 type Response struct {
 	Kind           ResponseKind `json:"kind"`
 	Version        string       `json:"version,omitempty"`
-	PID       int          `json:"pid,omitempty"`
+	PID            int          `json:"pid,omitempty"`
 	ActiveSessions int          `json:"active_sessions,omitempty"`
-	SessionID string       `json:"session_id,omitempty"`
+	SessionID      string       `json:"session_id,omitempty"`
+	StreamID       string       `json:"stream_id,omitempty"`
+	Bytes          int64        `json:"bytes,omitempty"`
 	Columns        []ColumnInfo `json:"columns,omitempty"`
 	Rows           [][]any      `json:"rows,omitempty"`
-	Error     string       `json:"error,omitempty"`
+	Error          string       `json:"error,omitempty"`
 	ErrorCode      ErrorCode    `json:"error_code,omitempty"`
 }
 

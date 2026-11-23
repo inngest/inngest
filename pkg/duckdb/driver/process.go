@@ -49,6 +49,7 @@ const restartHealthTimeout = 10 * time.Second
 type process struct {
 	workerBinary            string
 	workerSocket            string
+	workerAuthToken         string
 	libPath                 string
 	dbFile                  string
 	iceberg                 *IcebergOptions
@@ -58,6 +59,7 @@ type process struct {
 	quackServeToken         string
 	restrictExternalAccess  bool
 	resourceLimits          *ResourceLimits
+	onBootstrap             func(ctx context.Context, db *sql.DB) error
 	abandoned               atomic.Int64
 	maxAbandoned            int
 
@@ -134,6 +136,14 @@ func withWorkerSocket(sock string) processOption {
 	return func(p *process) { p.workerSocket = sock }
 }
 
+func withWorkerAuthToken(token string) processOption {
+	return func(p *process) { p.workerAuthToken = token }
+}
+
+func withOnBootstrap(fn func(ctx context.Context, db *sql.DB) error) processOption {
+	return func(p *process) { p.onBootstrap = fn }
+}
+
 func withLibPath(libPath string) processOption {
 	return func(p *process) { p.libPath = libPath }
 }
@@ -156,6 +166,7 @@ func startProcessWithLake(ctx context.Context, binaryPath, dbFile string, iceber
 		opt(p)
 	}
 	p.redactor.add(p.quackServeToken)
+	p.redactor.add(p.workerAuthToken)
 	if iceberg != nil {
 		p.redactor.add(iceberg.Token)
 	}
@@ -184,7 +195,7 @@ func (p *process) spawnLocked(ctx context.Context) error {
 	var err error
 
 	if p.workerSocket != "" {
-		client, err = worker.Dial(ctx, p.workerSocket)
+		client, err = worker.DialWithToken(ctx, p.workerSocket, p.workerAuthToken)
 		if err != nil {
 			return fmt.Errorf("duckdb: dialing external worker socket %q: %w", p.workerSocket, err)
 		}
@@ -279,10 +290,30 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 		return err
 	}
 
+	if p.onBootstrap != nil {
+		bootstrapDB := sql.OpenDB(bootstrapConnector{sess: p.sess})
+		bootstrapDB.SetMaxOpenConns(1)
+		err := p.onBootstrap(ctx, bootstrapDB)
+		_ = bootstrapDB.Close()
+		if err != nil {
+			return fmt.Errorf("duckdb: on-bootstrap hook failed: %w", p.redactor.redactErr(err))
+		}
+	}
+
 	p.quackGen++
 	p.workerEP.Store(&workerEndpoint{client: p.client, gen: p.quackGen})
 	return nil
 }
+
+type bootstrapConnector struct {
+	sess sqlExecer
+}
+
+func (b bootstrapConnector) Connect(context.Context) (driver.Conn, error) {
+	return &conn{sess: b.sess}, nil
+}
+
+func (b bootstrapConnector) Driver() driver.Driver { return &Driver{} }
 
 func (p *process) bootstrapExecLocked(ctx context.Context, phase string, stmts []string) error {
 	for _, stmt := range stmts {
@@ -717,6 +748,9 @@ type Options struct {
 	// inngest-duckdb-worker sidecar listening on this Unix domain socket
 	// instead of spawning a managed child worker subprocess.
 	WorkerSocket string
+	// WorkerAuthToken, when non-empty, is sent as the RPC auth token when
+	// dialing an external WorkerSocket.
+	WorkerAuthToken string
 	// WorkerBinary is the path to the inngest-duckdb-worker executable in
 	// managed child mode. Leave empty to fall back to BinaryPath (if set) or
 	// EnsureWorkerBinary.
@@ -757,6 +791,10 @@ type Options struct {
 	// MaxAbandonedStatements caps how many cancelled statements may still be
 	// running on the worker before OpenShared connections fail with ErrTooManyAbandoned.
 	MaxAbandonedStatements int
+	// OnBootstrap, when non-nil, runs at the end of every worker session
+	// bootstrap (both initial startup and crash/external-worker reconnects)
+	// against a dedicated non-reentrant *sql.DB handle.
+	OnBootstrap func(ctx context.Context, db *sql.DB) error
 }
 
 // DefaultMaxAbandonedStatements is Options.MaxAbandonedStatements' default.
@@ -791,6 +829,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		}
 		p, err := startProcessWithLake(ctx, workerBin, c.opts.DBFile, c.opts.Iceberg, c.opts.QuackAddr,
 			withWorkerSocket(c.opts.WorkerSocket),
+			withWorkerAuthToken(c.opts.WorkerAuthToken),
 			withLibPath(c.opts.LibPath),
 			withStateDir(c.opts.StateDir),
 			withAllowUnsignedExtensions(c.opts.AllowUnsignedExtensions),
@@ -799,6 +838,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			withRestrictExternalAccess(c.opts.RestrictExternalAccess),
 			withResourceLimits(c.opts.ResourceLimits),
 			withMaxAbandoned(c.opts.MaxAbandonedStatements),
+			withOnBootstrap(c.opts.OnBootstrap),
 		)
 		if err != nil {
 			return nil, err
