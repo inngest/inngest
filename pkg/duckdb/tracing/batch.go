@@ -324,6 +324,7 @@ func (b *batcher[T]) run(ctx context.Context) {
 				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "entity", b.name, "error", err, "rows", failedRows)
 			}
 		}
+		clear(buf)
 		buf = buf[:0]
 	}
 

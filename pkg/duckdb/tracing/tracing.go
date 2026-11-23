@@ -148,7 +148,10 @@ func (se *SpanExporter) Shutdown(context.Context) error { return nil }
 func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (s Span, ok bool) {
 	traceID := span.SpanContext().TraceID().String()
 	spanID := span.SpanContext().SpanID().String()
-	parentID := span.Parent().SpanID().String()
+	var parentID string
+	if span.Parent().IsValid() {
+		parentID = span.Parent().SpanID().String()
+	}
 
 	var accountID, envID, appID, appName, functionID, functionSlug, runID string
 	var output, input any

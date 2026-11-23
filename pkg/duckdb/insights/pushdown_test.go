@@ -93,6 +93,16 @@ func TestExtractPushdown(t *testing.T) {
 			}},
 		},
 		{
+			name: "JSON dot comparisons are rewritten before pushdown extraction",
+			sql: `SELECT id FROM events e WHERE data.user = '123' AND e.data.org IN ('a', 'b')
+				AND data.email LIKE 'u%' AND data.nested.deep = 'skip'`,
+			want: Pushdown{"events": {
+				{Column: "data", Path: "user", Op: federate.OpEq, Value: "123"},
+				{Column: "data", Path: "org", Op: federate.OpIn, Value: []any{"a", "b"}},
+				{Column: "data", Path: "email", Op: federate.OpLike, Value: "u%"},
+			}},
+		},
+		{
 			name: "column-to-column comparisons are not pushed",
 			sql:  `SELECT run_id FROM runs WHERE app_id = function_id`,
 			want: Pushdown{},

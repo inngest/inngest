@@ -109,6 +109,9 @@ const aggRelation = "agg"
 // AggregateStreamer that can apply q's predicates exactly, and over the
 // delta's rows in DuckDB otherwise. Both give the same rows.
 func (e *Executor) Aggregate(ctx context.Context, q AggregateQuery) (*Rows, error) {
+	if q.AccountID == uuid.Nil || q.EnvID == uuid.Nil {
+		return nil, fmt.Errorf("federate: AccountID and EnvID are required")
+	}
 	if err := validateAggregate(q); err != nil {
 		return nil, err
 	}

@@ -67,8 +67,26 @@ var sizeChecks = map[string]sizeCheck{
 	"generate_series": seriesSizeLimit(true),
 }
 
-// withSizeLimit wraps next with name's sizeChecks entry. It goes inside
-// withArity, so the check can assume a valid argument count.
+// maxCTEs caps the number of CTEs a query may define, preventing
+// non-recursive CTE doubling chains (WITH c1 AS (...), c2 AS (SELECT s||s||s||s FROM c1), ...).
+const maxCTEs = 10
+
+// maxReplaceDepth and maxReplaceLiteralLen bound replace/regexp_replace
+// nesting and replacement length so chained replacements cannot cause
+// exponential string expansion.
+const (
+	maxReplaceDepth      = 3
+	maxReplaceLiteralLen = 100
+)
+
+var replaceFunctions = map[string]bool{
+	"replace":        true,
+	"regexp_replace": true,
+}
+
+// withSizeLimit wraps next with name's sizeChecks entry (and replace/regexp_replace
+// replacement bounds). It goes inside withArity, so the check can assume a valid
+// argument count.
 func withSizeLimit(next functionTypeResolver) functionTypeResolver {
 	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 		if check, ok := sizeChecks[name]; ok {
@@ -76,8 +94,36 @@ func withSizeLimit(next functionTypeResolver) functionTypeResolver {
 				return ColumnTypeUnknown, nil, []Diagnostic{sizeLimitDiagnostic(name, problem)}
 			}
 		}
+		if replaceFunctions[name] {
+			if _, problem := replaceExpansionFactor(name, args); problem != "" {
+				return ColumnTypeUnknown, nil, []Diagnostic{sizeLimitDiagnostic(name, problem)}
+			}
+		}
 		return next(name, args, scope)
 	}
+}
+
+// replaceExpansionFactor checks a replace/regexp_replace call's replacement
+// argument (args[2]) and returns its worst-case per-character expansion factor.
+// Requiring a short string literal prevents both self-referential expansion
+// (replace(s, 'a', s)) and huge literal multipliers.
+func replaceExpansionFactor(name string, args []parser.Expr) (int, string) {
+	if len(args) < 3 {
+		return 1, ""
+	}
+	repl, ok := stringLiteral(args[2])
+	if !ok {
+		return 0, fmt.Sprintf("requires a string literal replacement (at most %d characters)", maxReplaceLiteralLen)
+	}
+	if len(repl) > maxReplaceLiteralLen {
+		return 0, fmt.Sprintf("replacement string is limited to %d characters", maxReplaceLiteralLen)
+	}
+	if name == "replace" {
+		if search, ok := stringLiteral(args[1]); ok && len(search) > 0 && len(repl) <= len(search) {
+			return 1, ""
+		}
+	}
+	return max(1, len(repl)), ""
 }
 
 // numberLiteral returns e's value if it's a (possibly signed) number
@@ -370,9 +416,129 @@ func maxDigitRun(s string) float64 {
 // rpad(col, 10000, ' ') columns, a repeat() in a CTE), which is the trade-off
 // for not having to reason about where a guarded value flows.
 func checkSizeComposition(stmt *parser.SelectStatement) error {
+	if err := checkCTELimit(stmt); err != nil {
+		return err
+	}
+	if err := checkReplaceNesting(stmt); err != nil {
+		return err
+	}
 	c := &sizeComposition{}
 	c.walkTopLevel(stmt)
 	return c.err
+}
+
+// checkCTELimit rejects queries whose WITH clause defines more than maxCTEs
+// CTEs or whose CTE reference chain exceeds maxCTEs, bounding non-recursive
+// CTE doubling chains (WITH c1 AS (...), c2 AS (SELECT s||s||s||s FROM c1), ...).
+func checkCTELimit(stmt *parser.SelectStatement) error {
+	var walk func(n parser.Node, depths map[string]int) error
+	walk = func(n parser.Node, depths map[string]int) error {
+		if n == nil {
+			return nil
+		}
+		if sel, ok := n.(*parser.SelectStatement); ok && sel.With != nil {
+			if len(sel.With.CTEs) > maxCTEs {
+				c := sel.With.CTEs[maxCTEs]
+				return sizeCompositionError(c, fmt.Sprintf("queries may define at most %d CTEs", maxCTEs))
+			}
+			nextDepths := make(map[string]int, len(depths)+len(sel.With.CTEs))
+			for k, v := range depths {
+				nextDepths[k] = v
+			}
+			for _, cte := range sel.With.CTEs {
+				if err := walk(cte.Select, nextDepths); err != nil {
+					return err
+				}
+				// Depth is 1 + max depth of any visible CTE this CTE references.
+				maxRef := 0
+				parser.Walk(visitFunc(func(sub parser.Node) bool {
+					if ref, ok := sub.(*parser.BaseTableRef); ok && len(ref.Name) == 1 {
+						if d := nextDepths[strings.ToLower(ref.Name[0])]; d > maxRef {
+							maxRef = d
+						}
+					}
+					return true
+				}), cte.Select)
+				d := maxRef + 1
+				if d > maxCTEs {
+					return sizeCompositionError(cte, fmt.Sprintf("CTE chain depth is limited to %d", maxCTEs))
+				}
+				nextDepths[strings.ToLower(cte.Name)] = d
+			}
+			for _, c := range sel.Children() {
+				if c == parser.Node(sel.With) {
+					continue
+				}
+				if err := walk(c, nextDepths); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		for _, c := range n.Children() {
+			if err := walk(c, depths); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return walk(stmt, nil)
+}
+
+// checkReplaceNesting caps both the AST nesting depth of replace/regexp_replace
+// calls (maxReplaceDepth) and the cumulative count and expansion product of
+// expanding replace/regexp_replace calls across the entire query (including
+// across CTEs and subqueries), preventing exponential string expansion.
+func checkReplaceNesting(stmt *parser.SelectStatement) error {
+	expandingCount := 0
+	cumulativeFactor := 1
+
+	var walk func(n parser.Node, depth, factor int) error
+	walk = func(n parser.Node, depth, factor int) error {
+		if n == nil {
+			return nil
+		}
+		if f, ok := n.(*parser.FunctionExpr); ok {
+			name := strings.ToLower(strings.Join(f.Name, "."))
+			if replaceFunctions[name] {
+				nextDepth := depth + 1
+				if nextDepth > maxReplaceDepth {
+					return sizeCompositionError(f, fmt.Sprintf("%s nesting depth is limited to %d", strings.ToUpper(name), maxReplaceDepth))
+				}
+				fFactor, problem := replaceExpansionFactor(name, f.Args)
+				if problem != "" {
+					return nil // validate already rejected it
+				}
+				nextFactor := factor * fFactor
+				if nextFactor > maxSizeArgument {
+					return sizeCompositionError(f, fmt.Sprintf("%s nested expansion is limited to %dx", strings.ToUpper(name), maxSizeArgument))
+				}
+				if fFactor > 1 {
+					expandingCount++
+					if expandingCount > maxReplaceDepth {
+						return sizeCompositionError(f, fmt.Sprintf("%s expanding calls are limited to %d per query", strings.ToUpper(name), maxReplaceDepth))
+					}
+					cumulativeFactor *= fFactor
+					if cumulativeFactor > maxSizeArgument {
+						return sizeCompositionError(f, fmt.Sprintf("%s cumulative expansion is limited to %dx", strings.ToUpper(name), maxSizeArgument))
+					}
+				}
+				for _, c := range f.Children() {
+					if err := walk(c, nextDepth, nextFactor); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		}
+		for _, c := range n.Children() {
+			if err := walk(c, depth, factor); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return walk(stmt, 0, 1)
 }
 
 // sizeComposition walks a statement for checkSizeComposition.

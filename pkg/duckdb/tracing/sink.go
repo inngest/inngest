@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Sink receives every entity the listener produces, one call per entity.
@@ -34,9 +35,12 @@ type BatchingSink struct {
 	droppedEvents   atomic.Int64
 	droppedMetadata atomic.Int64
 
-	ins      Inserter
-	batchers []interface{ stop() }
-	wg       sync.WaitGroup
+	ins       Inserter
+	batchers  []interface{ stop() }
+	wg        sync.WaitGroup
+	closeOnce sync.Once
+	closed    chan struct{}
+	closeErr  error
 }
 
 // NewBatchingSink returns a BatchingSink flushing through ins, with its
@@ -67,6 +71,7 @@ func newBatchingSinkChannels(spansCap, eventsCap, metadataCap int) *BatchingSink
 		spans:    make(chan Span, spansCap),
 		events:   make(chan Event, eventsCap),
 		metadata: make(chan RunMetadata, metadataCap),
+		closed:   make(chan struct{}),
 	}
 }
 
@@ -114,29 +119,48 @@ func (s *BatchingSink) Dropped() (spans, events, metadata int64) {
 // Close stops every batcher, waits (bounded by ctx) for them to drain and
 // flush, then closes the Inserter if it implements interface{ Close() error }.
 //
-// If ctx expires before every batcher has drained, Close does not wait
-// forever: it closes the Inserter anyway (for DuckDBInserter, the db, which
-// kills any subprocess a batcher is still blocked on and unblocks it), so a
-// wedged batcher self-resolves within roughly db.Close()'s own teardown bound
-// rather than leaking permanently.
+// Shutdown initiation runs once in a background goroutine so concurrent Close
+// callers each select between shutdown completion and their own ctx deadline.
 func (s *BatchingSink) Close(ctx context.Context) error {
-	for _, b := range s.batchers {
-		b.stop()
-	}
+	s.closeOnce.Do(func() {
+		if s.closed == nil {
+			s.closed = make(chan struct{})
+		}
+		go func() {
+			defer close(s.closed)
+			for _, b := range s.batchers {
+				b.stop()
+			}
 
-	done := make(chan struct{})
-	go func() {
-		s.wg.Wait()
-		close(done)
-	}()
+			done := make(chan struct{})
+			go func() {
+				s.wg.Wait()
+				close(done)
+			}()
+
+			drainTimer := time.NewTimer(finalFlushBudget)
+			select {
+			case <-done:
+				drainTimer.Stop()
+			case <-drainTimer.C:
+			}
+
+			if c, ok := s.ins.(interface{ Close() error }); ok {
+				s.closeErr = c.Close()
+			}
+		}()
+	})
 
 	select {
-	case <-done:
-	case <-ctx.Done():
+	case <-s.closed:
+		return s.closeErr
+	default:
 	}
 
-	if c, ok := s.ins.(interface{ Close() error }); ok {
-		return c.Close()
+	select {
+	case <-s.closed:
+		return s.closeErr
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return nil
 }

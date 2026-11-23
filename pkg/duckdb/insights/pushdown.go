@@ -446,7 +446,10 @@ func resolvePushdownTarget(e parser.Expr, entries []pushdownEntry) (table, col, 
 	return table, col, "", kc, ok
 }
 
-// jsonKeyText recognizes the text extractions of one plain JSON key.
+// jsonKeyText recognizes the text extractions of one plain JSON key:
+// col->>'key', json_extract_string(col, 'key'), and the
+// json_extract_string(col.key, '$') shape that rewriteJSONDotComparison
+// produces for idiomatic dot comparisons (WHERE data.user = '123').
 func jsonKeyText(e parser.Expr) (base parser.Expr, key string, ok bool) {
 	switch x := e.(type) {
 	case *parser.BinaryExpr:
@@ -461,10 +464,32 @@ func jsonKeyText(e parser.Expr) (base parser.Expr, key string, ok bool) {
 		return nil, "", false
 	}
 	base, key, ok = jsonPathAccess(e)
-	if !ok || key == "" || strings.HasPrefix(key, "$") {
+	if !ok || key == "" {
+		return nil, "", false
+	}
+	if key == "$" {
+		return unwrapSingleJSONDot(base)
+	}
+	if strings.HasPrefix(key, "$") {
 		return nil, "", false
 	}
 	return base, key, true
+}
+
+// unwrapSingleJSONDot splits a single-level JSON dot access (col.key,
+// alias.col.key, or (col).key) into its column base and top-level key.
+// Deeper paths (col.a.b) return ok=false (or fail resolvePushdownColumn when
+// 3-part unqualified).
+func unwrapSingleJSONDot(e parser.Expr) (base parser.Expr, key string, ok bool) {
+	switch x := e.(type) {
+	case *parser.Ident:
+		if len(x.Parts) == 2 || len(x.Parts) == 3 {
+			return &parser.Ident{Parts: x.Parts[:len(x.Parts)-1]}, x.Parts[len(x.Parts)-1], true
+		}
+	case *parser.DotExpr:
+		return x.X, x.Field, true
+	}
+	return nil, "", false
 }
 
 // targetValue is pushdownValue for a column, or a string literal for a JSON

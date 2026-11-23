@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/require"
 )
@@ -208,6 +209,116 @@ func TestListenerWithSinkSendsEntitiesSynchronously(t *testing.T) {
 	require.NoError(t, l.(Closer).Close(context.Background()))
 	sink.mu.Lock()
 	require.True(t, sink.closed, "Close should close a Sink that implements Close(ctx)")
+}
+
+func TestRootSpanParentSpanIDIsEmpty(t *testing.T) {
+	sink := &memSink{}
+	tp := newListenerTracerProvider(&SpanExporter{sink: sink}, 0)
+	md := testMetadata(t)
+
+	rootAttrs := meta.NewAttrSet()
+	addTenantAndDebugAttrs(rootAttrs, &md)
+	rootRef, err := tp.CreateSpan(context.Background(), "executor.run", &tracing.CreateSpanOptions{
+		Metadata:   safeMetadata(md),
+		Attributes: rootAttrs,
+		StartTime:  time.Now(),
+		EndTime:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	childAttrs := meta.NewAttrSet()
+	addTenantAndDebugAttrs(childAttrs, &md)
+	_, err = tp.CreateSpan(context.Background(), "executor.step", &tracing.CreateSpanOptions{
+		Metadata:   safeMetadata(md),
+		Parent:     rootRef,
+		Attributes: childAttrs,
+		StartTime:  time.Now(),
+		EndTime:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	require.Len(t, sink.spans, 2)
+	require.Equal(t, "executor.run", sink.spans[0].Name)
+	require.Empty(t, sink.spans[0].ParentSpanID, "root span parent_span_id should be empty (stored as NULL), not 0000000000000000")
+	require.Equal(t, "executor.step", sink.spans[1].Name)
+	require.Equal(t, sink.spans[0].SpanID, sink.spans[1].ParentSpanID, "child span should reference its parent span ID")
+}
+
+type blockingInserter struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+	closed  bool
+	mu      sync.Mutex
+}
+
+func (b *blockingInserter) InsertSpans(context.Context, []Span) error { return nil }
+func (b *blockingInserter) InsertEvents(ctx context.Context, _ []Event) error {
+	b.once.Do(func() { close(b.started) })
+	select {
+	case <-b.release:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+func (b *blockingInserter) InsertRunMetadata(context.Context, []RunMetadata) error { return nil }
+func (b *blockingInserter) Close() error {
+	b.mu.Lock()
+	b.closed = true
+	b.mu.Unlock()
+	return nil
+}
+
+func TestBatchingSinkCloseIdempotentAndConcurrentDeadlines(t *testing.T) {
+	ins := &memInserter{}
+	s := NewBatchingSink(ins, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	// Calling Close multiple times must not panic on closing batcher stop channels.
+	require.NotPanics(t, func() {
+		require.NoError(t, s.Close(context.Background()))
+		require.NoError(t, s.Close(context.Background()))
+	})
+	require.True(t, ins.closed)
+
+	// Concurrent Close callers must each honor their own context deadline even
+	// while an earlier Close is still waiting for a slow flush to drain.
+	bins := &blockingInserter{started: make(chan struct{}), release: make(chan struct{})}
+	s2 := NewBatchingSink(bins, func(o *setupOpts) {
+		o.batchMaxSize = 1
+		o.batchInterval = time.Hour
+	})
+	s2.SendEvent(context.Background(), Event{EventID: "e1"})
+	<-bins.started
+
+	close1Done := make(chan error, 1)
+	go func() {
+		close1Done <- s2.Close(context.Background())
+	}()
+
+	// Give caller 1 a moment to initiate closeOnce.
+	time.Sleep(15 * time.Millisecond)
+
+	shortCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	err2 := s2.Close(shortCtx)
+	require.ErrorIs(t, err2, context.DeadlineExceeded)
+	require.Less(t, time.Since(start), time.Second, "concurrent Close must honor its own deadline")
+
+	// Unblock flush and ensure caller 1 finishes cleanly.
+	close(bins.release)
+	select {
+	case err1 := <-close1Done:
+		require.NoError(t, err1)
+	case <-time.After(2 * time.Second):
+		t.Fatal("first Close did not complete after flush unblocked")
+	}
+	bins.mu.Lock()
+	require.True(t, bins.closed)
+	bins.mu.Unlock()
 }
 
 // Compile-time checks.

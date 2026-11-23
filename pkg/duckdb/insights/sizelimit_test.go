@@ -137,4 +137,79 @@ func TestSizeChecksAreAllowedFunctions(t *testing.T) {
 		_, ok := allowedFunctions[name]
 		require.True(t, ok, name)
 	}
+	for name := range replaceFunctions {
+		_, ok := allowedFunctions[name]
+		require.True(t, ok, name)
+	}
+}
+
+func TestReplaceAndCTELimits(t *testing.T) {
+	accepts := []string{
+		"SELECT replace(status, '_', ' ') AS s FROM runs",
+		"SELECT replace(replace(replace(status, 'a', '1'), 'b', '2'), 'c', '3') AS s FROM runs",
+		"SELECT replace(replace(status, 'a', 'aaaaaaaaaa'), 'a', 'aaaaaaaaaa') AS s FROM runs",
+		"SELECT regexp_replace(function_id, '^app-', '') AS s FROM runs",
+		"WITH c AS (SELECT replace(status, '_', ' ') AS s FROM runs) SELECT s FROM c",
+		// Exactly 10 CTEs is allowed.
+		"WITH c1 AS (SELECT run_id FROM runs), c2 AS (SELECT * FROM c1), c3 AS (SELECT * FROM c2), " +
+			"c4 AS (SELECT * FROM c3), c5 AS (SELECT * FROM c4), c6 AS (SELECT * FROM c5), " +
+			"c7 AS (SELECT * FROM c6), c8 AS (SELECT * FROM c7), c9 AS (SELECT * FROM c8), " +
+			"c10 AS (SELECT * FROM c9) SELECT * FROM c10",
+	}
+	for _, q := range accepts {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
+			require.NoError(t, err)
+		})
+	}
+
+	longLiteral := "'" + func() string {
+		b := make([]byte, 101)
+		for i := range b {
+			b[i] = 'a'
+		}
+		return string(b)
+	}() + "'"
+	rep30 := "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+	rep100 := "'" + func() string {
+		b := make([]byte, 100)
+		for i := range b {
+			b[i] = 'a'
+		}
+		return string(b)
+	}() + "'"
+
+	rejects := map[string]string{
+		"SELECT replace(status, 'a', status) AS s FROM runs":                                                         "REPLACE requires a string literal replacement",
+		"SELECT regexp_replace(status, 'a', status, 'g') AS s FROM runs":                                             "REGEXP_REPLACE requires a string literal replacement",
+		"SELECT replace(status, 'a', " + longLiteral + ") AS s FROM runs":                                            "REPLACE replacement string is limited to 100 characters",
+		"SELECT regexp_replace(status, 'a', " + longLiteral + ", 'g') AS s FROM runs":                                "REGEXP_REPLACE replacement string is limited to 100 characters",
+		"SELECT replace(replace(replace(replace(status, 'a', 'b'), 'b', 'c'), 'c', 'd'), 'd', 'e') AS s FROM runs":   "REPLACE nesting depth is limited to 3",
+		"SELECT replace(replace(replace(status, 'a', " + rep30 + "), 'a', " + rep30 + "), 'a', " + rep30 + ") FROM runs": "REPLACE nested expansion is limited to 10000x",
+		"SELECT regexp_replace(regexp_replace(regexp_replace(status, 'a', " + rep30 + ", 'g'), 'a', " + rep30 + ", 'g'), 'a', " + rep30 + ", 'g') FROM runs": "REGEXP_REPLACE nested expansion is limited to 10000x",
+		// Chained expanding replace across CTEs must not bypass cumulative expansion limits.
+		"WITH c1 AS (SELECT replace(status, 'a', " + rep100 + ") AS s FROM runs), " +
+			"c2 AS (SELECT replace(s, 'a', " + rep100 + ") AS s FROM c1), " +
+			"c3 AS (SELECT replace(s, 'a', " + rep100 + ") AS s FROM c2), " +
+			"c4 AS (SELECT replace(s, 'a', " + rep100 + ") AS s FROM c3), " +
+			"c5 AS (SELECT replace(s, 'a', " + rep100 + ") AS s FROM c4) SELECT s FROM c5": "REPLACE cumulative expansion is limited to 10000x",
+		// Even small expanding replaces across 4 CTEs exceed the max expanding-replace count.
+		"WITH c1 AS (SELECT replace(status, 'a', 'aa') AS s FROM runs), " +
+			"c2 AS (SELECT replace(s, 'a', 'aa') AS s FROM c1), " +
+			"c3 AS (SELECT replace(s, 'a', 'aa') AS s FROM c2), " +
+			"c4 AS (SELECT replace(s, 'a', 'aa') AS s FROM c3) SELECT s FROM c4": "REPLACE expanding calls are limited to 3 per query",
+		// 11 CTEs (e.g. non-recursive CTE doubling chain) is rejected.
+		"WITH c1 AS (SELECT run_id AS s FROM runs), c2 AS (SELECT s||s||s||s AS s FROM c1), " +
+			"c3 AS (SELECT s||s||s||s AS s FROM c2), c4 AS (SELECT s||s||s||s AS s FROM c3), " +
+			"c5 AS (SELECT s||s||s||s AS s FROM c4), c6 AS (SELECT s||s||s||s AS s FROM c5), " +
+			"c7 AS (SELECT s||s||s||s AS s FROM c6), c8 AS (SELECT s||s||s||s AS s FROM c7), " +
+			"c9 AS (SELECT s||s||s||s AS s FROM c8), c10 AS (SELECT s||s||s||s AS s FROM c9), " +
+			"c11 AS (SELECT s||s||s||s AS s FROM c10) SELECT * FROM c11": "at most 10 CTEs",
+	}
+	for q, want := range rejects {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
+			require.ErrorContains(t, err, want)
+		})
+	}
 }
