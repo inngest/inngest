@@ -47,6 +47,40 @@ func TestParseResponse(t *testing.T) {
 		map[string]any{"nested": map[string]any{"deep": "hi"}},
 		ParseResponse([]byte(`"{\"nested\": {\"deep\": \"hi\"}}"`)),
 	)
+
+	// Trailing data after an object is rejected, matching json.Unmarshal, so
+	// the raw payload falls through to the text handling.
+	r.Equal(string(`{"a":1}garbage`), ParseResponse([]byte(`{"a":1}garbage`)))
+}
+
+// TestParseResponsePreservesLargeIntegers guards against precision loss for
+// large integers (e.g. snowflake IDs) inside object responses. Decoding into a
+// map[string]interface{} via json.Unmarshal would store the value as a float64,
+// whose 53-bit mantissa cannot represent integers beyond 2^53 exactly, so
+// re-marshalling the output would silently round the value.
+func TestParseResponsePreservesLargeIntegers(t *testing.T) {
+	r := require.New(t)
+
+	const snowflake = "616581622363398142"
+
+	assertPreserved := func(input []byte) {
+		out := ParseResponse(input)
+		m, ok := out.(map[string]any)
+		r.True(ok, "expected object response to decode into a map, got %T", out)
+		r.Equal(json.Number(snowflake), m["id"])
+
+		// The value must survive a marshal round-trip without rounding, since
+		// the output is later re-serialised before being stored and returned.
+		byt, err := json.Marshal(m)
+		r.NoError(err)
+		r.JSONEq(`{"id":`+snowflake+`}`, string(byt))
+	}
+
+	// Plain object response.
+	assertPreserved([]byte(`{"id":` + snowflake + `}`))
+
+	// Double-encoded object response.
+	assertPreserved([]byte(`"{\"id\":` + snowflake + `}"`))
 }
 
 func TestParseGeneratorAllowsExplicitEmptyArray(t *testing.T) {
