@@ -402,6 +402,9 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	b.recordCall(ctx, "schedule_execution", start, err)
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID, "function_id", opts.FunctionID)
+		if !opts.At.After(time.Now()) {
+			b.runScheduledJobNow(ctx, opts, jobID)
+		}
 		return nil
 	}
 	if err != nil {
@@ -409,6 +412,35 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	}
 
 	return nil
+}
+
+// runScheduledJobNow moves a batch's already-enqueued schedule job to now.
+//
+// A batch's first append enqueues its timeout job under the batch's job ID.
+// When the batch fills, the run-now schedule uses the same job ID and collides
+// with that job, so without this the full batch waits out its whole timeout.
+// Failing to move the job is harmless: a leased job is already running, and a
+// missing one has already run, so the error is only recorded.
+func (b *redisBatchManager) runScheduledJobNow(ctx context.Context, opts ScheduleBatchOpts, jobID string) {
+	start := time.Now()
+	scope := queue.Scope{
+		IsSystem:      true,
+		AccountID:     opts.AccountID,
+		EnvID:         opts.WorkspaceID,
+		FunctionID:    opts.FunctionID,
+		QueueItemKind: queue.KindScheduleBatch,
+	}
+	err := b.q.RequeueByJobID(ctx, scope, "", jobID, start)
+	switch {
+	case err == nil:
+		b.recordCall(ctx, "requeue_execution", start, nil)
+	case errors.Is(err, queue.ErrQueueItemAlreadyLeased), errors.Is(err, queue.ErrQueueItemNotFound):
+		b.recordCall(ctx, "requeue_execution", start, nil)
+		b.log.Debug("scheduled batch job already running or done", "job_id", jobID, "function_id", opts.FunctionID, "error", err)
+	default:
+		b.recordCall(ctx, "requeue_execution", start, err)
+		b.log.Warn("could not move scheduled batch job to now", "job_id", jobID, "function_id", opts.FunctionID, "error", err)
+	}
 }
 
 // DeleteKeys drops keys related to the provided batchID and reports whether
