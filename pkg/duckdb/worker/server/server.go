@@ -579,6 +579,10 @@ func (s *Server) streamQueryResult(c net.Conn, sess *session, sql string) bool {
 			Kind: worker.KindChunk,
 			Rows: worker.EncodeRows(wireCols, rows),
 		}); err != nil {
+			if errors.Is(err, worker.ErrFrameTooLarge) {
+				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+				return true
+			}
 			return false
 		}
 	}
@@ -620,9 +624,11 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 				}
 				chunks, err := worker.DecodeBatch(frame.Blob)
 				if err != nil {
-					st.CloseWithError(err)
-					remaining--
-					continue
+					for _, other := range streams {
+						other.CloseWithError(err)
+					}
+					sess.conn.Interrupt()
+					return
 				}
 				for _, ch := range chunks {
 					libCols := make([]libduckdb.StreamColumn, len(ch.Columns))
@@ -706,6 +712,10 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 			Kind: worker.KindChunk,
 			Rows: worker.EncodeRows(wireCols, rows),
 		}); err != nil {
+			if errors.Is(err, worker.ErrFrameTooLarge) {
+				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+				return true
+			}
 			return false
 		}
 	}

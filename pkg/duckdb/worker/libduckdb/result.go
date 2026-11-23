@@ -216,16 +216,36 @@ func formatLogicalType(lib *Lib, lt uintptr) string {
 	}
 }
 
+var sqlReservedKeywords = map[string]struct{}{
+	"all": {}, "analyse": {}, "analyze": {}, "and": {}, "any": {}, "array": {}, "as": {},
+	"asc": {}, "asymmetric": {}, "both": {}, "case": {}, "cast": {}, "check": {},
+	"collate": {}, "column": {}, "constraint": {}, "create": {}, "current_catalog": {},
+	"current_date": {}, "current_role": {}, "current_time": {}, "current_timestamp": {},
+	"current_user": {}, "default": {}, "deferrable": {}, "desc": {}, "describe": {},
+	"distinct": {}, "do": {}, "else": {}, "end": {}, "except": {}, "false": {}, "fetch": {},
+	"for": {}, "foreign": {}, "from": {}, "grant": {}, "group": {}, "having": {}, "in": {},
+	"initially": {}, "intersect": {}, "into": {}, "lateral": {}, "leading": {}, "limit": {},
+	"localtime": {}, "localtimestamp": {}, "not": {}, "null": {}, "offset": {}, "on": {},
+	"only": {}, "or": {}, "order": {}, "pivot": {}, "placing": {}, "primary": {},
+	"qualify": {}, "references": {}, "returning": {}, "select": {}, "session_user": {},
+	"show": {}, "some": {}, "summarize": {}, "symmetric": {}, "table": {}, "then": {},
+	"to": {}, "trailing": {}, "true": {}, "union": {}, "unique": {}, "unpivot": {},
+	"user": {}, "using": {}, "variadic": {}, "when": {}, "where": {}, "window": {}, "with": {},
+}
+
 func formatStructFieldName(name string) string {
+	if name == "" {
+		return `""`
+	}
+	if _, reserved := sqlReservedKeywords[strings.ToLower(name)]; reserved {
+		return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	}
 	for i := 0; i < len(name); i++ {
 		c := name[i]
 		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || (i > 0 && c >= '0' && c <= '9')
 		if !ok {
 			return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 		}
-	}
-	if name == "" {
-		return `""`
 	}
 	return name
 }

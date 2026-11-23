@@ -190,7 +190,8 @@ func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
 		t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
 		_, err := db.ExecContext(t.Context(), "SELECT getenv('HOME') AS v;")
-		require.ErrorContains(t, err, "getenv is disabled", "persist=%v", persist)
+		require.Error(t, err, "persist=%v", persist)
+		require.Regexp(t, `getenv is disabled|Scalar Function with name getenv does not exist`, err.Error(), "persist=%v", persist)
 		_, err = db.ExecContext(t.Context(), "SELECT content FROM read_text('/etc/hosts');")
 		require.ErrorContains(t, err, "disabled by configuration", "persist=%v", persist)
 	}

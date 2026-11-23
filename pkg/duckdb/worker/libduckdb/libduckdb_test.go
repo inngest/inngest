@@ -400,13 +400,15 @@ func TestPuregoComplexTypesAndStreamTableFunction(t *testing.T) {
 	st := RegisterStream("test-stream-1")
 	defer UnregisterStream("test-stream-1")
 	go func() {
-		st.Push(StreamChunk{
+		if err := st.Push(StreamChunk{
 			RowCount: 2,
 			Columns: []StreamColumn{
 				{Kind: StreamColumnVarchar, Bytes: []byte("ab"), Ends: []uint32{1, 2}},
 				{Kind: StreamColumnBigint, Int64s: []int64{10, 20}},
 			},
-		})
+		}); err != nil {
+			t.Errorf("Push: %v", err)
+		}
 		st.Close()
 	}()
 

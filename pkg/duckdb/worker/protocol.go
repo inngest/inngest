@@ -144,6 +144,11 @@ type Response struct {
 	ErrorCode      ErrorCode    `json:"error_code,omitempty"`
 }
 
+// ErrFrameTooLarge is returned by WriteFrame when a serialized frame exceeds
+// maxFrameBytes. Callers on the server side can reply with a statement-level
+// KindError instead of closing the socket and forcing a worker restart.
+var ErrFrameTooLarge = errors.New("worker: frame size exceeds limit")
+
 // WriteFrame writes a 4-byte length-prefixed JSON frame to w.
 func WriteFrame(w io.Writer, v any) error {
 	payload, err := json.Marshal(v)
@@ -151,7 +156,7 @@ func WriteFrame(w io.Writer, v any) error {
 		return fmt.Errorf("worker: marshal frame: %w", err)
 	}
 	if len(payload) > maxFrameBytes {
-		return fmt.Errorf("worker: frame size %d exceeds limit %d", len(payload), maxFrameBytes)
+		return fmt.Errorf("%w (%d > %d)", ErrFrameTooLarge, len(payload), maxFrameBytes)
 	}
 	var hdr [4]byte
 	binary.BigEndian.PutUint32(hdr[:], uint32(len(payload)))
