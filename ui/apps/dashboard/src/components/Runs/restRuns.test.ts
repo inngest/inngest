@@ -183,7 +183,7 @@ it('translates selected app IDs for the REST request', async () => {
 
   expect(apiFetch).toHaveBeenCalledOnce();
   expect(apiFetch).toHaveBeenCalledWith(
-    '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
+    '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferredFrom&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
     { signal: expect.any(AbortSignal) },
   );
 });
