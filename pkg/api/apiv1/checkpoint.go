@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -252,14 +253,15 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	var jwt string
 	if len(input.Steps) > 0 {
 		err := a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
-			RunID:     input.RunID,
-			FnID:      fn.ID,
-			AppID:     appID,
-			AccountID: auth.AccountID(),
-			EnvID:     auth.WorkspaceID(),
-			Steps:     input.Steps,
-			Metadata:  md,
-			Function:  &fn,
+			RunID:      input.RunID,
+			FnID:       fn.ID,
+			AppID:      appID,
+			AccountID:  auth.AccountID(),
+			EnvID:      auth.WorkspaceID(),
+			Steps:      input.Steps,
+			Metadata:   md,
+			Function:   &fn,
+			InstanceID: r.Header.Get(headers.HeaderKeyConnectInstanceID),
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)
@@ -346,12 +348,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = a.checkpointer.CheckpointSyncSteps(ctx, checkpoint.SyncCheckpoint{
-		RunID:     input.RunID,
-		FnID:      input.FnID,
-		AppID:     input.AppID,
-		AccountID: auth.AccountID(),
-		EnvID:     auth.WorkspaceID(),
-		Steps:     input.Steps,
+		RunID:      input.RunID,
+		FnID:       input.FnID,
+		AppID:      input.AppID,
+		AccountID:  auth.AccountID(),
+		EnvID:      auth.WorkspaceID(),
+		Steps:      input.Steps,
+		InstanceID: r.Header.Get(headers.HeaderKeyConnectInstanceID),
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrStepOutputTooLarge) || errors.Is(err, state.ErrStateOverflowed) {
@@ -407,6 +410,7 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 		RequestStartedAt: input.RequestStartedAt,
 		AccountID:        auth.AccountID(),
 		EnvID:            auth.WorkspaceID(),
+		InstanceID:       r.Header.Get(headers.HeaderKeyConnectInstanceID),
 	})
 	if err != nil {
 		status := http.StatusBadRequest
