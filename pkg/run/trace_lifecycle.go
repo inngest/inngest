@@ -103,61 +103,6 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		}
 	}
 
-	// annotate the invoke span with target function run ID for reference purposes
-	for _, e := range evts {
-		go func(ctx context.Context, evt event.Event) {
-			if v, ok := evt.Data[consts.InngestEventDataPrefix]; ok {
-				meta := event.InngestMetadata{}
-				if err := meta.Decode(v); err == nil {
-					if meta.InvokeTraceCarrier != nil && meta.InvokeTraceCarrier.CanResumePause() {
-						ictx := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(meta.InvokeTraceCarrier.Context))
-
-						sid := meta.InvokeTraceCarrier.SpanID()
-
-						cIDs := strings.Split(meta.InvokeCorrelationId, ".")
-						if len(cIDs) != 2 {
-							// format is invalid
-							l.log.Error("invalid invoke correlation ID", "metadata", meta)
-							return
-						}
-
-						var mrunID ulid.ULID
-						if meta.RunID() != nil {
-							mrunID = *meta.RunID()
-						}
-
-						_, ispan := NewSpan(ictx,
-							WithScope(consts.OtelScopeStep),
-							WithName(consts.OtelSpanInvoke),
-							WithTimestamp(meta.InvokeTraceCarrier.Timestamp),
-							WithSpanID(sid),
-							WithSpanAttributes(
-								attribute.String(consts.OtelSysLifecycleID, "OnFunctionScheduled"),
-								attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
-								attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
-								attribute.String(consts.OtelSysAppID, meta.SourceAppID),
-								attribute.String(consts.OtelSysFunctionID, meta.SourceFnID),
-								attribute.Int(consts.OtelSysFunctionVersion, meta.SourceFnVersion),
-								attribute.String(consts.OtelAttrSDKRunID, mrunID.String()),
-								attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-								attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-								attribute.String(consts.OtelSysStepGroupID, meta.InvokeGroupID),
-								attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-								attribute.String(consts.OtelSysStepDisplayName, meta.InvokeDisplayName),
-
-								attribute.String(consts.OtelSysStepInvokeTargetFnID, md.ID.FunctionID.String()),
-								attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
-								attribute.String(consts.OtelSysStepInvokeTriggeringEventID, evt.ID),
-								attribute.String(consts.OtelSysStepInvokeRunID, runID.String()),
-								attribute.Bool(consts.OtelSysStepInvokeExpired, false),
-							),
-						)
-						defer ispan.End()
-					}
-				}
-			}
-		}(ctx, e.GetEvent())
-	}
 }
 
 func (l traceLifecycle) OnFunctionStarted(
@@ -937,64 +882,6 @@ func (l traceLifecycle) OnSleep(
 		),
 	)
 	defer span.End(trace.WithTimestamp(until))
-}
-
-func (l traceLifecycle) OnInvokeFunction(
-	ctx context.Context,
-	md statev2.Metadata,
-	item queue.Item,
-	gen statev1.GeneratorOpcode,
-	invocationEvt event.Event,
-) {
-	ctx = l.extractTraceCtx(ctx, md, false)
-
-	meta, err := invocationEvt.InngestMetadata()
-	if err != nil {
-		l.log.Error("invocation event metadata not available",
-			"lifecycle", "OnInvokeFunction",
-			"meta", md,
-			"evt", invocationEvt,
-			"error", err,
-		)
-		return
-	}
-
-	runID := md.ID.RunID
-	carrier := meta.InvokeTraceCarrier
-	if carrier == nil {
-		l.log.Error("no trace carrier available",
-			"meta", md,
-			"lifecycle", "OnInvokeFunction",
-		)
-		return
-	}
-	spanID := carrier.SpanID()
-
-	_, span := NewSpan(ctx,
-		WithScope(consts.OtelScopeStep),
-		WithName(consts.OtelSpanInvoke),
-		WithTimestamp(carrier.Timestamp),
-		WithSpanID(spanID),
-		WithSpanAttributes(
-			attribute.String(consts.OtelSysLifecycleID, "OnInvokeFunction"),
-			attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
-			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, md.Config.FunctionSlug()),
-			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
-			attribute.String(consts.OtelAttrSDKRunID, runID.String()),
-			attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
-			attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
-			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
-			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeInvokeFunction.String()),
-			attribute.String(consts.OtelSysStepDisplayName, gen.UserDefinedName()),
-			attribute.String(consts.OtelSysStepInvokeTargetFnID, meta.InvokeFnID),
-			attribute.Int64(consts.OtelSysStepInvokeExpires, meta.InvokeExpiresAt),
-			attribute.String(consts.OtelSysStepInvokeTriggeringEventID, invocationEvt.ID),
-		),
-	)
-	defer span.End()
 }
 
 func (l traceLifecycle) OnInvokeFunctionResumed(
