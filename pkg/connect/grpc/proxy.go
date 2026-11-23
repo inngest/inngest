@@ -23,10 +23,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
-	pkgName = "connect.execution.proxy"
+	pkgName                = "connect.execution.proxy"
+	maxRouteAssignAttempts = 5
 )
 
 /*
@@ -400,54 +402,11 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			}
 		}()
 
-		// Determine the most suitable connection
-		route, err := i.router.GetRoute(ctx, i.rnd, i.tracer, l, opts.Data)
+		route, err := i.routeAndAssignWorker(ctx, opts, l, span, "could not assign request lease to worker")
 		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "failed to route message")
-
-			// Check if this is a capacity error
-			if errors.Is(err, routing.ErrAllWorkersAtCapacity) {
-				return nil, syscode.Error{
-					Code:    syscode.CodeConnectAllWorkersAtCapacity,
-					Message: "All workers are at capacity",
-				}
-			}
-
-			if errors.Is(err, routing.ErrNoHealthyConnection) {
-				return nil, syscode.Error{
-					Code:    syscode.CodeConnectNoHealthyConnection,
-					Message: "Could not find a healthy connection",
-				}
-			}
-
-			return nil, fmt.Errorf("failed to route message: %w", err)
+			return nil, err
 		}
-
 		routedInstanceID = route.InstanceID
-		// Assign the request lease to the worker for capacity tracking
-		if err := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); err != nil {
-
-			// Check if this is a capacity error, this will happen when two in parallel
-			// checked for worker capacity earlier but now one got to this point first
-			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
-				return nil, syscode.Error{
-					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-					Message: "Assigned workers at capacity", // Assigned worker reached capacity before assigment
-				}
-			}
-
-			// if the instance ID is not set, we log the error and skip for now
-			span.RecordError(err)
-			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
-				"instance_id": routedInstanceID,
-				"gateway_id":  route.GatewayID.String(),
-			}))
-
-		}
-
-		// Trace the request lease assignment
-		l.Trace("assigned request lease to worker", "instance_id", routedInstanceID, "gateway_id", route.GatewayID.String())
 
 		transport := "grpc"
 
@@ -506,15 +465,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			l.Warn("forward to gateway failed, re-routing", "attempt", forwardAttempt+1, "err", err)
 
-			route, err = i.router.GetRoute(ctx, i.rnd, i.tracer, l, opts.Data)
+			route, err = i.routeAndAssignWorker(ctx, opts, l, span, "could not re-assign request lease on retry")
 			if err != nil {
 				l.Warn("re-route failed", "attempt", forwardAttempt+1, "err", err)
 				break
 			}
 			routedInstanceID = route.InstanceID
-			if assignErr := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, routedInstanceID, opts.Data.RequestId); assignErr != nil {
-				l.ReportError(assignErr, "could not re-assign request lease on retry")
-			}
 		}
 
 		if err != nil {
@@ -665,5 +621,73 @@ func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.Stat
 
 	if err := stateManager.DeleteRequestFromWorker(ctx, envID, instanceID, requestID); err != nil {
 		l.ReportError(err, message)
+	}
+}
+
+func (i *grpcConnector) routeAndAssignWorker(
+	ctx context.Context,
+	opts ProxyOpts,
+	l logger.Logger,
+	span oteltrace.Span,
+	assignErrMsg string,
+) (*routing.RouteResult, error) {
+	var rejectedWorkers map[string]struct{}
+	for range maxRouteAssignAttempts {
+		route, err := i.router.GetRoute(ctx, i.rnd, i.tracer, l, opts.Data)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "failed to route message")
+
+			if errors.Is(err, routing.ErrAllWorkersAtCapacity) {
+				if len(rejectedWorkers) > 0 {
+					return nil, syscode.Error{
+						Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+						Message: "Assigned workers at capacity",
+					}
+				}
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectAllWorkersAtCapacity,
+					Message: "All workers are at capacity",
+				}
+			}
+
+			if errors.Is(err, routing.ErrNoHealthyConnection) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectNoHealthyConnection,
+					Message: "Could not find a healthy connection",
+				}
+			}
+
+			return nil, fmt.Errorf("failed to route message: %w", err)
+		}
+
+		if _, seen := rejectedWorkers[route.InstanceID]; seen {
+			continue
+		}
+
+		assignErr := i.stateManager.AssignRequestToWorker(ctx, opts.EnvID, route.InstanceID, opts.Data.RequestId)
+		if assignErr != nil {
+			if errors.Is(assignErr, state.ErrWorkerCapacityExceeded) {
+				if rejectedWorkers == nil {
+					rejectedWorkers = make(map[string]struct{}, maxRouteAssignAttempts)
+				}
+				rejectedWorkers[route.InstanceID] = struct{}{}
+				continue
+			}
+
+			span.RecordError(assignErr)
+			l.ReportError(assignErr, assignErrMsg, logger.WithErrorReportTags(map[string]string{
+				"instance_id": route.InstanceID,
+				"gateway_id":  route.GatewayID.String(),
+			}))
+		}
+
+		l.Trace("assigned request lease to worker", "instance_id", route.InstanceID, "gateway_id", route.GatewayID.String())
+		return route, nil
+	}
+
+	return nil, syscode.Error{
+		Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+		Message: "Assigned workers at capacity",
 	}
 }
