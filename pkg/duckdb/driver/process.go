@@ -799,7 +799,11 @@ func (p *process) restartLocked(ctx context.Context) error {
 	if err := p.spawnLocked(); err != nil {
 		return err
 	}
-	return p.initSessionLocked(ctx)
+	if err := p.initSessionLocked(ctx); err != nil {
+		_ = p.closeLocked(context.Background())
+		return err
+	}
+	return nil
 }
 
 // restart attempts one respawn after a detected failure. Exposed for tests;

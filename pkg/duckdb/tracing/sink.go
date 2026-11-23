@@ -50,13 +50,13 @@ func NewBatchingSink(ins Inserter, opts ...Option) *BatchingSink {
 	s := newBatchingSinkChannels(o.spansCap, o.eventsCap, o.metadataCap)
 	s.ins = ins
 
-	// One shared disabledState across every batcher, so the driver's
-	// terminal duckdb.ErrDisabled state stops the whole dual-write path and
-	// is logged once rather than once per entity.
-	bopts := batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: &disabledState{}}
-	startBatcher(s, newBatcher("run_trace_spans", s.spans, ins.InsertSpans, bopts))
-	startBatcher(s, newBatcher("events", s.events, ins.InsertEvents, bopts))
-	startBatcher(s, newBatcher("run_metadata", s.metadata, ins.InsertRunMetadata, bopts))
+	// One shared disabledState across every batcher, so temporary
+	// duckdb.ErrDisabled cooldown warnings share a single rate limit rather
+	// than logging on every flush across every entity.
+	disabled := &disabledState{}
+	startBatcher(s, newBatcher("run_trace_spans", s.spans, ins.InsertSpans, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled, dropped: &s.droppedSpans}))
+	startBatcher(s, newBatcher("events", s.events, ins.InsertEvents, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled, dropped: &s.droppedEvents}))
+	startBatcher(s, newBatcher("run_metadata", s.metadata, ins.InsertRunMetadata, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled, dropped: &s.droppedMetadata}))
 	return s
 }
 
