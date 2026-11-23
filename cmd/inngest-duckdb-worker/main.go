@@ -13,13 +13,13 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "duckdb-worker: %v\n", err)
+		fmt.Fprintf(os.Stderr, "inngest-duckdb-worker: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
-	fs := flag.NewFlagSet("duckdb-worker", flag.ContinueOnError)
+	fs := flag.NewFlagSet("inngest-duckdb-worker", flag.ContinueOnError)
 	socketPath := fs.String("socket", "", "Unix domain socket path to listen on (required)")
 	libPath := fs.String("lib", "", "Path to libduckdb shared library (if empty, lazily downloaded into --state-dir)")
 	dbPath := fs.String("db", "", "DuckDB database file path (empty for in-memory)")

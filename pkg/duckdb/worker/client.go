@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-// SpawnConfig configures a managed child duckdb-worker subprocess.
+// SpawnConfig configures a managed child inngest-duckdb-worker subprocess.
 type SpawnConfig struct {
-	// WorkerBinary is the path to the duckdb-worker executable.
+	// WorkerBinary is the path to the inngest-duckdb-worker executable.
 	WorkerBinary string
 	// SocketPath is the Unix domain socket path the worker will listen on.
 	SocketPath string

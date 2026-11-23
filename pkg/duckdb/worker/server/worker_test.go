@@ -249,14 +249,14 @@ func TestWorkerManagedSubprocessAndCrashRestart(t *testing.T) {
 	libPath := findRealLib(t)
 
 	binDir := t.TempDir()
-	workerBin := filepath.Join(binDir, "duckdb-worker")
+	workerBin := filepath.Join(binDir, "inngest-duckdb-worker")
 	if runtime.GOOS == "windows" {
 		workerBin += ".exe"
 	}
-	buildCmd := exec.Command("go", "build", "-o", workerBin, "../../../../cmd/duckdb-worker")
+	buildCmd := exec.Command("go", "build", "-o", workerBin, "../../../../cmd/inngest-duckdb-worker")
 	buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf("building duckdb-worker: %v\n%s", err, out)
+		t.Fatalf("building inngest-duckdb-worker: %v\n%s", err, out)
 	}
 
 	sockPath := tempSocketPath(t, "dwm-*")

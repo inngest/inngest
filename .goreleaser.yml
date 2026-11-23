@@ -23,11 +23,11 @@ builds:
     goarch:
       - amd64
       - arm64
-  - id: duckdb-worker
+  - id: inngest-duckdb-worker
     env:
       - CGO_ENABLED=0
-    main: ./cmd/duckdb-worker
-    binary: duckdb-worker
+    main: ./cmd/inngest-duckdb-worker
+    binary: inngest-duckdb-worker
     ldflags:
       - -s -w
     goos:
@@ -95,10 +95,10 @@ archives:
           - zip
     files:
       - LICENSE.md
-  - id: duckdb-worker
+  - id: inngest-duckdb-worker
     ids:
-      - duckdb-worker
-    name_template: "duckdb-worker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+      - inngest-duckdb-worker
+    name_template: "inngest-duckdb-worker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
         formats:
