@@ -23,6 +23,7 @@ require (
 	github.com/dmarkham/enumer v1.5.8
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+	github.com/ebitengine/purego v0.10.1
 	github.com/eko/gocache/lib/v4 v4.1.5
 	github.com/eko/gocache/store/freecache/v4 v4.2.1
 	github.com/eko/gocache/store/rueidis/v4 v4.1.5
@@ -114,6 +115,7 @@ require (
 	golang.org/x/mod v0.42.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
+	golang.org/x/sys v0.49.0
 	gonum.org/v1/gonum v0.17.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260904194346-d0f1323225a4
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4
@@ -189,7 +191,6 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/emicklei/proto v1.6.15 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
@@ -325,7 +326,6 @@ require (
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/net v0.62.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect

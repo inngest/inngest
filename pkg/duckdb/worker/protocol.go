@@ -86,6 +86,7 @@ const (
 type Request struct {
 	Op        Op     `json:"op"`
 	SessionID string `json:"session_id,omitempty"`
+	RequestID uint64 `json:"request_id,omitempty"`
 	SQL       string `json:"sql,omitempty"`
 }
 

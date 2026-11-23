@@ -127,6 +127,8 @@ type ColumnInfo struct {
 }
 
 // cResult matches struct duckdb_result in duckdb.h (6 x 8 = 48 bytes on 64-bit).
+//
+//nolint:unused // C ABI layout padding fields required by duckdb_query/duckdb_fetch_chunk
 type cResult struct {
 	deprecatedColumnCount uint64
 	deprecatedRowCount    uint64

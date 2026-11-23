@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -279,8 +280,9 @@ type Session struct {
 	client *Client
 	id     string
 
-	mu     sync.Mutex
-	closed bool
+	nextReqID atomic.Uint64
+	mu        sync.Mutex
+	closed    bool
 }
 
 // ID returns the server-assigned session identifier.
@@ -290,9 +292,14 @@ func (s *Session) ID() string {
 
 // Interrupt sends an interrupt RPC to cancel any running query on this session.
 func (s *Session) Interrupt(ctx context.Context) error {
+	return s.interruptRequest(ctx, 0)
+}
+
+func (s *Session) interruptRequest(ctx context.Context, reqID uint64) error {
 	_, err := s.client.roundTrip(ctx, Request{
 		Op:        OpInterrupt,
 		SessionID: s.id,
+		RequestID: reqID,
 	})
 	return err
 }
@@ -314,21 +321,32 @@ func (s *Session) Close(ctx context.Context) error {
 	return err
 }
 
-func (s *Session) startCancelWatcher(ctx context.Context) func() {
+func (s *Session) startCancelWatcher(ctx context.Context, conn net.Conn, reqID uint64) func() {
 	if ctx.Done() == nil {
 		return func() {}
 	}
 	done := make(chan struct{})
+	exited := make(chan struct{})
 	go func() {
+		defer close(exited)
 		select {
 		case <-ctx.Done():
+			if conn != nil {
+				_ = conn.SetDeadline(time.Now())
+			}
 			intCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			_ = s.Interrupt(intCtx)
+			_ = s.interruptRequest(intCtx, reqID)
 			cancel()
 		case <-done:
 		}
 	}()
-	return func() { close(done) }
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			close(done)
+			<-exited
+		})
+	}
 }
 
 // Exec executes a SQL statement on the session, interrupting DuckDB if ctx is cancelled.
@@ -339,14 +357,19 @@ func (s *Session) Exec(ctx context.Context, sql string) error {
 	}
 	defer conn.Close()
 
-	stopWatch := s.startCancelWatcher(ctx)
+	reqID := s.nextReqID.Add(1)
+	stopWatch := s.startCancelWatcher(ctx, conn, reqID)
 	defer stopWatch()
 
 	if err := WriteFrame(conn, Request{
 		Op:        OpExec,
 		SessionID: s.id,
+		RequestID: reqID,
 		SQL:       sql,
 	}); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return err
 	}
 
@@ -437,15 +460,20 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 		return nil, err
 	}
 
-	stopWatch := s.startCancelWatcher(ctx)
+	reqID := s.nextReqID.Add(1)
+	stopWatch := s.startCancelWatcher(ctx, conn, reqID)
 
 	if err := WriteFrame(conn, Request{
 		Op:        OpQuery,
 		SessionID: s.id,
+		RequestID: reqID,
 		SQL:       sql,
 	}); err != nil {
 		stopWatch()
 		_ = conn.Close()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 

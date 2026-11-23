@@ -75,6 +75,35 @@ func Serve(ctx context.Context, opts Opts) error {
 type session struct {
 	id   string
 	conn *libduckdb.Conn
+
+	mu          sync.Mutex
+	active      bool
+	activeReqID uint64
+}
+
+func (sess *session) beginRequest(reqID uint64) {
+	sess.mu.Lock()
+	sess.active = true
+	sess.activeReqID = reqID
+	sess.mu.Unlock()
+}
+
+func (sess *session) endRequest(reqID uint64) {
+	sess.mu.Lock()
+	if sess.activeReqID == reqID {
+		sess.active = false
+		sess.activeReqID = 0
+	}
+	sess.mu.Unlock()
+}
+
+func (sess *session) interrupt(reqID uint64) {
+	sess.mu.Lock()
+	shouldInterrupt := reqID == 0 || (sess.active && sess.activeReqID == reqID)
+	sess.mu.Unlock()
+	if shouldInterrupt {
+		sess.conn.Interrupt()
+	}
 }
 
 // Server serves DuckDB queries over a Unix domain socket, maintaining
@@ -85,6 +114,7 @@ type Server struct {
 
 	mu         sync.RWMutex
 	sessions   map[string]*session
+	conns      map[net.Conn]struct{}
 	ln         net.Listener
 	socketPath string
 	closed     bool
@@ -101,6 +131,7 @@ func New(db *libduckdb.DB, version string) *Server {
 		db:         db,
 		version:    version,
 		sessions:   make(map[string]*session),
+		conns:      make(map[net.Conn]struct{}),
 		shutdownCh: make(chan struct{}),
 	}
 }
@@ -108,7 +139,8 @@ func New(db *libduckdb.DB, version string) *Server {
 // ListenAndServe binds a Unix domain socket at socketPath and serves until ctx
 // is cancelled or Shutdown is requested.
 func (s *Server) ListenAndServe(ctx context.Context, socketPath string) error {
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
+	sockDir := filepath.Dir(socketPath)
+	if err := os.MkdirAll(sockDir, 0o700); err != nil {
 		return fmt.Errorf("worker: creating socket directory: %w", err)
 	}
 	_ = os.Remove(socketPath)
@@ -117,7 +149,11 @@ func (s *Server) ListenAndServe(ctx context.Context, socketPath string) error {
 	if err != nil {
 		return fmt.Errorf("worker: listen unix %q: %w", socketPath, err)
 	}
-	_ = os.Chmod(socketPath, 0o600)
+	if err := os.Chmod(socketPath, 0o600); err != nil {
+		_ = ln.Close()
+		_ = os.Remove(socketPath)
+		return fmt.Errorf("worker: chmod unix socket %q: %w", socketPath, err)
+	}
 
 	s.mu.Lock()
 	s.socketPath = socketPath
@@ -156,17 +192,38 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 			}
 			return fmt.Errorf("worker: accept: %w", err)
 		}
+		if !s.trackConn(conn) {
+			_ = conn.Close()
+			continue
+		}
 		s.wg.Add(1)
 		go func(c net.Conn) {
 			defer s.wg.Done()
+			defer s.untrackConn(c)
 			defer c.Close()
 			s.handleConn(c)
 		}(conn)
 	}
 }
 
-// Close stops accepting new connections, closes all active sessions, and
-// removes the Unix socket file.
+func (s *Server) trackConn(c net.Conn) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return false
+	}
+	s.conns[c] = struct{}{}
+	return true
+}
+
+func (s *Server) untrackConn(c net.Conn) {
+	s.mu.Lock()
+	delete(s.conns, c)
+	s.mu.Unlock()
+}
+
+// Close stops accepting new connections, closes all active connections and
+// sessions, and removes the Unix socket file.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	if s.closed {
@@ -181,6 +238,11 @@ func (s *Server) Close() error {
 		sessions = append(sessions, sess)
 	}
 	s.sessions = make(map[string]*session)
+	conns := make([]net.Conn, 0, len(s.conns))
+	for c := range s.conns {
+		conns = append(conns, c)
+	}
+	s.conns = make(map[net.Conn]struct{})
 	s.mu.Unlock()
 
 	s.triggerShutdown()
@@ -190,6 +252,9 @@ func (s *Server) Close() error {
 		if err := ln.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 			firstErr = err
 		}
+	}
+	for _, c := range conns {
+		_ = c.Close()
 	}
 	for _, sess := range sessions {
 		sess.conn.Interrupt()
@@ -271,7 +336,7 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 	case worker.OpInterrupt:
 		sess := s.getSession(req.SessionID)
 		if sess != nil {
-			sess.conn.Interrupt()
+			sess.interrupt(req.RequestID)
 		}
 		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
 		return true
@@ -282,7 +347,10 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
 			return true
 		}
-		if err := sess.conn.Exec(req.SQL); err != nil {
+		sess.beginRequest(req.RequestID)
+		err := sess.conn.Exec(req.SQL)
+		sess.endRequest(req.RequestID)
+		if err != nil {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
@@ -295,6 +363,8 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
 			return true
 		}
+		sess.beginRequest(req.RequestID)
+		defer sess.endRequest(req.RequestID)
 		res, err := sess.conn.Query(req.SQL)
 		if err != nil {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})

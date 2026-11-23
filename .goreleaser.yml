@@ -37,6 +37,9 @@ builds:
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 dockers:
   - id: inngest-amd64

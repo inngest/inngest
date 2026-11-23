@@ -4,7 +4,9 @@ package libduckdb
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -91,7 +93,6 @@ func (l *Lib) registerSymbols() error {
 		{&l.columnCount, "duckdb_column_count"},
 		{&l.columnName, "duckdb_column_name"},
 		{&l.columnType, "duckdb_column_type"},
-		{&l.fetchChunk, "duckdb_fetch_chunk"},
 		{&l.dataChunkGetSize, "duckdb_data_chunk_get_size"},
 		{&l.dataChunkGetColumnCount, "duckdb_data_chunk_get_column_count"},
 		{&l.dataChunkGetVector, "duckdb_data_chunk_get_vector"},
@@ -112,6 +113,20 @@ func (l *Lib) registerSymbols() error {
 			return fmt.Errorf("libduckdb: GetProcAddress(%q): %w", b.name, err)
 		}
 		purego.RegisterFunc(b.fptr, addr)
+	}
+
+	// purego.RegisterFunc on Windows rejects struct-by-value arguments.
+	// duckdb_fetch_chunk(duckdb_result result) takes a 48-byte struct by value;
+	// on Windows x64 ABI structs larger than 8 bytes are passed by hidden
+	// pointer in RCX and the returned duckdb_data_chunk pointer is in RAX.
+	fetchChunkAddr, err := windows.GetProcAddress(l.handle, "duckdb_fetch_chunk")
+	if err != nil {
+		return fmt.Errorf("libduckdb: GetProcAddress(%q): %w", "duckdb_fetch_chunk", err)
+	}
+	l.fetchChunk = func(res cResult) uintptr {
+		r1, _, _ := syscall.SyscallN(fetchChunkAddr, uintptr(unsafe.Pointer(&res)))
+		runtime.KeepAlive(&res)
+		return r1
 	}
 	return nil
 }
