@@ -453,14 +453,17 @@ func TestFastPathCachesFileIO(t *testing.T) {
 
 func TestIOCacheDetachesRequestContext(t *testing.T) {
 	dir := t.TempDir()
+	type ctxKey struct{}
 	var loaderCtxErr error
+	var loaderCtxVal any
 	var cache ioCache
 	cache.loadFS = func(ctx context.Context, props map[string]string, loc string) (icebergio.IO, error) {
 		loaderCtxErr = ctx.Err()
+		loaderCtxVal = ctx.Value(ctxKey{})
 		return icebergio.LoadFS(ctx, props, loc)
 	}
 
-	canceledCtx, cancel := context.WithCancel(context.Background())
+	canceledCtx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "aws-cfg"))
 	cancel()
 
 	fsys, err := cache.get(canceledCtx, iceberg.Properties{}, filepath.Join(dir, "a.json"))
@@ -469,6 +472,9 @@ func TestIOCacheDetachesRequestContext(t *testing.T) {
 	}
 	if loaderCtxErr != nil {
 		t.Fatalf("expected loader to receive uncanceled context, got %v", loaderCtxErr)
+	}
+	if loaderCtxVal != "aws-cfg" {
+		t.Fatalf("expected loader to preserve caller context values, got %v", loaderCtxVal)
 	}
 
 	// Cached FileIO remains usable for subsequent writes.
