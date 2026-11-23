@@ -243,7 +243,7 @@ func TestProxyGRPCPath(t *testing.T) {
 
 	respCh := make(chan *connectpb.SDKResponse)
 	go func() {
-		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
+		resp, servedID, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
 			AccountID: accID,
 			EnvID:     envID,
 			AppID:     appID,
@@ -265,6 +265,7 @@ func TestProxyGRPCPath(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
+		require.Equal(t, "test-worker", servedID)
 		respCh <- resp
 	}()
 
@@ -437,7 +438,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 	respCh := make(chan *connectpb.SDKResponse)
 	errCh := make(chan error)
 	go func() {
-		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
+		resp, _, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
 			AccountID: accID,
 			EnvID:     envID,
 			AppID:     appID,
@@ -629,7 +630,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 
 	respCh := make(chan struct{})
 	go func() {
-		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
+		resp, servedID, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
 			AccountID: accID,
 			EnvID:     envID,
 			AppID:     appID,
@@ -653,6 +654,8 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 		require.ErrorAs(t, err, &sysErr)
 		require.Equal(t, syscode.CodeConnectWorkerStoppedResponding, sysErr.Code)
 		require.Nil(t, resp)
+		// the worker got the request before its lease expired, so the step failure names it.
+		require.Equal(t, "test-worker", servedID)
 		respCh <- struct{}{}
 	}()
 
@@ -710,7 +713,7 @@ func TestProxyGRPCNoHealthyConnection(t *testing.T) {
 	reqID := "reqid-test"
 
 	// Don't create any connections - this will cause routing to fail
-	resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+	resp, servedID, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 		AccountID: accID,
 		EnvID:     envID,
 		AppID:     appID,
@@ -732,6 +735,7 @@ func TestProxyGRPCNoHealthyConnection(t *testing.T) {
 	})
 
 	require.Nil(t, resp)
+	require.Empty(t, servedID)
 	var sysErr syscode.Error
 	require.ErrorAs(t, err, &sysErr)
 	require.Equal(t, syscode.CodeConnectNoHealthyConnection, sysErr.Code)
@@ -877,7 +881,7 @@ func TestProxyGRPCForwardError(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+			resp, servedID, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 				AccountID: accID,
 				EnvID:     envID,
 				AppID:     appID,
@@ -899,6 +903,7 @@ func TestProxyGRPCForwardError(t *testing.T) {
 			})
 
 			require.Nil(t, resp)
+			require.Empty(t, servedID)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "failed to route request to gateway")
 			require.Equal(t, tc.attempts, mockForwarder.calls)
@@ -1043,7 +1048,7 @@ func TestProxyGRPCContextCancellation(t *testing.T) {
 	shortCtx, shortCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer shortCancel()
 
-	resp, err := connector.Proxy(shortCtx, context.Background(), ProxyOpts{
+	resp, servedID, err := connector.Proxy(shortCtx, context.Background(), ProxyOpts{
 		AccountID: accID,
 		EnvID:     envID,
 		AppID:     appID,
@@ -1065,6 +1070,7 @@ func TestProxyGRPCContextCancellation(t *testing.T) {
 	})
 
 	require.Nil(t, resp)
+	require.Empty(t, servedID)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "parent context was closed unexpectedly")
 }
@@ -1123,7 +1129,7 @@ func TestProxyGRPCBufferedResponse(t *testing.T) {
 	err = sm.SaveResponse(ctx, envID, reqID, expectedResponse)
 	require.NoError(t, err)
 
-	resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+	resp, _, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 		AccountID: accID,
 		EnvID:     envID,
 		AppID:     appID,

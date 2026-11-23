@@ -1353,6 +1353,12 @@ func TestAssignRequestToWorker(t *testing.T) {
 		// Should not create set when no limit
 		setKey := mgr.workerRequestsKey(envID, instanceID)
 		require.False(t, r.Exists(setKey))
+
+		requestWorkerKey := mgr.requestWorkerKey(envID, "req-1")
+		mapped, err := r.Get(requestWorkerKey)
+		require.NoError(t, err)
+		require.Equal(t, instanceID, mapped)
+		require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, r.TTL(requestWorkerKey))
 	})
 
 	t.Run("increments counter when capacity set", func(t *testing.T) {
@@ -1469,6 +1475,49 @@ func TestDeleteRequestFromWorker(t *testing.T) {
 		instanceID := "test-instance-no-cap"
 		err := mgr.DeleteRequestFromWorker(ctx, envID, instanceID, "req-1")
 		require.NoError(t, err, "should be no-op when no capacity is set")
+	})
+
+	t.Run("limited worker with no request set keeps mapping of other worker", func(t *testing.T) {
+		limitedID := "test-instance-limited-old"
+		unlimitedID := "test-instance-unlimited-new"
+		requestID := "req-moved"
+		require.NoError(t, mgr.SetWorkerTotalCapacity(ctx, envID, limitedID, 5))
+		require.NoError(t, mgr.AssignRequestToWorker(ctx, envID, unlimitedID, requestID))
+		require.False(t, r.Exists(mgr.workerRequestsKey(envID, limitedID)))
+
+		err := mgr.DeleteRequestFromWorker(ctx, envID, limitedID, requestID)
+		require.ErrorIs(t, err, ErrWorkerRequestsSetDoesNotExists)
+
+		assigned, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, unlimitedID, assigned)
+	})
+
+	t.Run("deletes mapping of unlimited worker", func(t *testing.T) {
+		instanceID := "test-instance-unlimited"
+		requestID := "req-unlimited"
+		require.NoError(t, mgr.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+		err := mgr.DeleteRequestFromWorker(ctx, envID, instanceID, requestID)
+		require.NoError(t, err)
+		require.False(t, r.Exists(mgr.requestWorkerKey(envID, requestID)))
+
+		assigned, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Empty(t, assigned)
+	})
+
+	t.Run("keeps mapping of unlimited worker for a different instance", func(t *testing.T) {
+		instanceID := "test-instance-unlimited-owner"
+		requestID := "req-unlimited-owner"
+		require.NoError(t, mgr.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+		err := mgr.DeleteRequestFromWorker(ctx, envID, "test-instance-unlimited-other", requestID)
+		require.NoError(t, err)
+
+		assigned, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.Equal(t, instanceID, assigned)
 	})
 
 	t.Run("decrements counter", func(t *testing.T) {
@@ -2001,19 +2050,20 @@ func TestGetAssignedWorkerID(t *testing.T) {
 		require.LessOrEqual(t, ttl, consts.ConnectWorkerCapacityManagerTTL)
 	})
 
-	t.Run("no mapping created when no capacity limit", func(t *testing.T) {
+	t.Run("mapping created when no capacity limit", func(t *testing.T) {
 		workerInstance := "test-worker-no-limit"
 		requestID := "test-request-no-limit"
-
-		// Don't set capacity - worker is unlimited
 
 		err := mgr.AssignRequestToWorker(ctx, envID, workerInstance, requestID)
 		require.NoError(t, err)
 
-		// No mapping should exist
 		retrievedInstance, err := mgr.GetAssignedWorkerID(ctx, envID, requestID)
 		require.NoError(t, err)
-		require.Equal(t, "", retrievedInstance)
+		require.Equal(t, workerInstance, retrievedInstance)
+
+		requestWorkerKey := mgr.requestWorkerKey(envID, requestID)
+		require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, r.TTL(requestWorkerKey))
+		require.False(t, r.Exists(mgr.workerRequestsKey(envID, workerInstance)))
 	})
 }
 

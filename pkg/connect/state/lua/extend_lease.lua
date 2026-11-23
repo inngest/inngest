@@ -51,9 +51,9 @@ if requestItem.leaseID == nil or requestItem.leaseID == cjson.null then
 	return {-1, ""}
 end
 
--- this field is only set if worker capacity is limited, this value represents whether we have enabled or
--- disabled worker capacity tracking. If we have unlimited capacity, we don't track requests.
--- If we have limited capacity, we track requests and we need to check if the request is still assigned to the worker.
+-- unlimited workers skip this check.  a request that an older executor
+-- assigned to an unlimited worker has no request-to-worker key, and the check
+-- would reject every extension of that lease with -3.
 local mappedWorkerID = nil
 if workerCapUnlimitedBool == false then
 	mappedWorkerID = redis.call("GET", requestWorkerKey)
@@ -67,8 +67,13 @@ if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > cu
 	-- one predecessor in the existing lease value so the same worker can replay
 	-- an old-SDK extension and recover the current lease ID without another key
 	-- or an unbounded history.
-	local retryOwnedByWorker = requestItem.workerID == instanceID
-	if retryOwnedByWorker == false then
+	-- the request-to-worker key decides only when the lease names no worker.
+	-- unlimited workers also have the key, and without this check the routed
+	-- worker could take over a lease that another worker already extends.
+	local leaseWorkerID = requestItem.workerID
+	local leaseHasWorker = leaseWorkerID ~= nil and leaseWorkerID ~= cjson.null
+	local retryOwnedByWorker = leaseWorkerID == instanceID
+	if retryOwnedByWorker == false and leaseHasWorker == false then
 		if mappedWorkerID == nil then
 			mappedWorkerID = redis.call("GET", requestWorkerKey)
 		end
@@ -94,6 +99,11 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 	if workerCapUnlimitedBool == false then
 		redis.call("DEL", requestWorkerKey)
 	    redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
+	elseif redis.call("GET", requestWorkerKey) == instanceID then
+		-- unlimited workers skip the ownership check above.  the key is deleted
+		-- only when it names this instance, so a stale lease holder does not
+		-- erase the mapping of the worker that now runs the request.
+		redis.call("DEL", requestWorkerKey)
 	end
 	return {2, ""}
 end
@@ -112,6 +122,10 @@ redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 
 -- If worker capacity is unlimited, we don't need to manage the set
 if workerCapUnlimitedBool == true then
+	-- without this the request-to-worker key expires on runs longer than its
+	-- TTL and GetAssignedWorkerID returns no worker.  EXPIRE on a missing key
+	-- does nothing, so a request without the key still extends.
+	redis.call("EXPIRE", requestWorkerKey, requestWorkerMappingTTL)
 	return {1, newLeaseID}
 end
 
