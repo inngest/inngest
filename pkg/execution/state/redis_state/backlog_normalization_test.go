@@ -663,3 +663,71 @@ func TestBacklogNormalizeItemWithSingleton(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID), "backlog %s is in shadow partition", sourceBacklog.BacklogID, r.Dump())
 	require.False(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 }
+
+func TestNormalizationRejectsStaleItemSnapshots(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want error
+	}{
+		{name: "unleased"},
+		{name: "expired lease"},
+		{name: "active lease", want: osqueue.ErrQueueItemAlreadyLeased},
+		{name: "deleted", want: osqueue.ErrQueueItemNotFound},
+		{name: "no longer in backlog", want: osqueue.ErrQueueItemNotFound},
+		{name: "already normalized", want: osqueue.ErrQueueItemNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, rc := initRedis(t)
+			t.Cleanup(rc.Close)
+			clock := clockwork.NewFakeClock()
+			_, shard := newQueue(t, rc, osqueue.WithClock(clock), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }))
+			kg := shard.Client().KeyGenerator()
+			ctx := t.Context()
+			at := clock.Now().Add(time.Hour)
+			item := osqueue.QueueItem{
+				ID: "normalize-snapshot", FunctionID: uuid.New(), WorkspaceID: uuid.New(),
+				Data: osqueue.Item{Kind: osqueue.KindStart, Identifier: state.Identifier{AccountID: uuid.New(), RunID: ulid.Make()}, Throttle: &osqueue.Throttle{Key: "old", Limit: 10, Burst: 1, Period: 60}},
+			}
+			item.Data.Identifier.WorkflowID = item.FunctionID
+			item.Data.Identifier.WorkspaceID = item.WorkspaceID
+			item, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.NoError(t, err)
+			sourceBacklog := osqueue.ItemBacklog(ctx, item)
+			stale := item
+			stale.Data.Throttle = &osqueue.Throttle{Key: "new", Limit: 10, Burst: 1, Period: 60}
+			targetBacklog := osqueue.ItemBacklog(ctx, stale)
+			require.NotEqual(t, sourceBacklog.BacklogID, targetBacklog.BacklogID)
+			opts := osqueue.EnqueueOpts{PassthroughJobId: true, NormalizeFromBacklogID: sourceBacklog.BacklogID}
+			switch tc.name {
+			case "active lease", "expired lease":
+				_, err := shard.Lease(ctx, item, time.Minute, clock.Now())
+				require.NoError(t, err)
+				if tc.name == "expired lease" {
+					clock.Advance(2 * time.Minute)
+				}
+			case "deleted":
+				require.NoError(t, shard.Dequeue(ctx, item))
+			case "no longer in backlog":
+				_, err := rc.Do(ctx, rc.B().Zrem().Key(kg.BacklogSet(sourceBacklog.BacklogID)).Member(item.ID).Build()).ToInt64()
+				require.NoError(t, err)
+			case "already normalized":
+				_, err := shard.EnqueueItem(ctx, stale, at, opts)
+				require.NoError(t, err)
+			}
+			before := r.Dump()
+			_, err = shard.EnqueueItem(ctx, stale, at, opts)
+			if tc.want != nil {
+				require.ErrorIs(t, err, tc.want)
+				require.Equal(t, before, r.Dump(), "a stale normalization must not change any source data or indexes")
+				return
+			}
+			require.NoError(t, err)
+			stored, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			require.Equal(t, "new", stored.Data.Throttle.Key)
+			require.False(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
+			_, err = r.ZScore(kg.BacklogSet(targetBacklog.BacklogID), item.ID)
+			require.NoError(t, err)
+		})
+	}
+}

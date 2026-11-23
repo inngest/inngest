@@ -298,6 +298,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
 	switch status {
+	case -1:
+		return i, osqueue.ErrQueueItemNotFound
+	case -2:
+		return i, osqueue.ErrQueueItemAlreadyLeased
 	case 0:
 		return i, nil
 	case 1:
