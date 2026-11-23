@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -117,6 +120,10 @@ func TestIcebergBucketPartition(t *testing.T) {
 	acct2 := "11111111-1111-4111-a111-111111111111"
 	acct3 := "22222222-2222-4222-a222-222222222222"
 	acct4 := "33333333-3333-4333-a333-333333333333"
+	acct5 := "44444444-4444-4444-a444-444444444444"
+	acct6 := "55555555-5555-4555-a555-555555555555"
+	acct7 := "66666666-6666-4666-a666-666666666666"
+	acct8 := "77777777-7777-4777-a777-777777777777"
 
 	_, err = db.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO inngest.bucketed VALUES
@@ -125,8 +132,12 @@ func TestIcebergBucketPartition(t *testing.T) {
 			('%s', '2026-01-20T00:00:00Z', '2026-01-20T00:00:00Z', 'r2-jan'),
 			('%s', '2026-02-15T00:00:00Z', '2026-02-15T00:00:00Z', 'r2-feb'),
 			('%s', '2026-02-20T00:00:00Z', '2026-02-20T00:00:00Z', 'r3-feb'),
-			('%s', '2026-03-01T00:00:00Z', '2026-03-01T00:00:00Z', 'r4-mar');
-	`, acct1, acct1, acct2, acct2, acct3, acct4))
+			('%s', '2026-02-21T00:00:00Z', '2026-02-21T00:00:00Z', 'r4-feb'),
+			('%s', '2026-02-22T00:00:00Z', '2026-02-22T00:00:00Z', 'r5-feb'),
+			('%s', '2026-02-23T00:00:00Z', '2026-02-23T00:00:00Z', 'r6-feb'),
+			('%s', '2026-02-24T00:00:00Z', '2026-02-24T00:00:00Z', 'r7-feb'),
+			('%s', '2026-02-25T00:00:00Z', '2026-02-25T00:00:00Z', 'r8-feb');
+	`, acct1, acct1, acct2, acct2, acct3, acct4, acct5, acct6, acct7, acct8))
 	require.NoError(t, err)
 
 	count := func(q string) int {
@@ -135,11 +146,45 @@ func TestIcebergBucketPartition(t *testing.T) {
 		return n
 	}
 
-	require.Equal(t, 6, count("SELECT count(*) FROM inngest.bucketed;"))
+	require.Equal(t, 10, count("SELECT count(*) FROM inngest.bucketed;"))
 	require.Equal(t, 2, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct1)))
 	require.Equal(t, 2, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct2)))
 	require.Equal(t, 1, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct3)))
 	require.Equal(t, 1, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct4)))
+
+	// Verify bucket partition pruning via DuckDB JSON profiling: querying a
+	// single account in 2026-02 must read strictly fewer files than the full
+	// 2026-02 scan (specifically only the target bucket's file).
+	profDir := t.TempDir()
+	filesReadRe := regexp.MustCompile(`"Total Files Read":\s*"(\d+)"`)
+	profileFilesRead := func(name, q string) int {
+		profPath := filepath.Join(profDir, name+".json")
+		// Run enable -> query -> disable in one Exec so profiling_output is
+		// written for q and not overwritten by the driver's EOF canary.
+		_, err := db.ExecContext(ctx, fmt.Sprintf(
+			"SET enable_profiling = 'json'; SET profiling_output = '%s'; %s SET enable_profiling = 'no_output';",
+			profPath, q,
+		))
+		require.NoError(t, err)
+		raw, err := os.ReadFile(profPath)
+		require.NoError(t, err)
+		m := filesReadRe.FindStringSubmatch(string(raw))
+		require.NotNil(t, m, "expected Total Files Read in profiling output:\n%s", string(raw))
+		n, err := strconv.Atoi(m[1])
+		require.NoError(t, err)
+		return n
+	}
+
+	febAllFiles := profileFilesRead("feb-all", "SELECT count(run_id) FROM inngest.bucketed WHERE queued_at >= '2026-02-01T00:00:00Z' AND queued_at < '2026-03-01T00:00:00Z';")
+	febTargetFiles := profileFilesRead("feb-target", fmt.Sprintf("SELECT count(run_id) FROM inngest.bucketed WHERE account_id = '%s' AND queued_at >= '2026-02-01T00:00:00Z' AND queued_at < '2026-03-01T00:00:00Z';", acct1))
+	require.Greater(t, febAllFiles, 1, "expected multiple distinct bucket files in 2026-02")
+	require.Less(t, febTargetFiles, febAllFiles, "point query by account_id must prune other buckets' files")
+	require.Equal(t, 1, febTargetFiles, "single account + single month should read only its bucket's file")
+
+	allFiles := profileFilesRead("all", "SELECT count(run_id) FROM inngest.bucketed;")
+	acct1Files := profileFilesRead("acct1", fmt.Sprintf("SELECT count(run_id) FROM inngest.bucketed WHERE account_id = '%s';", acct1))
+	require.Less(t, acct1Files, allFiles, "WHERE account_id = <target> must prune other buckets' files")
+	require.Equal(t, 2, acct1Files, "acct1 spans 2 months so should read only 2 bucket files")
 
 	// Delete only rows at or after 2026-02-01 for acct1 and acct2.
 	_, err = db.ExecContext(ctx, fmt.Sprintf(`
@@ -149,7 +194,7 @@ func TestIcebergBucketPartition(t *testing.T) {
 	`, acct1, acct2))
 	require.NoError(t, err)
 
-	require.Equal(t, 4, count("SELECT count(*) FROM inngest.bucketed;"))
+	require.Equal(t, 8, count("SELECT count(*) FROM inngest.bucketed;"))
 	require.Equal(t, 1, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct1)))
 	require.Equal(t, 1, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct2)))
 	require.Equal(t, 1, count(fmt.Sprintf("SELECT count(*) FROM inngest.bucketed WHERE account_id = '%s';", acct3)))
