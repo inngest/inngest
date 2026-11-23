@@ -22,6 +22,7 @@ import {
 } from '@remixicon/react';
 
 import { displayPlanName } from '@/components/Billing/Plans/utils';
+import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
 import type { FileRouteTypes } from '@/routeTree.gen';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -32,6 +33,7 @@ import OrgAvatar from './OrgAvatar';
 type Props = React.PropsWithChildren<{
   profile: ProfileDisplayType;
   showOnboardingWidget: () => void;
+  organizationRedirectUrl?: string;
 }>;
 
 const iconClassName = 'text-muted h-4 w-4';
@@ -58,8 +60,14 @@ const OrgMenuPlanDocument: TypedDocumentNode<
   }
 `;
 
-export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
+export const OrgMenu = ({
+  children,
+  profile,
+  showOnboardingWidget,
+  organizationRedirectUrl,
+}: Props) => {
   const navigate = useNavigate();
+  const redirectUrl = sanitizeRedirectUrl(organizationRedirectUrl);
   const { nextStep, lastCompletedStep } = useOnboardingStep();
   const orgName = profile.orgName ?? '';
 
@@ -197,7 +205,10 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
 
         <DropdownMenuItem
           onSelect={() =>
-            navigate({ to: '/organization-list' as FileRouteTypes['to'] })
+            navigate({
+              to: '/organization-list' as FileRouteTypes['to'],
+              ...(redirectUrl && { search: { redirect_url: redirectUrl } }),
+            })
           }
         >
           <RiArrowLeftRightLine className={iconClassName} />

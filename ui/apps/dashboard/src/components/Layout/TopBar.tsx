@@ -16,6 +16,7 @@ export default function TopBar({
   showOnboardingWidget,
   children,
   focused = false,
+  organizationRedirectUrl,
 }: {
   activeEnv?: Environment;
   profile?: ProfileDisplayType;
@@ -23,6 +24,8 @@ export default function TopBar({
   children?: ReactNode;
   /** Company/profile header for focused account flows without environment navigation. */
   focused?: boolean;
+  /** Resume a focused flow after the user chooses an organization. */
+  organizationRedirectUrl?: string;
 }) {
   return (
     <header
@@ -37,6 +40,7 @@ export default function TopBar({
             <OrgMenu
               profile={profile}
               showOnboardingWidget={showOnboardingWidget}
+              organizationRedirectUrl={organizationRedirectUrl}
             >
               <OrgButton profile={profile} />
             </OrgMenu>
