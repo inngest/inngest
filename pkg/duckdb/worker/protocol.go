@@ -85,6 +85,7 @@ const (
 // Request is a single client-to-worker RPC message.
 type Request struct {
 	Op        Op     `json:"op"`
+	AuthToken string `json:"auth_token,omitempty"`
 	SessionID string `json:"session_id,omitempty"`
 	RequestID uint64 `json:"request_id,omitempty"`
 	SQL       string `json:"sql,omitempty"`
@@ -94,6 +95,7 @@ type Request struct {
 type Response struct {
 	Kind      ResponseKind `json:"kind"`
 	Version   string       `json:"version,omitempty"`
+	PID       int          `json:"pid,omitempty"`
 	SessionID string       `json:"session_id,omitempty"`
 	Columns   []ColumnInfo `json:"columns,omitempty"`
 	Rows      [][]any      `json:"rows,omitempty"`

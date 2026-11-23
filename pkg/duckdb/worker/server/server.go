@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,6 +31,9 @@ type Opts struct {
 	// HealthAddr, when non-empty, serves GET /healthz over HTTP (e.g. ":8080")
 	// for remote/k8s deployments. Empty disables the HTTP health server.
 	HealthAddr string
+	// AuthToken, when non-empty, is required on every RPC request. Required when
+	// ListenAddr is a non-loopback TCP address.
+	AuthToken string
 	// LibPath is an optional path to libduckdb. If empty, driver.EnsureLibrary
 	// lazily downloads and verifies libduckdb into StateDir.
 	LibPath string
@@ -82,6 +87,7 @@ func Serve(ctx context.Context, opts Opts) error {
 	defer db.Close()
 
 	srv := New(db, lib.Version())
+	srv.SetAuthToken(opts.AuthToken)
 	if opts.HealthAddr != "" {
 		stopHealth, err := startHealthServer(opts.HealthAddr, srv)
 		if err != nil {
@@ -166,8 +172,9 @@ func (sess *session) interrupt(reqID uint64) {
 // Server serves DuckDB queries over a Unix domain socket, maintaining
 // concurrent per-session libduckdb connections.
 type Server struct {
-	db      *libduckdb.DB
-	version string
+	db        *libduckdb.DB
+	version   string
+	authToken string
 
 	mu         sync.RWMutex
 	sessions   map[string]*session
@@ -195,6 +202,23 @@ func New(db *libduckdb.DB, version string) *Server {
 		shutdownCh: make(chan struct{}),
 		closeDone:  make(chan struct{}),
 	}
+}
+
+// SetAuthToken configures a shared secret required on every RPC request.
+// Must be called before ListenAndServe/Serve.
+func (s *Server) SetAuthToken(token string) {
+	s.authToken = token
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // ListenAndServe binds a Unix domain socket or TCP listener at addr and serves
@@ -226,6 +250,12 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 		s.socketPath = address
 		s.mu.Unlock()
 	} else {
+		if network == "tcp" && s.authToken == "" {
+			host, _, splitErr := net.SplitHostPort(address)
+			if splitErr != nil || !isLoopbackHost(host) {
+				return fmt.Errorf("worker: refusing to listen on non-loopback TCP address %q without --auth-token", address)
+			}
+		}
 		ln, err = net.Listen(network, address)
 		if err != nil {
 			return fmt.Errorf("worker: listen %s %q: %w", network, address, err)
@@ -387,9 +417,13 @@ func (s *Server) handleConn(c net.Conn) {
 }
 
 func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
+	if s.authToken != "" && subtle.ConstantTimeCompare([]byte(req.AuthToken), []byte(s.authToken)) != 1 {
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: "unauthorized"})
+		return false
+	}
 	switch req.Op {
 	case worker.OpPing:
-		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, Version: s.version})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, Version: s.version, PID: os.Getpid()})
 		return true
 
 	case worker.OpOpenSession:

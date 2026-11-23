@@ -28,8 +28,12 @@ type SpawnConfig struct {
 	// StateDir is the directory used for lazy libduckdb downloads when LibPath is empty.
 	StateDir string
 	// StartupTimeout bounds how long Spawn waits for the socket to become ready.
-	// Defaults to 15s.
+	// Defaults to 2m when LibPath is empty (allowing a cold libduckdb download)
+	// and 15s when LibPath is provided.
 	StartupTimeout time.Duration
+	// AuthToken, when non-empty, is passed to the worker via environment
+	// variable and sent on every RPC request.
+	AuthToken string
 	// Env holds extra KEY=VALUE environment variables appended to the minimal
 	// child environment.
 	Env []string
@@ -40,6 +44,7 @@ type SpawnConfig struct {
 // purego or libduckdb dependencies.
 type Client struct {
 	socketPath string
+	authToken  string
 
 	// Managed subprocess fields (nil in external sidecar mode).
 	cmd    *exec.Cmd
@@ -53,10 +58,16 @@ type Client struct {
 // Dial connects to an already-running external worker (Unix socket path,
 // unix:///path, tcp://host:port, or host:port) and verifies liveness with Ping.
 func Dial(ctx context.Context, addr string) (*Client, error) {
+	return DialWithToken(ctx, addr, "")
+}
+
+// DialWithToken connects to an already-running external worker using authToken
+// for RPC authentication and verifies liveness with Ping.
+func DialWithToken(ctx context.Context, addr, authToken string) (*Client, error) {
 	if addr == "" {
 		return nil, errors.New("worker: address is empty")
 	}
-	c := &Client{socketPath: addr}
+	c := &Client{socketPath: addr, authToken: authToken}
 	if _, err := c.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("worker: dialing %q: %w", addr, err)
 	}
@@ -75,7 +86,11 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 	}
 	timeout := cfg.StartupTimeout
 	if timeout <= 0 {
-		timeout = 15 * time.Second
+		if cfg.LibPath == "" {
+			timeout = 2 * time.Minute
+		} else {
+			timeout = 15 * time.Second
+		}
 	}
 
 	network, address := ParseAddress(cfg.SocketPath)
@@ -96,9 +111,14 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 		args = append(args, "--state-dir", cfg.StateDir)
 	}
 
+	extraEnv := cfg.Env
+	if cfg.AuthToken != "" {
+		extraEnv = append(append([]string(nil), cfg.Env...), "INNGEST_DUCKDB_WORKER_AUTH_TOKEN="+cfg.AuthToken)
+	}
+
 	var stderr bytes.Buffer
 	cmd := exec.Command(cfg.WorkerBinary, args...)
-	cmd.Env = minimalChildEnv(cfg.Env)
+	cmd.Env = minimalChildEnv(extraEnv)
 	cmd.Stderr = &stderr
 
 	if err := cmd.Start(); err != nil {
@@ -113,6 +133,7 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 
 	c := &Client{
 		socketPath: cfg.SocketPath,
+		authToken:  cfg.AuthToken,
 		cmd:        cmd,
 		stderr:     &stderr,
 		exitCh:     exitCh,
@@ -134,9 +155,9 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 				cfg.SocketPath, strings.TrimSpace(stderr.String()), readyCtx.Err())
 		case <-ticker.C:
 			pingCtx, pingCancel := context.WithTimeout(readyCtx, 200*time.Millisecond)
-			_, err := c.Ping(pingCtx)
+			resp, err := c.pingInfo(pingCtx)
 			pingCancel()
-			if err == nil {
+			if err == nil && resp.PID == cmd.Process.Pid {
 				return c, nil
 			}
 		}
@@ -211,6 +232,9 @@ func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 }
 
 func (c *Client) roundTrip(ctx context.Context, req Request) (Response, error) {
+	if req.AuthToken == "" {
+		req.AuthToken = c.authToken
+	}
 	conn, err := c.dial(ctx)
 	if err != nil {
 		return Response{}, err
@@ -233,9 +257,13 @@ func (c *Client) roundTrip(ctx context.Context, req Request) (Response, error) {
 	return resp, nil
 }
 
+func (c *Client) pingInfo(ctx context.Context) (Response, error) {
+	return c.roundTrip(ctx, Request{Op: OpPing})
+}
+
 // Ping checks worker liveness and returns the loaded DuckDB version.
 func (c *Client) Ping(ctx context.Context) (string, error) {
-	resp, err := c.roundTrip(ctx, Request{Op: OpPing})
+	resp, err := c.pingInfo(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -388,6 +416,7 @@ func (s *Session) Exec(ctx context.Context, sql string) error {
 
 	if err := WriteFrame(conn, Request{
 		Op:        OpExec,
+		AuthToken: s.client.authToken,
 		SessionID: s.id,
 		RequestID: reqID,
 		SQL:       sql,
@@ -490,6 +519,7 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 
 	if err := WriteFrame(conn, Request{
 		Op:        OpQuery,
+		AuthToken: s.client.authToken,
 		SessionID: s.id,
 		RequestID: reqID,
 		SQL:       sql,

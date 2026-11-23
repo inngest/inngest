@@ -26,6 +26,7 @@ func run(args []string) error {
 	libPath := fs.String("lib", "", "Path to libduckdb shared library (if empty, lazily downloaded into --state-dir)")
 	dbPath := fs.String("db", "", "DuckDB database file path (empty for in-memory)")
 	stateDir := fs.String("state-dir", "", "Directory for cached libduckdb downloads")
+	authToken := fs.String("auth-token", "", "Shared auth token required on RPCs (falls back to INNGEST_DUCKDB_WORKER_AUTH_TOKEN; required for non-loopback TCP)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -37,12 +38,18 @@ func run(args []string) error {
 		return fmt.Errorf("--listen (or --socket) is required")
 	}
 
+	token := *authToken
+	if token == "" {
+		token = os.Getenv("INNGEST_DUCKDB_WORKER_AUTH_TOKEN")
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	return server.Serve(ctx, server.Opts{
 		ListenAddr: addr,
 		HealthAddr: *healthAddr,
+		AuthToken:  token,
 		LibPath:    *libPath,
 		DBPath:     *dbPath,
 		StateDir:   *stateDir,
