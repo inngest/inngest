@@ -607,6 +607,68 @@ func TestExecRestartCooldownAndRecovery(t *testing.T) {
 	c.proc.mu.Unlock()
 }
 
+// TestRestartInitFailureClosesPartiallyStartedChild verifies that if
+// spawnLocked succeeds during a restart but initSessionLocked fails, the
+// partially initialized child is closed (p.started == false) so queries after
+// the cooldown expires run full setup on a fresh child instead of executing on
+// an uninitialized one.
+func TestRestartInitFailureClosesPartiallyStartedChild(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	c.proc.mu.Lock()
+	c.proc.now = func() time.Time { return now }
+	// Force initSessionLocked to fail after spawnLocked + healthCheckLocked succeed.
+	c.proc.iceberg = &IcebergOptions{URI: "", Warehouse: ""}
+	c.proc.mu.Unlock()
+
+	require.NoError(t, c.proc.cmd.Process.Kill())
+	_, _ = c.proc.cmd.Process.Wait()
+
+	// Crash triggers restart -> spawn succeeds, initSessionLocked fails -> child must be closed.
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+
+	c.proc.mu.Lock()
+	require.False(t, c.proc.started, "partially initialized child must be closed on initSessionLocked failure")
+	require.NotNil(t, c.proc.cmd.ProcessState, "partially initialized child must have been waited on")
+	require.True(t, c.proc.cmd.ProcessState.Exited(), "partially initialized child must have exited")
+	c.proc.mu.Unlock()
+
+	// Advance past the 10s cooldown while bootstrap is still broken: must attempt
+	// a fresh restart (and fail with ErrDisabled) rather than executing on a
+	// half-initialized child.
+	now = now.Add(10 * time.Second)
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+	c.proc.mu.Lock()
+	require.False(t, c.proc.started)
+	require.Equal(t, 2, c.proc.restartFails)
+	c.proc.mu.Unlock()
+
+	// Clear the bad iceberg config and advance past the 30s cooldown: recovery
+	// spawns a fresh child and completes full setup.
+	c.proc.mu.Lock()
+	c.proc.iceberg = nil
+	c.proc.mu.Unlock()
+	now = now.Add(30 * time.Second)
+
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+	c.proc.mu.Lock()
+	require.True(t, c.proc.started)
+	require.Equal(t, 0, c.proc.restartFails)
+	c.proc.mu.Unlock()
+}
+
 func TestSubprocessEnvAllowlist(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://secret")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret")
