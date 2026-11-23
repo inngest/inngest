@@ -697,6 +697,7 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 	reqID := s.nextReqID.Add(1)
 	if err := writeFrame(Request{
 		Op:        OpQueryStream,
+		AuthToken: s.client.authToken,
 		SessionID: s.id,
 		RequestID: reqID,
 		SQL:       sql,
@@ -708,11 +709,15 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 
 	stopWatch := s.startCancelWatcher(ctx, conn, reqID)
 	feedCtx, feedCancel := context.WithCancel(ctx)
+	var cleanupCancel atomic.Bool
 
 	var errMu sync.Mutex
 	var firstSourceErr error
 	var firstWriteErr error
 	recordSourceErr := func(e error) {
+		if cleanupCancel.Load() && errors.Is(e, context.Canceled) {
+			return
+		}
 		errMu.Lock()
 		if firstSourceErr == nil {
 			firstSourceErr = e
@@ -720,6 +725,9 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 		errMu.Unlock()
 	}
 	recordWriteErr := func(e error) {
+		if cleanupCancel.Load() {
+			return
+		}
 		errMu.Lock()
 		if firstWriteErr == nil {
 			firstWriteErr = e
@@ -760,6 +768,9 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 					return
 				}
 				if err != nil {
+					if cleanupCancel.Load() && errors.Is(err, context.Canceled) {
+						return
+					}
 					recordSourceErr(err)
 					feedCancel()
 					if werr := writeFrame(Request{Op: OpStreamError, StreamID: st.ID, Error: err.Error()}); werr != nil {
@@ -782,6 +793,7 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 	}
 
 	cleanup := func() {
+		cleanupCancel.Store(true)
 		feedCancel()
 		wg.Wait()
 	}

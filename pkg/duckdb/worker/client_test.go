@@ -105,3 +105,64 @@ func TestQueryWithStreamsCancelsSiblingFeedsOnSourceError(t *testing.T) {
 		t.Fatal("sibling stream feedCtx was not cancelled on source error")
 	}
 }
+
+func TestQueryWithStreamsPreservesSQLErrorOverCleanupCancel(t *testing.T) {
+	base := ""
+	if runtime.GOOS != "windows" {
+		base = "/tmp"
+	}
+	dir, err := os.MkdirTemp(base, "dw-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	sockPath := filepath.Join(dir, "sqlerr.sock")
+	ln, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+
+	// Mock server accepts OpQueryStream and immediately returns a SQL KindError
+	// while the client's feed goroutine is blocked waiting on feedCtx.Done().
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		var req Request
+		if err := ReadFrame(conn, &req); err != nil {
+			return
+		}
+		_ = WriteFrame(conn, Response{
+			Kind:  KindError,
+			Error: "Binder Error: Referenced column \"missing_col\" not found",
+		})
+	}()
+
+	client := &Client{socketPath: sockPath}
+	sess := &Session{client: client, id: "s-1"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err = sess.QueryWithStreams(ctx, "SELECT missing_col", []SendStream{
+		{
+			ID: "a",
+			Next: func(feedCtx context.Context) ([][]any, error) {
+				<-feedCtx.Done()
+				return nil, feedCtx.Err()
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected SQL error, got nil")
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, ErrStreamSource) {
+		t.Fatalf("QueryWithStreams hid SQL error behind cleanup cancellation: %v", err)
+	}
+	if got := err.Error(); got != `Binder Error: Referenced column "missing_col" not found` {
+		t.Fatalf("QueryWithStreams err = %q, want SQL error", got)
+	}
+}
