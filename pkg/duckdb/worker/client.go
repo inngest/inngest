@@ -50,6 +50,7 @@ type Client struct {
 	cmd    *exec.Cmd
 	stderr *bytes.Buffer
 	exitCh chan error
+	ready  atomic.Bool
 
 	mu     sync.Mutex
 	closed bool
@@ -158,6 +159,7 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 			resp, err := c.pingInfo(pingCtx)
 			pingCancel()
 			if err == nil && resp.PID == cmd.Process.Pid {
+				c.ready.Store(true)
 				return c, nil
 			}
 		}
@@ -303,26 +305,42 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	_ = c.Shutdown(shutCtx)
-	cancel()
+	if c.ready.Load() {
+		shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_ = c.Shutdown(shutCtx)
+		cancel()
 
-	select {
-	case <-c.exitCh:
-	case <-time.After(2 * time.Second):
-		terminateProcess(c.cmd.Process)
 		select {
 		case <-c.exitCh:
 		case <-time.After(2 * time.Second):
-			if c.cmd.Process != nil {
-				_ = c.cmd.Process.Kill()
+			terminateProcess(c.cmd.Process)
+			select {
+			case <-c.exitCh:
+			case <-time.After(2 * time.Second):
+				if c.cmd.Process != nil {
+					_ = c.cmd.Process.Kill()
+				}
+				<-c.exitCh
 			}
-			<-c.exitCh
 		}
+
+		if network, address := ParseAddress(c.socketPath); network == "unix" {
+			_ = os.Remove(address)
+		}
+		return nil
 	}
 
-	if network, address := ParseAddress(c.socketPath); network == "unix" {
-		_ = os.Remove(address)
+	// Child never confirmed readiness (its PID never answered Ping): terminate
+	// only the child process without sending Shutdown to the address or
+	// removing a socket another worker might own.
+	terminateProcess(c.cmd.Process)
+	select {
+	case <-c.exitCh:
+	case <-time.After(2 * time.Second):
+		if c.cmd.Process != nil {
+			_ = c.cmd.Process.Kill()
+		}
+		<-c.exitCh
 	}
 	return nil
 }
