@@ -426,7 +426,7 @@ func isPushdownTarget(e parser.Expr) bool {
 	if _, ok := e.(*parser.Ident); ok {
 		return true
 	}
-	_, _, ok := jsonKeyText(e)
+	_, _, ok := jsonKeyText(e, nil)
 	return ok
 }
 
@@ -435,7 +435,7 @@ func isPushdownTarget(e parser.Expr) bool {
 // column of this SELECT's own FROM. Only a plain top-level key is taken,
 // not a $-JSONPath.
 func resolvePushdownTarget(e parser.Expr, entries []pushdownEntry) (table, col, path string, kc knownColumn, ok bool) {
-	if base, key, isPath := jsonKeyText(e); isPath {
+	if base, key, isPath := jsonKeyText(e, entries); isPath {
 		table, col, kc, ok = resolvePushdownColumn(base, entries)
 		if !ok || kc.colType != ColumnTypeJSON {
 			return "", "", "", knownColumn{}, false
@@ -450,7 +450,12 @@ func resolvePushdownTarget(e parser.Expr, entries []pushdownEntry) (table, col, 
 // col->>'key', json_extract_string(col, 'key'), and the
 // json_extract_string(col.key, '$') shape that rewriteJSONDotComparison
 // produces for idiomatic dot comparisons (WHERE data.user = '123').
-func jsonKeyText(e parser.Expr) (base parser.Expr, key string, ok bool) {
+//
+// When entries is non-nil and key == "$", a 2-part identifier whose leading
+// part matches a table alias in entries (e.g. FROM events AS data WHERE
+// json_extract_string(data.data, '$') = '...') is a qualified whole-document
+// column reference, not a JSON dot path, so it is rejected.
+func jsonKeyText(e parser.Expr, entries []pushdownEntry) (base parser.Expr, key string, ok bool) {
 	switch x := e.(type) {
 	case *parser.BinaryExpr:
 		if x.Op != "->>" {
@@ -468,12 +473,25 @@ func jsonKeyText(e parser.Expr) (base parser.Expr, key string, ok bool) {
 		return nil, "", false
 	}
 	if key == "$" {
+		if id, ok := base.(*parser.Ident); ok && len(id.Parts) == 2 && hasAlias(entries, id.Parts[0]) {
+			return nil, "", false
+		}
 		return unwrapSingleJSONDot(base)
 	}
 	if strings.HasPrefix(key, "$") {
 		return nil, "", false
 	}
 	return base, key, true
+}
+
+func hasAlias(entries []pushdownEntry, name string) bool {
+	lower := strings.ToLower(name)
+	for _, en := range entries {
+		if en.alias != "" && en.alias == lower {
+			return true
+		}
+	}
+	return false
 }
 
 // unwrapSingleJSONDot splits a single-level JSON dot access (col.key,

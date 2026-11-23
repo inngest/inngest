@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // Sink receives every entity the listener produces, one call per entity.
@@ -132,18 +131,11 @@ func (s *BatchingSink) Close(ctx context.Context) error {
 				b.stop()
 			}
 
-			done := make(chan struct{})
-			go func() {
-				s.wg.Wait()
-				close(done)
-			}()
-
-			drainTimer := time.NewTimer(finalFlushBudget)
-			select {
-			case <-done:
-				drainTimer.Stop()
-			case <-drainTimer.C:
-			}
+			// Wait for every batcher to finish any in-flight flush (bounded by
+			// flushExecTimeout) and its final drain flush (bounded by
+			// finalFlushBudget) before closing the Inserter underneath it.
+			// Callers with a tighter deadline return via ctx.Done() below.
+			s.wg.Wait()
 
 			if c, ok := s.ins.(interface{ Close() error }); ok {
 				s.closeErr = c.Close()

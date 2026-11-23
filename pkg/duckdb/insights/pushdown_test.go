@@ -103,6 +103,18 @@ func TestExtractPushdown(t *testing.T) {
 			}},
 		},
 		{
+			name: "whole-document JSON read with table alias matching JSON column is not misread as JSON dot path",
+			sql:  `SELECT id FROM events AS data WHERE json_extract_string(data.data, '$') = '{"a":1}'`,
+			want: Pushdown{},
+		},
+		{
+			name: "qualified JSON dot path still pushes when table alias matches JSON column",
+			sql:  `SELECT id FROM events AS data WHERE data.data.user = '123'`,
+			want: Pushdown{"events": {
+				{Column: "data", Path: "user", Op: federate.OpEq, Value: "123"},
+			}},
+		},
+		{
 			name: "column-to-column comparisons are not pushed",
 			sql:  `SELECT run_id FROM runs WHERE app_id = function_id`,
 			want: Pushdown{},

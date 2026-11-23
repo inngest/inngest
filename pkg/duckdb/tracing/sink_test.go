@@ -308,6 +308,11 @@ func TestBatchingSinkCloseIdempotentAndConcurrentDeadlines(t *testing.T) {
 	require.ErrorIs(t, err2, context.DeadlineExceeded)
 	require.Less(t, time.Since(start), time.Second, "concurrent Close must honor its own deadline")
 
+	// Inserter must not be closed while the in-flight flush is still running.
+	bins.mu.Lock()
+	require.False(t, bins.closed, "inserter must stay open while an in-flight flush is still running")
+	bins.mu.Unlock()
+
 	// Unblock flush and ensure caller 1 finishes cleanly.
 	close(bins.release)
 	select {
