@@ -637,7 +637,14 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 							Ends:   col.Ends,
 						}
 					}
-					if !st.Push(libduckdb.StreamChunk{RowCount: ch.RowCount, Columns: libCols}) {
+					if err := st.Push(libduckdb.StreamChunk{RowCount: ch.RowCount, Columns: libCols}); err != nil {
+						if errors.Is(err, libduckdb.ErrStreamQueueOverflow) {
+							for _, other := range streams {
+								other.CloseWithError(err)
+							}
+							sess.conn.Interrupt()
+							return
+						}
 						break
 					}
 				}
@@ -648,10 +655,12 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 				remaining--
 			case worker.OpStreamError:
 				sourceFailed.Store(true)
-				if st != nil {
-					st.CloseWithError(errors.New(frame.Error))
+				srcErr := errors.New(frame.Error)
+				for _, other := range streams {
+					other.CloseWithError(srcErr)
 				}
-				remaining--
+				sess.conn.Interrupt()
+				return
 			}
 		}
 	}()

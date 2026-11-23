@@ -44,6 +44,36 @@ type StreamChunk struct {
 	Err      error
 }
 
+// DefaultMaxStreamQueueBytes bounds how much decoded chunk data a single Stream
+// may buffer ahead of DuckDB consumption before failing the stream with
+// ErrStreamQueueOverflow. Keeping the queue bounded prevents unbounded Go-heap
+// growth outside DuckDB's memory_limit without blocking the multiplexed reader.
+const DefaultMaxStreamQueueBytes int64 = 256 << 20
+
+const maxStreamChunkRows = 2048
+
+var (
+	// ErrStreamClosed is returned by Stream.Push when the stream was already closed.
+	ErrStreamClosed = errors.New("libduckdb: stream closed")
+	// ErrStreamQueueOverflow is returned by Stream.Push when a stream's queued
+	// bytes would exceed its configured limit.
+	ErrStreamQueueOverflow = errors.New("libduckdb: stream queue memory limit exceeded")
+)
+
+// approxBytes estimates the heap memory retained by a StreamChunk.
+func (c StreamChunk) approxBytes() int64 {
+	total := int64(64)
+	for _, col := range c.Columns {
+		total += int64(len(col.Nulls))
+		total += int64(len(col.UUIDs)) * 16
+		total += int64(len(col.Int64s)) * 8
+		total += int64(len(col.Bools))
+		total += int64(len(col.Bytes))
+		total += int64(len(col.Ends)) * 4
+	}
+	return total
+}
+
 // Stream feeds chunks from a Go producer into a running DuckDB query via the
 // registered `scan_data_from_quack_client` table function.
 //
@@ -52,27 +82,53 @@ type StreamChunk struct {
 //     send-on-closed-channel panic, and
 //   - pushing frames for stream A on a multiplexed socket reader can never
 //     block dispatching frames for stream B.
+//
+// Total queued bytes are capped at maxQueueBytes (default
+// DefaultMaxStreamQueueBytes) so an unconsumed stream fails cleanly instead of
+// growing Go heap memory without bound.
 type Stream struct {
-	id     string
-	mu     sync.Mutex
-	cond   *sync.Cond
-	queue  []StreamChunk
-	closed bool
-	err    error
+	id            string
+	mu            sync.Mutex
+	cond          *sync.Cond
+	queue         []StreamChunk
+	queuedBytes   int64
+	maxQueueBytes int64
+	closed        bool
+	err           error
 }
 
-// Push appends a chunk to the stream queue without blocking. Returns false if
-// the stream was closed early (e.g., query finished on LIMIT or cancelled).
-func (s *Stream) Push(chunk StreamChunk) bool {
+// SetMaxQueueBytes overrides the queued-byte limit for this stream (<= 0 disables).
+func (s *Stream) SetMaxQueueBytes(limit int64) {
+	s.mu.Lock()
+	s.maxQueueBytes = limit
+	s.mu.Unlock()
+}
+
+// Push appends a chunk to the stream queue without blocking. Returns
+// ErrStreamClosed if the stream was closed early (e.g., query finished on LIMIT
+// or cancelled), or ErrStreamQueueOverflow if buffering the chunk would exceed
+// the stream's memory limit.
+func (s *Stream) Push(chunk StreamChunk) error {
+	sz := chunk.approxBytes()
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		return false
+		return ErrStreamClosed
+	}
+	if s.maxQueueBytes > 0 && s.queuedBytes+sz > s.maxQueueBytes {
+		s.queue = nil
+		s.queuedBytes = 0
+		s.err = fmt.Errorf("%w: stream %q exceeded %d bytes", ErrStreamQueueOverflow, s.id, s.maxQueueBytes)
+		s.closed = true
+		s.cond.Broadcast()
+		s.mu.Unlock()
+		return ErrStreamQueueOverflow
 	}
 	s.queue = append(s.queue, chunk)
+	s.queuedBytes += sz
 	s.cond.Signal()
 	s.mu.Unlock()
-	return true
+	return nil
 }
 
 // Close marks the stream closed (signaling EOF once queued chunks are drained).
@@ -89,6 +145,8 @@ func (s *Stream) Close() {
 func (s *Stream) CloseWithError(err error) {
 	s.mu.Lock()
 	if !s.closed {
+		s.queue = nil
+		s.queuedBytes = 0
 		s.err = err
 		s.closed = true
 		s.cond.Broadcast()
@@ -107,6 +165,10 @@ func (s *Stream) Next() (StreamChunk, bool) {
 		chunk := s.queue[0]
 		s.queue[0] = StreamChunk{}
 		s.queue = s.queue[1:]
+		s.queuedBytes -= chunk.approxBytes()
+		if s.queuedBytes < 0 {
+			s.queuedBytes = 0
+		}
 		return chunk, true
 	}
 	if s.err != nil {
@@ -142,7 +204,7 @@ type streamBindState struct {
 // RegisterStream creates and registers a new Stream under id. The caller must
 // call UnregisterStream(id) once the query finishes.
 func RegisterStream(id string) *Stream {
-	s := &Stream{id: id}
+	s := &Stream{id: id, maxQueueBytes: DefaultMaxStreamQueueBytes}
 	s.cond = sync.NewCond(&s.mu)
 	streamMu.Lock()
 	streamByID[id] = s
@@ -328,6 +390,10 @@ func streamFuncCallback(info uintptr, output uintptr) {
 	}
 	if chunk.RowCount == 0 {
 		lib.dataChunkSetSize(output, 0)
+		return
+	}
+	if chunk.RowCount < 0 || chunk.RowCount > maxStreamChunkRows {
+		lib.functionSetError(info, fmt.Sprintf("scan_data_from_quack_client: chunk row count %d exceeds maximum %d", chunk.RowCount, maxStreamChunkRows))
 		return
 	}
 	if len(chunk.Columns) != len(state.types) {

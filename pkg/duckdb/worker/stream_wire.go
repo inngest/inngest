@@ -526,6 +526,9 @@ func DecodeBatch(blob []byte) ([]DecodedChunk, error) {
 	}
 	chunkCount := int(binary.LittleEndian.Uint32(blob[0:4]))
 	off := 4
+	if chunkCount > (len(blob)-off)/6 {
+		return nil, errors.New("worker: truncated batch chunks")
+	}
 	out := make([]DecodedChunk, chunkCount)
 
 	for ci := 0; ci < chunkCount; ci++ {
@@ -535,6 +538,9 @@ func DecodeBatch(blob []byte) ([]DecodedChunk, error) {
 		rowCount := int(binary.LittleEndian.Uint32(blob[off : off+4]))
 		colCount := int(binary.LittleEndian.Uint16(blob[off+4 : off+6]))
 		off += 6
+		if rowCount > StandardVectorSize {
+			return nil, fmt.Errorf("worker: chunk row count %d exceeds maximum %d", rowCount, StandardVectorSize)
+		}
 
 		cols := make([]DecodedColumn, colCount)
 		for colIdx := 0; colIdx < colCount; colIdx++ {
@@ -595,19 +601,25 @@ func DecodeBatch(blob []byte) ([]DecodedChunk, error) {
 				if off+4 > len(blob) {
 					return nil, errors.New("worker: truncated varchar length")
 				}
-				totalBytes := int(binary.LittleEndian.Uint32(blob[off : off+4]))
+				totalBytes := binary.LittleEndian.Uint32(blob[off : off+4])
 				off += 4
 				endsNeed := rowCount * 4
-				if off+endsNeed+totalBytes > len(blob) {
+				if uint64(off)+uint64(endsNeed)+uint64(totalBytes) > uint64(len(blob)) {
 					return nil, errors.New("worker: truncated varchar data")
 				}
 				dc.Ends = make([]uint32, rowCount)
+				var prev uint32
 				for i := 0; i < rowCount; i++ {
-					dc.Ends[i] = binary.LittleEndian.Uint32(blob[off+i*4 : off+(i+1)*4])
+					end := binary.LittleEndian.Uint32(blob[off+i*4 : off+(i+1)*4])
+					if end < prev || end > totalBytes {
+						return nil, fmt.Errorf("worker: invalid varchar offset %d at row %d (prev=%d, len=%d)", end, i, prev, totalBytes)
+					}
+					dc.Ends[i] = end
+					prev = end
 				}
 				off += endsNeed
-				dc.Bytes = blob[off : off+totalBytes]
-				off += totalBytes
+				dc.Bytes = blob[off : off+int(totalBytes)]
+				off += int(totalBytes)
 			default:
 				return nil, fmt.Errorf("worker: unknown stream column kind %d", kind)
 			}

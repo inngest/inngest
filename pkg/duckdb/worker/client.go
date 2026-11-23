@@ -761,9 +761,9 @@ func (s *Session) QueryWithStreams(ctx context.Context, sql string, streams []Se
 				}
 				if err != nil {
 					recordSourceErr(err)
+					feedCancel()
 					if werr := writeFrame(Request{Op: OpStreamError, StreamID: st.ID, Error: err.Error()}); werr != nil {
 						recordWriteErr(werr)
-						feedCancel()
 						_ = conn.Close()
 					}
 					return
