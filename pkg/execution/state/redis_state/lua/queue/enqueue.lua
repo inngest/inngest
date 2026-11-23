@@ -49,6 +49,7 @@ local shadowPartitionItem     = ARGV[11]
 local backlogItem             = ARGV[12]
 local backlogID               = ARGV[13]
 local normalizeFromBacklogID  = ARGV[14]
+local snapshotGeneration      = tonumber(ARGV[16])
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -76,7 +77,6 @@ if is_normalize then
   end
   -- A refill/worker retry may have restored the same backlog membership after
   -- the snapshot was read. Never roll its attempt, generation or schedule back.
-  local snapshotGeneration = tonumber(ARGV[16])
   if snapshotGeneration == nil or (tonumber(current.genID) or 0) ~= snapshotGeneration then
     return -1
   end
