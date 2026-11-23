@@ -42,6 +42,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 	}
 
 	kg := q.RedisClient.kg
+	singletonHold, singletonPending := singletonMigrationKeys(kg, osqueue.ScopeFromQueueItem(i))
 
 	partition := osqueue.ItemShadowPartition(ctx, i)
 	backlog := osqueue.ItemBacklog(ctx, i)
@@ -83,6 +84,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 
 		kg.PartitionScavengerIndex(partition.PartitionID),
 		kg.QueueItemEarliestPeekTime(i.ID),
+		singletonHold,
+		singletonPending,
 	}
 
 	// Append indexes

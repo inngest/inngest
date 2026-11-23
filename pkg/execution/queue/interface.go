@@ -171,6 +171,35 @@ type SingletonOperations interface {
 	SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error)
 }
 
+// SingletonMigrationOperations protects singleton ownership while a function's
+// jobs are split across queue shards. It is optional so an unsupported shard
+// fails migration before any items are copied.
+type SingletonMigrationOperations interface {
+	// BeginSingletonMigration is idempotent for migrationID. Holds are durable:
+	// a crash or an expired scanner lock must not release singleton ownership.
+	BeginSingletonMigration(ctx context.Context, scope Scope, migrationID string) error
+	// SingletonMigrationSourceDrained proves this shard owns no remaining work,
+	// including backlogs and expired leases awaiting recovery. Destination-owned
+	// work in a shared database must not count as source work.
+	SingletonMigrationSourceDrained(ctx context.Context, scope Scope) (bool, error)
+	// FinishSingletonMigration reconciles a bounded page of deferred releases.
+	// Call only after source jobs and leases have drained; repeat until done.
+	// A different migrationID cannot remove another migration's protection.
+	FinishSingletonMigration(ctx context.Context, scope Scope, migrationID string) (done bool, err error)
+}
+
+// SingletonMigrationRunProtector registers durable ownership and cleanup for
+// Redis runs still executing on the source, even if no job reaches destination.
+type SingletonMigrationRunProtector interface {
+	ProtectSingletonMigrationRun(ctx context.Context, scope Scope, migrationID, key string, runID ulid.ULID) error
+}
+
+// SingletonAdmissionOperations checks migration protection atomically with the
+// skip/cancel lock decision, without adding a scheduling round trip.
+type SingletonAdmissionOperations interface {
+	SingletonAdmission(ctx context.Context, scope Scope, key string, mode enums.SingletonMode) (*ulid.ULID, error)
+}
+
 // DebounceUpdateStatus describes the outcome of DebounceUpdate.
 type DebounceUpdateStatus int
 
