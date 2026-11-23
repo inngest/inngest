@@ -11,20 +11,17 @@ import (
 )
 
 func TestDecodeStringTInlineAndPointer(t *testing.T) {
-	// Empty string.
 	var empty cStringT
 	if got := string(decodeStringT(&empty)); got != "" {
 		t.Fatalf("empty string = %q, want empty", got)
 	}
 
-	// Inline string (<= 12 bytes).
 	inline := cStringT{length: 12}
 	copy(inline.data[:], "hello world!")
 	if got := string(decodeStringT(&inline)); got != "hello world!" {
 		t.Fatalf("inline string = %q, want %q", got, "hello world!")
 	}
 
-	// Pointer string (> 12 bytes).
 	backing := []byte("this is a much longer duckdb varchar payload")
 	ptrStr := cStringT{length: uint32(len(backing))}
 	copy(ptrStr.data[0:4], backing[:4])
@@ -37,8 +34,6 @@ func TestDecodeStringTInlineAndPointer(t *testing.T) {
 }
 
 func TestDecodeUUID(t *testing.T) {
-	// Canonical UUID: 01234567-89ab-cdef-fedc-ba9876543210
-	// DuckDB flips MSB of upper int64.
 	hi := uint64(0x0123456789abcdef)
 	lo := uint64(0xfedcba9876543210)
 	h := cHugeInt{
@@ -57,8 +52,8 @@ func TestDecodeValidityBitmask(t *testing.T) {
 		t.Fatal("nil validity mask must treat all rows as valid")
 	}
 	words := []uint64{
-		0b101,        // row 0 valid, row 1 NULL, row 2 valid
-		uint64(1) << 3, // row 67 valid
+		0b101,
+		uint64(1) << 3,
 	}
 	if !isValid(&words[0], 0) {
 		t.Fatal("row 0 should be valid")
@@ -89,8 +84,6 @@ func TestDecodeTimestampAndDate(t *testing.T) {
 	}
 }
 
-// findRealLib returns the path to a real libduckdb shared library for
-// integration tests, or skips if none is available on the host.
 func findRealLib(t *testing.T) string {
 	t.Helper()
 	if p := os.Getenv("DUCKDB_LIB_PATH"); p != "" {
@@ -228,7 +221,6 @@ func TestPuregoAllCoreTypes(t *testing.T) {
 		t.Errorf("c_blob = %#v, want %x", row[18], wantBlob)
 	}
 
-	// Next chunk must be EOF (nil, nil).
 	eof, err := res.NextChunk()
 	if err != nil || eof != nil {
 		t.Fatalf("expected EOF (nil, nil), got (%v, %v)", eof, err)

@@ -10,10 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/libduckdb"
 )
 
 // SpawnConfig configures a managed child duckdb-worker subprocess.
@@ -38,7 +35,8 @@ type SpawnConfig struct {
 }
 
 // Client communicates with a DuckDB UDS worker in either external sidecar mode
-// (Dial) or managed subprocess mode (Spawn).
+// (Dial) or managed subprocess mode (Spawn). It is 100% pure Go with zero
+// purego or libduckdb dependencies.
 type Client struct {
 	socketPath string
 
@@ -142,7 +140,7 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 // minimalChildEnv builds a minimal, leak-free environment for the child worker
 // process so parent secrets are never inherited.
 func minimalChildEnv(extra []string) []string {
-	allow := []string{"PATH", "HOME", "TMPDIR", "USER", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+	allow := []string{"PATH", "HOME", "TMPDIR", "TEMP", "TMP", "USER", "USERPROFILE", "SYSTEMROOT", "SSL_CERT_FILE", "SSL_CERT_DIR"}
 	out := make([]string, 0, len(allow)+len(extra))
 	for _, key := range allow {
 		if val, ok := os.LookupEnv(key); ok {
@@ -198,11 +196,11 @@ func (c *Client) roundTrip(ctx context.Context, req Request) (Response, error) {
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)
 	}
-	if err := writeFrame(conn, req); err != nil {
+	if err := WriteFrame(conn, req); err != nil {
 		return Response{}, err
 	}
 	var resp Response
-	if err := readFrame(conn, &resp); err != nil {
+	if err := ReadFrame(conn, &resp); err != nil {
 		return Response{}, err
 	}
 	if resp.Kind == KindError {
@@ -239,7 +237,7 @@ func (c *Client) Shutdown(ctx context.Context) error {
 }
 
 // Close closes the client. In managed subprocess mode, it gracefully shuts down
-// the child process (falling back to SIGTERM/SIGKILL) and removes the socket.
+// the child process (falling back to SIGTERM/Kill) and removes the socket.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	if c.closed {
@@ -253,7 +251,6 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	// Best-effort graceful RPC shutdown first.
 	shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	_ = c.Shutdown(shutCtx)
 	cancel()
@@ -261,9 +258,7 @@ func (c *Client) Close() error {
 	select {
 	case <-c.exitCh:
 	case <-time.After(2 * time.Second):
-		if c.cmd.Process != nil {
-			_ = c.cmd.Process.Signal(syscall.SIGTERM)
-		}
+		terminateProcess(c.cmd.Process)
 		select {
 		case <-c.exitCh:
 		case <-time.After(2 * time.Second):
@@ -319,8 +314,6 @@ func (s *Session) Close(ctx context.Context) error {
 	return err
 }
 
-// startCancelWatcher sends an OpInterrupt over an out-of-band UDS connection
-// if ctx is cancelled before stop() is called.
 func (s *Session) startCancelWatcher(ctx context.Context) func() {
 	if ctx.Done() == nil {
 		return func() {}
@@ -349,7 +342,7 @@ func (s *Session) Exec(ctx context.Context, sql string) error {
 	stopWatch := s.startCancelWatcher(ctx)
 	defer stopWatch()
 
-	if err := writeFrame(conn, Request{
+	if err := WriteFrame(conn, Request{
 		Op:        OpExec,
 		SessionID: s.id,
 		SQL:       sql,
@@ -358,7 +351,7 @@ func (s *Session) Exec(ctx context.Context, sql string) error {
 	}
 
 	var resp Response
-	if err := readFrame(conn, &resp); err != nil {
+	if err := ReadFrame(conn, &resp); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -377,14 +370,14 @@ func (s *Session) Exec(ctx context.Context, sql string) error {
 type QueryStream struct {
 	ctx       context.Context
 	conn      net.Conn
-	cols      []libduckdb.ColumnInfo
+	cols      []ColumnInfo
 	stopWatch func()
 	done      bool
 }
 
 // Columns returns the result column metadata.
-func (q *QueryStream) Columns() []libduckdb.ColumnInfo {
-	out := make([]libduckdb.ColumnInfo, len(q.cols))
+func (q *QueryStream) Columns() []ColumnInfo {
+	out := make([]ColumnInfo, len(q.cols))
 	copy(out, q.cols)
 	return out
 }
@@ -395,7 +388,7 @@ func (q *QueryStream) NextChunk() ([][]any, error) {
 		return nil, nil
 	}
 	var resp Response
-	if err := readFrame(q.conn, &resp); err != nil {
+	if err := ReadFrame(q.conn, &resp); err != nil {
 		q.Close()
 		if q.ctx.Err() != nil {
 			return nil, q.ctx.Err()
@@ -404,7 +397,7 @@ func (q *QueryStream) NextChunk() ([][]any, error) {
 	}
 	switch resp.Kind {
 	case KindChunk:
-		return decodeRows(q.cols, resp.Rows)
+		return DecodeRows(q.cols, resp.Rows)
 	case KindDone:
 		q.Close()
 		return nil, nil
@@ -446,7 +439,7 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 
 	stopWatch := s.startCancelWatcher(ctx)
 
-	if err := writeFrame(conn, Request{
+	if err := WriteFrame(conn, Request{
 		Op:        OpQuery,
 		SessionID: s.id,
 		SQL:       sql,
@@ -457,7 +450,7 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 	}
 
 	var meta Response
-	if err := readFrame(conn, &meta); err != nil {
+	if err := ReadFrame(conn, &meta); err != nil {
 		stopWatch()
 		_ = conn.Close()
 		if ctx.Err() != nil {
@@ -479,10 +472,8 @@ func (s *Session) Query(ctx context.Context, sql string) (*QueryStream, error) {
 		return nil, fmt.Errorf("worker: expected meta frame, got %q", meta.Kind)
 	}
 
-	cols := make([]libduckdb.ColumnInfo, len(meta.Columns))
-	for i, c := range meta.Columns {
-		cols[i] = libduckdb.ColumnInfo{Name: c.Name, Type: c.Type}
-	}
+	cols := make([]ColumnInfo, len(meta.Columns))
+	copy(cols, meta.Columns)
 
 	return &QueryStream{
 		ctx:       ctx,

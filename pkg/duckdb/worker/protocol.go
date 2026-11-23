@@ -9,14 +9,54 @@ import (
 	"math"
 	"strconv"
 	"time"
-
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/libduckdb"
 )
 
 const (
 	// maxFrameBytes caps a single RPC message frame at 64 MiB.
 	maxFrameBytes = 64 << 20
 )
+
+// ColumnType mirrors DuckDB's DUCKDB_TYPE enum without importing purego or
+// libduckdb, keeping pkg/duckdb/worker 100% pure Go (safe for static Alpine/musl
+// binaries).
+type ColumnType int32
+
+const (
+	TypeInvalid       ColumnType = 0
+	TypeBoolean       ColumnType = 1
+	TypeTinyInt       ColumnType = 2
+	TypeSmallInt      ColumnType = 3
+	TypeInteger       ColumnType = 4
+	TypeBigInt        ColumnType = 5
+	TypeUTinyInt      ColumnType = 6
+	TypeUSmallInt     ColumnType = 7
+	TypeUInteger      ColumnType = 8
+	TypeUBigInt       ColumnType = 9
+	TypeFloat         ColumnType = 10
+	TypeDouble        ColumnType = 11
+	TypeTimestamp     ColumnType = 12
+	TypeDate          ColumnType = 13
+	TypeTime          ColumnType = 14
+	TypeInterval      ColumnType = 15
+	TypeHugeInt       ColumnType = 16
+	TypeVarchar       ColumnType = 17
+	TypeBlob          ColumnType = 18
+	TypeDecimal       ColumnType = 19
+	TypeTimestampS    ColumnType = 20
+	TypeTimestampMS   ColumnType = 21
+	TypeTimestampNS   ColumnType = 22
+	TypeUUID          ColumnType = 27
+	TypeTimestampTZ   ColumnType = 31
+	TypeUHugeInt      ColumnType = 32
+	TypeSQLNull       ColumnType = 36
+	TypeTimestampTZNS ColumnType = 42
+)
+
+// ColumnInfo describes a result column on the wire.
+type ColumnInfo struct {
+	Name string     `json:"name"`
+	Type ColumnType `json:"type"`
+}
 
 // Op identifies a worker RPC operation.
 type Op string
@@ -49,23 +89,18 @@ type Request struct {
 	SQL       string `json:"sql,omitempty"`
 }
 
-// ColumnWire is the wire representation of a result column.
-type ColumnWire struct {
-	Name string         `json:"name"`
-	Type libduckdb.Type `json:"type"`
-}
-
 // Response is a single worker-to-client RPC message frame.
 type Response struct {
 	Kind      ResponseKind `json:"kind"`
 	Version   string       `json:"version,omitempty"`
 	SessionID string       `json:"session_id,omitempty"`
-	Columns   []ColumnWire `json:"columns,omitempty"`
+	Columns   []ColumnInfo `json:"columns,omitempty"`
 	Rows      [][]any      `json:"rows,omitempty"`
 	Error     string       `json:"error,omitempty"`
 }
 
-func writeFrame(w io.Writer, v any) error {
+// WriteFrame writes a 4-byte length-prefixed JSON frame to w.
+func WriteFrame(w io.Writer, v any) error {
 	payload, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("worker: marshal frame: %w", err)
@@ -82,7 +117,8 @@ func writeFrame(w io.Writer, v any) error {
 	return err
 }
 
-func readFrame(r io.Reader, dst any) error {
+// ReadFrame reads a 4-byte length-prefixed JSON frame from r into dst.
+func ReadFrame(r io.Reader, dst any) error {
 	var hdr [4]byte
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
 		return err
@@ -101,10 +137,10 @@ func readFrame(r io.Reader, dst any) error {
 	return nil
 }
 
-// encodeRows converts decoded libduckdb rows into JSON-safe lossless wire values
+// EncodeRows converts decoded Go values into JSON-safe lossless wire values
 // using column type metadata so int64/uint64/time.Time/[]byte/NaN round-trip
 // without precision loss.
-func encodeRows(cols []libduckdb.ColumnInfo, rows [][]any) [][]any {
+func EncodeRows(cols []ColumnInfo, rows [][]any) [][]any {
 	out := make([][]any, len(rows))
 	for rIdx, row := range rows {
 		enc := make([]any, len(row))
@@ -113,7 +149,7 @@ func encodeRows(cols []libduckdb.ColumnInfo, rows [][]any) [][]any {
 				enc[cIdx] = nil
 				continue
 			}
-			colType := libduckdb.TypeInvalid
+			colType := TypeInvalid
 			if cIdx < len(cols) {
 				colType = cols[cIdx].Type
 			}
@@ -124,50 +160,50 @@ func encodeRows(cols []libduckdb.ColumnInfo, rows [][]any) [][]any {
 	return out
 }
 
-func encodeCell(colType libduckdb.Type, val any) any {
+func encodeCell(colType ColumnType, val any) any {
 	switch colType {
-	case libduckdb.TypeTinyInt:
+	case TypeTinyInt:
 		return strconv.FormatInt(int64(val.(int8)), 10)
-	case libduckdb.TypeSmallInt:
+	case TypeSmallInt:
 		return strconv.FormatInt(int64(val.(int16)), 10)
-	case libduckdb.TypeInteger:
+	case TypeInteger:
 		return strconv.FormatInt(int64(val.(int32)), 10)
-	case libduckdb.TypeBigInt:
+	case TypeBigInt:
 		return strconv.FormatInt(val.(int64), 10)
-	case libduckdb.TypeUTinyInt:
+	case TypeUTinyInt:
 		return strconv.FormatUint(uint64(val.(uint8)), 10)
-	case libduckdb.TypeUSmallInt:
+	case TypeUSmallInt:
 		return strconv.FormatUint(uint64(val.(uint16)), 10)
-	case libduckdb.TypeUInteger:
+	case TypeUInteger:
 		return strconv.FormatUint(uint64(val.(uint32)), 10)
-	case libduckdb.TypeUBigInt:
+	case TypeUBigInt:
 		return strconv.FormatUint(val.(uint64), 10)
-	case libduckdb.TypeFloat:
+	case TypeFloat:
 		f := float64(val.(float32))
 		if math.IsNaN(f) || math.IsInf(f, 0) {
 			return strconv.FormatFloat(f, 'g', -1, 32)
 		}
 		return f
-	case libduckdb.TypeDouble:
+	case TypeDouble:
 		f := val.(float64)
 		if math.IsNaN(f) || math.IsInf(f, 0) {
 			return strconv.FormatFloat(f, 'g', -1, 64)
 		}
 		return f
-	case libduckdb.TypeBlob:
+	case TypeBlob:
 		return base64.StdEncoding.EncodeToString(val.([]byte))
-	case libduckdb.TypeTimestamp, libduckdb.TypeTimestampTZ,
-		libduckdb.TypeTimestampS, libduckdb.TypeTimestampMS,
-		libduckdb.TypeTimestampNS, libduckdb.TypeTimestampTZNS,
-		libduckdb.TypeDate:
+	case TypeTimestamp, TypeTimestampTZ,
+		TypeTimestampS, TypeTimestampMS,
+		TypeTimestampNS, TypeTimestampTZNS,
+		TypeDate:
 		return val.(time.Time).UTC().Format(time.RFC3339Nano)
 	default:
 		return val
 	}
 }
 
-// decodeRows reconstructs typed Go values from wire JSON rows using column metadata.
-func decodeRows(cols []libduckdb.ColumnInfo, rows [][]any) ([][]any, error) {
+// DecodeRows reconstructs typed Go values from wire JSON rows using column metadata.
+func DecodeRows(cols []ColumnInfo, rows [][]any) ([][]any, error) {
 	out := make([][]any, len(rows))
 	for rIdx, row := range rows {
 		dec := make([]any, len(row))
@@ -176,13 +212,13 @@ func decodeRows(cols []libduckdb.ColumnInfo, rows [][]any) ([][]any, error) {
 				dec[cIdx] = nil
 				continue
 			}
-			colType := libduckdb.TypeInvalid
+			colType := TypeInvalid
 			if cIdx < len(cols) {
 				colType = cols[cIdx].Type
 			}
 			v, err := decodeCell(colType, val)
 			if err != nil {
-				return nil, fmt.Errorf("row %d col %d (%s): %w", rIdx, cIdx, colType, err)
+				return nil, fmt.Errorf("row %d col %d (type %d): %w", rIdx, cIdx, colType, err)
 			}
 			dec[cIdx] = v
 		}
@@ -191,69 +227,69 @@ func decodeRows(cols []libduckdb.ColumnInfo, rows [][]any) ([][]any, error) {
 	return out, nil
 }
 
-func decodeCell(colType libduckdb.Type, val any) (any, error) {
+func decodeCell(colType ColumnType, val any) (any, error) {
 	switch colType {
-	case libduckdb.TypeBoolean:
+	case TypeBoolean:
 		b, ok := val.(bool)
 		if !ok {
 			return nil, fmt.Errorf("expected bool, got %T", val)
 		}
 		return b, nil
-	case libduckdb.TypeTinyInt:
+	case TypeTinyInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseInt(s, 10, 8)
 		return int8(n), err
-	case libduckdb.TypeSmallInt:
+	case TypeSmallInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseInt(s, 10, 16)
 		return int16(n), err
-	case libduckdb.TypeInteger:
+	case TypeInteger:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseInt(s, 10, 32)
 		return int32(n), err
-	case libduckdb.TypeBigInt:
+	case TypeBigInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		return strconv.ParseInt(s, 10, 64)
-	case libduckdb.TypeUTinyInt:
+	case TypeUTinyInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseUint(s, 10, 8)
 		return uint8(n), err
-	case libduckdb.TypeUSmallInt:
+	case TypeUSmallInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseUint(s, 10, 16)
 		return uint16(n), err
-	case libduckdb.TypeUInteger:
+	case TypeUInteger:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		n, err := strconv.ParseUint(s, 10, 32)
 		return uint32(n), err
-	case libduckdb.TypeUBigInt:
+	case TypeUBigInt:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		return strconv.ParseUint(s, 10, 64)
-	case libduckdb.TypeFloat:
+	case TypeFloat:
 		switch v := val.(type) {
 		case float64:
 			return float32(v), nil
@@ -263,7 +299,7 @@ func decodeCell(colType libduckdb.Type, val any) (any, error) {
 		default:
 			return nil, fmt.Errorf("expected float, got %T", val)
 		}
-	case libduckdb.TypeDouble:
+	case TypeDouble:
 		switch v := val.(type) {
 		case float64:
 			return v, nil
@@ -272,16 +308,16 @@ func decodeCell(colType libduckdb.Type, val any) (any, error) {
 		default:
 			return nil, fmt.Errorf("expected double, got %T", val)
 		}
-	case libduckdb.TypeBlob:
+	case TypeBlob:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err
 		}
 		return base64.StdEncoding.DecodeString(s)
-	case libduckdb.TypeTimestamp, libduckdb.TypeTimestampTZ,
-		libduckdb.TypeTimestampS, libduckdb.TypeTimestampMS,
-		libduckdb.TypeTimestampNS, libduckdb.TypeTimestampTZNS,
-		libduckdb.TypeDate:
+	case TypeTimestamp, TypeTimestampTZ,
+		TypeTimestampS, TypeTimestampMS,
+		TypeTimestampNS, TypeTimestampTZNS,
+		TypeDate:
 		s, err := asString(val)
 		if err != nil {
 			return nil, err

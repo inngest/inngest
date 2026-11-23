@@ -1,4 +1,4 @@
-package worker
+package server
 
 import (
 	"context"
@@ -11,8 +11,66 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/libduckdb"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
+	"github.com/inngest/inngest/pkg/duckdb/worker/libduckdb"
 )
+
+// Opts configures Serve.
+type Opts struct {
+	// SocketPath is the Unix domain socket path to listen on (required).
+	SocketPath string
+	// LibPath is an optional path to libduckdb. If empty, driver.EnsureLibrary
+	// lazily downloads and verifies libduckdb into StateDir.
+	LibPath string
+	// DBPath is the DuckDB database path ("" or ":memory:" for in-memory).
+	DBPath string
+	// StateDir is the cache directory used when LibPath is empty.
+	StateDir string
+	// Config holds optional DuckDB database configuration parameters.
+	Config map[string]string
+}
+
+// Serve loads libduckdb via purego (downloading it lazily if LibPath is empty),
+// opens the DuckDB database, and serves the Unix domain socket worker protocol
+// until ctx is cancelled or a Shutdown RPC is received.
+func Serve(ctx context.Context, opts Opts) error {
+	if opts.SocketPath == "" {
+		return fmt.Errorf("duckdb worker: SocketPath is required")
+	}
+
+	resolvedLib := opts.LibPath
+	if resolvedLib == "" {
+		dir := opts.StateDir
+		if dir == "" {
+			cacheDir, err := os.UserCacheDir()
+			if err != nil {
+				return fmt.Errorf("duckdb worker: resolving user cache dir: %w", err)
+			}
+			dir = filepath.Join(cacheDir, "inngest", "duckdb")
+		}
+		var err error
+		resolvedLib, err = driver.EnsureLibrary(ctx, dir)
+		if err != nil {
+			return fmt.Errorf("duckdb worker: ensuring libduckdb: %w", err)
+		}
+	}
+
+	lib, err := libduckdb.Load(resolvedLib)
+	if err != nil {
+		return fmt.Errorf("duckdb worker: loading libduckdb: %w", err)
+	}
+	defer lib.Close()
+
+	db, err := lib.Open(opts.DBPath, opts.Config)
+	if err != nil {
+		return fmt.Errorf("duckdb worker: opening database: %w", err)
+	}
+	defer db.Close()
+
+	srv := New(db, lib.Version())
+	return srv.ListenAndServe(ctx, opts.SocketPath)
+}
 
 type session struct {
 	id   string
@@ -37,8 +95,8 @@ type Server struct {
 	wg           sync.WaitGroup
 }
 
-// NewServer constructs a Server backed by db.
-func NewServer(db *libduckdb.DB, version string) *Server {
+// New constructs a Server backed by db.
+func New(db *libduckdb.DB, version string) *Server {
 	return &Server{
 		db:         db,
 		version:    version,
@@ -53,7 +111,6 @@ func (s *Server) ListenAndServe(ctx context.Context, socketPath string) error {
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
 		return fmt.Errorf("worker: creating socket directory: %w", err)
 	}
-	// Remove any stale socket file left from a prior crash.
 	_ = os.Remove(socketPath)
 
 	ln, err := net.Listen("unix", socketPath)
@@ -158,12 +215,12 @@ func (s *Server) isClosed() bool {
 
 func (s *Server) handleConn(c net.Conn) {
 	for {
-		var req Request
-		if err := readFrame(c, &req); err != nil {
+		var req worker.Request
+		if err := worker.ReadFrame(c, &req); err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) {
 				return
 			}
-			_ = writeFrame(c, Response{Kind: KindError, Error: err.Error()})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return
 		}
 		if !s.dispatch(c, &req) {
@@ -172,16 +229,16 @@ func (s *Server) handleConn(c net.Conn) {
 	}
 }
 
-func (s *Server) dispatch(c net.Conn, req *Request) bool {
+func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 	switch req.Op {
-	case OpPing:
-		_ = writeFrame(c, Response{Kind: KindOK, Version: s.version})
+	case worker.OpPing:
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, Version: s.version})
 		return true
 
-	case OpOpenSession:
+	case worker.OpOpenSession:
 		conn, err := s.db.Connect()
 		if err != nil {
-			_ = writeFrame(c, Response{Kind: KindError, Error: err.Error()})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
 		id := fmt.Sprintf("s-%d", s.nextID.Add(1))
@@ -189,15 +246,15 @@ func (s *Server) dispatch(c net.Conn, req *Request) bool {
 		if s.closed {
 			s.mu.Unlock()
 			_ = conn.Close()
-			_ = writeFrame(c, Response{Kind: KindError, Error: "worker: server shutting down"})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: "worker: server shutting down"})
 			return false
 		}
 		s.sessions[id] = &session{id: id, conn: conn}
 		s.mu.Unlock()
-		_ = writeFrame(c, Response{Kind: KindOK, SessionID: id})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, SessionID: id})
 		return true
 
-	case OpCloseSession:
+	case worker.OpCloseSession:
 		s.mu.Lock()
 		sess, ok := s.sessions[req.SessionID]
 		if ok {
@@ -208,80 +265,80 @@ func (s *Server) dispatch(c net.Conn, req *Request) bool {
 			sess.conn.Interrupt()
 			_ = sess.conn.Close()
 		}
-		_ = writeFrame(c, Response{Kind: KindOK})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
 		return true
 
-	case OpInterrupt:
+	case worker.OpInterrupt:
 		sess := s.getSession(req.SessionID)
 		if sess != nil {
 			sess.conn.Interrupt()
 		}
-		_ = writeFrame(c, Response{Kind: KindOK})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
 		return true
 
-	case OpExec:
+	case worker.OpExec:
 		sess := s.getSession(req.SessionID)
 		if sess == nil {
-			_ = writeFrame(c, Response{Kind: KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
 			return true
 		}
 		if err := sess.conn.Exec(req.SQL); err != nil {
-			_ = writeFrame(c, Response{Kind: KindError, Error: err.Error()})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
-		_ = writeFrame(c, Response{Kind: KindOK})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
 		return true
 
-	case OpQuery:
+	case worker.OpQuery:
 		sess := s.getSession(req.SessionID)
 		if sess == nil {
-			_ = writeFrame(c, Response{Kind: KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
 			return true
 		}
 		res, err := sess.conn.Query(req.SQL)
 		if err != nil {
-			_ = writeFrame(c, Response{Kind: KindError, Error: err.Error()})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
 		defer res.Close()
 
-		cols := res.Columns()
-		wireCols := make([]ColumnWire, len(cols))
-		for i, col := range cols {
-			wireCols[i] = ColumnWire{Name: col.Name, Type: col.Type}
+		libCols := res.Columns()
+		wireCols := make([]worker.ColumnInfo, len(libCols))
+		for i, col := range libCols {
+			wireCols[i] = worker.ColumnInfo{Name: col.Name, Type: worker.ColumnType(col.Type)}
 		}
-		if err := writeFrame(c, Response{Kind: KindMeta, Columns: wireCols}); err != nil {
+		if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindMeta, Columns: wireCols}); err != nil {
 			return false
 		}
 
 		for {
 			rows, err := res.NextChunk()
 			if err != nil {
-				_ = writeFrame(c, Response{Kind: KindError, Error: err.Error()})
+				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 				return true
 			}
 			if rows == nil {
 				break
 			}
-			if err := writeFrame(c, Response{
-				Kind: KindChunk,
-				Rows: encodeRows(cols, rows),
+			if err := worker.WriteFrame(c, worker.Response{
+				Kind: worker.KindChunk,
+				Rows: worker.EncodeRows(wireCols, rows),
 			}); err != nil {
 				return false
 			}
 		}
-		if err := writeFrame(c, Response{Kind: KindDone}); err != nil {
+		if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindDone}); err != nil {
 			return false
 		}
 		return true
 
-	case OpShutdown:
-		_ = writeFrame(c, Response{Kind: KindOK})
+	case worker.OpShutdown:
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
 		s.triggerShutdown()
 		return false
 
 	default:
-		_ = writeFrame(c, Response{Kind: KindError, Error: fmt.Sprintf("unknown op %q", req.Op)})
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown op %q", req.Op)})
 		return true
 	}
 }

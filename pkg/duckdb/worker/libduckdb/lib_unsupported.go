@@ -1,4 +1,4 @@
-//go:build !darwin && !linux
+//go:build !darwin && !linux && !windows
 
 package libduckdb
 
@@ -39,7 +39,7 @@ type Lib struct {
 	libraryVersion          func() *byte
 }
 
-// Load returns an error on platforms without purego dlopen support.
+// Load returns an error on platforms without purego dynamic loading support.
 func Load(libPath string) (*Lib, error) {
 	return nil, fmt.Errorf("libduckdb: purego dynamic loading is not supported on %s/%s", runtime.GOOS, runtime.GOARCH)
 }

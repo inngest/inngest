@@ -1,4 +1,4 @@
-package worker_test
+package server_test
 
 import (
 	"bytes"
@@ -8,13 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/libduckdb"
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/worker"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
+	"github.com/inngest/inngest/pkg/duckdb/worker/libduckdb"
+	"github.com/inngest/inngest/pkg/duckdb/worker/server"
 )
 
 func findRealLib(t *testing.T) string {
@@ -47,6 +48,20 @@ func collectAll(t *testing.T, stream *worker.QueryStream) [][]any {
 	return all
 }
 
+func tempSocketPath(t *testing.T, prefix string) string {
+	t.Helper()
+	base := ""
+	if runtime.GOOS != "windows" {
+		base = "/tmp"
+	}
+	dir, err := os.MkdirTemp(base, prefix)
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return filepath.Join(dir, "w.sock")
+}
+
 func TestWorkerExternalSidecarMode(t *testing.T) {
 	libPath := findRealLib(t)
 	lib, err := libduckdb.Load(libPath)
@@ -61,24 +76,17 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Use short /tmp path so Unix socket path never exceeds macOS 104-byte sun_path limit.
-	sockDir, err := os.MkdirTemp("/tmp", "dw-*")
-	if err != nil {
-		t.Fatalf("MkdirTemp: %v", err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
-	sockPath := filepath.Join(sockDir, "w.sock")
+	sockPath := tempSocketPath(t, "dw-*")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv := worker.NewServer(db, lib.Version())
+	srv := server.New(db, lib.Version())
 	serveErr := make(chan error, 1)
 	go func() {
 		serveErr <- srv.ListenAndServe(ctx, sockPath)
 	}()
 
-	// Wait briefly for listener to bind.
 	var client *worker.Client
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
@@ -104,8 +112,6 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 	}
 	defer sess.Close(ctx)
 
-	// Verify Exec + Query across all core types including UUID, TIMESTAMPTZ,
-	// short/long VARCHAR, BLOB, NULL, and 64-bit integers.
 	if err := sess.Exec(ctx, "CREATE TABLE items (id BIGINT, name VARCHAR)"); err != nil {
 		t.Fatalf("Exec CREATE TABLE: %v", err)
 	}
@@ -165,7 +171,6 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 		t.Errorf("blob = %#v", r[9])
 	}
 
-	// Concurrent sessions on one worker.
 	const n = 4
 	var wg sync.WaitGroup
 	errs := make(chan error, n)
@@ -208,7 +213,6 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Context cancellation via duckdb_interrupt.
 	cancelCtx, cancelQuery := context.WithTimeout(ctx, 150*time.Millisecond)
 	defer cancelQuery()
 	_, err = sess.Query(cancelCtx, "SELECT count(*) FROM range(100000000) a, range(1000) b")
@@ -219,7 +223,6 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 		t.Fatalf("expected context error on interrupted query, got: %v", err)
 	}
 
-	// Verify session is still usable after interrupt!
 	q2, err := sess.Query(ctx, "SELECT 42")
 	if err != nil {
 		t.Fatalf("Query after interrupt: %v", err)
@@ -229,7 +232,6 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 		t.Fatalf("Query after interrupt = %#v, want [[42]]", got)
 	}
 
-	// Graceful shutdown.
 	if err := client.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown: %v", err)
 	}
@@ -246,21 +248,18 @@ func TestWorkerExternalSidecarMode(t *testing.T) {
 func TestWorkerManagedSubprocessAndCrashRestart(t *testing.T) {
 	libPath := findRealLib(t)
 
-	// Build cmd/duckdb-worker with CGO_ENABLED=0 into a temp dir.
 	binDir := t.TempDir()
 	workerBin := filepath.Join(binDir, "duckdb-worker")
-	buildCmd := exec.Command("go", "build", "-o", workerBin, "../../../../../cmd/duckdb-worker")
+	if runtime.GOOS == "windows" {
+		workerBin += ".exe"
+	}
+	buildCmd := exec.Command("go", "build", "-o", workerBin, "../../../../cmd/duckdb-worker")
 	buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := buildCmd.CombinedOutput(); err != nil {
 		t.Fatalf("building duckdb-worker: %v\n%s", err, out)
 	}
 
-	sockDir, err := os.MkdirTemp("/tmp", "dwm-*")
-	if err != nil {
-		t.Fatalf("MkdirTemp: %v", err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
-	sockPath := filepath.Join(sockDir, "worker.sock")
+	sockPath := tempSocketPath(t, "dwm-*")
 
 	ctx := context.Background()
 	client, err := worker.Spawn(ctx, worker.SpawnConfig{
@@ -291,10 +290,13 @@ func TestWorkerManagedSubprocessAndCrashRestart(t *testing.T) {
 		t.Fatalf("unexpected rows: %#v", rows)
 	}
 
-	// Simulate an unexpected worker crash (SIGKILL) and verify detection + clean restart.
-	pid := client.PID()
-	if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-		t.Fatalf("SIGKILL worker: %v", err)
+	// Simulate an unexpected worker crash and verify detection + clean restart.
+	proc, err := os.FindProcess(client.PID())
+	if err != nil {
+		t.Fatalf("FindProcess: %v", err)
+	}
+	if err := proc.Kill(); err != nil {
+		t.Fatalf("Kill worker: %v", err)
 	}
 	select {
 	case <-client.WaitExit():
@@ -302,7 +304,7 @@ func TestWorkerManagedSubprocessAndCrashRestart(t *testing.T) {
 		t.Fatal("timed out waiting for killed worker exit notification")
 	}
 	if client.Alive() {
-		t.Fatal("expected Alive() == false after SIGKILL")
+		t.Fatal("expected Alive() == false after crash")
 	}
 	_ = client.Close()
 

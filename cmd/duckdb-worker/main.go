@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/worker/server"
 )
 
 func main() {
@@ -31,10 +31,10 @@ func run(args []string) error {
 		return fmt.Errorf("--socket is required")
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	return driver.ServeWorker(ctx, driver.WorkerServerOpts{
+	return server.Serve(ctx, server.Opts{
 		SocketPath: *socketPath,
 		LibPath:    *libPath,
 		DBPath:     *dbPath,

@@ -242,7 +242,6 @@ func decodeDateDays(days int32) time.Time {
 }
 
 func decodeHugeInt(h cHugeInt) *big.Int {
-	// Value = upper * 2^64 + lower (where upper is signed int64, lower is unsigned uint64).
 	res := big.NewInt(h.upper)
 	res.Lsh(res, 64)
 	lo := new(big.Int).SetUint64(h.lower)
