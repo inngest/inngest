@@ -335,7 +335,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 		// Keep normalization discovery running while refill is paused, but avoid
 		// spinning on continuations. Recheck soon so lifting the pause is prompt.
 		q.removeShadowContinue(ctx, shadowPart, false)
-		requeueAt := q.Clock().Now().Add(BacklogDefaultRequeueExtension)
+		requeueAt := q.Clock().Now().Add(ShadowPartitionRefillDisabledRequeueExtension)
 		_, err := DurationWithTags(ctx, shard.Name(), durOpShadowPartitionRequeue, q.Clock().Now(), func(ctx context.Context) (any, error) {
 			return nil, shard.ShadowPartitionRequeue(ctx, shadowPart, &requeueAt)
 		}, map[string]any{"reason": "refill_paused"})

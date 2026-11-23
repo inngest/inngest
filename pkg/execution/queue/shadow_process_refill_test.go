@@ -51,7 +51,8 @@ func TestKeyQueueRefillPause(t *testing.T) {
 				if paused {
 					require.Equal(t, acquired, manager.acquires, "pause must precede capacity acquisition")
 					require.Equal(t, refilled, shard.refills)
-					require.Equal(t, clock.Now().Add(BacklogDefaultRequeueExtension), *shard.shadowPartitionRequeueAt)
+					require.Equal(t, clock.Now().Add(ShadowPartitionRefillDisabledRequeueExtension), *shard.shadowPartitionRequeueAt)
+					require.True(t, shard.shadowPartitionRequeueAt.After(clock.Now().Add(ShadowPartitionLookahead)), "paused retries must stay beyond the scanner lookahead")
 					require.Empty(t, q.GetShadowContinuations())
 				} else {
 					require.Equal(t, acquired+1, manager.acquires)
