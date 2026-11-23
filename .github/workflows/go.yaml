@@ -81,7 +81,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/duckdb-state/bin"
           CGO_ENABLED=0 go build -o "$RUNNER_TEMP/duckdb-state/bin/inngest-duckdb-worker" ./cmd/inngest-duckdb-worker
           echo "$RUNNER_TEMP/duckdb-state/bin" >> "$GITHUB_PATH"
-          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1)"
+          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1 | awk '{print $NF}')"
           echo "DUCKDB_LIB_PATH=$LIB_PATH" >> "$GITHUB_ENV"
 
       - name: Smoke
@@ -124,7 +124,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/duckdb-state/bin"
           CGO_ENABLED=0 go build -o "$RUNNER_TEMP/duckdb-state/bin/inngest-duckdb-worker" ./cmd/inngest-duckdb-worker
           echo "$RUNNER_TEMP/duckdb-state/bin" >> "$GITHUB_PATH"
-          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1)"
+          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1 | awk '{print $NF}')"
           echo "DUCKDB_LIB_PATH=$LIB_PATH" >> "$GITHUB_ENV"
 
       - name: Test
