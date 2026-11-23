@@ -13,10 +13,11 @@ import fontsCss from "@inngest/components/AppRoot/fonts.css?url";
 import globalsCss from "@inngest/components/AppRoot/globals.css?url";
 import { TooltipProvider } from "@inngest/components/Tooltip";
 import { ThemeProvider } from "next-themes";
-import type { QueryClient } from "@tanstack/react-query";
 import { StatusBanner } from "@inngest/components/Support/StatusBanner";
+import type { QueryClient } from "@tanstack/react-query";
 import type { ExtendedStatus } from "@inngest/components/Support/Status";
 import { InngestClerkProvider } from "@/components/Clerk/Provider";
+import { HolidayBanner } from "@/components/Support/HolidayBanner";
 import { Navigation } from "@/components/Support/Navigation";
 import { getStatus } from "@/data/status";
 
@@ -90,6 +91,7 @@ function RootComponent() {
               <div className="flex flex-col grow">
                 {/* Status Banner */}
                 <StatusBanner status={status} />
+                <HolidayBanner />
 
                 <div className="mx-auto w-full py-6 px-4">
                   <Outlet />
