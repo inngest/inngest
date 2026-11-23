@@ -209,22 +209,39 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 }
 
 func (q *queueProcessor) ScanAccountPartitions(ctx context.Context, accountID uuid.UUID, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64, dispatch DispatchFunc) error {
-	partitions, err := q.Shard().PeekAccountPartitions(ctx, accountID, peekLimit, peekUntil, q.isSequential())
+	partitions, checkPause, err := q.peekPartitionsForScan(ctx, &accountID, peekLimit, peekUntil)
 	if err != nil {
 		return fmt.Errorf("could not peek account partitions: %w", err)
 	}
 
-	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions, dispatch)
+	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions, dispatch, checkPause)
 }
 
-// ScanGlobalPartitions scans the partiton of partitions across all fns.
+// ScanGlobalPartitions scans partitions across all functions.
 func (q *queueProcessor) ScanGlobalPartitions(ctx context.Context, peekLimit int64, peekUntil time.Time, metricShardName string, reportPeekedPartitions *int64, dispatch DispatchFunc) error {
-	partitions, err := q.Shard().PartitionPeek(ctx, q.isSequential(), peekUntil, peekLimit)
+	partitions, checkPause, err := q.peekPartitionsForScan(ctx, nil, peekLimit, peekUntil)
 	if err != nil {
 		return fmt.Errorf("could not peek global partitions: %w", err)
 	}
 
-	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions, dispatch)
+	return q.processScannedPartitions(ctx, partitions, peekUntil, metricShardName, reportPeekedPartitions, dispatch, checkPause)
+}
+
+type partitionScanPeeker interface {
+	PeekPartitionsForScan(context.Context, *uuid.UUID, bool, time.Time, int64) ([]*QueuePartition, func(context.Context, *QueuePartition) bool, error)
+}
+
+func (q *queueProcessor) peekPartitionsForScan(ctx context.Context, accountID *uuid.UUID, limit int64, until time.Time) ([]*QueuePartition, func(context.Context, *QueuePartition) bool, error) {
+	shard, sequential := q.Shard(), q.isSequential()
+	if scanner, ok := shard.(partitionScanPeeker); ok {
+		return scanner.PeekPartitionsForScan(ctx, accountID, sequential, until, limit)
+	}
+	if accountID == nil {
+		partitions, err := shard.PartitionPeek(ctx, sequential, until, limit)
+		return partitions, nil, err
+	}
+	partitions, err := shard.PeekAccountPartitions(ctx, *accountID, limit, until, sequential)
+	return partitions, nil, err
 }
 
 func (q *queueProcessor) processScannedPartitions(
@@ -234,6 +251,7 @@ func (q *queueProcessor) processScannedPartitions(
 	metricShardName string,
 	reportPeekedPartitions *int64,
 	dispatch DispatchFunc,
+	checkPause func(context.Context, *QueuePartition) bool,
 ) error {
 	if reportPeekedPartitions != nil {
 		atomic.AddInt64(reportPeekedPartitions, int64(len(partitions)))
@@ -247,6 +265,12 @@ func (q *queueProcessor) processScannedPartitions(
 	)
 
 	eg := errgroup.Group{}
+	var leaseOpts []PartitionLeaseOpt
+	if checkPause != nil {
+		leaseOpts = []PartitionLeaseOpt{func(o *PartitionLeaseOptions) {
+			o.RecheckEligibilityUntil = peekUntil
+		}}
+	}
 
 	for _, ptr := range partitions {
 		if q.capacity() == 0 || !q.partitionSem.TryAcquire(1) {
@@ -264,7 +288,10 @@ func (q *queueProcessor) processScannedPartitions(
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 				return nil
 			}
-			err := q.ProcessPartition(ctx, &p, 0, false, dispatch)
+			if checkPause != nil && !checkPause(ctx, &p) {
+				return nil
+			}
+			err := q.processPartition(ctx, &p, 0, false, dispatch, leaseOpts...)
 
 			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,

@@ -30,6 +30,11 @@ type AccountExists func(ctx context.Context, accountID uuid.UUID) (bool, error)
 type PartitionPausedInfo struct {
 	Stale  bool
 	Paused bool
+
+	// CachePathTime covers the shared cache call outside of its own Postgres
+	// load, including any wait for a concurrent cache fill.
+	CachePathTime time.Duration
+	PostgresTime  time.Duration
 }
 type PartitionPausedGetter func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo
 
@@ -94,6 +99,21 @@ func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) QueueOpt {
 	return func(q *QueueOptions) {
 		q.PartitionPausedGetter = partitionPausedGetter
+	}
+}
+
+// WithCachedPartitionPauseGetter supplies a local-only read of pause status.
+func WithCachedPartitionPauseGetter(getter func(uuid.UUID) (paused, found bool)) QueueOpt {
+	return func(q *QueueOptions) {
+		q.CachedPartitionPauseGetter = getter
+	}
+}
+
+// WithConcurrentPartitionPauseChecks moves Redis scanner pause checks to
+// partition workers. A non-positive limit keeps checks in the peek.
+func WithConcurrentPartitionPauseChecks(limit int) QueueOpt {
+	return func(q *QueueOptions) {
+		q.ConcurrentPartitionPauseChecks = limit
 	}
 }
 
@@ -485,6 +505,8 @@ type QueueOptions struct {
 	AccountPriorityFinder            AccountPriorityFinder
 	AccountExists                    AccountExists
 	PartitionPausedGetter            PartitionPausedGetter
+	CachedPartitionPauseGetter       func(uuid.UUID) (paused, found bool)
+	ConcurrentPartitionPauseChecks   int
 	AccountShardIterationEnabled     AccountShardIterationEnabled
 	QueueItemEarliestPeekTimeEnabled QueueItemEarliestPeekTimeEnabled
 

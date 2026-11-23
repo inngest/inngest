@@ -4,6 +4,7 @@ Output:
     0: Success
    -1: Partition item not found
    -2: Partition item already leased
+   -3: Partition is no longer eligible
 
 ]]
 
@@ -11,12 +12,14 @@ local keyPartitionMap = KEYS[1] -- key storing all partitions
 local keyGlobalPartitionPtr = KEYS[2] -- global top-level partitioned queue
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
 local keyAccountPartitions = KEYS[4] -- accounts:$accountID:partition:sorted - zset
+local keyMigrationLock = KEYS[5] -- optional, only for a deferred pause check
 
 local partitionID = ARGV[1]
 local leaseID = ARGV[2]
 local currentTime = tonumber(ARGV[3]) -- in ms, to check lease validation
 local leaseTime = tonumber(ARGV[4]) -- in seconds, as partition score
 local accountID = ARGV[5]
+local peekUntilMS = tonumber(ARGV[6])
 
 -- $include(get_partition_item.lua)
 -- $include(decode_ulid_time.lua)
@@ -32,6 +35,13 @@ end
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
 	return { -2 }
+end
+
+if peekUntilMS ~= nil then
+	local forceAtMS = existing.forceAtMS
+	if (forceAtMS ~= nil and forceAtMS ~= cjson.null and forceAtMS > peekUntilMS) or redis.call("EXISTS", keyMigrationLock) == 1 then
+		return { -3 }
+	end
 end
 
 local existingTime = existing.last -- store a ref to the last time we successfully checked this partition
