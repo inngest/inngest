@@ -157,3 +157,58 @@ func TestCheckMetadataOnlyNewPaths(t *testing.T) {
 		t.Fatal("expected snap-1 to be rejected once it's outside the new location")
 	}
 }
+
+func TestTableCacheMonotonicVersionAndSizeBound(t *testing.T) {
+	var c tableCache
+	c.maxEntries = 3
+
+	md1, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, "/wh/app.db/t", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ident := table.Identifier{"app", "t"}
+	v5 := "/wh/app.db/t/metadata/00005-00000000-0000-0000-0000-000000000005.metadata.json"
+	v3 := "/wh/app.db/t/metadata/00003-00000000-0000-0000-0000-000000000003.metadata.json"
+	v6 := "/wh/app.db/t/metadata/00006-00000000-0000-0000-0000-000000000006.metadata.json"
+
+	if _, err := c.put(ident, v5, md1); err != nil {
+		t.Fatal(err)
+	}
+	// Stale version for the same UUID must not regress the cache.
+	if _, err := c.put(ident, v3, md1); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := c.get(ident); !ok || got.loc != v5 {
+		t.Fatalf("expected cache to keep v5, got %v %v", ok, got.loc)
+	}
+	// Newer version advances the cache.
+	if _, err := c.put(ident, v6, md1); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := c.get(ident); !ok || got.loc != v6 {
+		t.Fatalf("expected cache to advance to v6, got %v %v", ok, got.loc)
+	}
+	// Different UUID (recreated table) replaces even at lower version.
+	md2, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, "/wh/app.db/t", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v0 := "/wh/app.db/t/metadata/00000-00000000-0000-0000-0000-000000000000.metadata.json"
+	if _, err := c.put(ident, v0, md2); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := c.get(ident); !ok || got.loc != v0 || got.md.TableUUID() != md2.TableUUID() {
+		t.Fatalf("expected new UUID to replace cache entry, got %v %v", ok, got.loc)
+	}
+
+	// Size bound: inserting more than maxEntries keeps len(c.m) <= maxEntries.
+	for i := range 6 {
+		id := table.Identifier{"app", fmt.Sprintf("t%d", i)}
+		if _, err := c.put(id, v0, md2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(c.m) > c.maxEntries {
+		t.Fatalf("expected cache size <= %d, got %d", c.maxEntries, len(c.m))
+	}
+}

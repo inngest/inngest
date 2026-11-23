@@ -134,3 +134,16 @@ func TestRequestLogUsesRoute(t *testing.T) {
 		}
 	}
 }
+
+func TestReadJSONMaxBytes(t *testing.T) {
+	big := strings.NewReader(`{"namespace":["` + strings.Repeat("a", maxRequestBodyBytes+1) + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/namespaces", big)
+	rec := httptest.NewRecorder()
+	var dst createNamespaceRequest
+	if readJSON(rec, req, &dst) {
+		t.Fatal("expected readJSON to reject oversized body")
+	}
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

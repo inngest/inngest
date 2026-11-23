@@ -8,6 +8,8 @@ import (
 	"github.com/apache/iceberg-go/table"
 )
 
+const maxTableCacheEntries = 4096
+
 // tableCache keeps each table's latest metadata this server has seen (from a
 // load or its own commit) along w/ its JSON encoding, keyed by table and
 // checked against the metadata location so a stale entry is never served.
@@ -18,8 +20,9 @@ import (
 // iceberg-go's own CommitTable load) and encodes it twice, all of which
 // grow w/ the table's snapshot count.
 type tableCache struct {
-	mu sync.Mutex
-	m  map[string]cachedTable
+	mu         sync.Mutex
+	m          map[string]cachedTable
+	maxEntries int
 }
 
 type cachedTable struct {
@@ -49,18 +52,41 @@ func (c *tableCache) body(ident table.Identifier, loc string, md table.Metadata)
 	return c.put(ident, loc, md)
 }
 
-// put encodes md and caches it as ident's latest version.
+// put encodes md and caches it as ident's latest version, refusing to
+// regress an existing entry for the same table UUID to an older metadata
+// version and bounding total cache size.
 func (c *tableCache) put(ident table.Identifier, loc string, md table.Metadata) (json.RawMessage, error) {
 	body, err := json.Marshal(md)
 	if err != nil {
 		return nil, err
 	}
+	key := tableKey(ident)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.m == nil {
 		c.m = map[string]cachedTable{}
 	}
-	c.m[tableKey(ident)] = cachedTable{loc: loc, md: md, body: body}
+	if existing, ok := c.m[key]; ok {
+		if existing.md != nil && md != nil && existing.md.TableUUID() == md.TableUUID() {
+			oldV := parseMetadataVersion(existing.loc)
+			newV := parseMetadataVersion(loc)
+			if oldV >= 0 && newV >= 0 && newV < oldV {
+				return body, nil
+			}
+		}
+	} else {
+		limit := c.maxEntries
+		if limit <= 0 {
+			limit = maxTableCacheEntries
+		}
+		if len(c.m) >= limit {
+			for k := range c.m {
+				delete(c.m, k)
+				break
+			}
+		}
+	}
+	c.m[key] = cachedTable{loc: loc, md: md, body: body}
 	return body, nil
 }
 

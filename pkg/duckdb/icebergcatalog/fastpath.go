@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/url"
 	"path"
 	"regexp"
 	"slices"
@@ -73,12 +74,66 @@ type fastPath struct {
 	probed bool
 	v0     bool
 
+	// io caches FileIO instances per scheme+host so commits don't rebuild
+	// AWS SDK clients on every write.
+	io ioCache
+
 	// beforeSwap, when non-nil, runs right before the CAS (tests use it to
 	// commit underneath an in-flight commit).
 	beforeSwap func()
 	// afterSwap, when non-nil, replaces the CAS's error (tests use it to
 	// lose a committed swap's response).
 	afterSwap func(error) error
+}
+
+// ioCache caches icebergio.IO instances keyed by scheme+host (or "local" for
+// local paths) so callers don't recreate AWS SDK clients on every commit/GC.
+type ioCache struct {
+	mu     sync.Mutex
+	m      map[string]icebergio.IO
+	loadFS func(ctx context.Context, props map[string]string, location string) (icebergio.IO, error)
+}
+
+func ioCacheKey(loc string) string {
+	u, err := url.Parse(loc)
+	if err != nil || isLocal(u) {
+		return "local"
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+func (c *ioCache) get(ctx context.Context, props iceberg.Properties, loc string) (icebergio.IO, error) {
+	key := ioCacheKey(loc)
+	c.mu.Lock()
+	if fsys, ok := c.m[key]; ok {
+		c.mu.Unlock()
+		return fsys, nil
+	}
+	loader := c.loadFS
+	c.mu.Unlock()
+
+	if loader == nil {
+		loader = icebergio.LoadFS
+	}
+	ioProps := maps.Clone(props)
+	if ioProps == nil {
+		ioProps = iceberg.Properties{}
+	}
+	fsys, err := loader(ctx, ioProps, loc)
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	if c.m == nil {
+		c.m = map[string]icebergio.IO{}
+	}
+	if existing, ok := c.m[key]; ok {
+		c.mu.Unlock()
+		return existing, nil
+	}
+	c.m[key] = fsys
+	c.mu.Unlock()
+	return fsys, nil
 }
 
 func newFastPath(c *CatalogDB) *fastPath {
@@ -226,7 +281,19 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 		return nil, "", err
 	}
 	if md.Equals(base.md) {
-		// Nothing changed, same as the sql catalog.
+		// Nothing changed, but still verify no concurrent writer moved
+		// metadata_location since our base check so we neither hide a
+		// conflict nor regress tableCache.
+		if f.beforeSwap != nil {
+			f.beforeSwap()
+		}
+		curLoc, ok, err := f.currentLocation(ctx, ident)
+		if err != nil {
+			return nil, "", err
+		}
+		if !ok || curLoc != base.loc {
+			return nil, "", errNotCurrent
+		}
 		return base.md, base.loc, nil
 	}
 	v := parseMetadataVersion(base.loc)
@@ -243,11 +310,7 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 	}
 	// Never merge table-level md.Properties() into FileIO config: a client
 	// must not be able to override s3.endpoint/credentials/HTTP settings.
-	ioProps := maps.Clone(f.props)
-	if ioProps == nil {
-		ioProps = iceberg.Properties{}
-	}
-	fsys, err := icebergio.LoadFS(ctx, ioProps, loc)
+	fsys, err := f.io.get(ctx, f.props, loc)
 	if err != nil {
 		return nil, "", err
 	}

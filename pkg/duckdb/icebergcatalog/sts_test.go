@@ -2,6 +2,8 @@ package icebergcatalog
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,4 +78,86 @@ func TestSTSVendor(t *testing.T) {
 		_, err := v.VendCredentials(t.Context(), []string{"t"}, loc)
 		require.Error(t, err, loc)
 	}
+}
+
+type blockingSTS struct {
+	calls   atomic.Int64
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingSTS) AssumeRole(_ context.Context, _ *sts.AssumeRoleInput, _ ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+	if b.calls.Add(1) == 1 {
+		close(b.started)
+	}
+	<-b.release
+	return &sts.AssumeRoleOutput{Credentials: &ststypes.Credentials{
+		AccessKeyId: aws.String("AK"), SecretAccessKey: aws.String("SK"), SessionToken: aws.String("TOK"),
+		Expiration: aws.Time(time.UnixMilli(1_800_000_000_000)),
+	}}, nil
+}
+
+func TestSTSVendorHardening(t *testing.T) {
+	t.Run("singleflight coalesces concurrent calls", func(t *testing.T) {
+		b := &blockingSTS{started: make(chan struct{}), release: make(chan struct{})}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: b, RoleARN: "arn:x", Now: func() time.Time { return now }}
+
+		const n = 8
+		var wg sync.WaitGroup
+		wg.Add(n)
+		for range n {
+			go func() {
+				defer wg.Done()
+				props, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+				require.NoError(t, err)
+				require.Equal(t, "AK", props["s3.access-key-id"])
+			}()
+		}
+		<-b.started
+		time.Sleep(10 * time.Millisecond)
+		close(b.release)
+		wg.Wait()
+		require.Equal(t, int64(1), b.calls.Load())
+	})
+
+	t.Run("returns cloned properties map", func(t *testing.T) {
+		f := &fakeSTS{}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: f, RoleARN: "arn:x", Now: func() time.Time { return now }}
+		p1, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+		require.NoError(t, err)
+		p1["s3.access-key-id"] = "MUTATED"
+
+		p2, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+		require.NoError(t, err)
+		require.Equal(t, "AK", p2["s3.access-key-id"])
+	})
+
+	t.Run("evicts expired entries on write", func(t *testing.T) {
+		f := &fakeSTS{}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: f, RoleARN: "arn:x", Now: func() time.Time { return now }}
+		_, err := v.VendCredentials(t.Context(), []string{"app", "a"}, "s3://bucket/wh/app.db/a")
+		require.NoError(t, err)
+		require.Len(t, v.cache, 1)
+
+		// Advance past half-life (1_750_000_000_000ms) and vend for another table.
+		now = time.UnixMilli(1_760_000_000_000)
+		_, err = v.VendCredentials(t.Context(), []string{"app", "b"}, "s3://bucket/wh/app.db/b")
+		require.NoError(t, err)
+		require.Len(t, v.cache, 1)
+		require.Contains(t, v.cache, "s3://bucket/wh/app.db/b")
+		require.NotContains(t, v.cache, "s3://bucket/wh/app.db/a")
+	})
+
+	t.Run("rejects invalid durations", func(t *testing.T) {
+		for _, d := range []time.Duration{-time.Second, 500 * time.Millisecond, 999 * time.Millisecond} {
+			f := &fakeSTS{}
+			v := &STSVendor{STS: f, RoleARN: "arn:x", Duration: d}
+			_, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+			require.Error(t, err, "duration %v", d)
+			require.Equal(t, 0, f.calls)
+		}
+	})
 }

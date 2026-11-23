@@ -2,6 +2,7 @@ package icebergcatalog
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"io/fs"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/apache/iceberg-go"
+	icebergio "github.com/apache/iceberg-go/io"
 	"github.com/apache/iceberg-go/table"
 )
 
@@ -26,13 +28,12 @@ const (
 	// table changed. Both only bind the snapshot at the start of a
 	// statement, so this is way more than they need.
 	DefaultMaxSnapshotAge = 5 * time.Minute
-	// DefaultMaxSnapshots is Retention.MaxSnapshots's default. Every
-	// duckdb write is a snapshot, so a table taking a steady stream of
-	// small appends piles up way more than MinSnapshotsToKeep inside
-	// MaxSnapshotAge, and each commit rewrites (and each load parses) all
-	// of them (~1.3MB of metadata.json at 1000-run batches w/o the cap vs
-	// ~111KB w/ it).
-	DefaultMaxSnapshots = 100
+	// DefaultMaxSnapshots is Retention.MaxSnapshots's default: an emergency
+	// hard cap so metadata.json can't grow unboundedly during a runaway
+	// write burst, while still being large enough that normal bursts within
+	// DefaultMaxSnapshotAge never expire snapshots an active reader is
+	// pinned to.
+	DefaultMaxSnapshots = 1000
 
 	// MaxSnapshotsKey is the table property that overrides
 	// Retention.MaxSnapshots. It's ours, not a standard Iceberg property
@@ -186,9 +187,9 @@ func (s *Server) retain(base, md table.Metadata, client table.Updates, req *comm
 // This doesn't take anything away from readers: duckdb only finds an older
 // metadata.json (for a transaction that started before the table changed)
 // through the log, so a file that fell out of it is unreachable anyways.
-// Only files directly under the table's `metadata/` dir in a local
-// warehouse named like the catalog names them are touched.
-func (s *Server) deleteOldMetadata(prev, next table.Metadata, nextLoc string) {
+// Only files directly under the table's metadata dir named like the catalog
+// names them are touched (both local and remote warehouses via WriteFileIO).
+func (s *Server) deleteOldMetadata(ctx context.Context, prev, next table.Metadata, nextLoc string) {
 	if s.opts.Retention.KeepOldMetadata || prev == nil {
 		return
 	}
@@ -199,11 +200,6 @@ func (s *Server) deleteOldMetadata(prev, next table.Metadata, nextLoc string) {
 	}
 	wh, err := url.Parse(s.opts.Warehouse)
 	if err != nil {
-		return
-	}
-	if !isLocal(wh) {
-		// TODO(maintenance): delete from remote warehouses too (same as
-		// purge).
 		return
 	}
 	keep := map[string]bool{nextLoc: true}
@@ -221,17 +217,64 @@ func (s *Server) deleteOldMetadata(prev, next table.Metadata, nextLoc string) {
 	}
 
 	c := s.locations()
-	loc, err := c.check(next.Location())
+	provider, err := table.LoadLocationProvider(next.Location(), next.Properties())
 	if err != nil {
 		return
 	}
-	dir := filepath.Join(loc, "metadata")
+	rawDir := strings.TrimSuffix(provider.NewMetadataLocation("f"), "/f")
+	dir, err := c.check(rawDir)
+	if err != nil {
+		return
+	}
+
+	if isLocal(wh) {
+		for _, f := range dropped {
+			p, err := c.check(f)
+			if err != nil || filepath.Dir(p) != dir || !strings.HasSuffix(p, ".metadata.json") {
+				continue
+			}
+			if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) && s.opts.Logger != nil {
+				s.opts.Logger.Warn("failed to delete old iceberg metadata file", "path", p, "error", err)
+			}
+		}
+		return
+	}
+
+	var toDelete []string
 	for _, f := range dropped {
 		p, err := c.check(f)
-		if err != nil || filepath.Dir(p) != dir || !strings.HasSuffix(p, ".metadata.json") {
+		if err != nil || !strings.HasSuffix(p, ".metadata.json") {
 			continue
 		}
-		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) && s.opts.Logger != nil {
+		// Must be directly under dir (no extra subdirectory segments).
+		rel, ok := strings.CutPrefix(p, strings.TrimSuffix(dir, "/")+"/")
+		if !ok || rel == "" || strings.Contains(rel, "/") {
+			continue
+		}
+		toDelete = append(toDelete, p)
+	}
+	if len(toDelete) == 0 {
+		return
+	}
+	fsys, err := s.getFileIO(ctx, toDelete[0])
+	if err != nil {
+		if s.opts.Logger != nil {
+			s.opts.Logger.Warn("failed to load FileIO for old iceberg metadata cleanup", "location", dir, "error", err)
+		}
+		return
+	}
+	wfs, ok := fsys.(icebergio.WriteFileIO)
+	if !ok {
+		return
+	}
+	if brm, ok := fsys.(icebergio.BulkRemovableIO); ok && len(toDelete) > 1 {
+		if _, err := brm.DeleteFiles(ctx, toDelete); err != nil && s.opts.Logger != nil {
+			s.opts.Logger.Warn("failed to delete old iceberg metadata files", "location", dir, "error", err)
+		}
+		return
+	}
+	for _, p := range toDelete {
+		if err := wfs.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) && s.opts.Logger != nil {
 			s.opts.Logger.Warn("failed to delete old iceberg metadata file", "path", p, "error", err)
 		}
 	}

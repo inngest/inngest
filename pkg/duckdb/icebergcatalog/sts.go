@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"golang.org/x/sync/singleflight"
 )
 
 // AssumeRoleAPI is the one sts.Client method STSVendor uses.
@@ -45,6 +48,7 @@ type STSVendor struct {
 
 	mu    sync.Mutex
 	cache map[string]cachedCreds
+	sf    singleflight.Group
 }
 
 // cachedCreds are one location's creds. duckdb loads a table on every
@@ -56,6 +60,23 @@ type cachedCreds struct {
 }
 
 var _ CredentialVendor = (*STSVendor)(nil)
+var _ readOnlyVendor = (*STSVendor)(nil)
+
+func (v *STSVendor) readOnly() CredentialVendor {
+	if v.ReadOnly {
+		return v
+	}
+	return &STSVendor{
+		STS:       v.STS,
+		RoleARN:   v.RoleARN,
+		Duration:  v.Duration,
+		Region:    v.Region,
+		Endpoint:  v.Endpoint,
+		PathStyle: v.PathStyle,
+		ReadOnly:  true,
+		Now:       v.Now,
+	}
+}
 
 func (v *STSVendor) VendCredentials(ctx context.Context, ident table.Identifier, location string) (iceberg.Properties, error) {
 	now := time.Now
@@ -66,29 +87,61 @@ func (v *STSVendor) VendCredentials(ctx context.Context, ident table.Identifier,
 	c, ok := v.cache[location]
 	v.mu.Unlock()
 	if ok && now().Before(c.refresh) {
-		return c.props, nil
+		return maps.Clone(c.props), nil
 	}
-	props, exp, err := v.assumeRole(ctx, ident, location)
+
+	res, err, _ := v.sf.Do(location, func() (any, error) {
+		v.mu.Lock()
+		c, ok := v.cache[location]
+		v.mu.Unlock()
+		if ok && now().Before(c.refresh) {
+			return c.props, nil
+		}
+		props, exp, err := v.assumeRole(ctx, ident, location)
+		if err != nil {
+			return nil, err
+		}
+		// Reused for the first half of their life, so a client always gets at
+		// least half a lifetime before it has to refresh.
+		issued := now()
+		refresh := issued
+		if !exp.IsZero() {
+			refresh = issued.Add(exp.Sub(issued) / 2)
+		}
+		v.mu.Lock()
+		if v.cache == nil {
+			v.cache = map[string]cachedCreds{}
+		}
+		// Evict expired entries so cache memory stays bounded.
+		for k, entry := range v.cache {
+			if !issued.Before(entry.refresh) {
+				delete(v.cache, k)
+			}
+		}
+		if issued.Before(refresh) {
+			v.cache[location] = cachedCreds{props: props, refresh: refresh}
+		}
+		v.mu.Unlock()
+		return props, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	// Reused for the first half of their life, so a client always gets at
-	// least half a lifetime before it has to refresh.
-	issued := now()
-	refresh := issued
-	if !exp.IsZero() {
-		refresh = issued.Add(exp.Sub(issued) / 2)
-	}
-	v.mu.Lock()
-	if v.cache == nil {
-		v.cache = map[string]cachedCreds{}
-	}
-	v.cache[location] = cachedCreds{props: props, refresh: refresh}
-	v.mu.Unlock()
-	return props, nil
+	return maps.Clone(res.(iceberg.Properties)), nil
 }
 
 func (v *STSVendor) assumeRole(ctx context.Context, ident table.Identifier, location string) (iceberg.Properties, time.Time, error) {
+	if v.Duration < 0 {
+		return nil, time.Time{}, fmt.Errorf("icebergcatalog: invalid STS duration %v", v.Duration)
+	}
+	if v.Duration > 0 {
+		if v.Duration < time.Second {
+			return nil, time.Time{}, fmt.Errorf("icebergcatalog: STS duration %v must be at least 1s", v.Duration)
+		}
+		if v.Duration/time.Second > math.MaxInt32 {
+			return nil, time.Time{}, fmt.Errorf("icebergcatalog: STS duration %v is too large", v.Duration)
+		}
+	}
 	policy, err := tablePolicy(location, v.ReadOnly)
 	if err != nil {
 		return nil, time.Time{}, err

@@ -18,6 +18,7 @@ import (
 
 	"github.com/apache/iceberg-go"
 	sqlcat "github.com/apache/iceberg-go/catalog/sql"
+	icebergio "github.com/apache/iceberg-go/io"
 	"github.com/apache/iceberg-go/table"
 )
 
@@ -414,4 +415,38 @@ func TestFastPathAmbiguousSwapKeepsMetadata(t *testing.T) {
 		t.Fatalf("load: %d %v", status, body)
 	}
 	ft.mustCommit(assertMain(2), snapshotUpdates(3, snapLoc(ft, 3)))
+}
+
+func TestFastPathNoOpCommitCASConflict(t *testing.T) {
+	ft := newFastTable(t, []string{"app"}, "")
+	ft.mustCommit("", `{"action":"set-properties","updates":{"k":"v"}}`)
+
+	// Another writer commits between cachedCurrent and the no-op commit check.
+	ft.srv.fast.beforeSwap = func() {
+		ft.srv.fast.beforeSwap = nil
+		ft.commitBehindBack("", `{"action":"set-properties","updates":{"other":"y"}}`)
+	}
+	// Setting k=v again produces md.Equals(base.md), so it hits the no-op path.
+	status, body := ft.commit("", `{"action":"set-properties","updates":{"k":"v"}}`)
+	if status != http.StatusConflict || body["error"].(map[string]any)["type"] != "CommitFailedException" {
+		t.Fatalf("expected 409 on raced no-op commit, got %d %v", status, body)
+	}
+}
+
+func TestFastPathCachesFileIO(t *testing.T) {
+	ft := newFastTable(t, []string{"app"}, "")
+	var loadCalls atomic.Int64
+	ft.srv.fast.io.loadFS = func(ctx context.Context, props map[string]string, loc string) (icebergio.IO, error) {
+		loadCalls.Add(1)
+		return icebergio.LoadFS(ctx, props, loc)
+	}
+	// First commit populates cache via sql catalog.
+	ft.mustCommit("", snapshotUpdates(1, snapLoc(ft, 1)))
+	// Next 3 commits go through fast path and should share a single LoadFS call.
+	ft.mustCommit(assertMain(1), snapshotUpdates(2, snapLoc(ft, 2)))
+	ft.mustCommit(assertMain(2), snapshotUpdates(3, snapLoc(ft, 3)))
+	ft.mustCommit(assertMain(3), snapshotUpdates(4, snapLoc(ft, 4)))
+	if got := loadCalls.Load(); got != 1 {
+		t.Fatalf("expected FileIO to be loaded once across fast-path commits, got %d", got)
+	}
 }

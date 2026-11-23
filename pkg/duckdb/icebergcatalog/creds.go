@@ -20,6 +20,19 @@ type CredentialVendor interface {
 	VendCredentials(ctx context.Context, ident table.Identifier, location string) (iceberg.Properties, error)
 }
 
+// readOnlyVendor is implemented by vendors that can enforce read-only
+// storage permissions when Options.ReadOnly is enabled.
+type readOnlyVendor interface {
+	readOnly() CredentialVendor
+}
+
+func readOnlyCredentials(v CredentialVendor) CredentialVendor {
+	if rv, ok := v.(readOnlyVendor); ok {
+		return rv.readOnly()
+	}
+	return v
+}
+
 // accessDelegationHeader is how a client asks for vended credentials (vs
 // remote signing, which we don't support).
 const accessDelegationHeader = "X-Iceberg-Access-Delegation"
