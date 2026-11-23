@@ -307,6 +307,9 @@ func streamBindCallback(info uintptr) {
 		return
 	}
 	structLT := lib.getValueType(p1)
+	if structLT != 0 {
+		defer lib.destroyLogicalType(&structLT)
+	}
 	if structLT == 0 || Type(lib.getTypeID(structLT)) != TypeStruct {
 		lib.destroyValue(&p1)
 		lib.bindSetError(info, "scan_data_from_quack_client: second parameter must be NULL::STRUCT(...)")

@@ -888,21 +888,32 @@ func (s *Session) Merge(ctx context.Context, schema, table string, cfg MergeConf
 	return s.execSingleBatchStream(ctx, sqlText, streamID, kinds, rows)
 }
 
+// maxSingleStreamRawBytes caps the raw (pre-base64) blob size sent in a single
+// OpStreamData frame by execSingleBatchStream so base64+JSON framing stays well
+// below maxFrameBytes (64 MiB).
+const maxSingleStreamRawBytes = 16 << 20
+
 func (s *Session) execSingleBatchStream(ctx context.Context, sqlText, streamID string, cols []StreamColumnKind, rows [][]any) error {
-	blob, _, err := EncodeRowsBatch(cols, rows)
-	if err != nil {
-		return err
-	}
-	sent := false
+	offset := 0
 	qs, err := s.QueryWithStreams(ctx, sqlText, []SendStream{{
 		ID:      streamID,
 		Columns: cols,
 		NextEncoded: func(context.Context) ([]byte, uint64, error) {
-			if sent {
+			if offset >= len(rows) {
 				return nil, 0, io.EOF
 			}
-			sent = true
-			return blob, 1, nil
+			batchLen := min(StandardVectorSize, len(rows)-offset)
+			for {
+				blob, _, err := EncodeRowsBatch(cols, rows[offset:offset+batchLen])
+				if err != nil {
+					return nil, 0, err
+				}
+				if len(blob) <= maxSingleStreamRawBytes || batchLen == 1 {
+					offset += batchLen
+					return blob, uint64(batchLen), nil
+				}
+				batchLen = max(1, batchLen/2)
+			}
 		},
 	}})
 	if err != nil {
