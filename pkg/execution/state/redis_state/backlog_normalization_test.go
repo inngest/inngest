@@ -3,6 +3,8 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -670,6 +672,8 @@ func TestNormalizationRejectsStaleItemSnapshots(t *testing.T) {
 		want error
 	}{
 		{name: "unleased"},
+		{name: "legacy missing generation"},
+		{name: "legacy zero generation"},
 		{name: "expired lease"},
 		{name: "active lease", want: osqueue.ErrQueueItemAlreadyLeased},
 		{name: "deleted", want: osqueue.ErrQueueItemNotFound},
@@ -686,12 +690,25 @@ func TestNormalizationRejectsStaleItemSnapshots(t *testing.T) {
 			at := clock.Now().Add(time.Hour)
 			item := osqueue.QueueItem{
 				ID: "normalize-snapshot", FunctionID: uuid.New(), WorkspaceID: uuid.New(),
-				Data: osqueue.Item{Kind: osqueue.KindStart, Identifier: state.Identifier{AccountID: uuid.New(), RunID: ulid.Make()}, Throttle: &osqueue.Throttle{Key: "old", Limit: 10, Burst: 1, Period: 60}},
+				Data: osqueue.Item{Kind: osqueue.KindStart, Identifier: state.Identifier{AccountID: uuid.New(), RunID: ulid.Make()}, Throttle: &osqueue.Throttle{Key: "old", Limit: 10, Burst: 1, Period: 60, KeyExpressionHash: "old-expression"}},
 			}
 			item.Data.Identifier.WorkflowID = item.FunctionID
 			item.Data.Identifier.WorkspaceID = item.WorkspaceID
 			item, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{PassthroughJobId: true})
 			require.NoError(t, err)
+			if tc.name == "legacy missing generation" || tc.name == "legacy zero generation" {
+				item.GenerationID = 0
+				raw, err := json.Marshal(item)
+				require.NoError(t, err)
+				if tc.name == "legacy zero generation" {
+					var fields map[string]json.RawMessage
+					require.NoError(t, json.Unmarshal(raw, &fields))
+					fields["genID"] = json.RawMessage("0")
+					raw, err = json.Marshal(fields)
+					require.NoError(t, err)
+				}
+				r.HSet(kg.QueueItem(), item.ID, string(raw))
+			}
 			sourceBacklog := osqueue.ItemBacklog(ctx, item)
 			stale := item
 			stale.Data.Throttle = &osqueue.Throttle{Key: "new", Limit: 10, Burst: 1, Period: 60}
@@ -728,6 +745,76 @@ func TestNormalizationRejectsStaleItemSnapshots(t *testing.T) {
 			require.False(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
 			_, err = r.ZScore(kg.BacklogSet(targetBacklog.BacklogID), item.ID)
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestNormalizationPreservesRequeuedGeneration(t *testing.T) {
+	for _, generation := range []int{0, 1, 4} {
+		t.Run(fmt.Sprintf("generation=%d", generation), func(t *testing.T) {
+			r, rc := initRedis(t)
+			t.Cleanup(rc.Close)
+			clock := clockwork.NewFakeClock()
+			_, shard := newQueue(t, rc, osqueue.WithClock(clock), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }))
+			ctx := t.Context()
+			kg := shard.Client().KeyGenerator()
+			at := clock.Now()
+			item := osqueue.QueueItem{
+				ID: "normalization-retry", FunctionID: uuid.New(), WorkspaceID: uuid.New(), GenerationID: generation,
+				Data: osqueue.Item{Kind: osqueue.KindStart, Identifier: state.Identifier{AccountID: uuid.New(), RunID: ulid.Make()}, Throttle: &osqueue.Throttle{Key: "old", Limit: 10, Burst: 1, Period: 60, KeyExpressionHash: "old-expression"}},
+			}
+			item.Data.Identifier.WorkflowID = item.FunctionID
+			item.Data.Identifier.WorkspaceID = item.WorkspaceID
+			item, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.NoError(t, err)
+			if generation == 0 {
+				// Emulate a persisted job from before generations were recorded.
+				item.GenerationID = 0
+				raw, err := json.Marshal(item)
+				require.NoError(t, err)
+				r.HSet(kg.QueueItem(), item.ID, string(raw))
+			}
+			// The normalizer reads before an in-flight refill and worker retry.
+			stale, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			backlog := osqueue.ItemBacklog(ctx, item)
+			sp := osqueue.ItemShadowPartition(ctx, item)
+			refill, err := shard.BacklogRefill(ctx, &backlog, &sp, at.Add(time.Minute), []string{item.ID})
+			require.NoError(t, err)
+			require.Equal(t, []string{item.ID}, refill.RefilledItems)
+			_, err = shard.Lease(ctx, item, time.Minute, clock.Now())
+			require.NoError(t, err)
+			worker, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			worker.Data.Attempt++
+			retryAt := at.Add(10 * time.Minute)
+			require.NoError(t, shard.Requeue(ctx, *worker, retryAt))
+			retried, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			require.Nil(t, retried.LeaseID)
+			require.Equal(t, generation+1, retried.GenerationID)
+			require.Equal(t, 1, retried.Data.Attempt)
+			require.Equal(t, retryAt.UnixMilli(), retried.AtMS)
+			score, err := r.ZScore(kg.BacklogSet(backlog.BacklogID), item.ID)
+			require.NoError(t, err)
+			require.Equal(t, float64(retryAt.UnixMilli()), score)
+
+			stale.Data.Throttle = &osqueue.Throttle{Key: "new", Limit: 10, Burst: 1, Period: 60}
+			opts := osqueue.EnqueueOpts{PassthroughJobId: true, NormalizeFromBacklogID: backlog.BacklogID}
+			before := r.Dump()
+			_, err = shard.EnqueueItem(ctx, *stale, at, opts)
+			require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+			require.Equal(t, before, r.Dump(), "the stale snapshot must not roll back retry data or indexes")
+
+			// A newly read snapshot can still be normalized, preserving the retry.
+			retried.Data.Throttle = stale.Data.Throttle
+			_, err = shard.EnqueueItem(ctx, *retried, retryAt, opts)
+			require.NoError(t, err)
+			normalized, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			require.Equal(t, generation+1, normalized.GenerationID)
+			require.Equal(t, 1, normalized.Data.Attempt)
+			require.Equal(t, retryAt.UnixMilli(), normalized.AtMS)
 		})
 	}
 }
