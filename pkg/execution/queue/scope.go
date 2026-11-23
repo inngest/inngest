@@ -12,6 +12,10 @@ type Scope struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID
 	FunctionID uuid.UUID
+	// QueueItemKind optionally names the kind of an existing queue item this
+	// scope refers to. Lookups by job ID use it to route to the same shard that
+	// Enqueue chose for an item of that kind.
+	QueueItemKind string
 }
 
 // Validate checks whether the scope is valid for general queue operations.

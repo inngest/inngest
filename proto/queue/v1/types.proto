@@ -29,6 +29,9 @@ message Scope {
   string account_id = 2;
   string env_id = 3;
   string function_id = 4;
+  // queue_item_kind optionally names the kind of an existing item the scope
+  // refers to, so lookups by job ID route to the shard Enqueue chose for it.
+  string queue_item_kind = 5;
 }
 
 message CapacityLease {

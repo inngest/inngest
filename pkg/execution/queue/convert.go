@@ -92,10 +92,11 @@ func QueueItemFromProto(msg *pb.QueueItem) (QueueItem, error) {
 
 func ScopeToProto(scope Scope) *pb.Scope {
 	return &pb.Scope{
-		IsSystem:   scope.IsSystem,
-		AccountId:  scope.AccountID.String(),
-		EnvId:      scope.EnvID.String(),
-		FunctionId: scope.FunctionID.String(),
+		IsSystem:      scope.IsSystem,
+		AccountId:     scope.AccountID.String(),
+		EnvId:         scope.EnvID.String(),
+		FunctionId:    scope.FunctionID.String(),
+		QueueItemKind: scope.QueueItemKind,
 	}
 }
 
@@ -104,7 +105,7 @@ func ScopeFromProto(msg *pb.Scope) (Scope, error) {
 		return Scope{}, fmt.Errorf("scope is required")
 	}
 
-	scope := Scope{IsSystem: msg.GetIsSystem()}
+	scope := Scope{IsSystem: msg.GetIsSystem(), QueueItemKind: msg.GetQueueItemKind()}
 	accountID, err := parseUUID(msg.GetAccountId(), "scope account_id")
 	if err != nil {
 		return Scope{}, err
