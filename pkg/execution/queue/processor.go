@@ -188,6 +188,8 @@ type queueProcessor struct {
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
 	continues        map[string]continuation
 	continueCooldown map[string]time.Time
+	// repairRetry prevents continuations from bypassing deferred repair scans.
+	repairRetry sync.Map
 
 	// peekSizeCache stores ewma peek sizes for partitions.
 	peekSizeCache *ccache.Cache[int64]

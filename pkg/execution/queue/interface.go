@@ -51,7 +51,7 @@ type RequeueOptions struct {
 
 // RequeueIfExpiredCapacityLease conditionally repairs a ready item without
 // overwriting a newer generation, capacity reservation, or live item lease.
-// It also requires key queues to remain enabled for the item. A failed item
+// It also requires key queues and capacity-lease repair to remain enabled. A failed item
 // condition is a no-op; lost partition ownership returns ErrPartitionLeaseMismatch.
 func RequeueIfExpiredCapacityLease(partitionLeaseID ulid.ULID) RequeueOptionFn {
 	return func(o *RequeueOptions) { o.ExpiredCapacityLeasePartition = &partitionLeaseID }

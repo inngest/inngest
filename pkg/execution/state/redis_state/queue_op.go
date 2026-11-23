@@ -214,7 +214,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		opt(o)
 	}
 	if o.ExpiredCapacityLeasePartition != nil &&
-		(i.CapacityLease == nil || (i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "")) {
+		(!q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, i) || i.CapacityLease == nil || (i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "")) {
 		return nil
 	}
 

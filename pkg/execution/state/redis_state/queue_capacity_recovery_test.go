@@ -92,6 +92,7 @@ type capacityRecoveryFixture struct {
 	dispatched       int
 	dispatchMu       sync.Mutex
 	keyQueuesEnabled bool
+	repairEnabled    bool
 	dispatchIDs      map[string]bool
 	enqueued         int
 	completionDelay  time.Duration
@@ -103,9 +104,9 @@ type pendingCompletion struct {
 	item queue.ProcessItem
 }
 
-func newCapacityRecoveryFixture(t *testing.T, limit int) *capacityRecoveryFixture {
+func newCapacityRecoveryFixture(t *testing.T, limit int, repairOptions ...queue.QueueOpt) *capacityRecoveryFixture {
 	t.Helper()
-	f := &capacityRecoveryFixture{t: t, redis: miniredis.RunT(t), clock: clockwork.NewFakeClockAt(time.Now().Truncate(time.Second)), keyQueuesEnabled: true}
+	f := &capacityRecoveryFixture{t: t, redis: miniredis.RunT(t), clock: clockwork.NewFakeClockAt(time.Now().Truncate(time.Second)), keyQueuesEnabled: true, repairEnabled: true}
 	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{f.redis.Addr()}, DisableCache: true})
 	require.NoError(t, err)
 	t.Cleanup(rc.Close)
@@ -120,12 +121,19 @@ func newCapacityRecoveryFixture(t *testing.T, limit int) *capacityRecoveryFixtur
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 	f.shadow = queue.QueueShadowPartition{PartitionID: fnID.String(), AccountID: &accountID, EnvID: &envID, FunctionID: &fnID}
 	f.backlog = *f.shadow.DefaultBacklog(f.constraints, true)
+	limits := queue.DefaultKeyQueueCapacityLeaseRepairLimits()
+	limits.MaxDuration = time.Second
+	budget, err := queue.NewKeyQueueCapacityLeaseRepairBudget(limits)
+	require.NoError(t, err)
 	opts := []queue.QueueOpt{
 		queue.WithClock(f.clock), queue.WithNumWorkers(100), queue.WithPeekSizeRange(250, 1500),
 		queue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return f.keyQueuesEnabled }),
+		queue.WithAllowKeyQueueCapacityLeaseRepair(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return f.repairEnabled }),
+		queue.WithKeyQueueCapacityLeaseRepairBudget(budget),
 		queue.WithCapacityManager(f.cm), queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		queue.WithPartitionConstraintConfigGetter(func(context.Context, queue.PartitionIdentifier) queue.PartitionConstraintConfig { return f.constraints }),
 	}
+	opts = append(opts, repairOptions...)
 	f.shard = redis_state.NewQueueShard("repro", redis_state.NewQueueClient(rc, "{q:v1}"), opts...)
 	registry, err := queue.NewSingleShardRegistry(f.shard)
 	require.NoError(t, err)
@@ -461,7 +469,7 @@ func TestExpiredCapacityRepairBoundsWorkAndReachesReservations(t *testing.T) {
 	key := f.shard.Client().KeyGenerator().GlobalPartitionIndex()
 	score, err := f.redis.ZScore(key, f.shadow.PartitionID)
 	require.NoError(t, err)
-	require.LessOrEqual(t, int64(score), f.clock.Now().Unix(), "remaining repair must be promptly rescanned")
+	require.Greater(t, int64(score), f.clock.Now().Add(queue.PartitionLookahead).Unix(), "deferred repair must stay beyond lookahead")
 }
 
 func TestExpiredCapacityRepairRespectsKeyQueueDisable(t *testing.T) {
@@ -526,6 +534,78 @@ func TestExpiredCapacityRepairRespectsKeyQueueDisable(t *testing.T) {
 			require.Zero(t, f.ready())
 			require.Zero(t, f.backlogSize())
 			require.Zero(t, f.functionUsage())
+		})
+	}
+}
+
+func TestExpiredCapacityRepairRateLimitStillDrains(t *testing.T) {
+	limits := queue.DefaultKeyQueueCapacityLeaseRepairLimits()
+	limits.Rate, limits.Burst, limits.MaxDuration = 1, 1, time.Second
+	budget, err := queue.NewKeyQueueCapacityLeaseRepairBudget(limits)
+	require.NoError(t, err)
+	f := newCapacityRecoveryFixture(t, 25, queue.WithKeyQueueCapacityLeaseRepairBudget(budget))
+	f.enqueue(60)
+	for range 2 {
+		f.refill()
+		f.advance(time.Millisecond)
+	}
+	f.advance(31 * time.Second)
+	_, err = f.cm.Scavenge(t.Context())
+	require.NoError(t, err)
+	for range 2 {
+		f.refill()
+		f.advance(time.Millisecond)
+	}
+	require.Equal(t, 50, f.ready())
+	f.processPartition()
+	require.Equal(t, 25, f.dispatched, "fresh reservation owners dispatch despite the exhausted repair budget")
+	require.Equal(t, 24, f.ready(), "only one expired item may be repaired in the initial burst")
+	require.EqualValues(t, 11, f.backlogSize())
+	for i := 0; i < 120 && f.dispatched < 60; i++ {
+		f.advance(5 * time.Second)
+		_, err = f.cm.Scavenge(t.Context())
+		require.NoError(t, err)
+		f.refill()
+		f.processPartition()
+	}
+	require.Equal(t, 60, f.dispatched)
+	require.Zero(t, f.ready())
+	require.Zero(t, f.backlogSize())
+	require.Zero(t, f.functionUsage())
+}
+
+func TestExpiredCapacityRepairActivationGate(t *testing.T) {
+	for _, during := range []bool{false, true} {
+		t.Run(fmt.Sprintf("disable-during-scan=%t", during), func(t *testing.T) {
+			f := newCapacityRecoveryFixture(t, 25)
+			f.enqueue(25)
+			for range 2 {
+				f.refill()
+				f.advance(time.Millisecond)
+			}
+			f.advance(31 * time.Second)
+			if during {
+				queue.WithAllowKeyQueueCapacityLeaseRepair(func(_ context.Context, account, env, fn uuid.UUID) bool {
+					require.Equal(t, *f.shadow.AccountID, account)
+					require.Equal(t, *f.shadow.EnvID, env)
+					require.Equal(t, *f.shadow.FunctionID, fn)
+					wasEnabled := f.repairEnabled
+					f.repairEnabled = false
+					return wasEnabled
+				})(f.processor.Options())
+			} else {
+				// A missing option defaults to no repair, including on legacy items.
+				queue.WithAllowKeyQueueCapacityLeaseRepair(nil)(f.processor.Options())
+				f.repairEnabled = false
+			}
+			f.processPartition()
+			require.Zero(t, f.backlogSize(), "disabled repair must not return ready items to backlogs")
+			if during {
+				require.Equal(t, 24, f.dispatched)
+				f.processPartition()
+			}
+			require.Equal(t, 25, f.dispatched, "the repair gate does not pause ordinary execution")
+			require.Zero(t, f.ready())
 		})
 	}
 }
