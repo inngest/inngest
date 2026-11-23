@@ -62,7 +62,17 @@ func TestSTSVendor(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, f.calls, "refreshed past half life")
 
-	for _, loc := range []string{"/local/dir", "s3://bucket", "s3://bucket/", "gs://b/p"} {
+	for _, loc := range []string{
+		"/local/dir",
+		"s3://bucket",
+		"s3://bucket/",
+		"gs://b/p",
+		"s3://user:pass@bucket/wh/t",
+		"s3://bucket/wh/t*",
+		"s3://bucket/wh/t?",
+		"s3://bucket/wh/${aws:username}",
+		"s3://bucket/wh/t%2a",
+	} {
 		_, err := v.VendCredentials(t.Context(), []string{"t"}, loc)
 		require.Error(t, err, loc)
 	}

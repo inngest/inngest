@@ -253,7 +253,9 @@ func pushdownExpr(e parser.Expr, entries []pushdownEntry) (string, federate.Pred
 			return "", federate.Predicate{}, false
 		}
 		lit, ok := x.Pattern.(*parser.Literal)
-		if !ok || lit.Kind != parser.LitString {
+		// Do not push patterns containing '\': DuckDB treats '\' literally in
+		// LIKE (without ESCAPE), whereas ClickHouse treats '\' as an escape char.
+		if !ok || lit.Kind != parser.LitString || strings.Contains(lit.Text, `\`) {
 			return "", federate.Predicate{}, false
 		}
 		like := federate.Predicate{Column: col, Path: path, Op: federate.OpLike, Value: lit.Text}

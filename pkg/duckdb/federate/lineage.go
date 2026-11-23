@@ -334,6 +334,32 @@ func positional(stmt *parser.SelectStatement) bool {
 		lit, ok := x.(*parser.Literal)
 		return ok && lit.Kind == parser.LitNumber
 	}
+	var groupByHasPos func(item parser.GroupByItem) bool
+	groupByHasPos = func(item parser.GroupByItem) bool {
+		switch g := item.(type) {
+		case *parser.GroupByExprItem:
+			return isNum(g.X)
+		case *parser.GroupByCube:
+			for _, x := range g.Items {
+				if isNum(x) {
+					return true
+				}
+			}
+		case *parser.GroupByRollup:
+			for _, x := range g.Items {
+				if isNum(x) {
+					return true
+				}
+			}
+		case *parser.GroupingSets:
+			for _, set := range g.Sets {
+				if groupByHasPos(set) {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	if stmt.OrderBy != nil {
 		for _, it := range stmt.OrderBy.Items {
 			if isNum(it.X) {
@@ -343,7 +369,7 @@ func positional(stmt *parser.SelectStatement) bool {
 	}
 	if stmt.GroupBy != nil {
 		for _, it := range stmt.GroupBy.Items {
-			if g, ok := it.(*parser.GroupByExprItem); ok && isNum(g.X) {
+			if groupByHasPos(it) {
 				return true
 			}
 		}
@@ -409,6 +435,15 @@ func (l *lineage) starOutputs(star *parser.StarExpr, sc *scope) []output {
 		}
 		if r.cols == nil {
 			out = append(out, output{star: r})
+			for _, rep := range star.Replace {
+				o := output{name: strings.ToLower(rep.Alias), expr: rep.Expr}
+				for _, ren := range star.Rename {
+					if starNameMatches(ren.From, r.alias, rep.Alias) {
+						o.name = strings.ToLower(ren.To)
+					}
+				}
+				out = append(out, o)
+			}
 			continue
 		}
 		for _, c := range r.cols {
@@ -815,14 +850,22 @@ func (l *lineage) expr(x parser.Expr, sc *scope) {
 	}
 }
 
-// identIfColumn reads name if it's a column in scope, and is a no-op
-// otherwise.
+// identIfColumn reads name if it's a column or lateral SELECT alias in scope,
+// failing closed when any relation in scope has unknown columns.
 func (l *lineage) identIfColumn(name string, sc *scope) {
 	for s := sc; s != nil; s = s.outer {
 		for _, r := range s.rels {
-			if r.cols != nil && r.has(name) {
+			if r.cols == nil {
+				l.fail("lambda/arrow parameter %q in scope with unknown columns", name)
+				return
+			}
+			if r.has(name) {
 				r.need.add(name)
 			}
+		}
+		if x, ok := s.items[strings.ToLower(name)]; ok {
+			delete(s.items, strings.ToLower(name)) // once, and no cycles
+			l.expr(x, s)
 		}
 	}
 }

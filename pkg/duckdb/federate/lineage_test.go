@@ -164,6 +164,42 @@ func TestSourceColumnsRead(t *testing.T) {
 			want: map[Table][]string{TableRuns: runsCols},
 		},
 		{
+			name: "positional GROUP BY ROLLUP", sql: `SELECT r FROM (SELECT run_id AS r, output FROM runs GROUP BY ROLLUP(1, 2))`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"output", "run_id"}},
+		},
+		{
+			name: "positional GROUP BY CUBE", sql: `SELECT r FROM (SELECT run_id AS r, output FROM runs GROUP BY CUBE(1, 2))`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"output", "run_id"}},
+		},
+		{
+			name: "positional GROUP BY GROUPING SETS", sql: `SELECT r FROM (SELECT run_id AS r, output FROM runs GROUP BY GROUPING SETS ((1), (2)))`, tables: []Table{TableRuns},
+			want: map[Table][]string{TableRuns: {"output", "run_id"}},
+		},
+		{
+			name:   "star REPLACE over unknown-columns relation still walks replacement expr",
+			sql:    `SELECT * REPLACE (s.output AS c) FROM (SELECT count(*) FROM runs) u, spans s`,
+			tables: []Table{TableRuns, TableSpans},
+			want:   map[Table][]string{TableRuns: {}, TableSpans: spansCols},
+		},
+		{
+			name:   "star REPLACE over unknown-columns relation selected by replaced alias",
+			sql:    `SELECT c FROM (SELECT u.* REPLACE (s.output AS c) FROM (SELECT count(*) FROM runs) u, spans s)`,
+			tables: []Table{TableRuns, TableSpans},
+			want:   map[Table][]string{TableRuns: {}, TableSpans: {"output"}},
+		},
+		{
+			name:   "lambda/arrow on lateral SELECT alias reads underlying column",
+			sql:    `SELECT output AS a, a -> 'k' FROM spans`,
+			tables: []Table{TableSpans},
+			want:   map[Table][]string{TableSpans: {"output"}},
+		},
+		{
+			// Unknown columns in scope: fail closed (nil -> stream all columns).
+			name:   "lambda/arrow in scope with unknown columns fails closed",
+			sql:    `SELECT a -> 'k' FROM (SELECT count(*) FROM runs) u`,
+			tables: []Table{TableRuns},
+		},
+		{
 			// ORDER BY prefers the alias, WHERE the column: both are read.
 			name:   "ORDER BY an alias shadowing a column",
 			sql:    `WITH t AS (SELECT run_id, output AS status FROM runs ORDER BY status LIMIT 1) SELECT run_id FROM t`,

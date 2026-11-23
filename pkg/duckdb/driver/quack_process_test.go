@@ -73,7 +73,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	require.Equal(t, int64(1), rows[0].Get("c"))
 
 	p.mu.Lock()
-	disabled := p.disabled
+	disabled := p.isDisabledLocked()
 	pidAfter := p.cmd.Process.Pid
 	_, stillQuack := p.sess.(*quack.Session)
 	p.mu.Unlock()
@@ -145,7 +145,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 
 	p.mu.Lock()
 	pidAfter := p.cmd.Process.Pid
-	disabled := p.disabled
+	disabled := p.isDisabledLocked()
 	p.mu.Unlock()
 	require.Equal(t, pidBefore, pidAfter, "a cancelled query must not respawn the subprocess")
 	require.False(t, disabled)
@@ -224,7 +224,7 @@ func TestQuackAbandonedStatementDoesNotBlockNextStatement(t *testing.T) {
 	}
 
 	p.mu.Lock()
-	disabled := p.disabled
+	disabled := p.isDisabledLocked()
 	p.mu.Unlock()
 	require.False(t, disabled)
 }
@@ -377,7 +377,7 @@ func TestQuackAbandonedStatementsAreCapped(t *testing.T) {
 	require.Len(t, rows, 1)
 
 	p.mu.Lock()
-	disabled := p.disabled
+	disabled := p.isDisabledLocked()
 	p.mu.Unlock()
 	require.False(t, disabled)
 }

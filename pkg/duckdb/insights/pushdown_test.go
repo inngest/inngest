@@ -68,6 +68,11 @@ func TestExtractPushdown(t *testing.T) {
 			}},
 		},
 		{
+			name: "LIKE patterns containing backslash are not pushed",
+			sql:  `SELECT run_id FROM metadata WHERE span_id LIKE 'x\%' AND scope LIKE 'a\\b%'`,
+			want: Pushdown{},
+		},
+		{
 			name: "literal type must match the column type",
 			sql:  `SELECT run_id FROM metadata WHERE step_index = '1' AND step_attempt = 1.5 AND scope = 1`,
 			want: Pushdown{},
