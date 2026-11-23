@@ -87,7 +87,7 @@ func TestPooledQuackConnsRecoverFromSubprocessRestart(t *testing.T) {
 	}
 
 	c.proc.mu.Lock()
-	genAfter, disabled := c.proc.quackGen, c.proc.disabled
+	genAfter, disabled := c.proc.quackGen, c.proc.isDisabledLocked()
 	c.proc.mu.Unlock()
 	require.False(t, disabled)
 	require.NotEqual(t, pidBefore, currentPid(c.proc))

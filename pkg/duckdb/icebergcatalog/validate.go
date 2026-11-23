@@ -29,14 +29,30 @@ var locationProperties = []string{
 	"write.object-storage.path",
 }
 
+// iamUnsafeChars are IAM policy wildcard and variable-substitution
+// characters that must never appear in identifiers or table locations
+// interpolated into STS session policies.
+const iamUnsafeChars = "*?${}"
+
+// forbiddenPropertyPrefixes are client/storage FileIO property prefixes that
+// callers must not set on namespaces or tables (prevents credential/endpoint
+// overrides and SSRF through FileIO).
+var forbiddenPropertyPrefixes = []string{
+	"s3.",
+	"gcs.",
+	"adls.",
+	"client.",
+	"http.",
+}
+
 // validateName rejects namespace levels and table names that could escape
 // the warehouse once they're joined into a default location
-// (`<warehouse>/<ns>.db/<table>`).
+// (`<warehouse>/<ns>.db/<table>`), or inject IAM policy wildcards/variables.
 func validateName(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w: empty name", errBadRequest)
 	}
-	if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
+	if strings.ContainsAny(name, `/\`+iamUnsafeChars) || strings.Contains(name, "..") {
 		return fmt.Errorf("%w: invalid name %q", errBadRequest, name)
 	}
 	for _, r := range name {
@@ -82,7 +98,7 @@ func (c *locationChecker) check(loc string) (string, error) {
 	if s.opts.Warehouse == "" {
 		return "", fmt.Errorf("%w: no warehouse configured, explicit locations aren't allowed", errBadRequest)
 	}
-	if strings.ContainsRune(loc, 0) || hasDotSegment(loc) {
+	if strings.ContainsRune(loc, 0) || strings.ContainsAny(loc, iamUnsafeChars) || hasDotSegment(loc) {
 		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
 	}
 
@@ -103,11 +119,14 @@ func (c *locationChecker) check(loc string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: invalid location %q: %v", errBadRequest, loc, err)
 	}
+	if u.User != nil {
+		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
+	}
 	if u.Scheme != wh.Scheme || u.Host != wh.Host || u.RawQuery != "" || u.Fragment != "" {
 		return "", fmt.Errorf("%w: location %q is outside the warehouse", errBadRequest, loc)
 	}
-	if hasDotSegment(u.Path) {
-		// Encoded (IE %2e%2e), which the raw check above can't see.
+	if hasDotSegment(u.Path) || strings.ContainsAny(u.Path, iamUnsafeChars) || strings.ContainsAny(u.Host, iamUnsafeChars) {
+		// Encoded (IE %2e%2e or %2a), which the raw check above can't see.
 		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
 	}
 	root := path.Clean("/" + wh.Path)
@@ -150,11 +169,14 @@ func checkLocalLocation(root, loc string) (string, error) {
 	if err != nil || !isLocal(u) {
 		return "", fmt.Errorf("%w: location %q is outside the warehouse", errBadRequest, loc)
 	}
+	if u.User != nil {
+		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
+	}
 	p := localPath(loc, u)
-	if hasDotSegment(p) {
+	if hasDotSegment(p) || strings.ContainsAny(p, iamUnsafeChars) {
 		// A file:// URL's path is decoded, so an encoded `..` (%2e%2e)
-		// only shows up here. Cleaning it away below would check a
-		// different path than the one written, which follows symlinks
+		// or wildcard (%2a) only shows up here. Cleaning it away below would
+		// check a different path than the one written, which follows symlinks
 		// before applying the `..`.
 		return "", fmt.Errorf("%w: invalid location %q", errBadRequest, loc)
 	}
@@ -194,18 +216,34 @@ func resolveExisting(p string) (string, error) {
 	}
 }
 
-// underRoot is a path-prefix check w/ a trailing separator, so `/wh-evil`
-// isn't under `/wh`.
+// underRoot is a strict path-prefix check w/ a trailing separator, so neither
+// `/wh` itself nor `/wh-evil` is under `/wh`.
 func underRoot(p, root, sep string) bool {
 	if p == root {
-		return true
+		return false
 	}
 	return strings.HasPrefix(p, strings.TrimSuffix(root, sep)+sep)
 }
 
+// checkForbiddenProps rejects FileIO/credential/HTTP property overrides.
+func checkForbiddenProps(props iceberg.Properties) error {
+	for k := range props {
+		lower := strings.ToLower(k)
+		for _, pfx := range forbiddenPropertyPrefixes {
+			if strings.HasPrefix(lower, pfx) {
+				return fmt.Errorf("%w: property %q is not allowed", errBadRequest, k)
+			}
+		}
+	}
+	return nil
+}
+
 // checkLocationProps validates (and normalizes in place) every location-ish
-// property in props.
+// property in props, and rejects forbidden FileIO/credential property keys.
 func (s *Server) checkLocationProps(props iceberg.Properties) error {
+	if err := checkForbiddenProps(props); err != nil {
+		return err
+	}
 	for _, k := range locationProperties {
 		v, ok := props[k]
 		if !ok {
@@ -223,7 +261,8 @@ func (s *Server) checkLocationProps(props iceberg.Properties) error {
 // allowedUpdates are the commit update actions we apply: what duckdb sends
 // (see the smoke test) plus what a spec-compliant client managing snapshots,
 // properties and statistics would. Anything else (encryption keys, removing
-// schemas/specs) is rejected rather than reasoned about.
+// schemas/specs, relocating a table via set-location) is rejected rather than
+// reasoned about.
 var allowedUpdates = map[string]bool{
 	table.UpdateAssignUUID:                true,
 	table.UpdateUpgradeFormatVersion:      true,
@@ -233,7 +272,6 @@ var allowedUpdates = map[string]bool{
 	table.UpdateSetDefaultSpec:            true,
 	table.UpdateAddSortOrder:              true,
 	table.UpdateSetDefaultSortOrder:       true,
-	table.UpdateSetLocation:               true,
 	table.UpdateAddSnapshot:               true,
 	table.UpdateSetSnapshotRef:            true,
 	table.UpdateRemoveSnapshots:           true,
@@ -256,8 +294,15 @@ var allowedUpdates = map[string]bool{
 // updates produce.
 func (s *Server) checkCommit(base table.Metadata, updates table.Updates) (table.Metadata, error) {
 	for _, u := range updates {
-		if !allowedUpdates[u.Action()] {
-			return nil, fmt.Errorf("%w: update action %q is not supported", errBadRequest, u.Action())
+		action := u.Action()
+		// set-location is only permitted during stage-create (base == nil),
+		// which DuckDB sends to establish a newly created table's location;
+		// relocating an existing table is disallowed.
+		if action == table.UpdateSetLocation && base == nil {
+			continue
+		}
+		if !allowedUpdates[action] {
+			return nil, fmt.Errorf("%w: update action %q is not supported", errBadRequest, action)
 		}
 	}
 	if base == nil {
@@ -297,6 +342,9 @@ func (s *Server) checkMetadata(md, prev table.Metadata) error {
 	}
 	roots := []string{loc}
 	props := md.Properties()
+	if err := checkForbiddenProps(props); err != nil {
+		return err
+	}
 	for _, k := range locationProperties {
 		v, ok := props[k]
 		if !ok {
@@ -451,7 +499,7 @@ func (s *Server) locationInUse(ctx context.Context, loc string) (bool, error) {
 				// Not under the warehouse, so it can't overlap loc.
 				continue
 			}
-			if underRoot(other, loc, sep) || underRoot(loc, other, sep) {
+			if other == loc || underRoot(other, loc, sep) || underRoot(loc, other, sep) {
 				return true, nil
 			}
 		}

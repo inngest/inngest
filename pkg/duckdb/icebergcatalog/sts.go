@@ -143,9 +143,15 @@ func sessionName(ident table.Identifier) string {
 // tablePolicy is an IAM session policy for an `s3://bucket/prefix` table
 // location: objects under the prefix, and listing only that prefix.
 func tablePolicy(location string, readOnly bool) (string, error) {
+	if strings.ContainsAny(location, iamUnsafeChars) {
+		return "", fmt.Errorf("icebergcatalog: invalid characters in table location %q", location)
+	}
 	u, err := url.Parse(location)
-	if err != nil || (u.Scheme != "s3" && u.Scheme != "s3a") || u.Host == "" {
+	if err != nil || (u.Scheme != "s3" && u.Scheme != "s3a") || u.Host == "" || u.User != nil {
 		return "", fmt.Errorf("icebergcatalog: can't vend S3 creds for table location %q", location)
+	}
+	if strings.ContainsAny(u.Host, iamUnsafeChars) || strings.ContainsAny(u.Path, iamUnsafeChars) {
+		return "", fmt.Errorf("icebergcatalog: invalid characters in table location %q", location)
 	}
 	prefix := strings.Trim(u.Path, "/")
 	if prefix == "" {
