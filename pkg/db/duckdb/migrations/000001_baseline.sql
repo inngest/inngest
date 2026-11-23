@@ -1,14 +1,17 @@
 -- +goose Up
 -- The lake tables. On an Iceberg lake they're format-version 3, partitioned
--- by account + month, and set (DUCKDB_ICEBERG_ONLY is empty in-memory):
+-- by bucket(128, account_id) + month (bounding files per export at 128
+-- instead of ~200k accounts), and set (DUCKDB_ICEBERG_ONLY is empty
+-- in-memory):
 --   * commit.manifest-merge.enabled=false: merging reads every manifest on
 --     each commit until duckdb/duckdb-iceberg#1650 ships.
 --   * commit.retry.*: duckdb's defaults (4 retries, up to 60s backoff)
 --     starve concurrent writers.
 --   * zstd: ~35% smaller than duckdb's snappy default.
--- No SORTED BY (sorting each small append only slows inserts), compaction
--- owns sorting. JSON payloads are JSON text in VARCHAR columns (Iceberg
--- rejects duckdb's JSON type), the views cast them back.
+-- No SORTED BY (sorting each small append only slows inserts); export and
+-- compaction own (account_id, env_id, <time_col>) sort order. JSON payloads
+-- are JSON text in VARCHAR columns (Iceberg rejects duckdb's JSON type), the
+-- views cast them back.
 --
 -- bucket_at is when the row reached the buffer (Kafka LogAppendTime, or the
 -- insert time here): federated reads take the lake for bucket_at <= W and
@@ -43,7 +46,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   defer_parent_run_ids VARCHAR[],
   trace_id VARCHAR,
   bucket_at TIMESTAMPTZ NOT NULL${DUCKDB_BUCKET_AT_DEFAULT-}
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (bucket(128, account_id), month(queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- One row per metadata write, joined onto run_trace_spans by
@@ -65,7 +68,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   values         VARCHAR NOT NULL,
   created_at     TIMESTAMPTZ NOT NULL,
   bucket_at      TIMESTAMPTZ NOT NULL${DUCKDB_BUCKET_AT_DEFAULT-}
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (bucket(128, account_id), month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- output/error are the SDK's output envelope split at write time
@@ -92,7 +95,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   error VARCHAR,
   input VARCHAR,
   bucket_at TIMESTAMPTZ NOT NULL${DUCKDB_BUCKET_AT_DEFAULT-}
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (bucket(128, account_id), month(run_queued_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- +goose ENVSUB ON
@@ -110,7 +113,7 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   event_ts TIMESTAMPTZ NOT NULL,
   event_meta VARCHAR NOT NULL DEFAULT '{}',
   bucket_at TIMESTAMPTZ NOT NULL${DUCKDB_BUCKET_AT_DEFAULT-}
-) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(received_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (bucket(128, account_id), month(received_at)) WITH ('format-version' = '3', 'commit.manifest-merge.enabled' = 'false', 'commit.retry.num-retries' = '100', 'commit.retry.max-wait-ms' = '200', 'write.parquet.compression-codec' = 'zstd')};
 -- +goose ENVSUB OFF
 
 -- +goose Down

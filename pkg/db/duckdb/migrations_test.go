@@ -193,6 +193,10 @@ func TestLakeTableProperties(t *testing.T) {
 			require.Equal(t, "false", props["commit.manifest-merge.enabled"])
 			// No declared sort order, compaction owns sorting.
 			require.True(t, lt.SortOrder().IsUnsorted(), "sort order %v", lt.SortOrder())
+			spec := lt.Spec()
+			require.Equal(t, 2, spec.NumFields(), "partition spec %v", spec)
+			require.Equal(t, iceberg.BucketTransform{NumBuckets: 128}, spec.Field(0).Transform)
+			require.Equal(t, iceberg.MonthTransform{}, spec.Field(1).Transform)
 		})
 	}
 
