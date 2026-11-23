@@ -18,72 +18,52 @@ type MetricRow = {
   inferred?: string[];
 };
 
-/** Builds one chart row per timestamp from independently reported series. */
+/** Combines dense metric series that share the same ordered buckets. */
 export function mergeMetricRows(
   series: MetricSeries[],
   granularity: string,
   rangeStart: string,
   rangeEnd: string,
 ) {
-  const byBucket = new Map<number, MetricRow>();
-
-  for (const { key, data, mapValue } of series) {
-    for (const { bucket, value } of data) {
-      const timestamp = new Date(bucket).getTime();
-      const metric = byBucket.get(timestamp) ?? { name: bucket, values: {} };
-
-      // Preserve null as a chart gap and don't pass it to mappers; for example,
-      // Boolean(null) would conflate absence with a reported false value.
-      metric.values[key] = value === null ? null : (mapValue?.(value) ?? value);
-      byBucket.set(timestamp, metric);
-    }
-  }
-
   const amount = Number.parseInt(granularity, 10);
   const bucketWidth = amount * (granularity.endsWith('h') ? 60 : 1) * 60_000;
-
-  for (const { key, data, inferMissingAsZero } of series) {
-    if (!inferMissingAsZero) continue;
-
-    for (const timestamp of findSustainedMissingBuckets(
-      data,
-      bucketWidth,
-      rangeStart,
-      rangeEnd,
-    )) {
-      const metric = byBucket.get(timestamp) ?? {
-        name: new Date(timestamp).toISOString(),
-        values: {},
-      };
-      metric.values[key] = 0;
-      metric.inferred = [...(metric.inferred ?? []), key];
-      byBucket.set(timestamp, metric);
-    }
-  }
-
-  const observed = Array.from(byBucket.values()).sort((a, b) =>
-    a.name.localeCompare(b.name),
+  const inferredByKey = new Map(
+    series
+      .filter(({ inferMissingAsZero }) => inferMissingAsZero)
+      .map(({ key, data }) => [
+        key,
+        new Set(
+          findSustainedMissingBuckets(data, bucketWidth, rangeStart, rangeEnd),
+        ),
+      ]),
   );
-  if (observed.length < 2) {
-    return observed;
-  }
 
-  const firstBucket = new Date(observed[0].name).getTime();
-  const lastBucket = new Date(observed.at(-1)!.name).getTime();
-  const metrics: MetricRow[] = [];
+  // The backend contract guarantees that every response has the same dense,
+  // ordered buckets. Choosing the longest response is only defensive so one
+  // missing response does not hide another; this does not align sparse series.
+  const buckets = series.reduce<Metric[]>((longest, { data }) => {
+    return data.length > longest.length ? data : longest;
+  }, []);
 
-  for (
-    let timestamp = firstBucket;
-    timestamp <= lastBucket;
-    timestamp += bucketWidth
-  ) {
-    metrics.push(
-      byBucket.get(timestamp) ?? {
-        name: new Date(timestamp).toISOString(),
-        values: {},
-      },
-    );
-  }
+  return buckets.map(({ bucket }, index): MetricRow => {
+    const timestamp = new Date(bucket).getTime();
+    const metric: MetricRow = { name: bucket, values: {} };
 
-  return metrics;
+    for (const { key, data, mapValue } of series) {
+      const value = data[index]?.value;
+      if (value === undefined) continue;
+
+      if (inferredByKey.get(key)?.has(timestamp)) {
+        metric.values[key] = 0;
+        metric.inferred = [...(metric.inferred ?? []), key];
+      } else {
+        // Preserve null as a chart gap and don't pass it to mappers; for
+        // example, Boolean(null) would conflate absence with reported false.
+        metric.values[key] =
+          value === null ? null : (mapValue?.(value) ?? value);
+      }
+    }
+
+    return metric;
+  });
 }
