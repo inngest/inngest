@@ -20,22 +20,29 @@ func main() {
 
 func run(args []string) error {
 	fs := flag.NewFlagSet("inngest-duckdb-worker", flag.ContinueOnError)
-	socketPath := fs.String("socket", "", "Unix domain socket path to listen on (required)")
+	listenAddr := fs.String("listen", "", "Address to listen on: Unix socket path (/path.sock, unix:///path.sock) or TCP address (:9090, tcp://0.0.0.0:9090)")
+	socketPath := fs.String("socket", "", "Alias for --listen (Unix domain socket path)")
+	healthAddr := fs.String("health-addr", "", "Optional HTTP listen address for GET /healthz (e.g. :8080)")
 	libPath := fs.String("lib", "", "Path to libduckdb shared library (if empty, lazily downloaded into --state-dir)")
 	dbPath := fs.String("db", "", "DuckDB database file path (empty for in-memory)")
 	stateDir := fs.String("state-dir", "", "Directory for cached libduckdb downloads")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *socketPath == "" {
-		return fmt.Errorf("--socket is required")
+	addr := *listenAddr
+	if addr == "" {
+		addr = *socketPath
+	}
+	if addr == "" {
+		return fmt.Errorf("--listen (or --socket) is required")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	return server.Serve(ctx, server.Opts{
-		SocketPath: *socketPath,
+		ListenAddr: addr,
+		HealthAddr: *healthAddr,
 		LibPath:    *libPath,
 		DBPath:     *dbPath,
 		StateDir:   *stateDir,

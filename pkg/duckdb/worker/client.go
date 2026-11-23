@@ -50,22 +50,22 @@ type Client struct {
 	closed bool
 }
 
-// Dial connects to an already-running external sidecar worker at socketPath
-// and verifies liveness with a Ping.
-func Dial(ctx context.Context, socketPath string) (*Client, error) {
-	if socketPath == "" {
-		return nil, errors.New("worker: socket path is empty")
+// Dial connects to an already-running external worker (Unix socket path,
+// unix:///path, tcp://host:port, or host:port) and verifies liveness with Ping.
+func Dial(ctx context.Context, addr string) (*Client, error) {
+	if addr == "" {
+		return nil, errors.New("worker: address is empty")
 	}
-	c := &Client{socketPath: socketPath}
+	c := &Client{socketPath: addr}
 	if _, err := c.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("worker: dialing %q: %w", socketPath, err)
+		return nil, fmt.Errorf("worker: dialing %q: %w", addr, err)
 	}
 	return c, nil
 }
 
 // Spawn starts a managed duckdb-worker subprocess with a minimal environment,
-// waits until the Unix domain socket responds to Ping, and returns a Client
-// that tears down the subprocess on Close.
+// waits until the listener responds to Ping, and returns a Client that tears
+// down the subprocess on Close.
 func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 	if cfg.WorkerBinary == "" {
 		return nil, errors.New("worker: WorkerBinary is required")
@@ -78,9 +78,14 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 		timeout = 15 * time.Second
 	}
 
-	_ = os.Remove(cfg.SocketPath)
-
-	args := []string{"--socket", cfg.SocketPath}
+	network, address := ParseAddress(cfg.SocketPath)
+	var args []string
+	if network == "unix" {
+		_ = os.Remove(address)
+		args = []string{"--socket", address}
+	} else {
+		args = []string{"--listen", cfg.SocketPath}
+	}
 	if cfg.LibPath != "" {
 		args = append(args, "--lib", cfg.LibPath)
 	}
@@ -201,7 +206,8 @@ func (c *Client) WaitExit() <-chan error {
 
 func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 	var d net.Dialer
-	return d.DialContext(ctx, "unix", c.socketPath)
+	network, address := ParseAddress(c.socketPath)
+	return d.DialContext(ctx, network, address)
 }
 
 func (c *Client) roundTrip(ctx context.Context, req Request) (Response, error) {
@@ -287,7 +293,9 @@ func (c *Client) Close() error {
 		}
 	}
 
-	_ = os.Remove(c.socketPath)
+	if network, address := ParseAddress(c.socketPath); network == "unix" {
+		_ = os.Remove(address)
+	}
 	return nil
 }
 

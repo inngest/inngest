@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/worker"
@@ -18,8 +20,15 @@ import (
 
 // Opts configures Serve.
 type Opts struct {
-	// SocketPath is the Unix domain socket path to listen on (required).
+	// ListenAddr is the address to listen on: a Unix domain socket path
+	// (/path.sock, unix:///path.sock) or TCP address (:9090, tcp://0.0.0.0:9090).
+	// If empty, SocketPath is used.
+	ListenAddr string
+	// SocketPath is a backward-compatible alias for ListenAddr (Unix socket).
 	SocketPath string
+	// HealthAddr, when non-empty, serves GET /healthz over HTTP (e.g. ":8080")
+	// for remote/k8s deployments. Empty disables the HTTP health server.
+	HealthAddr string
 	// LibPath is an optional path to libduckdb. If empty, driver.EnsureLibrary
 	// lazily downloads and verifies libduckdb into StateDir.
 	LibPath string
@@ -32,11 +41,15 @@ type Opts struct {
 }
 
 // Serve loads libduckdb via purego (downloading it lazily if LibPath is empty),
-// opens the DuckDB database, and serves the Unix domain socket worker protocol
+// opens the DuckDB database, and serves the worker protocol over UDS or TCP
 // until ctx is cancelled or a Shutdown RPC is received.
 func Serve(ctx context.Context, opts Opts) error {
-	if opts.SocketPath == "" {
-		return fmt.Errorf("duckdb worker: SocketPath is required")
+	addr := opts.ListenAddr
+	if addr == "" {
+		addr = opts.SocketPath
+	}
+	if addr == "" {
+		return fmt.Errorf("duckdb worker: ListenAddr (or SocketPath) is required")
 	}
 
 	resolvedLib := opts.LibPath
@@ -69,7 +82,51 @@ func Serve(ctx context.Context, opts Opts) error {
 	defer db.Close()
 
 	srv := New(db, lib.Version())
-	return srv.ListenAndServe(ctx, opts.SocketPath)
+	if opts.HealthAddr != "" {
+		stopHealth, err := startHealthServer(opts.HealthAddr, srv)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = stopHealth() }()
+	}
+	return srv.ListenAndServe(ctx, addr)
+}
+
+func startHealthServer(addr string, srv *Server) (func() error, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("duckdb worker: listen health %q: %w", addr, err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		if srv.isClosed() {
+			http.Error(w, "closing", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok\n"))
+	})
+	httpSrv := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	errCh := make(chan error, 1)
+	go func() {
+		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+	return func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := httpSrv.Shutdown(shutdownCtx)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		return errors.Join(err, <-errCh)
+	}, nil
 }
 
 type session struct {
@@ -140,28 +197,40 @@ func New(db *libduckdb.DB, version string) *Server {
 	}
 }
 
-// ListenAndServe binds a Unix domain socket at socketPath and serves until ctx
-// is cancelled or Shutdown is requested.
-func (s *Server) ListenAndServe(ctx context.Context, socketPath string) error {
-	sockDir := filepath.Dir(socketPath)
-	if err := os.MkdirAll(sockDir, 0o700); err != nil {
-		return fmt.Errorf("worker: creating socket directory: %w", err)
-	}
-	_ = os.Remove(socketPath)
+// ListenAndServe binds a Unix domain socket or TCP listener at addr and serves
+// until ctx is cancelled or Shutdown is requested.
+func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
+	network, address := worker.ParseAddress(addr)
+	var (
+		ln  net.Listener
+		err error
+	)
+	if network == "unix" {
+		sockDir := filepath.Dir(address)
+		if err := os.MkdirAll(sockDir, 0o700); err != nil {
+			return fmt.Errorf("worker: creating socket directory: %w", err)
+		}
+		_ = os.Remove(address)
 
-	ln, err := net.Listen("unix", socketPath)
-	if err != nil {
-		return fmt.Errorf("worker: listen unix %q: %w", socketPath, err)
-	}
-	if err := os.Chmod(socketPath, 0o600); err != nil {
-		_ = ln.Close()
-		_ = os.Remove(socketPath)
-		return fmt.Errorf("worker: chmod unix socket %q: %w", socketPath, err)
-	}
+		ln, err = net.Listen("unix", address)
+		if err != nil {
+			return fmt.Errorf("worker: listen unix %q: %w", address, err)
+		}
+		if err := os.Chmod(address, 0o600); err != nil {
+			_ = ln.Close()
+			_ = os.Remove(address)
+			return fmt.Errorf("worker: chmod unix socket %q: %w", address, err)
+		}
 
-	s.mu.Lock()
-	s.socketPath = socketPath
-	s.mu.Unlock()
+		s.mu.Lock()
+		s.socketPath = address
+		s.mu.Unlock()
+	} else {
+		ln, err = net.Listen(network, address)
+		if err != nil {
+			return fmt.Errorf("worker: listen %s %q: %w", network, address, err)
+		}
+	}
 
 	return s.Serve(ctx, ln)
 }
