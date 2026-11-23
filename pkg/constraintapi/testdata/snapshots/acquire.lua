@@ -186,6 +186,10 @@ local function throttle(key, now_ms, period_ms, limit, burst, quantity)
 	end
 	return result
 end
+local function decodeManualOwner(value)
+	local weight, request = string.match(value, "^(%d+):([^:]*)$")
+	return tonumber(weight), request
+end
 local requested = requestDetails.r
 local configVersion = requestDetails.cv
 local constraints = requestDetails.s
@@ -210,6 +214,9 @@ local exhaustedConstraints = {}
 local exhaustedSet = {}
 local retryAt = 0
 local concurrencyUsageCache = {}
+local manualReuse = {}
+local manualOwnerKeys = {}
+local semaphoreCapacityCache = {}
 local constraintUsage = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 local cacheEnabled = cacheMaxTTL > 0
@@ -260,6 +267,7 @@ end
 for index, value in ipairs(constraints) do
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
+	local runLimited = false
 	if skipGCRA and (value.k == 1 or value.k == 3) then
 		constraintCapacity = math.max(availableCapacity, 1)
 	elseif value.k == 1 then
@@ -282,19 +290,30 @@ for index, value in ipairs(constraints) do
 	elseif value.k == 4 then
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		semaphoreCapacityCache[index] = capacity
 		local weight = toInteger(value.sem.w)
 		if not weight or weight <= 0 then
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if remaining < weight then
-			constraintCapacity = 0
-		else
-			constraintCapacity = math.floor(remaining / weight)
+		constraintCapacity = math.max(math.floor(remaining / weight), 0)
+		if requestDetails.mso and value.sem.rel == 1 then
+			local ownerKey = value.sem.k .. ":owner:" .. requestDetails.lri[requestDetails.lik[1]]
+			manualOwnerKeys[index] = ownerKey
+			local owned = call("GET", ownerKey)
+			if owned ~= false then
+				local held, claim = decodeManualOwner(owned)
+				if held == nil or usage < held then
+					return redis.error_reply("ERR manual semaphore ownership is invalid")
+				end
+				manualReuse[index] = held == weight and claim == ""
+				constraintCapacity = manualReuse[index] and 1 or 0
+				runLimited = not manualReuse[index]
+			end
 		end
 		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
-	if constraintCapacity <= 0 then
+	if constraintCapacity <= 0 and not runLimited then
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
@@ -372,8 +391,17 @@ for i, value in ipairs(constraints) do
 		if not weight or weight <= 0 then
 			weight = 1
 		end
-		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
-		local capacity = tonumber(call("GET", value.sem.ck)) or 0
+		local acquired = manualReuse[i] and 0 or granted
+		local newUsage
+		if acquired > 0 then
+			newUsage = call("INCRBY", value.sem.k, toInteger(weight * acquired))
+		else
+			newUsage = tonumber(call("GET", value.sem.k)) or 0
+		end
+		if manualOwnerKeys[i] then
+			call("MSET", value.sem.k .. ":ownership", "1", manualOwnerKeys[i], tostring(toInteger(weight)) .. ":" .. requestID)
+		end
+		local capacity = semaphoreCapacityCache[i]
 		local remaining = capacity - newUsage
 		if remaining < weight then
 			constraintCapacity = 0

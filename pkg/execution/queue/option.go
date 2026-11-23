@@ -603,6 +603,7 @@ type QueueOptions struct {
 	AcquireCapacityLeaseOnBacklogRefill bool
 	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
 	BypassArchivedWorkspaceAppSemaphore BypassArchivedWorkspaceAppSemaphore
+	ManualSemaphoreOwnership            func(uuid.UUID) bool
 	CapacityReleaseWakeEnabled          CapacityReleaseWakeEnabled
 
 	ConditionalTracer trace.ConditionalTracer
@@ -806,6 +807,12 @@ func WithBypassArchivedWorkspaceAppSemaphore(f BypassArchivedWorkspaceAppSemapho
 	return func(q *QueueOptions) {
 		q.BypassArchivedWorkspaceAppSemaphore = f
 	}
+}
+
+// WithManualSemaphoreOwnership excludes owned manual permits from shared
+// per-pass exhaustion memos. Use the same immutable account policy as Acquire.
+func WithManualSemaphoreOwnership(enabled func(uuid.UUID) bool) QueueOpt {
+	return func(q *QueueOptions) { q.ManualSemaphoreOwnership = enabled }
 }
 
 // WithCapacityReleaseWakeEnabled gates CapacityReleaseNotifier wakes per
