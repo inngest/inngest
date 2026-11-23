@@ -694,3 +694,60 @@ func TestBatcherKeepsResumeInterruptedAgain(t *testing.T) {
 		require.Equal(t, []string{"b"}, got, "run %d", i)
 	}
 }
+
+// When a resumed batch succeeds and only newer items in buf fail with
+// ErrDisabled, dropped must only count the failed items, not the already-flushed
+// resumed batch.
+func TestBatcherDroppedCountExcludesResumedBatch(t *testing.T) {
+	var calls atomic.Int64
+	var dropped atomic.Int64
+	firstFailed := make(chan struct{})
+
+	flush := func(_ context.Context, items []Event) error {
+		switch calls.Add(1) {
+		case 1:
+			// Initial flush of 2 items hits a retryable conflict and enters backoff.
+			close(firstFailed)
+			return errConflict
+		case 2:
+			// Final flush retries the resumed 2 items and succeeds.
+			require.Len(t, items, 2)
+			return nil
+		case 3:
+			// Final flush attempts the 1 newly drained item and hits ErrDisabled.
+			require.Len(t, items, 1)
+			return duckdbdriver.ErrDisabled
+		default:
+			t.Fatalf("unexpected flush call %d", calls.Load())
+			return nil
+		}
+	}
+
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, flush, batcherOpts{
+		maxSize:        2,
+		flushInterval:  time.Hour,
+		retryBaseDelay: time.Hour,
+		retryMaxDelay:  time.Hour,
+		dropped:        &dropped,
+	})
+	done := make(chan struct{})
+	go func() { b.run(t.Context()); close(done) }()
+
+	ch <- testEvent("1", "a")
+	ch <- testEvent("2", "b")
+	<-firstFailed
+
+	// Queue one more event while the batcher is in backoff, then stop so
+	// drainRemaining appends it to buf before the final flush.
+	ch <- testEvent("3", "c")
+	b.stop()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batcher did not exit after stop")
+	}
+	require.Equal(t, int64(3), calls.Load())
+	require.Equal(t, int64(1), dropped.Load(), "only the failed newer item should be counted as dropped")
+}
