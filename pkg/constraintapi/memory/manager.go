@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
@@ -85,6 +86,33 @@ type Manager struct {
 
 	locks [stripeCount]paddedMutex
 	stats *stats
+
+	// log receives a record for every change when this manager is the
+	// primary of a replicated shard.  nil when nothing is replicated.
+	log atomic.Pointer[Log]
+
+	// hkMu is the housekeeping mutex.  the sweeper tick and Freeze take it,
+	// so a state export never runs in the middle of a sweep.  capMu makes a
+	// capacity write and its log append one step.  an operation takes its
+	// stripe lock first and capMu second.
+	hkMu  sync.Mutex
+	capMu sync.Mutex
+
+	// setSeq issues constraint set IDs.  setDrops is the sets that left the
+	// sets map and whose RecSetDrop is not logged yet; the housekeeping
+	// mutex guards it.
+	setSeq   atomic.Uint64
+	setDrops []setDrop
+
+	// follower is true while this manager only applies records.  it has no
+	// sweeper then.  replSets is the sets a follower was told about, by set
+	// ID.  only the goroutine that calls Apply touches it.
+	follower bool
+	nonceSet bool
+	replSets map[uint64]*constraintSet
+	// followerStep is the stripe the next FollowerHousekeepStep sweeps.  only
+	// the goroutine that calls Apply touches it.
+	followerStep int
 
 	stop      chan struct{}
 	done      chan struct{}
@@ -167,11 +195,13 @@ func NewManager(opts ...Option) (*Manager, error) {
 		m.clock = clockwork.NewRealClock()
 	}
 
-	nonce, err := randomNonce()
-	if err != nil {
-		return nil, fmt.Errorf("could not draw manager nonce: %w", err)
+	if !m.nonceSet {
+		nonce, err := randomNonce()
+		if err != nil {
+			return nil, fmt.Errorf("could not draw manager nonce: %w", err)
+		}
+		m.nonce = nonce
 	}
-	m.nonce = nonce
 	m.expiry = newExpiryIndex(m.nowMS())
 	m.stats = newStats(m.shardName)
 
@@ -180,7 +210,7 @@ func NewManager(opts ...Option) (*Manager, error) {
 		defer m.wg.Done()
 		m.stats.run(m.stop)
 	}()
-	if m.sweepInterval > 0 {
+	if m.sweepInterval > 0 && !m.follower {
 		m.wg.Add(1)
 		go m.run()
 	}
@@ -204,7 +234,7 @@ func (m *Manager) nowMS() int64 {
 	return m.clock.Now().UnixMilli()
 }
 
-func (m *Manager) log(ctx context.Context) logger.Logger {
+func (m *Manager) logger(ctx context.Context) logger.Logger {
 	return logger.StdlibLogger(ctx).With("shard", m.shardName)
 }
 

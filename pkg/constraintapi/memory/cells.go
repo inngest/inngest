@@ -67,19 +67,41 @@ func (c *semaphoreCell) take(capacity, w int64, q int) (fit int, after int64, ok
 // because two concurrent double releases fixing up would leave the counter
 // at +1.  ok is false when the cell is dead and nothing changed.
 func (c *semaphoreCell) give(w int64) (v int64, ok bool) {
+	v, _, ok = c.giveApplied(w)
+	return v, ok
+}
+
+// giveApplied is give that also returns how much it subtracted, which is
+// less than w when the counter was clamped at zero.
+func (c *semaphoreCell) giveApplied(w int64) (v int64, applied int64, ok bool) {
 	for {
 		old := c.v.Load()
 		if isDead(old) {
-			return 0, false
+			return 0, 0, false
 		}
 		next := old - w
 		if next < 0 {
 			next = 0
 		}
 		if c.v.CompareAndSwap(old, next) {
-			return next, true
+			return next, old - next, true
 		}
 	}
+}
+
+// add adds delta with no clamp and no capacity check.  a follower applies
+// replicated changes with it.  records from different log buffers reach a
+// follower in a different order than the primary made them, so the counter
+// can be below zero for a moment, and every change must be a plain add for
+// the sum to come out the same.  ok is false when the cell is dead and
+// nothing changed.
+func (c *semaphoreCell) add(delta int64) (ok bool) {
+	after := c.v.Add(delta)
+	if isDead(after - delta) {
+		c.v.Add(-delta)
+		return false
+	}
+	return true
 }
 
 // set stores v.  ok is false when the cell is dead and nothing changed.
@@ -124,6 +146,25 @@ func (c *semaphoreCell) kill() bool {
 type gcraState struct {
 	tat       float64
 	expiresAt int64
+	// version orders the states of one cell.  a follower stores a state
+	// only when its version is greater than the one it has.
+	version uint64
+}
+
+// tatVersionShift leaves 20 bits below the millisecond clock, so a version
+// taken from the clock is above every version written in an earlier
+// millisecond.
+const tatVersionShift = 20
+
+// nextTATVersion is the version of a state stored at nowMS over old.  it is
+// above old's version, and above the version of any state a dropped cell had,
+// because a cell is dropped only after its state expired.
+func nextTATVersion(old *gcraState, nowMS int64) uint64 {
+	v := uint64(nowMS) << tatVersionShift
+	if old != nil && old != deadGCRA && old.version >= v {
+		v = old.version + 1
+	}
+	return v
 }
 
 // deadGCRA marks a cell housekeeping dropped from its map.
@@ -152,13 +193,14 @@ func (c *gcraCell) alive() bool {
 
 // update runs f on the current TAT and stores the result with a CAS.  f is
 // pure and may run more than once under contention.  when f returns store
-// false nothing is written and update returns after one run.  ok is false
-// when the cell is dead and nothing was written.
-func (c *gcraCell) update(nowMS int64, f func(tat float64, present bool) (newTAT float64, store bool, ttlSec int64)) (ok bool) {
+// false nothing is written and update returns after one run.  stored is the
+// state this call wrote, nil when it wrote nothing.  ok is false when the
+// cell is dead and nothing was written.
+func (c *gcraCell) update(nowMS int64, f func(tat float64, present bool) (newTAT float64, store bool, ttlSec int64)) (stored *gcraState, ok bool) {
 	for {
 		old := c.state.Load()
 		if old == deadGCRA {
-			return false
+			return nil, false
 		}
 		var tat float64
 		present := old != nil && old.expiresAt > nowMS
@@ -167,9 +209,35 @@ func (c *gcraCell) update(nowMS int64, f func(tat float64, present bool) (newTAT
 		}
 		newTAT, store, ttlSec := f(tat, present)
 		if !store {
+			return nil, true
+		}
+		next := &gcraState{
+			tat:       newTAT,
+			expiresAt: nowMS + ttlSec*1000,
+			version:   nextTATVersion(old, nowMS),
+		}
+		if c.state.CompareAndSwap(old, next) {
+			return next, true
+		}
+	}
+}
+
+// apply stores a replicated state when its version is greater than the one
+// the cell has.  ok is false when the cell is dead and nothing was written.
+func (c *gcraCell) apply(tat float64, expiresAt int64, version uint64) (ok bool) {
+	for {
+		old := c.state.Load()
+		if old == deadGCRA {
+			return false
+		}
+		if old != nil && old.version >= version {
 			return true
 		}
-		next := &gcraState{tat: newTAT, expiresAt: nowMS + ttlSec*1000}
+		next := &gcraState{
+			tat:       tat,
+			expiresAt: expiresAt,
+			version:   version,
+		}
 		if c.state.CompareAndSwap(old, next) {
 			return true
 		}

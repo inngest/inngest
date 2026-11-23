@@ -21,10 +21,19 @@ func (m *Manager) ExtendLease(ctx context.Context, req *constraintapi.CapacityEx
 
 	mu := m.lock(extKey)
 	cached, hit := m.extIdem.get(nowMS, extKey)
+	var batch *Batch
 	if !hit {
-		cached = m.extend(nowMS, leaseExpiryMS, req, extKey)
+		cached, batch = m.extend(nowMS, leaseExpiryMS, req, extKey)
 	}
 	mu.Unlock()
+
+	// only a successful extend is kept for replays
+	if hit {
+		batch = m.replayBatch()
+	}
+	if ierr := m.awaitCommit(ctx, batch, req.CommitLevel, constraintapi.CommitLevelAll); ierr != nil {
+		return nil, ierr
+	}
 
 	res := *cached
 	res.OperationIdempotencyHit = hit
@@ -53,34 +62,48 @@ func (m *Manager) ExtendLease(ctx context.Context, req *constraintapi.CapacityEx
 
 // extend is the body of one ExtendLease.  it runs once per idempotency key.
 // an expired lease ID is rejected before any lookup, like extend.lua.
-func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.CapacityExtendLeaseRequest, extKey uint64) *constraintapi.CapacityExtendLeaseResponse {
+func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.CapacityExtendLeaseRequest, extKey uint64) (*constraintapi.CapacityExtendLeaseResponse, *Batch) {
 	res := &constraintapi.CapacityExtendLeaseResponse{AccountID: req.AccountID}
 
 	expiresAtMS, seq, nonce := decodeLeaseID(req.LeaseID)
 	if expiresAtMS < nowMS {
-		return res
+		return res, nil
 	}
 	if nonce != m.nonce {
 		m.stats.foreign("extend")
-		return res
+		return res, nil
 	}
 	sl := m.slab.get(seq)
 	if sl == nil {
-		return res
+		return res, nil
 	}
 	if sl.expiresAtMS != expiresAtMS {
 		m.stats.foreign("extend")
-		return res
+		return res, nil
 	}
 	rs := sl.req.Load()
 	if rs == nil || rs.set.accountID != req.AccountID {
-		return res
+		return res, nil
 	}
 	if !sl.take() {
-		return res
+		return res, nil
 	}
 
+	// the extend is logged before the new lease reaches the expiry index, so
+	// a reclaim of the new lease is always logged after it
 	newSeq, _ := m.slab.alloc(nowMS, leaseExpiryMS, rs)
+	idemExpiryMS := idemExpiry(nowMS, m.operationIdempotencyTTL)
+	var batch *Batch
+	if l := m.log.Load(); l != nil {
+		batch = l.append(rs.route, Record{
+			Kind:        RecExtend,
+			Seq:         seq,
+			NewSeq:      newSeq,
+			ExpiresAtMS: leaseExpiryMS,
+			KeyA:        extKey,
+			Value:       idemExpiryMS,
+		})
+	}
 	m.expiry.add(leaseExpiryMS, newSeq)
 	sl.req.Store(nil)
 
@@ -103,6 +126,6 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 		}
 	}
 
-	m.extIdem.set(extKey, res, idemExpiry(nowMS, m.operationIdempotencyTTL))
-	return res
+	m.extIdem.set(extKey, res, idemExpiryMS)
+	return res, batch
 }

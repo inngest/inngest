@@ -38,6 +38,13 @@ type constraintSet struct {
 	order       []uint8
 
 	used atomic.Bool
+
+	// id names the set in log records.  def is what a follower builds the
+	// set from.  logged has one bit per log buffer that already carries def,
+	// so a grant writes the definition once per buffer.
+	id     uint64
+	def    *SetDef
+	logged atomic.Uint64
 }
 
 // requestState is shared by every lease one Acquire granted.  slots point at
@@ -54,6 +61,10 @@ type requestState struct {
 
 	maximumLifetime time.Duration
 	source          constraintapi.LeaseSource
+
+	// route picks the log buffer for every record of these leases, so a
+	// follower sees the grant before any extend or release of it.
+	route uint8
 }
 
 // resolvedConstraint is one constraint with its counters and configured
@@ -230,6 +241,27 @@ func (m *Manager) set(key cellKey, build func() *constraintSet) *constraintSet {
 }
 
 func (m *Manager) buildSet(accountID, envID, functionID, appID uuid.UUID, config constraintapi.ConstraintConfig, constraints []constraintapi.ConstraintItem) *constraintSet {
+	limits := make([]constraintapi.ConstraintLimits, len(constraints))
+	for i, ci := range constraints {
+		limits[i] = ci.ResolveLimits(config)
+	}
+	return m.buildSetFrom(&SetDef{
+		ID:            m.setSeq.Add(1),
+		AccountID:     accountID,
+		EnvID:         envID,
+		FunctionID:    functionID,
+		AppID:         appID,
+		ConfigVersion: config.FunctionVersion,
+		Items:         append([]constraintapi.ConstraintItem(nil), constraints...),
+		Limits:        limits,
+	})
+}
+
+// buildSetFrom builds a set from its definition.  a follower builds the same
+// set from the definition the primary logged, without the config.
+func (m *Manager) buildSetFrom(def *SetDef) *constraintSet {
+	accountID, envID, functionID, appID := def.AccountID, def.EnvID, def.FunctionID, def.AppID
+	constraints := def.Items
 	n := len(constraints)
 	order := make([]uint8, n)
 	for i := range order {
@@ -244,15 +276,17 @@ func (m *Manager) buildSet(accountID, envID, functionID, appID uuid.UUID, config
 		envID:         envID,
 		functionID:    functionID,
 		appID:         appID,
-		configVersion: config.FunctionVersion,
+		configVersion: def.ConfigVersion,
 		constraints:   make([]resolvedConstraint, n),
 		order:         order,
+		id:            def.ID,
+		def:           def,
 	}
 	for i, oi := range order {
 		ci := constraints[oi]
 		rc := &s.constraints[i]
 		rc.item = ci
-		rc.limits = ci.ResolveLimits(config)
+		rc.limits = def.Limits[oi]
 		switch ci.Kind {
 		case constraintapi.ConstraintKindSemaphore:
 			rc.usageKey, rc.capacityKey = semaphoreCells(accountID, ci.Semaphore.ID, ci.Semaphore.EvaluatedKeyHash)
@@ -335,10 +369,19 @@ func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquir
 	// way a second Lua call finds the first call's record.
 	mu := m.lock(acqKey)
 	rec, hit := m.acqIdem.get(pc.nowMS, acqKey)
+	var batch *Batch
 	if !hit {
-		rec = m.acquire(pc, leaseExpiryMS, req, set, acqKey)
+		rec, batch = m.acquire(pc, leaseExpiryMS, req, set, acqKey)
 	}
 	mu.Unlock()
+
+	// only a grant is kept for replays, so a replay is always a grant
+	if hit {
+		batch = m.replayBatch()
+	}
+	if ierr := m.awaitCommit(ctx, batch, req.CommitLevel, constraintapi.CommitLevelAll); ierr != nil {
+		return nil, ierr
+	}
 
 	resp := m.response(req, rec, requestID, hit, now)
 
@@ -467,6 +510,13 @@ type view struct {
 	used    int64
 	limit   int64
 	has     bool
+	// tat is the last rate limit or throttle state this acquire stored, nil
+	// when it stored none.
+	tat *gcraState
+	// short is how much a rollback could not give back because the counter
+	// was already at zero.  the log carries it so a follower, which adds the
+	// grant and nothing else, ends at the same value.
+	short int64
 }
 
 func (st *acquireState) limit(i int) {
@@ -498,7 +548,11 @@ func (st *acquireState) exhaust(i int, retryAt int64) {
 // constraint from the values pass two left, which is what acquire.lua reads
 // back after its own increments.  under no contention the result matches the
 // Lua.
-func (m *Manager) acquire(pc passCtx, leaseExpiryMS int64, req *constraintapi.CapacityAcquireRequest, set *constraintSet, acqKey uint64) *acquireRecord {
+//
+// the returned handle is set only for a grant with a log attached.  a denied
+// acquire logs the rate limit and throttle states it changed and nothing
+// waits on them.
+func (m *Manager) acquire(pc passCtx, leaseExpiryMS int64, req *constraintapi.CapacityAcquireRequest, set *constraintSet, acqKey uint64) (*acquireRecord, *Batch) {
 	var st acquireState
 	pc.skipGCRA = m.hasCheckIdem(pc.nowMS, req.AccountID, req.IdempotencyKey)
 
@@ -515,7 +569,7 @@ func (m *Manager) acquire(pc passCtx, leaseExpiryMS int64, req *constraintapi.Ca
 		}
 	}
 	if available <= 0 {
-		return m.record(req, set, &st, 0, leaseExpiryMS, nil)
+		return m.record(req, set, &st, 0, leaseExpiryMS, nil), nil
 	}
 
 	// commit order: counters first, GCRA last
@@ -559,8 +613,13 @@ func (m *Manager) acquire(pc passCtx, leaseExpiryMS int64, req *constraintapi.Ca
 			st.exhaust(i, v.retryAt)
 		}
 	}
+	l := m.log.Load()
+	route := uint8(acqKey % logBuffers)
 	if granted == 0 {
-		return m.record(req, set, &st, 0, leaseExpiryMS, nil)
+		if l != nil {
+			m.logAcquire(l, route, set, &st, nil)
+		}
+		return m.record(req, set, &st, 0, leaseExpiryMS, nil), nil
 	}
 
 	rs := &requestState{
@@ -569,23 +628,141 @@ func (m *Manager) acquire(pc passCtx, leaseExpiryMS int64, req *constraintapi.Ca
 		grantedAmount:   int32(granted),
 		maximumLifetime: req.MaximumLifetime,
 		source:          req.Source,
+		route:           route,
 	}
 	rs.active.Store(int64(granted))
 
 	seqs := make([]uint64, granted)
+	for i := range seqs {
+		seqs[i], _ = m.slab.alloc(pc.nowMS, leaseExpiryMS, rs)
+	}
+
+	// the grant is logged before the leases reach the expiry index, which is
+	// the only way the sweeper finds them.  a reclaim is therefore always
+	// logged after the grant it ends.
+	idemExpiryMS := idemExpiry(pc.nowMS, min(m.operationIdempotencyTTL, req.Duration))
+	var batch *Batch
+	if l != nil {
+		batch = m.logAcquire(l, route, set, &st, &Record{
+			Kind:            RecGrant,
+			SetID:           set.id,
+			Seqs:            seqs,
+			ExpiresAtMS:     leaseExpiryMS,
+			Requested:       rs.requestedAmount,
+			Granted:         rs.grantedAmount,
+			MaximumLifetime: rs.maximumLifetime,
+			Source:          rs.source,
+			KeyA:            acqKey,
+			Value:           idemExpiryMS,
+		})
+	}
+
 	ccExpiry := idemExpiry(pc.nowMS, m.constraintCheckIdempotencyTTL)
-	for i := 0; i < granted; i++ {
-		seq, _ := m.slab.alloc(pc.nowMS, leaseExpiryMS, rs)
+	for i, seq := range seqs {
 		m.expiry.add(leaseExpiryMS, seq)
-		seqs[i] = seq
 		m.checkIdem.set(opKey(req.AccountID, "cc", req.LeaseIdempotencyKeys[i]), struct{}{}, ccExpiry)
 	}
 	m.checkIdem.set(opKey(req.AccountID, "cc", req.IdempotencyKey), struct{}{}, ccExpiry)
 
 	rec := m.record(req, set, &st, granted, leaseExpiryMS, seqs)
 	rec.status = 3
-	m.acqIdem.set(acqKey, rec, idemExpiry(pc.nowMS, min(m.operationIdempotencyTTL, req.Duration)))
-	return rec
+	m.acqIdem.set(acqKey, rec, idemExpiryMS)
+	return rec, batch
+}
+
+// logAcquire appends what one acquire changed to the buffer of route.  that
+// is every rate limit and throttle state the acquire stored, a correction for
+// every rollback that was clamped at zero, the set definition when this
+// buffer has not carried it, and the grant when there is one.  it returns the
+// handle of the grant, nil when grant is nil.
+func (m *Manager) logAcquire(l *Log, route uint8, set *constraintSet, st *acquireState, grant *Record) *Batch {
+	if grant == nil {
+		wrote := false
+		for i := range set.constraints {
+			if st.views[i].tat != nil || st.views[i].short != 0 {
+				wrote = true
+				break
+			}
+		}
+		if !wrote {
+			return nil
+		}
+	}
+
+	b := l.buffer(route)
+	bit := uint64(1) << (route % logBuffers)
+	b.mu.Lock()
+	for i := range set.constraints {
+		rc, v := &set.constraints[i], &st.views[i]
+		if v.short != 0 {
+			b.buf = append(b.buf, Record{
+				Kind:  RecDelta,
+				KeyA:  rc.usageKey.a,
+				KeyB:  rc.usageKey.b,
+				Value: v.short,
+			})
+		}
+		if v.tat == nil {
+			continue
+		}
+		b.buf = append(b.buf, Record{
+			Kind:        RecTAT,
+			KeyA:        rc.stateKey.a,
+			KeyB:        rc.stateKey.b,
+			TAT:         v.tat.tat,
+			ExpiresAtMS: v.tat.expiresAt,
+			Version:     v.tat.version,
+		})
+	}
+	var h *Batch
+	if grant != nil {
+		if set.logged.Load()&bit == 0 {
+			b.buf = append(b.buf, Record{
+				Kind:  RecSet,
+				SetID: set.id,
+				Set:   set.def,
+			})
+			set.logged.Or(bit)
+		}
+		b.buf = append(b.buf, *grant)
+		h = b.batch
+	}
+	b.mu.Unlock()
+	return h
+}
+
+// replayBatch is the handle a replayed operation waits on.  it covers the
+// records of the first call.  nil when no log is attached.
+func (m *Manager) replayBatch() *Batch {
+	if l := m.log.Load(); l != nil {
+		return l.newest()
+	}
+	return nil
+}
+
+// awaitCommit makes the caller wait until batch is on as many replicas as
+// level asks for.  def is the level of the operation when the request names
+// none.  with a Pending in ctx the handle is added to it and nothing waits.
+// a nil batch means there is nothing to wait for.
+func (m *Manager) awaitCommit(ctx context.Context, batch *Batch, level, def constraintapi.CommitLevel) errs.InternalError {
+	if batch == nil {
+		return nil
+	}
+	if level == constraintapi.CommitLevelDefault {
+		level = def
+	}
+	if level <= constraintapi.CommitLevelPrimary {
+		return nil
+	}
+	batch.log.signal()
+	if p := pendingFrom(ctx); p != nil {
+		p.add(batch, level)
+		return nil
+	}
+	if err := batch.Wait(ctx, level); err != nil {
+		return errs.Wrap(0, true, "write is not on enough replicas: %w", err)
+	}
+	return nil
 }
 
 // hasCheckIdem reports whether an acquire with this idempotency key, or a
@@ -724,7 +901,7 @@ func (m *Manager) commit(pc passCtx, rc *resolvedConstraint, q int, v *view) int
 func (m *Manager) commitGCRA(pc passCtx, rc *resolvedConstraint, q int, v *view) int {
 	for {
 		var res gcra.Result
-		ok := rc.gcra.Load().update(pc.nowMS, func(tat float64, present bool) (float64, bool, int64) {
+		stored, ok := rc.gcra.Load().update(pc.nowMS, func(tat float64, present bool) (float64, bool, int64) {
 			var newTAT float64
 			var ttl int64
 			var store bool
@@ -734,6 +911,9 @@ func (m *Manager) commitGCRA(pc passCtx, rc *resolvedConstraint, q int, v *view)
 		if !ok {
 			rc.gcra.Store(m.gcraCell(rc.stateKey))
 			continue
+		}
+		if stored != nil {
+			v.tat = stored
 		}
 		rc.gcraView(res, v)
 		if !res.Limited {
@@ -761,7 +941,10 @@ func (m *Manager) rollback(pc passCtx, rc *resolvedConstraint, units int, v *vie
 	}
 	switch rc.item.Kind {
 	case constraintapi.ConstraintKindSemaphore, constraintapi.ConstraintKindConcurrency:
-		v.used = m.giveCell(&rc.usage, rc.usageKey, rc.weight*int64(units))
+		w := rc.weight * int64(units)
+		var applied int64
+		v.used, applied = m.giveCell(&rc.usage, rc.usageKey, w)
+		v.short += w - applied
 	case constraintapi.ConstraintKindRateLimit, constraintapi.ConstraintKindThrottle:
 		if pc.skipGCRA {
 			return
@@ -781,7 +964,7 @@ func (m *Manager) rollbackGCRA(pc passCtx, rc *resolvedConstraint, units int, v 
 	}
 	var after float64
 	for {
-		ok := rc.gcra.Load().update(pc.nowMS, func(tat float64, present bool) (float64, bool, int64) {
+		stored, ok := rc.gcra.Load().update(pc.nowMS, func(tat float64, present bool) (float64, bool, int64) {
 			if !present {
 				after = now
 				return 0, false, 0
@@ -791,6 +974,9 @@ func (m *Manager) rollbackGCRA(pc passCtx, rc *resolvedConstraint, units int, v 
 			return after, true, int64(math.Max((after-now)/perSecond, 1))
 		})
 		if ok {
+			if stored != nil {
+				v.tat = stored
+			}
 			break
 		}
 		rc.gcra.Store(m.gcraCell(rc.stateKey))
@@ -811,11 +997,13 @@ func (m *Manager) loadCell(p *atomic.Pointer[semaphoreCell], key cellKey) int64 
 }
 
 // giveCell subtracts w from a counter through its pointer, replacing the
-// pointer when housekeeping dropped the counter.
-func (m *Manager) giveCell(p *atomic.Pointer[semaphoreCell], key cellKey, w int64) int64 {
+// pointer when housekeeping dropped the counter.  it returns the new value
+// and how much it subtracted, which is less than w when the counter was
+// clamped at zero.
+func (m *Manager) giveCell(p *atomic.Pointer[semaphoreCell], key cellKey, w int64) (v int64, applied int64) {
 	for {
-		if v, ok := p.Load().give(w); ok {
-			return v
+		if v, applied, ok := p.Load().giveApplied(w); ok {
+			return v, applied
 		}
 		p.Store(m.sem(key))
 	}

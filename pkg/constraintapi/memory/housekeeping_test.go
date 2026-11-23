@@ -154,3 +154,94 @@ func TestBackgroundSweeper(t *testing.T) {
 		t.Fatal("the sweeper did not stop")
 	}
 }
+
+// TestConstraintCheckIdempotencyTTLOption checks that the constraint check
+// record of a grant lives for the TTL of the option, and for
+// constraintapi.ConstraintCheckIdempotencyTTL with no option.  housekeeping
+// drops the record after that.
+func TestConstraintCheckIdempotencyTTLOption(t *testing.T) {
+	const short = time.Minute
+	require.Less(t, short, constraintapi.ConstraintCheckIdempotencyTTL)
+
+	for _, c := range []struct {
+		name string
+		opts []Option
+		ttl  time.Duration
+	}{
+		{
+			name: "default",
+			ttl:  constraintapi.ConstraintCheckIdempotencyTTL,
+		},
+		{
+			name: "option",
+			opts: []Option{WithConstraintCheckIdempotencyTTL(short)},
+			ttl:  short,
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			clock := clockwork.NewFakeClockAt(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
+			opts := append([]Option{WithShardName("cc"), WithClock(clock), WithSweepInterval(0)}, c.opts...)
+			m, err := NewManager(opts...)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = m.Close() })
+
+			ctx := context.Background()
+			accountID := uuid.New()
+			resp, err := m.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+				AccountID:      accountID,
+				EnvID:          uuid.New(),
+				FunctionID:     uuid.New(),
+				IdempotencyKey: "acq",
+				Constraints: []constraintapi.ConstraintItem{
+					{
+						Kind: constraintapi.ConstraintKindConcurrency,
+						Concurrency: &constraintapi.ConcurrencyConstraint{
+							Mode:  enums.ConcurrencyModeStep,
+							Scope: enums.ConcurrencyScopeFn,
+						},
+					},
+				},
+				Amount: 1,
+				Configuration: constraintapi.ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: constraintapi.ConcurrencyConfig{
+						FunctionConcurrency: 10,
+					},
+				},
+				LeaseIdempotencyKeys: []string{"lease"},
+				CurrentTime:          clock.Now(),
+				Duration:             5 * time.Second,
+				MaximumLifetime:      time.Hour,
+				Source: constraintapi.LeaseSource{
+					Service:  constraintapi.ServiceExecutor,
+					Location: constraintapi.CallerLocationItemLease,
+				},
+			})
+			require.NoError(t, err)
+			require.Len(t, resp.Leases, 1)
+			_, err = m.Release(ctx, &constraintapi.CapacityReleaseRequest{
+				IdempotencyKey: "rel",
+				AccountID:      accountID,
+				LeaseID:        resp.Leases[0].LeaseID,
+			})
+			require.NoError(t, err)
+
+			live := func() bool {
+				return m.hasCheckIdem(m.nowMS(), accountID, "acq") && m.hasCheckIdem(m.nowMS(), accountID, "lease")
+			}
+			require.True(t, live())
+
+			clock.Advance(c.ttl - time.Second)
+			_, err = m.Scavenge(ctx)
+			require.NoError(t, err)
+			require.True(t, live(), "the record is live one second before its TTL")
+			require.Equal(t, 2, m.checkIdem.len())
+
+			clock.Advance(time.Second)
+			require.False(t, live(), "the record is gone at its TTL")
+			_, err = m.Scavenge(ctx)
+			require.NoError(t, err)
+			require.Zero(t, m.checkIdem.len(), "housekeeping dropped the record")
+		})
+	}
+}

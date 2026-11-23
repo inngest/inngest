@@ -82,23 +82,124 @@ func (s *slab) alloc(nowMS, expiresAtMS int64, req *requestState) (seq uint64, s
 // is marked taken when the page is created so the page can still be freed.
 func (s *slab) allocIn(shard int, expiresAtMS int64, req *requestState) (seq uint64, sl *slot) {
 	seq = uint64(shard)<<shardShift | s.shards[shard].next.Add(1)
-	idx := seq >> pageBits
-	var p *page
-	if v, ok := s.pages.Load(idx); ok {
-		p = v.(*page)
-	} else {
-		np := &page{}
-		if idx == uint64(shard)<<(shardShift-pageBits) {
-			np.slots[0].state.Store(slotTaken)
-		}
-		v, _ := s.pages.LoadOrStore(idx, np)
-		p = v.(*page)
-	}
+	p := s.pageFor(seq)
 	sl = &p.slots[seq&(pageSize-1)]
 	sl.expiresAtMS = expiresAtMS
 	sl.req.Store(req)
 	sl.state.Store(slotLive)
 	return seq, sl
+}
+
+// pageFor returns the page that contains seq, creating it on first use.
+func (s *slab) pageFor(seq uint64) *page {
+	idx := seq >> pageBits
+	if v, ok := s.pages.Load(idx); ok {
+		return v.(*page)
+	}
+	np := &page{}
+	shard := seq >> shardShift
+	if idx == shard<<(shardShift-pageBits) {
+		np.slots[0].state.Store(slotTaken)
+	}
+	v, _ := s.pages.LoadOrStore(idx, np)
+	return v.(*page)
+}
+
+// seqMask is the counter part of a seq, below the shard bits.
+const seqMask = 1<<shardShift - 1
+
+// allocAt places a live slot at a seq another Manager handed out, and raises
+// the shard counter to it.  a follower calls it for every replicated lease.
+// it returns false when the slot was already used and nothing changed.
+func (s *slab) allocAt(seq uint64, expiresAtMS int64, req *requestState) bool {
+	s.raise(int(seq>>shardShift)%slabShards, seq&seqMask)
+	sl := &s.pageFor(seq).slots[seq&(pageSize-1)]
+	if sl.state.Load() != slotEmpty {
+		return false
+	}
+	sl.expiresAtMS = expiresAtMS
+	sl.req.Store(req)
+	sl.state.Store(slotLive)
+	return true
+}
+
+// raise moves a shard counter up to at least n.
+func (s *slab) raise(shard int, n uint64) {
+	next := &s.shards[shard].next
+	for {
+		cur := next.Load()
+		if cur >= n || next.CompareAndSwap(cur, n) {
+			return
+		}
+	}
+}
+
+// seqJump is how far past the highest known seq a promoted follower starts.
+// the old primary may have handed out seqs it never replicated, and a seq
+// must never name two leases.
+const seqJump = 1 << 20
+
+// seal makes the slab ready to hand out seqs after it only received them.
+// every empty slot in an existing page is marked taken so the page can be
+// freed, and every shard counter moves to a page boundary at least seqJump
+// past the highest seq seen.
+func (s *slab) seal() {
+	s.pages.Range(func(_, v any) bool {
+		p := v.(*page)
+		for i := range p.slots {
+			p.slots[i].state.CompareAndSwap(slotEmpty, slotTaken)
+		}
+		return true
+	})
+	for i := range s.shards {
+		next := &s.shards[i].next
+		// the first seq handed out is next+1, which must be slot 0 of a page
+		target := (next.Load()+seqJump+pageSize)&^uint64(pageSize-1) - 1
+		next.Store(target)
+	}
+}
+
+// each calls fn for every live slot.
+func (s *slab) each(fn func(seq uint64, sl *slot)) {
+	s.pages.Range(func(k, v any) bool {
+		idx, p := k.(uint64), v.(*page)
+		for i := range p.slots {
+			if p.slots[i].state.Load() == slotLive {
+				fn(idx<<pageBits|uint64(i), &p.slots[i])
+			}
+		}
+		return true
+	})
+}
+
+// noLive is true when no slot in the page is live.
+func (p *page) noLive() bool {
+	for i := range p.slots {
+		if p.slots[i].state.Load() == slotLive {
+			return false
+		}
+	}
+	return true
+}
+
+// freeIdlePages is freePages for a follower.  a follower receives seqs out
+// of order and never sees the seqs of leases that ended before it joined, so
+// its pages keep empty slots.  it drops every page with no live slot that is
+// below its shard's allocation page.  a late lease for a dropped page creates
+// the page again.
+func (s *slab) freeIdlePages() (freed int) {
+	s.pages.Range(func(k, v any) bool {
+		idx, p := k.(uint64), v.(*page)
+		shard := int(idx>>(shardShift-pageBits)) % slabShards
+		if idx >= s.currentPage(shard) || !p.noLive() {
+			return true
+		}
+		if s.pages.CompareAndDelete(k, v) {
+			freed++
+		}
+		return true
+	})
+	return freed
 }
 
 // get returns the slot for seq while it is live, else nil.

@@ -16,6 +16,23 @@ type CapacityManager interface {
 	Release(ctx context.Context, req *CapacityReleaseRequest) (*CapacityReleaseResponse, errs.InternalError)
 }
 
+// CommitLevel says how many copies of a write must exist before the caller
+// is answered.  only a replicated store reads it.  the Redis manager and an
+// unreplicated memory manager ignore it.
+type CommitLevel uint8
+
+const (
+	// CommitLevelDefault uses the default of the operation.
+	CommitLevelDefault CommitLevel = iota
+	// CommitLevelPrimary answers when the primary has applied the write.
+	CommitLevelPrimary
+	// CommitLevelTwo answers when the primary and one in-sync follower have
+	// the write.
+	CommitLevelTwo
+	// CommitLevelAll answers when every in-sync replica has the write.
+	CommitLevelAll
+)
+
 type CapacityCheckRequest struct {
 	AccountID uuid.UUID
 
@@ -162,6 +179,10 @@ type CapacityAcquireRequest struct {
 	// May be zero, in which case the cache treats the request as unanchored and
 	// honors any non-expired entry.
 	RequestTime time.Time
+
+	// CommitLevel overrides how many copies of this write must exist before
+	// the caller is answered.  zero uses the default of the operation.
+	CommitLevel CommitLevel
 }
 
 // CapacityLease represents the tuple of LeaseID <-> IdempotencyKey which identifies the leased resource (event, queue item, etc.).
@@ -235,6 +256,10 @@ type CapacityExtendLeaseRequest struct {
 	// LeaseIssuedAt represents the time the initial lease was issued.
 	// This can be used for routing lease extension request to the same shard.
 	LeaseIssuedAt time.Time
+
+	// CommitLevel overrides how many copies of this write must exist before
+	// the caller is answered.  zero uses the default of the operation.
+	CommitLevel CommitLevel
 }
 
 type CapacityExtendLeaseResponse struct {
@@ -275,6 +300,10 @@ type CapacityReleaseRequest struct {
 	// LeaseIssuedAt represents the time the initial lease was issued.
 	// This can be used for routing the lease release request to the same shard.
 	LeaseIssuedAt time.Time
+
+	// CommitLevel overrides how many copies of this write must exist before
+	// the caller is answered.  zero uses the default of the operation.
+	CommitLevel CommitLevel
 }
 
 type CapacityReleaseResponse struct {

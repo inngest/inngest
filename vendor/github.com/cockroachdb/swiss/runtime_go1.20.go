@@ -17,12 +17,12 @@
 // bumping of the go versions supported by adjusting the build tags below. The
 // way go version tags work the tag for goX.Y will be declared for every
 // subsequent release. So go1.20 will be defined for go1.21, go1.22, etc. The
-// build tag "go1.20 && !go1.27" defines the range [go1.20, go1.27) (inclusive
-// on go1.20, exclusive on go1.27).
+// build tag "go1.20 && !go1.28" defines the range [go1.20, go1.28) (inclusive
+// on go1.20, exclusive on go1.28).
 
 // The untested_go_version flag enables building on any go version, intended
 // to ease testing against Go at tip.
-//go:build (go1.20 && !go1.27) || untested_go_version
+//go:build (go1.20 && !go1.28) || untested_go_version
 
 package swiss
 

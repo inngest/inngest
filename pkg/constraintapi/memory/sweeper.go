@@ -11,6 +11,14 @@ import (
 // lease source, so hooks, metrics and forced semaphore release behave as they
 // do for the Redis scavenger.  it returns how many leases it reclaimed.
 func (m *Manager) Scavenge(ctx context.Context) (int, error) {
+	m.hkMu.Lock()
+	defer m.hkMu.Unlock()
+	return m.scavenge(ctx)
+}
+
+// scavenge is the body of Scavenge.  the caller has the housekeeping mutex,
+// so Freeze never runs in the middle of a sweep.
+func (m *Manager) scavenge(ctx context.Context) (int, error) {
 	now := m.clock.Now()
 	nowMS := now.UnixMilli()
 
@@ -72,8 +80,21 @@ func (m *Manager) Scavenge(ctx context.Context) (int, error) {
 	return reclaimed, firstErr
 }
 
+// setDropDelay is how long after a constraint set left the sets map its
+// RecSetDrop is logged.  a request that loaded the set before it left can
+// still log a grant for it, and a follower must have the definition then.
+const setDropDelay = 2 * time.Second
+
+// setDrop is a constraint set that left the sets map and whose RecSetDrop is
+// not logged yet.
+type setDrop struct {
+	set         *constraintSet
+	deletedAtMS int64
+}
+
 // housekeep sweeps the idempotency maps, frees slab pages, drops counters
-// that read zero or expired, and drops constraint sets nobody used.
+// that read zero or expired, and drops constraint sets nobody used.  the
+// caller has the housekeeping mutex.
 func (m *Manager) housekeep(nowMS int64) {
 	m.acqIdem.sweep(nowMS)
 	m.extIdem.sweep(nowMS)
@@ -91,9 +112,30 @@ func (m *Manager) housekeep(nowMS int64) {
 	})
 	// a set nobody used since the last round is dropped.  a request that
 	// loaded it meanwhile keeps working on it, and the next request rebuilds.
+	l := m.log.Load()
+	if l != nil {
+		// a drop is logged in the first round that is setDropDelay after the
+		// set left the map
+		keep := m.setDrops[:0]
+		for _, d := range m.setDrops {
+			if nowMS-d.deletedAtMS < setDropDelay.Milliseconds() {
+				keep = append(keep, d)
+				continue
+			}
+			l.append(uint8(d.set.id%logBuffers), Record{
+				Kind:  RecSetDrop,
+				SetID: d.set.id,
+			})
+		}
+		m.setDrops = keep
+	}
 	m.sets.Range(func(k, v any) bool {
-		if !v.(*constraintSet).used.Swap(false) {
-			m.sets.CompareAndDelete(k, v)
+		s := v.(*constraintSet)
+		if !s.used.Swap(false) && m.sets.CompareAndDelete(k, v) && l != nil {
+			m.setDrops = append(m.setDrops, setDrop{
+				set:         s,
+				deletedAtMS: nowMS,
+			})
 		}
 		return true
 	})
@@ -120,12 +162,14 @@ func (m *Manager) run() {
 			return
 		case <-ticker.Chan():
 		}
-		if _, err := m.Scavenge(ctx); err != nil {
-			m.log(ctx).Error("scavenging expired leases failed", "err", err)
+		m.hkMu.Lock()
+		if _, err := m.scavenge(ctx); err != nil {
+			m.logger(ctx).Error("scavenging expired leases failed", "err", err)
 		}
 		ticks++
 		if ticks%housekeepEvery == 0 {
 			m.housekeep(m.nowMS())
 		}
+		m.hkMu.Unlock()
 	}
 }

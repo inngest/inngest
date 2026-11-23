@@ -15,7 +15,9 @@ const ttlStripes = 256
 type ttlStripe[V any] struct {
 	mu sync.Mutex
 	m  map[uint64]ttlEntry[V]
-	_  [48]byte
+	// lastExpiryMS is the latest expiry an entry of this stripe ever had.
+	lastExpiryMS int64
+	_            [40]byte
 }
 
 type ttlEntry[V any] struct {
@@ -53,23 +55,44 @@ func (t *ttlMap[V]) set(key uint64, v V, expiresAtMS int64) {
 	s := t.stripe(key)
 	s.mu.Lock()
 	s.m[key] = ttlEntry[V]{expiresAtMS: expiresAtMS, v: v}
+	s.lastExpiryMS = max(s.lastExpiryMS, expiresAtMS)
 	s.mu.Unlock()
+}
+
+// lastExpiry returns the time at which every entry now in the map has
+// expired.  it is zero for a map that never had an entry.
+func (t *ttlMap[V]) lastExpiry() int64 {
+	var last int64
+	for i := range t.stripes {
+		s := &t.stripes[i]
+		s.mu.Lock()
+		last = max(last, s.lastExpiryMS)
+		s.mu.Unlock()
+	}
+	return last
 }
 
 // sweep deletes every entry expired at nowMS and returns how many it removed.
 func (t *ttlMap[V]) sweep(nowMS int64) int {
 	removed := 0
 	for i := range t.stripes {
-		s := &t.stripes[i]
-		s.mu.Lock()
-		for k, e := range s.m {
-			if e.expiresAtMS <= nowMS {
-				delete(s.m, k)
-				removed++
-			}
-		}
-		s.mu.Unlock()
+		removed += t.sweepStripe(i, nowMS)
 	}
+	return removed
+}
+
+// sweepStripe is sweep for stripe i only.
+func (t *ttlMap[V]) sweepStripe(i int, nowMS int64) int {
+	removed := 0
+	s := &t.stripes[i]
+	s.mu.Lock()
+	for k, e := range s.m {
+		if e.expiresAtMS <= nowMS {
+			delete(s.m, k)
+			removed++
+		}
+	}
+	s.mu.Unlock()
 	return removed
 }
 
@@ -83,4 +106,19 @@ func (t *ttlMap[V]) len() int {
 		s.mu.Unlock()
 	}
 	return n
+}
+
+// each calls fn for every entry that has not expired at nowMS.  fn runs
+// under the stripe lock and must not call back into the map.
+func (t *ttlMap[V]) each(nowMS int64, fn func(key uint64, v V, expiresAtMS int64)) {
+	for i := range t.stripes {
+		s := &t.stripes[i]
+		s.mu.Lock()
+		for k, e := range s.m {
+			if e.expiresAtMS > nowMS {
+				fn(k, e.v, e.expiresAtMS)
+			}
+		}
+		s.mu.Unlock()
+	}
 }
