@@ -122,6 +122,9 @@ type Server struct {
 	nextID       atomic.Uint64
 	shutdownOnce sync.Once
 	shutdownCh   chan struct{}
+	closeOnce    sync.Once
+	closeDone    chan struct{}
+	closeErr     error
 	wg           sync.WaitGroup
 }
 
@@ -133,6 +136,7 @@ func New(db *libduckdb.DB, version string) *Server {
 		sessions:   make(map[string]*session),
 		conns:      make(map[net.Conn]struct{}),
 		shutdownCh: make(chan struct{}),
+		closeDone:  make(chan struct{}),
 	}
 }
 
@@ -187,16 +191,16 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 		conn, err := ln.Accept()
 		if err != nil {
 			if s.isClosed() || errors.Is(err, net.ErrClosed) {
-				s.wg.Wait()
+				_ = s.Close()
 				return nil
 			}
+			_ = s.Close()
 			return fmt.Errorf("worker: accept: %w", err)
 		}
 		if !s.trackConn(conn) {
 			_ = conn.Close()
 			continue
 		}
-		s.wg.Add(1)
 		go func(c net.Conn) {
 			defer s.wg.Done()
 			defer s.untrackConn(c)
@@ -213,6 +217,7 @@ func (s *Server) trackConn(c net.Conn) bool {
 		return false
 	}
 	s.conns[c] = struct{}{}
+	s.wg.Add(1)
 	return true
 }
 
@@ -222,48 +227,66 @@ func (s *Server) untrackConn(c net.Conn) {
 	s.mu.Unlock()
 }
 
-// Close stops accepting new connections, closes all active connections and
-// sessions, and removes the Unix socket file.
+// Close stops accepting new connections, waits for active handlers to finish,
+// closes all remaining sessions, and removes the Unix socket file.
 func (s *Server) Close() error {
-	s.mu.Lock()
-	if s.closed {
-		s.mu.Unlock()
-		return nil
-	}
-	s.closed = true
-	ln := s.ln
-	sock := s.socketPath
-	sessions := make([]*session, 0, len(s.sessions))
-	for _, sess := range s.sessions {
-		sessions = append(sessions, sess)
-	}
-	s.sessions = make(map[string]*session)
-	conns := make([]net.Conn, 0, len(s.conns))
-	for c := range s.conns {
-		conns = append(conns, c)
-	}
-	s.conns = make(map[net.Conn]struct{})
-	s.mu.Unlock()
+	s.closeOnce.Do(func() {
+		defer close(s.closeDone)
 
-	s.triggerShutdown()
-
-	var firstErr error
-	if ln != nil {
-		if err := ln.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			firstErr = err
+		s.mu.Lock()
+		s.closed = true
+		ln := s.ln
+		sock := s.socketPath
+		conns := make([]net.Conn, 0, len(s.conns))
+		for c := range s.conns {
+			conns = append(conns, c)
 		}
-	}
-	for _, c := range conns {
-		_ = c.Close()
-	}
-	for _, sess := range sessions {
-		sess.conn.Interrupt()
-		_ = sess.conn.Close()
-	}
-	if sock != "" {
-		_ = os.Remove(sock)
-	}
-	return firstErr
+		s.conns = make(map[net.Conn]struct{})
+		activeSessions := make([]*session, 0, len(s.sessions))
+		for _, sess := range s.sessions {
+			activeSessions = append(activeSessions, sess)
+		}
+		s.mu.Unlock()
+
+		s.triggerShutdown()
+
+		var firstErr error
+		if ln != nil {
+			if err := ln.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				firstErr = err
+			}
+		}
+		for _, c := range conns {
+			_ = c.Close()
+		}
+		for _, sess := range activeSessions {
+			sess.conn.Interrupt()
+		}
+
+		// Wait for all connection handlers to exit before closing DuckDB
+		// sessions so no handler is still executing against a closing conn.
+		s.wg.Wait()
+
+		s.mu.Lock()
+		remaining := make([]*session, 0, len(s.sessions))
+		for _, sess := range s.sessions {
+			remaining = append(remaining, sess)
+		}
+		s.sessions = make(map[string]*session)
+		s.mu.Unlock()
+
+		for _, sess := range remaining {
+			sess.conn.Interrupt()
+			_ = sess.conn.Close()
+		}
+		if sock != "" {
+			_ = os.Remove(sock)
+		}
+		s.closeErr = firstErr
+	})
+
+	<-s.closeDone
+	return s.closeErr
 }
 
 func (s *Server) triggerShutdown() {

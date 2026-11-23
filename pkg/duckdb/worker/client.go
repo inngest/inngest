@@ -141,11 +141,28 @@ func Spawn(ctx context.Context, cfg SpawnConfig) (*Client, error) {
 // minimalChildEnv builds a minimal, leak-free environment for the child worker
 // process so parent secrets are never inherited.
 func minimalChildEnv(extra []string) []string {
-	allow := []string{"PATH", "HOME", "TMPDIR", "TEMP", "TMP", "USER", "USERPROFILE", "SYSTEMROOT", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+	allow := map[string]struct{}{
+		"PATH":          {},
+		"HOME":          {},
+		"TMPDIR":        {},
+		"TEMP":          {},
+		"TMP":           {},
+		"USER":          {},
+		"USERPROFILE":   {},
+		"LOCALAPPDATA":  {},
+		"SYSTEMROOT":    {},
+		"SSL_CERT_FILE": {},
+		"SSL_CERT_DIR":  {},
+	}
+	env := os.Environ()
 	out := make([]string, 0, len(allow)+len(extra))
-	for _, key := range allow {
-		if val, ok := os.LookupEnv(key); ok {
-			out = append(out, key+"="+val)
+	for _, kv := range env {
+		key, _, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		if _, allowed := allow[strings.ToUpper(key)]; allowed {
+			out = append(out, kv)
 		}
 	}
 	out = append(out, extra...)
