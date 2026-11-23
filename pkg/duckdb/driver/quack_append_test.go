@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 	"github.com/stretchr/testify/require"
 )
 
@@ -163,7 +163,7 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 		[]QuackColumnKind{QuackColumnVarchar, QuackColumnJSON})
 	require.NoError(t, err)
 
-	const wantRows = 2*quack.StandardVectorSize + 500
+	const wantRows = 2*worker.StandardVectorSize + 500
 	for i := range wantRows {
 		require.NoError(t, appender.AppendRow(fmt.Sprintf("row-%d", i), fmt.Sprintf(`{"i":%d}`, i)))
 	}
@@ -393,17 +393,20 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	require.Equal(t, wantRows, distinct, "no row should have been lost or duplicated across concurrent pooled appenders")
 }
 
-// TestQuackAppenderRejectsNonQuackConnection pins the guard: appending
-// requires a quack-transport *sql.DB (Options.QuackAddr set), not the
-// default jsonlines transport, since AppendRequest has no jsonlines
-// equivalent.
-func TestQuackAppenderRejectsNonQuackConnection(t *testing.T) {
+// TestQuackAppenderWorksWithoutQuackAddr verifies the worker backend supports
+// QuackAppender natively without requiring Options.QuackAddr.
+func TestQuackAppenderWorksWithoutQuackAddr(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 
 	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = NewQuackAppender(t.Context(), db, "", "main", "t", []QuackColumnKind{QuackColumnVarchar})
-	require.Error(t, err)
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE main.t (name VARCHAR);")
+	require.NoError(t, err)
+
+	a, err := NewQuackAppender(t.Context(), db, "", "main", "t", []QuackColumnKind{QuackColumnVarchar})
+	require.NoError(t, err)
+	require.NoError(t, a.AppendRow("ok"))
+	require.NoError(t, a.Close(t.Context()))
 }

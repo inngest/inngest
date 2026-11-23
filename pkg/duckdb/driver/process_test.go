@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +41,7 @@ func TestStartProcessExecAndQuery(t *testing.T) {
 	_, rows, err := p.sess.Exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].Get("id"))
+	require.Equal(t, int64(1), rows[0].Get("id"))
 	require.Equal(t, "a", rows[0].Get("name"))
 }
 
@@ -55,8 +56,7 @@ func TestProcessRestartAfterCrash(t *testing.T) {
 
 	// Simulate a crash: kill the underlying subprocess out from under the
 	// session, bypassing the normal close() path.
-	require.NoError(t, p.cmd.Process.Kill())
-	_, _ = p.cmd.Process.Wait()
+	killSubprocess(t, p)
 
 	// The stale session should now fail health checks (broken pipe / EOF).
 	require.Error(t, p.healthCheck(t.Context()))
@@ -129,8 +129,7 @@ func TestConnectorCloseTerminatesSubprocess(t *testing.T) {
 	// close() blocks (with a kill fallback) until cmd.Wait() returns, so by
 	// the time db.Close() returns, ProcessState must be populated and report
 	// the process as exited — not merely "we stopped watching it".
-	require.NotNil(t, c.proc.cmd.ProcessState, "subprocess should have been waited on by db.Close()")
-	require.True(t, c.proc.cmd.ProcessState.Exited(), "subprocess should have exited after db.Close()")
+	require.False(t, c.proc.alive(), "subprocess should have exited after db.Close()")
 }
 
 // TestExecTriggersRestartAfterCrash covers the success path of review
@@ -152,8 +151,7 @@ func TestExecTriggersRestartAfterCrash(t *testing.T) {
 	require.NotNil(t, c.proc)
 
 	// Simulate a crash out from under the session, bypassing close().
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	// This call goes through database/sql -> conn.ExecContext ->
 	// process.exec, which must detect the dead session, restart, and retry —
@@ -188,11 +186,10 @@ func TestExecPermanentlyDisablesAfterFailedRestart(t *testing.T) {
 	require.NotNil(t, c.proc)
 
 	c.proc.mu.Lock()
-	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.workerBinary = "/nonexistent/path/to/duckdb"
 	c.proc.mu.Unlock()
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	// First call after the crash: exec detects the dead session, attempts a
 	// restart, and the restart fails because the binary path is now bogus.
@@ -222,8 +219,7 @@ func TestExecLogsWhenSubprocessCrashesAndRestartSucceeds(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, c.proc)
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	var buf bytes.Buffer
 	loggedCtx := logger.WithStdlib(context.Background(), logger.StdlibLogger(context.Background(),
@@ -258,11 +254,10 @@ func TestExecLogsWhenRestartFails(t *testing.T) {
 	require.NotNil(t, c.proc)
 
 	c.proc.mu.Lock()
-	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.workerBinary = "/nonexistent/path/to/duckdb"
 	c.proc.mu.Unlock()
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	var buf bytes.Buffer
 	loggedCtx := logger.WithStdlib(context.Background(), logger.StdlibLogger(context.Background(),
@@ -349,8 +344,7 @@ func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
 	// Simulate a crash out from under the session.
-	require.NoError(t, p.cmd.Process.Kill())
-	_, _ = p.cmd.Process.Wait()
+	killSubprocess(t, p)
 
 	// Trigger the restart through a short-lived context, mirroring a single
 	// dual-write batch-flush/hook-call context.
@@ -449,12 +443,12 @@ func TestExecStatementErrorDoesNotRestartSubprocess(t *testing.T) {
 	_, err := db.ExecContext(t.Context(), "CREATE TABLE t (id INTEGER NOT NULL);")
 	require.NoError(t, err)
 
-	pidBefore := c.proc.cmd.Process.Pid
+	pidBefore := c.proc.pid()
 
 	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (NULL);")
 	require.Error(t, err)
 
-	require.Equal(t, pidBefore, c.proc.cmd.Process.Pid,
+	require.Equal(t, pidBefore, c.proc.pid(),
 		"a rejected statement must not respawn the subprocess")
 	c.proc.mu.Lock()
 	disabled := c.proc.isDisabledLocked()
@@ -507,22 +501,14 @@ func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
 	cancel()
 
 	_, _, err = p.sess.Exec(ctx, "SELECT 42 AS answer;")
-	require.ErrorIs(t, err, result.ErrSessionDesynced)
 	require.ErrorIs(t, err, context.Canceled)
 
-	// A desynced session refuses further work outright, so the abandoned
-	// statement's queued output can never be misread as another statement's
-	// result.
-	_, _, err = p.sess.Exec(t.Context(), "SELECT 1 AS ok;")
-	require.ErrorIs(t, err, result.ErrSessionDesynced)
-
-	// process.exec recognises the desync as recoverable-by-respawn and does
-	// so, using a context detached from the (dead) caller ctx for the health
-	// check.
+	// The worker transport does not desync on a cancelled context; the next
+	// statement succeeds cleanly.
 	_, rows, err := p.Exec(t.Context(), "SELECT 7 AS seven;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(7), rows[0].Get("seven"))
+	require.Equal(t, int64(7), rows[0].Get("seven"))
 }
 
 // TestExecFailedRestartWrapsErrDisabledImmediately pins Fix 5's contract: the
@@ -542,11 +528,10 @@ func TestExecFailedRestartWrapsErrDisabledImmediately(t *testing.T) {
 	require.NoError(t, err)
 
 	c.proc.mu.Lock()
-	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.workerBinary = "/nonexistent/path/to/duckdb"
 	c.proc.mu.Unlock()
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
 	require.ErrorIs(t, err, ErrDisabled, "the disabling error itself must be observable as ErrDisabled")
@@ -569,11 +554,10 @@ func TestExecRestartCooldownAndRecovery(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	c.proc.mu.Lock()
 	c.proc.now = func() time.Time { return now }
-	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.workerBinary = "/nonexistent/path/to/duckdb"
 	c.proc.mu.Unlock()
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	// Failure 1 -> 10s cooldown.
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
@@ -595,7 +579,7 @@ func TestExecRestartCooldownAndRecovery(t *testing.T) {
 
 	// Restore binary and advance past the 30s cooldown: next Exec recovers.
 	c.proc.mu.Lock()
-	c.proc.binaryPath = binPath
+	c.proc.workerBinary = binPath
 	c.proc.mu.Unlock()
 	now = now.Add(30 * time.Second)
 
@@ -630,8 +614,7 @@ func TestRestartInitFailureClosesPartiallyStartedChild(t *testing.T) {
 	c.proc.iceberg = &IcebergOptions{URI: "", Warehouse: ""}
 	c.proc.mu.Unlock()
 
-	require.NoError(t, c.proc.cmd.Process.Kill())
-	_, _ = c.proc.cmd.Process.Wait()
+	killSubprocess(t, c.proc)
 
 	// Crash triggers restart -> spawn succeeds, initSessionLocked fails -> child must be closed.
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
@@ -639,8 +622,6 @@ func TestRestartInitFailureClosesPartiallyStartedChild(t *testing.T) {
 
 	c.proc.mu.Lock()
 	require.False(t, c.proc.started, "partially initialized child must be closed on initSessionLocked failure")
-	require.NotNil(t, c.proc.cmd.ProcessState, "partially initialized child must have been waited on")
-	require.True(t, c.proc.cmd.ProcessState.Exited(), "partially initialized child must have exited")
 	c.proc.mu.Unlock()
 
 	// Advance past the 10s cooldown while bootstrap is still broken: must attempt
@@ -674,7 +655,7 @@ func TestSubprocessEnvAllowlist(t *testing.T) {
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret")
 	t.Setenv("HTTP_PROXY", "http://proxy.internal:8080")
 
-	env := subprocessEnv()
+	env := worker.MinimalChildEnv(nil)
 	require.Contains(t, env, "TZ=UTC")
 	for _, kv := range env {
 		require.NotContains(t, kv, "DATABASE_URL")

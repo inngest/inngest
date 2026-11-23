@@ -2,7 +2,6 @@ package query
 
 import (
 	"database/sql"
-	"os/exec"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
@@ -16,10 +15,7 @@ import (
 // pkg/duckdb/tracing/helpers_test.go's newTestDuckDB.
 func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",

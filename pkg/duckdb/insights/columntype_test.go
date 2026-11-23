@@ -1,7 +1,6 @@
 package insights
 
 import (
-	"os/exec"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
@@ -124,10 +123,7 @@ var sqlStandardTypeAliases = []string{
 // name a real duckdb reports for it (typeof(NULL::<alias>)). Names that
 // need type parameters (LIST, MAP, ...) error in DuckDB and are skipped.
 func TestDuckDBTypeAliasesMatchDuckDB(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })

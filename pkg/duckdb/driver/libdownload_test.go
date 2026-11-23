@@ -1,17 +1,58 @@
 package driver
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
 )
+
+func buildFakeArchive(t *testing.T, entryName string, contents []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+	if err := tw.WriteHeader(&tar.Header{
+		Name: entryName,
+		Mode: 0o755,
+		Size: int64(len(contents)),
+	}); err != nil {
+		t.Fatalf("writing tar header: %v", err)
+	}
+	if _, err := tw.Write(contents); err != nil {
+		t.Fatalf("writing tar entry: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("closing tar writer: %v", err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatalf("closing gzip writer: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func testInstallServer(t *testing.T, assetName string, archive []byte) (baseURL string) {
+	t.Helper()
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	mux.HandleFunc("/"+assetName, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(archive)
+	})
+
+	return server.URL + "/"
+}
 
 func buildFakeZipArchive(t *testing.T, entries map[string][]byte) []byte {
 	t.Helper()

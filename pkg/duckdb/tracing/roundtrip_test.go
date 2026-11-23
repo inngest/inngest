@@ -2,7 +2,6 @@ package tracing
 
 import (
 	"encoding/json"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -23,10 +22,7 @@ import (
 // -> the UI/GQL read path and Insights, the way ClickHouse's String columns
 // return it.
 func TestJSONRoundTripsByteForByte(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", Iceberg: icebergtest.Start(t)})
 	require.NoError(t, err)
 	defer db.Close()

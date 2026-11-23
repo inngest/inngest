@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -49,10 +48,7 @@ func TestIcebergConfigForUsesPostgresWhenURIProvided(t *testing.T) {
 }
 
 func TestSetupDualWriteReturnsListenerWhenBinaryPresent(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	l, _, _ := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l)
 	stopDualWrite(context.Background(), l)
@@ -84,10 +80,7 @@ func TestSetupDualWriteNeverBlocksOnFailure(t *testing.T) {
 // setupDualWrite must return nil without spawning a subprocess or creating
 // any state on disk — even with a perfectly good duckdb binary available.
 func TestSetupDualWriteIsOptInAndOffByDefault(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	stateDir := t.TempDir()
 
@@ -105,10 +98,7 @@ func TestSetupDualWriteIsOptInAndOffByDefault(t *testing.T) {
 // means "in-memory databases" for SQLite/Redis, and this is the same
 // contract extended to DuckDB.
 func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	stateDir := t.TempDir()
 
@@ -128,10 +118,7 @@ func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
 // process's cwd. The stateDir passed here is relative, mirroring how
 // --sqlite-dir arrives from the CLI.
 func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	// Chdir into a temp dir so the relative override resolves somewhere
 	// disposable rather than into the repo.
@@ -151,18 +138,16 @@ func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
 // downloads/caches the pinned binary; here it's pre-seeded so the test
 // doesn't hit the network).
 func TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty(t *testing.T) {
-	realBin, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	realBin := driver.RequireDuckDBBinary(t)
 
-	stateDir := t.TempDir()
-	cached := filepath.Join(stateDir, "bin", driver.PinnedVersion, "duckdb")
+	binDir := t.TempDir()
+	cached := filepath.Join(binDir, "inngest-duckdb-worker")
 	data, err := os.ReadFile(realBin)
 	require.NoError(t, err)
-	require.NoError(t, os.MkdirAll(filepath.Dir(cached), 0o755))
 	require.NoError(t, os.WriteFile(cached, data, 0o755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
+	stateDir := t.TempDir()
 	l, db, _ := setupDualWrite(context.Background(), true, true, "", stateDir, "")
 	require.NotNil(t, l)
 	require.NotNil(t, db)
@@ -174,10 +159,7 @@ func TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty(t *testing.T) {
 // extension cache lands under <state-dir>/duckdb/extensions rather than the
 // ambient HOME.
 func TestSetupDualWriteIsolatesExtensionDirectory(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	stateDir := t.TempDir()
 
 	l, _, _ := setupDualWrite(context.Background(), true, true, binPath, stateDir, "")
@@ -188,10 +170,7 @@ func TestSetupDualWriteIsolatesExtensionDirectory(t *testing.T) {
 }
 
 func TestSetupDualWriteReturnsDBHandleOnSuccess(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	l, db, _ := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l)
 	require.NotNil(t, db)
@@ -203,10 +182,7 @@ func TestSetupDualWriteReturnsDBHandleOnSuccess(t *testing.T) {
 // the persisted (Iceberg) and in-memory modes, while migrations (run after
 // the sandbox is applied) still succeed.
 func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	for _, persist := range []bool{true, false} {
 		l, db, _ := setupDualWrite(context.Background(), true, persist, binPath, t.TempDir(), "")
 		require.NotNil(t, l, "persist=%v", persist)
@@ -225,10 +201,7 @@ func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
 // lake (after lakeFlushInterval), and a second setupDualWrite on the same
 // state dir (IE restarting the dev server) still reads them.
 func TestSetupDualWritePersistedLakeSurvivesRestart(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	stateDir := t.TempDir()
 	ctx := t.Context()
 
@@ -262,10 +235,7 @@ func TestSetupDualWritePersistedLakeSurvivesRestart(t *testing.T) {
 // migration as applied, against some other catalog) still gets the lake
 // tables created, instead of a lake w/ none.
 func TestSetupDualWriteIgnoresOldLakeMainDB(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	stateDir := t.TempDir()
 	ctx := t.Context()
 	require.NoError(t, os.MkdirAll(filepath.Join(stateDir, "duckdb"), 0o755))
@@ -308,10 +278,7 @@ func TestStopDualWriteIsSafeWithNilListener(t *testing.T) {
 // s.cqrs/dbcqrs at all, which is already covered by Tasks 2/3's tests
 // asserting the async listeners' behavior is untouched.
 func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	stateDir := t.TempDir()
 	ctx := t.Context()
@@ -335,10 +302,7 @@ func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
 // the success criterion the whole POC (and this final wiring task) exists
 // to demonstrate.
 func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	ctx := t.Context()
 	dir := t.TempDir()
@@ -374,10 +338,7 @@ func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
 // migrations, tracing.NewListener, and batch-flush path, but against a
 // bare in-memory catalog with no lake ATTACH at all.
 func TestDualWriteEndToEndRowsLandInDuckDBInMemory(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	ctx := t.Context()
 
@@ -414,10 +375,7 @@ func TestDualWriteEndToEndRowsLandInDuckDBInMemory(t *testing.T) {
 // underlying batcher.run's stopc case makes this deterministic: Close waits
 // for every batcher to actually exit before returning.
 func TestStopDualWriteStopsBatcherGoroutines(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 
 	ctx := t.Context()
 	stateDir := t.TempDir()
@@ -444,10 +402,7 @@ func TestStopDualWriteStopsBatcherGoroutines(t *testing.T) {
 // quack listener; a fixed address would make the second setupDualWrite fail
 // to bind the port the first one already holds.
 func TestSetupDualWriteTwoInstancesDoNotCollideOnQuackPort(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	ctx := t.Context()
 
 	l1, _, _ := setupDualWrite(ctx, true, true, binPath, t.TempDir(), "")
@@ -491,10 +446,7 @@ func TestValidateDuckDBPersistenceFlags(t *testing.T) {
 // queries would), dual-write's handle still runs statements, and closing the
 // read handle leaves the subprocess up for writes.
 func TestSetupDualWriteReadsCantStarveWrites(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
 	require.NotNil(t, readDB)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
@@ -508,7 +460,7 @@ func TestSetupDualWriteReadsCantStarveWrites(t *testing.T) {
 	// The read pool is exhausted, so another read waits...
 	waitCtx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
-	_, err = readDB.Conn(waitCtx)
+	_, err := readDB.Conn(waitCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 
 	// ...but writes still get a connection.
@@ -544,10 +496,7 @@ func TestDuckDBConnLimit(t *testing.T) {
 // TestSetupDualWriteReadConnsFromEnv pins that INNGEST_DUCKDB_READ_CONNS
 // sizes the read handle's pool.
 func TestSetupDualWriteReadConnsFromEnv(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	t.Setenv(duckDBReadConnsEnv, "3")
 	t.Setenv(duckDBWriteConnsEnv, "5")
 	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
@@ -562,10 +511,7 @@ func TestSetupDualWriteReadConnsFromEnv(t *testing.T) {
 // every write runs on the primary connection: a read must not wait behind a
 // slow write.
 func TestSetupDualWriteReadsDontShareASingleWriteConn(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	t.Setenv(duckDBWriteConnsEnv, "1")
 	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
 	require.NotNil(t, readDB)

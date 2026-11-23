@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -27,10 +26,7 @@ import (
 // left that conn unusable (IE stuck in an aborted transaction).
 func newTestIcebergLake(t *testing.T) *sql.DB {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	dir := t.TempDir()
 	addr := driver.EphemeralQuackAddr
 	db, err := driver.Open(t.Context(), driver.Options{

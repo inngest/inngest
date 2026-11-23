@@ -3,7 +3,6 @@ package dashboards_test
 import (
 	"database/sql"
 	"fmt"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -23,10 +22,7 @@ import (
 // another package -- see pkg/duckdb/insights/views_test.go's own copy).
 func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",

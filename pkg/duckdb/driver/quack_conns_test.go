@@ -11,9 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestOpenWithQuackConnsRequiresQuackAddr pins the validation: QuackConns
-// only means anything once a quack listener actually exists to open
-// additional sessions against.
+// TestOpenWithQuackConnsWorksWithoutQuackAddr verifies the worker backend
+// supports concurrent pooled connections even without QuackAddr set.
 func TestOpenWithQuackConnsRequiresQuackAddr(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 
@@ -22,8 +21,11 @@ func TestOpenWithQuackConnsRequiresQuackAddr(t *testing.T) {
 		DBFile:     ":memory:",
 		QuackConns: 3,
 	})
-	require.Error(t, err)
-	require.Nil(t, db)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	var one int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT 1;").Scan(&one))
+	require.Equal(t, 1, one)
 }
 
 // TestOpenWithQuackConnsRunsQueriesConcurrently is the real proof: with
@@ -127,8 +129,11 @@ func TestQuackPooledConnsDisconnectOnClose(t *testing.T) {
 	t.Cleanup(func() { _ = primary.Close() })
 
 	active := func() int {
-		var n int
-		require.NoError(t, primary.QueryRowContext(t.Context(), "SELECT count(*) FROM quack_active_connections();").Scan(&n))
+		connector.proc.mu.Lock()
+		client := connector.proc.client
+		connector.proc.mu.Unlock()
+		n, err := client.ActiveSessions(t.Context())
+		require.NoError(t, err)
 		return n
 	}
 	base := active()

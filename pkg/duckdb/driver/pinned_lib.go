@@ -1,5 +1,10 @@
 package driver
 
+// PinnedVersion is the DuckDB release this package downloads and runs against:
+// a tagged GitHub release, which EnsureLibrary (libdownload.go) fetches from
+// defaultInstallBaseURL.
+const PinnedVersion = "v2.0.0"
+
 // pinnedLibChecksums are the SHA256 digests of each pinned-version DuckDB
 // shared library release archive EnsureLibrary might download, keyed by asset
 // name. DuckDB v2.0.0 publishes shared libraries as duckdb-shared-libs-<dist>.tar.gz.

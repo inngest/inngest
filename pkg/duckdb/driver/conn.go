@@ -10,8 +10,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -19,32 +19,18 @@ import (
 )
 
 // sqlExecer abstracts over what runs a SQL statement and collects its rows.
-// The transports (*jsonlines.Session, *quack.Session) implement it directly;
-// *process implements it on top of whichever one is active, adding crash
-// detection, one-restart-then-permanently-disable recovery, and locking
-// around the real subprocess, and *pooledQuackConn does the same for extra
-// pooled connections. conn is deliberately transport-agnostic; conn_test.go
-// exercises it against a stub.
-//
-// cols is the result's column names in the query's own left-to-right order.
-// It may be nil for a statement that returns no columns (DDL) or, for the
-// jsonlines transport specifically, no rows (see jsonlines.Session.Exec).
-//
-// Query is Exec's counterpart for conn.QueryContext: it additionally
-// returns types, the result's DuckDB column type names in the same order as
-// cols — see jsonlines.Session.Query and quack.Session.Query for how each
-// transport gets there (a batched DESCRIBE for jsonlines;
-// already-decoded PrepareResponse metadata, no extra statement at all, for
-// quack).
+// *process implements it on top of the primary worker session (adding crash
+// detection, restart recovery, and locking), and *pooledQuackConn implements
+// it for additional concurrent worker sessions. conn is transport-agnostic;
+// conn_test.go exercises it against a stub.
 type sqlExecer interface {
 	Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error)
 	Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error)
 }
 
 // conn implements database/sql/driver.Conn, ExecerContext, and QueryerContext
-// over a single duckdb subprocess session. Parameter binding is handled by
-// literal.go (encodeArgs) since this transport has no wire-level bind
-// protocol.
+// over a single DuckDB worker session. Parameter binding is handled by
+// literal.go (encodeArgs).
 type conn struct {
 	sess sqlExecer
 }
@@ -64,7 +50,7 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) Begin() (driver.Tx, error) {
-	return nil, errors.New("duckdb: transactions not supported in this POC")
+	return nil, errors.New("duckdb: transactions not supported via Begin; use explicit BEGIN/COMMIT")
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -90,8 +76,6 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	var cols, types []string
 	var rows []result.Row
 	if streams := quackStreamsFrom(ctx); len(streams) > 0 {
-		// The streams are fed on the same quack session the query runs on,
-		// under the transport's own locking and restart policy.
 		sq, ok := c.sess.(streamQuerier)
 		if !ok {
 			return nil, errQuackStreamsTransport
@@ -107,11 +91,6 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	return newMapRows(cols, types, rows), nil
 }
 
-// logStatement debug-logs one statement without its SQL text. The
-// interpolated statement carries bound values — dual-write's batch INSERTs
-// include event payloads and step output — so it is identified by a
-// fingerprint of the un-interpolated query instead, which is stable across
-// executions of the same statement shape. rows < 0 means "not applicable".
 func logStatement(ctx context.Context, op, query string, args int, start time.Time, rows int, err error) {
 	attrs := []any{
 		"op", op,
@@ -133,9 +112,6 @@ func queryFingerprint(query string) string {
 	return hex.EncodeToString(sum[:6])
 }
 
-// errRowsAffectedUnsupported is returned by unknownResult: neither transport
-// reports DuckDB's changed-row count, and fabricating 0 would claim a
-// successful statement touched nothing.
 var errRowsAffectedUnsupported = errors.New("duckdb: RowsAffected is not supported by this driver")
 
 type unknownResult struct{}
@@ -164,29 +140,10 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	case ulid.ULID:
 		nv.Value = v.String()
 	case []string:
-		// Not one of driver.Value's standard kinds, but encodeLiteral (see
-		// literal.go) handles it directly as a DuckDB array literal — this
-		// transport binds by SQL-text interpolation, not a wire-level bind
-		// protocol, so there's no driver.Value validity constraint to honor
-		// here beyond what encodeLiteral itself understands.
 		return nil
 	case meta.EventSessions:
-		// Not one of driver.Value's standard kinds either — encodeLiteral
-		// handles it directly as a DuckDB list-of-struct literal, same
-		// reasoning as []string above.
 		return nil
 	case json.RawMessage:
-		// Load-bearing, not just a style choice: json.RawMessage's
-		// underlying kind is []byte, so returning driver.ErrSkip here (the
-		// default for an unhandled case) would fall through to
-		// database/sql's own DefaultParameterConverter, which converts any
-		// named []byte-kind type down to a plain []byte via reflection —
-		// silently discarding the json.RawMessage type, and with it
-		// encodeLiteral's ::JSON cast, before this value ever reaches
-		// interpolate (encodeLiteral's own []byte case encodes as a BLOB
-		// literal instead, not what a JSON column needs — see
-		// encodeLiteral's json.RawMessage case). Returning nil instead
-		// tells database/sql to accept nv.Value exactly as given.
 		return nil
 	}
 
@@ -195,7 +152,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 
 // AtomicMultiTableCommit reports whether a transaction on c that writes
 // several lake tables commits them all or none: SupportsTransactions, and a
-// lake whose commits span tables (plain duckdb tables, not Iceberg). c must be pinned, as for SupportsTransactions.
+// lake whose commits span tables (plain duckdb tables, not Iceberg).
 func AtomicMultiTableCommit(c *sql.Conn) bool {
 	if !SupportsTransactions(c) {
 		return false
@@ -212,7 +169,6 @@ func AtomicMultiTableCommit(c *sql.Conn) bool {
 	return ok
 }
 
-// processOf is the subprocess behind dc, or nil for a bare quack session.
 func processOf(dc *conn) *process {
 	switch s := dc.sess.(type) {
 	case *process:
@@ -223,22 +179,12 @@ func processOf(dc *conn) *process {
 	return nil
 }
 
-// atomicMultiTableCommit: plain duckdb tables commit every table in a
-// transaction at once. An Iceberg lake doesn't: duckdb-iceberg needs the
-// catalog's /v1/transactions/commit for that, and rejects a multi-table
-// transaction w/o it (the embedded catalog doesn't have it).
 func (p *process) atomicMultiTableCommit() bool { return p.iceberg == nil }
 
 // SupportsTransactions reports whether c can run an explicit
 // `BEGIN ... COMMIT` script and recover from a failure partway through it
-// (by running `ROLLBACK` on the same connection afterwards), IE whether
-// c's transport is quack. The jsonlines transport can't: a failed statement
-// leaves the session's transaction aborted, so the trailing marker SELECT
-// jsonlines uses to find the end of a statement's output fails too and the
-// read never returns.
-//
-// c must be pinned (*sql.DB.Conn) for the answer to mean anything about the
-// statements the caller runs next.
+// (by running `ROLLBACK` on the same connection afterwards). Every worker-backed
+// connection supports transactions natively.
 func SupportsTransactions(c *sql.Conn) bool {
 	var ok bool
 	_ = c.Raw(func(driverConn any) error {
@@ -246,15 +192,14 @@ func SupportsTransactions(c *sql.Conn) bool {
 		if !isConn {
 			return nil
 		}
-		switch s := dc.sess.(type) {
-		case *quack.Session, *pooledQuackConn:
+		switch dc.sess.(type) {
+		case *workerSessionExecer, *pooledQuackConn, *process:
 			ok = true
-		case *process:
-			s.mu.Lock()
-			_, ok = s.sess.(*quack.Session)
-			s.mu.Unlock()
 		}
 		return nil
 	})
 	return ok
 }
+
+// Keep worker import referenced cleanly.
+var _ = (*worker.Session)(nil)

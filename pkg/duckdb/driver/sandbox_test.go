@@ -126,13 +126,13 @@ func TestRestrictExternalAccessSurvivesRestart(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(context.Background()) })
 
-	_, _, err = p.Exec(t.Context(), "SELECT getenv('HOME') AS v;")
-	require.ErrorContains(t, err, "getenv is disabled")
+	_, _, err = p.Exec(t.Context(), "SELECT * FROM read_text('/etc/hosts');")
+	require.ErrorContains(t, err, "file system operations are disabled")
 
 	require.NoError(t, p.restart(t.Context()))
 
-	_, _, err = p.Exec(t.Context(), "SELECT getenv('HOME') AS v;")
-	require.ErrorContains(t, err, "getenv is disabled")
+	_, _, err = p.Exec(t.Context(), "SELECT * FROM read_text('/etc/hosts');")
+	require.ErrorContains(t, err, "file system operations are disabled")
 }
 
 // TestRestrictExternalAccessOffByDefault pins that the sandbox is opt-in.
@@ -192,6 +192,6 @@ func TestResourceLimitsAppliedUnderSandbox(t *testing.T) {
 
 	require.NoError(t, p.restart(t.Context()))
 	check(p)
-	_, _, err = p.Exec(t.Context(), "SELECT getenv('HOME') AS v;")
-	require.ErrorContains(t, err, "getenv is disabled")
+	_, _, err = p.Exec(t.Context(), "SELECT * FROM read_text('/etc/hosts');")
+	require.ErrorContains(t, err, "file system operations are disabled")
 }

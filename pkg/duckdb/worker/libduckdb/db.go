@@ -171,9 +171,20 @@ func (c *Conn) Query(sql string) (*Result, error) {
 	colCount := c.lib.columnCount(&res)
 	cols := make([]ColumnInfo, colCount)
 	for i := uint64(0); i < colCount; i++ {
+		lt := c.lib.columnLogicalType(&res, i)
+		typeName := ""
+		if lt != 0 {
+			typeName = formatLogicalType(c.lib, lt)
+			c.lib.destroyLogicalType(&lt)
+		}
+		ct := Type(c.lib.columnType(&res, i))
+		if typeName == "" {
+			typeName = ct.String()
+		}
 		cols[i] = ColumnInfo{
-			Name: cString(c.lib.columnName(&res, i)),
-			Type: Type(c.lib.columnType(&res, i)),
+			Name:     cString(c.lib.columnName(&res, i)),
+			Type:     ct,
+			TypeName: typeName,
 		}
 	}
 

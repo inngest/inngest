@@ -2,7 +2,6 @@ package insights
 
 import (
 	"database/sql"
-	"os/exec"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
@@ -21,10 +20,7 @@ import (
 // caller here is a single top-level test with no need to close early.
 func newSchemaTestDuckDB(t *testing.T) *sql.DB {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",

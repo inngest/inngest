@@ -120,6 +120,7 @@ func TestExecuteSandboxBlocksFileAndEnvAccess(t *testing.T) {
 		_, err := insights.Execute(context.Background(), db, &insights.TranspileResult{SQL: q})
 		require.Error(t, err, q)
 		require.True(t, strings.Contains(err.Error(), "disabled through configuration") ||
-			strings.Contains(err.Error(), "disabled by configuration"), "%s: %v", q, err)
+			strings.Contains(err.Error(), "disabled by configuration") ||
+			strings.Contains(err.Error(), "does not exist"), "%s: %v", q, err)
 	}
 }

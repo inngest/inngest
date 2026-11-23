@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 	"github.com/stretchr/testify/require"
 )
 
@@ -101,7 +101,7 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	const wantRows = 2*quack.StandardVectorSize + 500
+	const wantRows = 2*worker.StandardVectorSize + 500
 	for i := range wantRows {
 		require.NoError(t, appender.AppendRow(fmt.Sprintf("row-%d", i), fmt.Sprintf("v-%d", i)))
 	}

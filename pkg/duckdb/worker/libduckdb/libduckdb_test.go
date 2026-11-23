@@ -327,3 +327,99 @@ func TestPuregoInterrupt(t *testing.T) {
 		t.Fatal("timed out waiting for duckdb_interrupt to abort query")
 	}
 }
+
+func TestPuregoComplexTypesAndStreamTableFunction(t *testing.T) {
+	libPath := findRealLib(t)
+	lib, err := Load(libPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	defer lib.Close()
+
+	db, err := lib.Open(":memory:", nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer db.Close()
+
+	conn, err := db.Connect()
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Complex types: LIST, STRUCT, MAP, ARRAY, ENUM, UNION, VARIANT, INTERVAL, BIT, JSON, DECIMAL.
+	if err := conn.Exec("CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')"); err != nil {
+		t.Fatalf("CREATE TYPE: %v", err)
+	}
+	res, err := conn.Query(`SELECT
+		[1, 2, 3] AS c_list,
+		{'a': 1, 'b': 'hi'} AS c_struct,
+		MAP {'a': 1, 'b': 2} AS c_map,
+		[1, 2, 3]::INTEGER[3] AS c_arr,
+		'happy'::mood AS c_enum,
+		union_value(a := 1) AS c_union,
+		'{"x": 1, "y": [2, 3]}'::JSON::VARIANT AS c_var,
+		INTERVAL '1 year 2 months 3 days 04:05:06.789' AS c_iv,
+		BIT '101010' AS c_bit,
+		'{"k":"v"}'::JSON AS c_json,
+		123.45::DECIMAL(10,2) AS c_dec`)
+	if err != nil {
+		t.Fatalf("Query complex: %v", err)
+	}
+	cols := res.Columns()
+	wantTypes := []string{
+		"INTEGER[]", "STRUCT(a INTEGER, b VARCHAR)", "MAP(VARCHAR, INTEGER)",
+		"INTEGER[3]", "ENUM('sad', 'ok', 'happy')", "UNION(a INTEGER)",
+		"VARIANT", "INTERVAL", "BIT", "JSON", "DECIMAL(10,2)",
+	}
+	for i, wt := range wantTypes {
+		if cols[i].TypeName != wt {
+			t.Errorf("col %d TypeName = %q, want %q", i, cols[i].TypeName, wt)
+		}
+	}
+	rows, err := res.NextChunk()
+	res.Close()
+	if err != nil || len(rows) != 1 {
+		t.Fatalf("NextChunk complex: rows=%d err=%v", len(rows), err)
+	}
+	if rows[0][4] != "happy" {
+		t.Errorf("enum = %#v", rows[0][4])
+	}
+	if rows[0][7] != "1 year 2 months 3 days 04:05:06.789" {
+		t.Errorf("interval = %#v", rows[0][7])
+	}
+	if rows[0][8] != "101010" {
+		t.Errorf("bit = %#v", rows[0][8])
+	}
+
+	// Stream table function test.
+	if err := conn.RegisterStreamTableFunction(); err != nil {
+		t.Fatalf("RegisterStreamTableFunction: %v", err)
+	}
+	st := RegisterStream("test-stream-1")
+	defer UnregisterStream("test-stream-1")
+	go func() {
+		st.Push(StreamChunk{
+			RowCount: 2,
+			Columns: []StreamColumn{
+				{Kind: StreamColumnVarchar, Bytes: []byte("ab"), Ends: []uint32{1, 2}},
+				{Kind: StreamColumnBigint, Int64s: []int64{10, 20}},
+			},
+		})
+		st.Close()
+	}()
+
+	sres, err := conn.Query("SELECT c0, c1 FROM scan_data_from_quack_client('test-stream-1', NULL::STRUCT(c0 VARCHAR, c1 BIGINT), ordered := true)")
+	if err != nil {
+		t.Fatalf("Query stream: %v", err)
+	}
+	srows, err := sres.NextChunk()
+	sres.Close()
+	if err != nil {
+		t.Fatalf("NextChunk stream: %v", err)
+	}
+	if len(srows) != 2 || srows[0][0] != "a" || srows[0][1] != int64(10) || srows[1][0] != "b" || srows[1][1] != int64(20) {
+		t.Fatalf("unexpected stream rows: %#v", srows)
+	}
+}
