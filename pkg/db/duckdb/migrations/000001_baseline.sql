@@ -1,7 +1,7 @@
 -- +goose Up
 -- The lake tables. On an Iceberg lake they're format-version 3, partitioned
 -- by bucket(128, account_id) + month (bounding files per export at 128
--- instead of ~200k accounts), and set (DUCKDB_ICEBERG_ONLY is empty
+-- instead of one per active account), and set (DUCKDB_ICEBERG_ONLY is empty
 -- in-memory):
 --   * commit.manifest-merge.enabled=false: merging reads every manifest on
 --     each commit until duckdb/duckdb-iceberg#1650 ships.
