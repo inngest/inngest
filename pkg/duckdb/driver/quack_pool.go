@@ -102,7 +102,7 @@ func (c *pooledQuackConn) run(ctx context.Context, fn func(*quack.Session) error
 // currentSession directly. It returns the generation fn ran against (or
 // tried to handshake with) for recoverQuack.
 func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) error) (uint64, error) {
-	ep, err := c.p.currentQuackEndpoint()
+	ep, err := c.p.currentQuackEndpoint(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -156,7 +156,7 @@ func (c *pooledQuackConn) Close() error {
 // appenders) that drive protocol messages sqlExecer doesn't cover.
 func (c *pooledQuackConn) currentSession(ctx context.Context) (*quack.Session, error) {
 	var sess *quack.Session
-	if _, err := c.attempt(ctx, func(s *quack.Session) error {
+	if err := c.run(ctx, func(s *quack.Session) error {
 		sess = s
 		return nil
 	}); err != nil {
