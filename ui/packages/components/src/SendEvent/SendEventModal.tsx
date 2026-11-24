@@ -78,6 +78,7 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
   const [dark, setDark] = useState(isDark());
   const [activeTab, setActiveTab] = useState('editor');
   const [isLoading, setIsLoading] = useState(false);
+  const sendInFlightRef = useRef(false);
   const [sdkCode, setSdkCode] = useState('');
   const [curlCode, setCurlCode] = useState('');
   const [sdkDirty, setSdkDirty] = useState(false);
@@ -107,12 +108,10 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
 
   // Update payload when JSON editor changes
   const handleJSONChange = useCallback((value: string | undefined) => {
-    if (!value) return;
-
-    setJsonInput(value); // Always update the input immediately
+    setJsonInput(value ?? ''); // Always update the input, including clearing the editor
 
     try {
-      const parsedPayload = JSON.parse(value);
+      const parsedPayload = JSON.parse(value ?? '');
       setPayload(parsedPayload); // Only update payload if valid JSON
     } catch {
       // Invalid JSON - don't update payload, but let user keep typing
@@ -154,8 +153,24 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
   }, []);
 
   const sendEvent = useCallback<() => void>(async () => {
-    const events = Array.isArray(payload) ? payload : [payload];
+    if (!isOpen || sendInFlightRef.current || config.ui?.isLoading) {
+      return;
+    }
+
+    let currentPayload: EventPayload | EventPayload[];
+    try {
+      currentPayload = JSON.parse(jsonInput);
+    } catch {
+      toast.error('Event payload must be valid JSON.');
+      return;
+    }
+
+    const events = Array.isArray(currentPayload) ? currentPayload : [currentPayload];
     for (const event of events) {
+      if (!event || typeof event !== 'object') {
+        toast.error('Each event payload must be an object.');
+        return;
+      }
       if (!event.name) {
         toast.error('Each event payload must contain a name.');
         return;
@@ -177,12 +192,13 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
     }
 
     try {
+      sendInFlightRef.current = true;
       setIsLoading(true);
 
-      const payloadToSend = preparePayloadForSending(payload);
+      const payloadToSend = preparePayloadForSending(currentPayload);
       await config.sendEvent(payloadToSend);
-      const message = Array.isArray(payload)
-        ? `${payload.length} events were successfully added.`
+      const message = Array.isArray(currentPayload)
+        ? `${currentPayload.length} events were successfully added.`
         : 'The event was successfully added.';
 
       toast.success(message);
@@ -192,9 +208,17 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
       toast.error(`Failed to send event: ${errorMessage}`);
       console.error('Send event error:', error);
     } finally {
+      sendInFlightRef.current = false;
       setIsLoading(false);
     }
-  }, [config.sendEvent, payload, onClose, preparePayloadForSending]);
+  }, [
+    config.sendEvent,
+    config.ui?.isLoading,
+    isOpen,
+    jsonInput,
+    onClose,
+    preparePayloadForSending,
+  ]);
 
   const handleCopySDK = useCallback(async () => {
     await copyToClipboard(sdkCode || config.generateSDKCode(payload));
@@ -307,10 +331,14 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
   const activeTabData = (tabs.find((tab) => tab.id === activeTab) ?? tabs[0])!;
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
       const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
 
-      if (isCtrlCmdPressed && event.key === 'Enter') {
+      if (isCtrlCmdPressed && event.key === 'Enter' && !event.defaultPrevented) {
+        event.preventDefault();
+        if (isLoading || (activeTab === 'editor' && config.ui?.isLoading)) return;
         activeTabData.buttonAction();
       }
     };
@@ -320,7 +348,7 @@ export function SendEventModal({ data, isOpen, onClose, config }: SharedSendEven
     return () => {
       document.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [activeTabData]);
+  }, [activeTabData, activeTab, isOpen, isLoading, config.ui?.isLoading]);
 
   return portal(
     <Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-5xl">
