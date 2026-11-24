@@ -245,10 +245,12 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 	hashedStepID := "hashed-step-1"
 	userlandStepID := "my-step"
 	stepAttempt := 2
+	stepType := enums.StepTypeGroupExperiment
 	withStepIdentity := func(cfg *MetadataSpanConfig) {
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &userlandStepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, &stepAttempt)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepType, &stepType)
 	}
 
 	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
@@ -269,6 +271,7 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 	require.Equal(t, hashedStepID, got.StepHashedID)
 	require.NotNil(t, got.StepAttempt)
 	require.Equal(t, stepAttempt, *got.StepAttempt)
+	require.Equal(t, enums.StepTypeGroupExperiment.String(), got.StepType)
 	require.Nil(t, got.StepIndex)
 }
 
@@ -323,6 +326,7 @@ func TestCreateMetadataSpanFromValues_StepIdentityEmptyWithoutEitherAttr(t *test
 	require.Len(t, rec.entries, 1)
 	require.Empty(t, rec.entries[0].StepID)
 	require.Empty(t, rec.entries[0].StepHashedID)
+	require.Empty(t, rec.entries[0].StepType)
 }
 
 // TestCreateMetadataSpanFromValues_NotifiesSyncListenersFromAttrsWhenStateMetadataNil

@@ -133,6 +133,7 @@ type MetadataTemplateItem struct {
 	StepID      *string
 	StepIndex   *int
 	StepAttempt *int
+	StepType    *string
 	Kind        string
 	IsUser      bool
 	Values      string
@@ -250,11 +251,14 @@ type MetadataRow struct {
 	EnvID       uuid.UUID
 	RunID       string
 	RunQueuedAt time.Time
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
 	SpanID      string
 	Scope       string
 	StepID      *string
 	StepIndex   *int
 	StepAttempt *int
+	StepType    *string
 	Kind        string
 	IsUser      bool
 	Values      string

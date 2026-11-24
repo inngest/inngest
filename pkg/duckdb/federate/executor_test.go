@@ -562,7 +562,7 @@ func TestExecutorPrunedJoinKeepsFilteredRows(t *testing.T) {
 			"attributes": `{}`, "bucket_at": f.deltaBucketAt(),
 		}}
 		f.streamer.rows[TableMetadata] = []map[string]any{{
-			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "span_id": "span-1",
+			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "app_id": f.app, "function_id": f.fn, "span_id": "span-1",
 			"scope": "step", "kind": "name", "is_user": true, "values": `{}`, "created_at": q, "bucket_at": f.deltaBucketAt(),
 		}}
 

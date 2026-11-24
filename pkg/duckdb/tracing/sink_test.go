@@ -200,9 +200,12 @@ func TestListenerWithSinkSendsEntitiesSynchronously(t *testing.T) {
 	require.Contains(t, names, "executor.run.queued")
 
 	require.Len(t, sink.metadata, 1)
+	require.Equal(t, md.ID.Tenant.AppID.String(), sink.metadata[0].AppID)
+	require.Equal(t, md.ID.FunctionID.String(), sink.metadata[0].FunctionID)
 	require.Equal(t, md.ID.RunID.String(), sink.metadata[0].RunID)
 	require.Equal(t, metadata.Kind("test.kind").Suffix(), sink.metadata[0].Kind)
 	require.Nil(t, sink.metadata[0].StepID, "run-scoped metadata has no step")
+	require.Nil(t, sink.metadata[0].StepType, "run-scoped metadata has no step type")
 	sink.mu.Unlock()
 
 	require.NoError(t, l.(Closer).Close(context.Background()))

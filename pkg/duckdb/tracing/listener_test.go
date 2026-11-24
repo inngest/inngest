@@ -1119,8 +1119,10 @@ func TestListenerOnMetadataEntryWritesRow(t *testing.T) {
 		return count == 1
 	}, 2*time.Second, 20*time.Millisecond, "metadata row should land after a batch flush")
 
-	rows := selectRows(t, db, "SELECT run_id, span_id, kind, scope, is_user, values, step_id, step_index, step_attempt FROM inngest.run_metadata;")
+	rows := selectRows(t, db, "SELECT app_id, function_id, run_id, span_id, kind, scope, is_user, values, step_id, step_index, step_attempt, step_type FROM inngest.run_metadata;")
 	require.Len(t, rows, 1)
+	require.Equal(t, appID.String(), rows[0]["app_id"])
+	require.Equal(t, functionID.String(), rows[0]["function_id"])
 	require.Equal(t, runID.String(), rows[0]["run_id"])
 	require.Equal(t, tracing.SpanContextFromMetadata(parent).SpanID().String(), rows[0]["span_id"])
 	require.Equal(t, "test.kind", rows[0]["kind"])
@@ -1129,6 +1131,7 @@ func TestListenerOnMetadataEntryWritesRow(t *testing.T) {
 	require.Nil(t, rows[0]["step_id"], "run-scoped metadata should have no step_id")
 	require.Nil(t, rows[0]["step_index"])
 	require.Nil(t, rows[0]["step_attempt"])
+	require.Nil(t, rows[0]["step_type"])
 
 	values, ok := rows[0]["values"].(map[string]any)
 	require.True(t, ok, "values column should decode to a map, got %T", rows[0]["values"])
@@ -1169,6 +1172,7 @@ func TestListenerOnMetadataEntryWritesStepLevelRow(t *testing.T) {
 		StepID:      "step-hash-1",
 		StepIndex:   &stepIndex,
 		StepAttempt: &stepAttempt,
+		StepType:    enums.StepTypeGroupExperiment.String(),
 	}
 	l.OnMetadataEntry(context.Background(), entry)
 
@@ -1179,12 +1183,15 @@ func TestListenerOnMetadataEntryWritesStepLevelRow(t *testing.T) {
 		return count == 1
 	}, 2*time.Second, 20*time.Millisecond, "metadata row should land after a batch flush")
 
-	rows := selectRows(t, db, "SELECT scope, step_id, step_index, step_attempt FROM inngest.run_metadata;")
+	rows := selectRows(t, db, "SELECT app_id, function_id, scope, step_id, step_index, step_attempt, step_type FROM inngest.run_metadata;")
 	require.Len(t, rows, 1)
+	require.Equal(t, appID.String(), rows[0]["app_id"])
+	require.Equal(t, functionID.String(), rows[0]["function_id"])
 	require.Equal(t, enums.MetadataScopeStep.String(), rows[0]["scope"])
 	require.Equal(t, "step-hash-1", rows[0]["step_id"])
 	require.EqualValues(t, 2, rows[0]["step_index"])
 	require.EqualValues(t, 1, rows[0]["step_attempt"])
+	require.Equal(t, enums.StepTypeGroupExperiment.String(), rows[0]["step_type"])
 }
 
 // deferScheduleEventJSON builds the raw JSON of an inngest/deferred.schedule

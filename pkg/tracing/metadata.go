@@ -269,6 +269,9 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepAttempt); ok && v != nil {
 		entry.StepAttempt = v
 	}
+	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepType); ok && v != nil {
+		entry.StepType = v.String()
+	}
 
 	return entry, true
 }

@@ -311,13 +311,14 @@ func TestCreateMetadataSpan_StepScopesCarryAttempt(t *testing.T) {
 			rc.attempt = 2
 
 			md := &mockStructured{kind: "test.kind", values: makeValues(16)}
-			_, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, scope, &state.GeneratorOpcode{ID: "hashed-step"})
+			_, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, scope, &state.GeneratorOpcode{ID: "hashed-step", Op: enums.OpcodeStepRun})
 			require.NoError(t, err)
 
 			require.Len(t, rec.entries, 1)
 			require.NotNil(t, rec.entries[0].StepAttempt)
 			require.Equal(t, 2, *rec.entries[0].StepAttempt)
 			require.Equal(t, "hashed-step", rec.entries[0].StepHashedID)
+			require.Equal(t, enums.StepTypeRun.String(), rec.entries[0].StepType)
 		})
 	}
 }

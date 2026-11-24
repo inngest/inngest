@@ -96,15 +96,15 @@ func TestExecuteFederated(t *testing.T) {
 		// run-lake's "cost" is in the lake, then replaced by a newer
 		// emission in the delta; run-delta's only emission is in the delta.
 		_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.run_metadata
-			(account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at, bucket_at)
-			VALUES (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'cost', true, '{"usd":1}', ?, ?),
-			       (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'region', true, '{"name":"us"}', ?, ?)`,
-			account.String(), env.String(), queued, queued, w.Add(-time.Second),
-			account.String(), env.String(), queued, queued, w.Add(-time.Second))
+			(account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at, bucket_at)
+			VALUES (?::UUID, ?::UUID, 'run-lake', ?, ?::UUID, ?::UUID, 'span-lake', 'run', 'cost', true, '{"usd":1}', ?, ?),
+			       (?::UUID, ?::UUID, 'run-lake', ?, ?::UUID, ?::UUID, 'span-lake', 'run', 'region', true, '{"name":"us"}', ?, ?)`,
+			account.String(), env.String(), queued, app.String(), fn.String(), queued, w.Add(-time.Second),
+			account.String(), env.String(), queued, app.String(), fn.String(), queued, w.Add(-time.Second))
 		require.NoError(t, err)
 		emission := func(run, span, kind, values string, at time.Time) map[string]any {
 			return map[string]any{
-				"account_id": account, "env_id": env, "run_id": run, "run_queued_at": queued, "span_id": span,
+				"account_id": account, "env_id": env, "run_id": run, "run_queued_at": queued, "app_id": app, "function_id": fn, "span_id": span,
 				"scope": "run", "kind": kind, "is_user": true, "values": values, "created_at": at, "bucket_at": at,
 			}
 		}
@@ -143,7 +143,7 @@ func TestExecuteFederated(t *testing.T) {
 				"bucket_at": at,
 			}},
 			federate.TableMetadata: {{
-				"account_id": account, "env_id": env, "run_id": "run-delta", "run_queued_at": queued, "span_id": "span-step",
+				"account_id": account, "env_id": env, "run_id": "run-delta", "run_queued_at": queued, "app_id": app, "function_id": fn, "span_id": "span-step",
 				"scope": "step", "kind": "cost", "is_user": true, "values": `{"usd":4}`, "created_at": at, "bucket_at": at,
 			}},
 		}

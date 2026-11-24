@@ -93,8 +93,9 @@ var (
 	// duckdb-quack server) for event_ids' VARCHAR->LIST casting above.
 	metadataColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, // app_id, function_id
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
-		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt, step_type
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
 		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
@@ -223,7 +224,7 @@ func spanRowValues(s SpanRow) []any {
 // trick as event_ids above (see metadataColumns' doc comment) since
 // duckdbdriver.QuackColumnKind has no native INTEGER/BOOLEAN wire type.
 func metadataRowValues(m MetadataRow) []any {
-	var stepID, stepIndex, stepAttempt any
+	var stepID, stepIndex, stepAttempt, stepType any
 	if m.StepID != nil {
 		stepID = *m.StepID
 	}
@@ -233,10 +234,14 @@ func metadataRowValues(m MetadataRow) []any {
 	if m.StepAttempt != nil {
 		stepAttempt = strconv.Itoa(*m.StepAttempt)
 	}
+	if m.StepType != nil {
+		stepType = *m.StepType
+	}
 	return []any{
 		m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt,
+		m.AppID, m.FunctionID,
 		m.SpanID, m.Scope,
-		stepID, stepIndex, stepAttempt,
+		stepID, stepIndex, stepAttempt, stepType,
 		m.Kind, strconv.FormatBool(m.IsUser),
 		m.Values, m.CreatedAt,
 		m.CreatedAt, // bucket_at: an emission is written when it's recorded

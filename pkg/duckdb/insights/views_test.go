@@ -93,9 +93,9 @@ func insertMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, run
 	t.Helper()
 	_, err := db.ExecContext(t.Context(),
 		`INSERT INTO inngest.run_metadata
-		   (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, 'run', ?, ?, ?, ?);`,
-		accountID.String(), envID.String(), runID, createdAt, spanID, kind, isUser, json.RawMessage(values), createdAt,
+		   (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'run', ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, createdAt, uuid.NewString(), uuid.NewString(), spanID, kind, isUser, json.RawMessage(values), createdAt,
 	)
 	require.NoError(t, err)
 }

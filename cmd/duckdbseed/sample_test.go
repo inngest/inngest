@@ -57,9 +57,9 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at, bucket_at)
-		 VALUES (?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?, now());`,
-		accountID.String(), envID.String(), runID, now,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?, now());`,
+		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
 		"span-1", `{"variant":"a"}`, now,
 	)
 	require.NoError(t, err)
@@ -159,9 +159,9 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	insertSpan("step-1", rootSpanID, now.Add(2*time.Second))
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, span_id, scope, step_id, step_index, step_attempt, kind, is_user, values, created_at, bucket_at)
-		 VALUES (?, ?, ?, ?, ?, 'step', ?, 1, 1, 'user.custom', true, '{"n":2}', ?, now());`,
-		accountID.String(), envID.String(), runID, now, "step-1", "step-1", now,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, step_id, step_index, step_attempt, step_type, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'step', ?, 1, 1, 'run', 'user.custom', true, '{"n":2}', ?, now());`,
+		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(), "step-1", "step-1", now,
 	)
 	require.NoError(t, err)
 
@@ -187,7 +187,7 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	require.Len(t, tmpl.MetadataProfiles, 1)
 	profile := tmpl.MetadataProfiles[0]
 	require.Equal(t, []MetadataTemplateItem{
-		{SpanID: "step-1", Scope: "step", StepID: new("step-1"), StepIndex: new(1), StepAttempt: new(1), Kind: "user.custom", IsUser: true, Values: `{"n":2}`, Offset: 0},
+		{SpanID: "step-1", Scope: "step", StepID: new("step-1"), StepIndex: new(1), StepAttempt: new(1), StepType: new("run"), Kind: "user.custom", IsUser: true, Values: `{"n":2}`, Offset: 0},
 	}, profile.Items)
 
 	// Replaying the sampled trace must preserve the exact same

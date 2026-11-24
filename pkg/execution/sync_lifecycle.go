@@ -385,11 +385,11 @@ type MetadataEntry struct {
 	Values     metadata.Values
 	CreatedAt  time.Time
 
-	// StepID/StepIndex/StepAttempt identify the step this metadata belongs
-	// to, independently of Parent (which identifies the span this metadata
-	// is attached to -- a request-scoped metadata span's Parent is the
-	// request's execution span, not the step span, but it still belongs to
-	// a step). All four are empty/nil for run-scoped metadata.
+	// StepID/StepIndex/StepAttempt/StepType identify the step this metadata
+	// belongs to, independently of Parent (which identifies the span this
+	// metadata is attached to -- a request-scoped metadata span's Parent is
+	// the request's execution span, not the step span, but it still belongs to
+	// a step). All five are empty/nil for run-scoped metadata.
 	//
 	// StepID is the SDK-facing userland step ID (meta.Attrs.StepUserlandID),
 	// falling back to the internal hashed ID (StepHashedID) when userland
@@ -401,6 +401,9 @@ type MetadataEntry struct {
 	StepHashedID string
 	StepIndex    *int
 	StepAttempt  *int
+	// StepType carries _inngest.step.type (e.g. "run", "groupExperiment") when
+	// emitted for a step.
+	StepType string
 }
 
 // ExtendedTraceSpan carries everything OnExtendedTraceSpan needs to record a

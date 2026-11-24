@@ -414,7 +414,7 @@ func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfi
 		WHERE run_id IN (SELECT run_id FROM sampled_runs)
 		QUALIFY row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
 	)
-	SELECT m.run_id, rt.queued_at, m.span_id, m.scope, m.step_id, m.step_index, m.step_attempt, m.kind, m.is_user, m.values, m.created_at
+	SELECT m.run_id, rt.queued_at, m.span_id, m.scope, m.step_id, m.step_index, m.step_attempt, m.step_type, m.kind, m.is_user, m.values, m.created_at
 	FROM %s.run_metadata m
 	JOIN run_timing rt ON rt.run_id = m.run_id;`, driver.LakeAlias, driver.LakeAlias, driver.LakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
@@ -428,10 +428,10 @@ func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfi
 	for rows.Next() {
 		var rawRunID, rawQueuedAt any
 		var spanID, scope string
-		var rawStepID, rawStepIndex, rawStepAttempt any
+		var rawStepID, rawStepIndex, rawStepAttempt, rawStepType any
 		var kind string
 		var rawIsUser, rawValues, rawCreatedAt any
-		if err := rows.Scan(&rawRunID, &rawQueuedAt, &spanID, &scope, &rawStepID, &rawStepIndex, &rawStepAttempt, &kind, &rawIsUser, &rawValues, &rawCreatedAt); err != nil {
+		if err := rows.Scan(&rawRunID, &rawQueuedAt, &spanID, &scope, &rawStepID, &rawStepIndex, &rawStepAttempt, &rawStepType, &kind, &rawIsUser, &rawValues, &rawCreatedAt); err != nil {
 			return nil, fmt.Errorf("duckdbseed: scanning sampled metadata: %w", err)
 		}
 
@@ -466,6 +466,10 @@ func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfi
 			v := int(int64Value(rawStepAttempt))
 			stepAttempt = &v
 		}
+		var stepType *string
+		if s, ok := rawStepType.(string); ok {
+			stepType = &s
+		}
 
 		profile.Items = append(profile.Items, MetadataTemplateItem{
 			SpanID:      spanID,
@@ -473,6 +477,7 @@ func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfi
 			StepID:      stepID,
 			StepIndex:   stepIndex,
 			StepAttempt: stepAttempt,
+			StepType:    stepType,
 			Kind:        kind,
 			IsUser:      boolValue(rawIsUser),
 			Values:      jsonText(rawValues),
