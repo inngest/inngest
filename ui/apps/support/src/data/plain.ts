@@ -1,6 +1,6 @@
 import {
-  PlainClient,
   AttachmentType,
+  PlainClient,
 } from "@team-plain/typescript-sdk/dist/index";
 import { createServerFn } from "@tanstack/react-start";
 import type {
@@ -8,6 +8,8 @@ import type {
   ThreadPartsFragment,
 } from "@team-plain/typescript-sdk/dist/index";
 import { authMiddleware } from "@/data/clerk";
+import { getAccountPlanInfo } from "@/data/inngest";
+import { getCreateThreadPriority } from "@/data/ticketOptions";
 
 // Initialize Plain client
 // The API key should be set in the environment variable PLAIN_API_KEY
@@ -697,7 +699,7 @@ export type CreateTicketInput = {
     type: string;
     body: string;
     severity?: string;
-    attachmentIds?: string[];
+    attachmentIds?: Array<string>;
   };
 };
 
@@ -734,10 +736,17 @@ export const createTicket = createServerFn({ method: "POST" })
         question: "General question",
       };
 
-      // Get or create customer using the authenticated email
-      const existingCustomer = await plainClient.getCustomerByEmail({
-        email: authEmail,
-      });
+      // Plan lookups are only needed to default non-bug tickets for free users.
+      const isNonBug = ticket.type !== "bug";
+      const [existingCustomer, plainTier, inngestPlan] = await Promise.all([
+        plainClient.getCustomerByEmail({
+          email: authEmail,
+        }),
+        isNonBug ? getCustomerTierByEmail() : Promise.resolve(undefined),
+        isNonBug
+          ? getAccountPlanInfo({ data: {} })
+          : Promise.resolve(undefined),
+      ]);
 
       let customerId = existingCustomer.data?.id;
 
@@ -801,12 +810,16 @@ export const createTicket = createServerFn({ method: "POST" })
         threadInput.labelTypeIds = [labelTypeId];
       }
 
-      // Add priority if severity is specified (Plain supports 0-3)
-      if (ticket.severity) {
-        const severity = parseInt(ticket.severity, 10);
-        if (severity >= 0 && severity <= 3) {
-          threadInput.priority = severity;
-        }
+      const priority = getCreateThreadPriority({
+        type: ticket.type,
+        severity: ticket.severity,
+        isPaid: (plainTier?.isPaid ?? false) || (inngestPlan?.isPaid ?? false),
+        isEnterprise:
+          (plainTier?.isEnterprise ?? false) ||
+          (inngestPlan?.isEnterprise ?? false),
+      });
+      if (priority !== undefined) {
+        threadInput.priority = priority;
       }
       if (ticket.attachmentIds && ticket.attachmentIds.length > 0) {
         threadInput.attachmentIds = ticket.attachmentIds;
@@ -1319,7 +1332,7 @@ export type ReplyToThreadInput = {
   /** @deprecated No longer used - email is derived from authenticated session */
   userEmail?: string;
   /** Optional attachment IDs to include with the reply */
-  attachmentIds?: string[];
+  attachmentIds?: Array<string>;
 };
 
 export type ReplyToThreadResult = {
@@ -1372,7 +1385,7 @@ export const replyToThread = createServerFn({ method: "POST" })
         threadId: string;
         textContent: string;
         markdownContent: string;
-        attachmentIds?: string[];
+        attachmentIds?: Array<string>;
         impersonation: {
           asCustomer: {
             customerIdentifier: {

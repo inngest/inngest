@@ -90,3 +90,37 @@ export const severityOptions: Array<SeverityOption> = [
 
 export type BugSeverity = (typeof severityOptions)[number]["value"];
 export const DEFAULT_BUG_SEVERITY_LEVEL = "3";
+
+/** Plain thread priority: 0 Urgent, 1 High, 2 Normal, 3 Low */
+export const PLAIN_PRIORITY_LOW = 3;
+
+/**
+ * Bug tickets keep the user-selected severity.
+ * Other labels are Low when the customer is neither paid nor enterprise.
+ * Paid/enterprise non-bug tickets omit priority so Plain defaults to Normal.
+ */
+export function getCreateThreadPriority({
+  type,
+  severity,
+  isPaid,
+  isEnterprise,
+}: {
+  type: string;
+  severity?: string;
+  isPaid: boolean;
+  isEnterprise: boolean;
+}): number | undefined {
+  if (type === "bug") {
+    if (!severity) {
+      return undefined;
+    }
+    const parsed = parseInt(severity, 10);
+    return parsed >= 0 && parsed <= 3 ? parsed : undefined;
+  }
+
+  if (!isPaid && !isEnterprise) {
+    return PLAIN_PRIORITY_LOW;
+  }
+
+  return undefined;
+}
