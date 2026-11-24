@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -101,6 +102,14 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		idempotency = *i.IdempotencyPeriod
 	}
 
+	expectedLeaseID := ""
+	if o.ExpectedLeaseID != nil {
+		if *o.ExpectedLeaseID == (ulid.ULID{}) {
+			return osqueue.ErrQueueItemLeaseMismatch
+		}
+		expectedLeaseID = o.ExpectedLeaseID.String()
+	}
+
 	args, err := StrSlice([]any{
 		i.ID,
 		partition.PartitionID,
@@ -109,6 +118,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
+		expectedLeaseID,
+		q.Clock.Now().UnixMilli(),
 	})
 	if err != nil {
 		return err
@@ -132,6 +143,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		return nil
 	case 1:
 		return osqueue.ErrQueueItemNotFound
+	case 2:
+		return osqueue.ErrQueueItemLeaseMismatch
 	default:
 		return fmt.Errorf("unknown response dequeueing item: %d", status)
 	}
@@ -294,6 +307,11 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		}
 	}
 
+	expectedLeaseID := ""
+	if o.ExpectedLeaseID != nil {
+		expectedLeaseID = o.ExpectedLeaseID.String()
+	}
+
 	args, err := StrSlice([]any{
 		i.ID,
 		i,
@@ -309,6 +327,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
+		expectedLeaseID,
 	})
 	if err != nil {
 		return err
@@ -355,6 +374,8 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
 		return osqueue.ErrQueueItemNotFound
+	case 3:
+		return osqueue.ErrQueueItemLeaseMismatch
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}

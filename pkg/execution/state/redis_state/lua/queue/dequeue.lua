@@ -3,6 +3,7 @@
 Output:
   0: Successfully dequeued item
   1: Queue item not found
+  2: Expected lease is missing, replaced or expired
 
 ]]
 
@@ -42,12 +43,28 @@ local backlogID      = ARGV[3]
 local accountID      = ARGV[4]
 local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
+local expectedLeaseID = ARGV[7]
+local nowMS = tonumber(ARGV[8])
 
 -- $include(get_partition_item.lua)
+-- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
+
+-- Check the current lease in the same transaction as deletion and index/lock
+-- cleanup. A client-side ownership read would race a worker or the scavenger.
+if expectedLeaseID ~= nil and expectedLeaseID ~= "" then
+  local stored = redis.call("HGET", keyQueueMap, queueID)
+  if not stored then
+    return 1
+  end
+  local item = cjson.decode(stored)
+  if item.leaseID ~= expectedLeaseID or nowMS == nil or decode_ulid_time(expectedLeaseID) <= nowMS then
+    return 2
+  end
+end
 
 if redis.call("HDEL", keyQueueMap, queueID) == 0 then
 	return 1

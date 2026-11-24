@@ -20,6 +20,8 @@ type DequeueOptions struct {
 	// that wake parked partitions on capacity release should wait for
 	// CapacityReleaseNotifier.CapacityReleased instead of waking at dequeue.
 	CapacityLeased bool
+	// ExpectedLeaseID makes Redis dequeue conditional on still owning this live lease.
+	ExpectedLeaseID *ulid.ULID
 }
 
 // DequeueCapacityLeased marks the dequeued item as holding a capacity lease
@@ -28,15 +30,29 @@ func DequeueCapacityLeased() DequeueOptionFn {
 	return func(o *DequeueOptions) { o.CapacityLeased = true }
 }
 
+// DequeueWithLease requires Redis to check lease ownership atomically with all
+// dequeue mutations. A missing, replaced or expired lease leaves the item intact.
+func DequeueWithLease(id ulid.ULID) DequeueOptionFn {
+	return func(o *DequeueOptions) { o.ExpectedLeaseID = &id }
+}
+
 type RequeueOptions struct {
 	// CapacityLeased has the same meaning as DequeueOptions.CapacityLeased.
 	CapacityLeased bool
+	// ExpectedLeaseID makes Redis requeue conditional on the observed lease.
+	ExpectedLeaseID *ulid.ULID
 }
 
 // RequeueCapacityLeased marks the requeued item as holding a capacity lease
 // that will be released after the requeue completes.
 func RequeueCapacityLeased() RequeueOptionFn {
 	return func(o *RequeueOptions) { o.CapacityLeased = true }
+}
+
+// RequeueWithLease checks the observed Redis lease atomically before requeueing.
+// Unlike dequeue, expired leases are allowed; a zero ID requires no stored lease.
+func RequeueWithLease(id ulid.ULID) RequeueOptionFn {
+	return func(o *RequeueOptions) { o.ExpectedLeaseID = &id }
 }
 
 type RequeueOptionFn func(o *RequeueOptions)

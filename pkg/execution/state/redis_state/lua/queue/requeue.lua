@@ -6,6 +6,7 @@ Output:
   0: Successfully re-enqueued item
   1: Queue item not found
   2: Successfully re-queued to backlog -- TODO: this should be a temporary status
+  3: Observed lease no longer matches
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
@@ -47,6 +48,7 @@ local requeueToBacklog				= tonumber(ARGV[8])
 local shadowPartitionItem     = ARGV[9]
 local backlogID               = ARGV[10]
 local backlogItem             = ARGV[11]
+local expectedLeaseID         = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -58,6 +60,17 @@ local backlogItem             = ARGV[11]
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
     return 1
+end
+
+-- A scavenger snapshot must not clear a lease acquired after it was read.
+if expectedLeaseID ~= nil and expectedLeaseID ~= "" then
+  local currentLeaseID = item.leaseID
+  if currentLeaseID == nil or currentLeaseID == cjson.null then
+    currentLeaseID = "00000000000000000000000000"
+  end
+  if currentLeaseID ~= expectedLeaseID then
+    return 3
+  end
 end
 
 -- Update the queue item with a nil lease, at, atMS, etc.
