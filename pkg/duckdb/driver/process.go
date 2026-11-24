@@ -439,7 +439,7 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 	if p.iceberg == nil {
 		return nil
 	}
-	stmts, err := icebergBootstrapStmts(*p.iceberg, p.localExtensionPaths)
+	stmts, err := icebergBootstrapStmtsForWorker(*p.iceberg, p.localExtensionPaths, p.workerSocket != "")
 	if err != nil {
 		return err
 	}
@@ -447,6 +447,10 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 }
 
 func icebergBootstrapStmts(opts IcebergOptions, localExtensionPaths map[string]string) ([]string, error) {
+	return icebergBootstrapStmtsForWorker(opts, localExtensionPaths, false)
+}
+
+func icebergBootstrapStmtsForWorker(opts IcebergOptions, localExtensionPaths map[string]string, sharedWorker bool) ([]string, error) {
 	if opts.URI == "" {
 		return nil, fmt.Errorf("duckdb: Iceberg enabled but URI is empty")
 	}
@@ -486,6 +490,15 @@ func icebergBootstrapStmts(opts IcebergOptions, localExtensionPaths map[string]s
 		attachOpts += ", SECRET " + icebergSecretName
 	} else {
 		attachOpts += ", AUTHORIZATION_TYPE 'none'"
+	}
+
+	if sharedWorker {
+		// Never DETACH on a shared external worker: another client may be
+		// actively reading from LakeAlias.
+		return append(stmts,
+			fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (%s, DEFAULT_SCHEMA %s);", whLit, LakeAlias, attachOpts, nsLit),
+			fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s.%s;", LakeAlias, LakeNamespace),
+		), nil
 	}
 
 	return append(stmts,

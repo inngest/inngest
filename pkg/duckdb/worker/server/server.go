@@ -655,12 +655,14 @@ func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Reques
 					return
 				}
 				blobBytes := int64(len(frame.Blob))
-				if len(chunks) == 0 && blobBytes > 0 {
-					_ = writeResp(worker.Response{
-						Kind:     worker.KindStreamCredit,
-						StreamID: frame.StreamID,
-						Bytes:    blobBytes,
-					}, false)
+				if len(chunks) == 0 {
+					if blobBytes > 0 {
+						_ = writeResp(worker.Response{
+							Kind:     worker.KindStreamCredit,
+							StreamID: frame.StreamID,
+							Bytes:    blobBytes,
+						}, false)
+					}
 					continue
 				}
 				perChunkCredit := blobBytes / int64(len(chunks))
