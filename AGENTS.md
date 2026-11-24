@@ -64,9 +64,13 @@ compatible with the sections and placeholders described in
 
 ## Development Commands
 
-- `go run . dev` runs development mode with hot reloading.
-- `make dev` is an alias for development mode.
-- `go run .` runs the main CLI application.
+Run `git submodule update --init` before building or running the CLI; it
+embeds docs from the website submodule.
+
+- `go run ./cmd dev` runs the local development server.
+- `make run` runs the development server in test mode with the flags defined in the Makefile.
+- `make dev` builds a development binary with GoReleaser; it does not start the server.
+- `go run ./cmd` runs the main CLI application.
 - `make test` or `go test -test.v ./...` runs the full test suite.
 - `make lint` or `golangci-lint run --verbose` runs linting.
 
