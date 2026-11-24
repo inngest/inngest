@@ -7,6 +7,10 @@ import {
 } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Input } from '@inngest/components/Forms/Input';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
+import { placeholderColor, textColor } from '@/utils/tailwind';
+import { cardErrors } from './copy';
 import type { CardFieldsProps } from './types';
 import type { useComputeVerification } from './useComputeVerification';
 
@@ -95,9 +99,10 @@ function StripeFields({
         });
         if (!mounted.current) return;
         if (result.error) {
-          setError(
-            result.error.message ?? 'Card authentication failed. Try again.',
-          );
+          // The bank refused 3D Secure, so this SetupIntent can't succeed.
+          // The next submit starts over with a new card.
+          secret.current = undefined;
+          setError(cardErrors.bank);
           return;
         }
         if (!result.setupIntent) {
@@ -172,7 +177,16 @@ function StripeFields({
                 disableLink: true,
                 hidePostalCode: true,
                 disabled: disabled || pending,
-                style: { base: { fontSize: '14px', color: '#636363' } },
+                style: {
+                  base: {
+                    fontSize: '14px',
+                    color: resolveColor(textColor.basis, isDark()),
+                    '::placeholder': {
+                      color: resolveColor(placeholderColor.disabled, isDark()),
+                    },
+                  },
+                  invalid: { color: resolveColor(textColor.error, isDark()) },
+                },
               }}
               onChange={(event) => {
                 if (!busy.current && !event.empty) {
@@ -210,11 +224,6 @@ function StripeFields({
               fieldError ??
               'Card verification is unavailable. Try again later.'}
           </p>
-        )}
-        {errorID && (
-          <span className="sr-only" aria-describedby={errorID}>
-            Card verification needs attention.
-          </span>
         )}
       </div>
     ),

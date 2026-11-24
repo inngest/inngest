@@ -216,11 +216,13 @@ export function useComputeVerification(targetAccountID: string) {
     const latest = await load();
     if (version !== epoch.current) return;
     setTransient((value) => ({ ...value, failure: undefined }));
-    // All checks can be saved while finalization is rate-limited. Email rechecks finalize safely.
+    // Email rechecks are safe: they finish a rate-limited finalization, and
+    // they redo an automatic email check that failed.
+    const checks = latest?.computeVerification?.checks ?? [];
     if (
       latest?.computeVerification?.status === 'REQUIRED' &&
-      latest.computeVerification.checks.length >= 3 &&
-      latest.computeVerification.checks.every((check) => check.passed)
+      (checks.every((check) => check.passed) ||
+        !checks.some((check) => check.kind === 'EMAIL' && check.passed))
     )
       await run({ kind: 'email' });
   }

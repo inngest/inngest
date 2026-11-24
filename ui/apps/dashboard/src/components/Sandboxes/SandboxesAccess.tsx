@@ -15,6 +15,15 @@ export function SandboxesAccess() {
   const account = result.data?.account;
   const summary = account?.computeVerification;
   let state: SandboxesVerificationState = { status: 'loading' };
+  if (account && !summary)
+    // The verification read failed; fall back to the plan's entitlement.
+    return account.ents.sandboxes.enabled ? (
+      <SandboxesLayout key={environment.id}>
+        <SandboxesList />
+      </SandboxesLayout>
+    ) : (
+      <SandboxesEmptyState />
+    );
   if (result.error || (!result.fetching && !summary))
     state = { status: 'error' };
   else if (summary) {

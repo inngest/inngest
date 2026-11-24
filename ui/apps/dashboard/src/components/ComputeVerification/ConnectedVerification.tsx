@@ -1,4 +1,6 @@
+import { useOrganizationList } from '@clerk/tanstack-react-start';
 import type { ProfileDisplayType } from '@/queries/server/profile';
+import { pathCreator } from '@/utils/urls';
 import { VerificationPage } from './VerificationPage';
 import { adaptVerification } from './adapter';
 import { useComputeVerification } from './useComputeVerification';
@@ -21,6 +23,15 @@ export function ConnectedVerification({
 }): JSX.Element {
   const controller = useComputeVerification(account_id);
   const account = controller.account;
+  // The link names an account UUID; show the user's matching organization.
+  const { userMemberships } = useOrganizationList({
+    userMemberships: { infinite: true },
+  });
+  const linkedAccountName = userMemberships.data?.find(
+    (membership) =>
+      (membership.organization.publicMetadata as { accountID?: string })
+        .accountID === account_id,
+  )?.organization.name;
   const state = adaptVerification(
     account?.computeVerification,
     {
@@ -34,6 +45,9 @@ export function ConnectedVerification({
     source,
     controller.transient,
   );
+  if (state.originatingAccount)
+    state.originatingAccount.companyName =
+      linkedAccountName ?? 'the account from your link';
   if (controller.loading && !account) state.status = 'loading';
   else if (controller.readError) state.status = 'unavailable';
   state.pending = controller.pending;
@@ -69,7 +83,7 @@ export function ConnectedVerification({
       window.location.assign(return_to ?? '/env/production');
     },
     onContactSupport: () => {
-      window.location.assign('mailto:support@inngest.com');
+      window.location.assign(pathCreator.support());
     },
   };
   return (

@@ -54,7 +54,7 @@ export const Route = createFileRoute('/_authed')({
   },
 });
 
-function Authed(): JSX.Element {
+function Authed() {
   const { navCollapsed, profile } = Route.useLoaderData();
   const Layout = useNavigationV2() ? LayoutV2 : LayoutV1;
   const activeEnv = useMatch({

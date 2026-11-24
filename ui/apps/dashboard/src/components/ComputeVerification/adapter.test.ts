@@ -106,11 +106,17 @@ describe('backend verification adapter', () => {
   it.each([Failure.EmailUnverified, Failure.EmailDisposable])(
     'recovers email for %s',
     (failure) => {
-      expect(getVerificationScreen(adapt(summary(), { failure }))).toBe(
-        'email',
-      );
+      expect(
+        getVerificationScreen(adapt(summary(), { failure, action: 'email' })),
+      ).toBe('email');
     },
   );
+  it('waits for the automatic email check before showing the email screen', () => {
+    expect(getVerificationScreen(adapt(summary()))).toBe('loading');
+    expect(getVerificationScreen(adapt(summary(), { action: 'email' }))).toBe(
+      'email',
+    );
+  });
 });
 
 describe('shared sandbox list/detail UI policy', () => {
@@ -121,7 +127,8 @@ describe('shared sandbox list/detail UI policy', () => {
     [Status.Exempt, false, true],
     [Status.NotEligible, true, true],
     [Status.NotEligible, false, false],
-    [undefined, true, false],
+    [undefined, true, true],
+    [undefined, false, false],
   ] as const)('handles %s with entitlement %s', (status, enabled, allowed) => {
     expect(allowsSandboxList(status, enabled)).toBe(allowed);
   });

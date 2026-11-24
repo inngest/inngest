@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => ({
   rateLimited: false,
 }));
 vi.mock('urql', () => ({ useClient: () => mocks }));
+vi.mock('@clerk/tanstack-react-start', () => ({
+  useOrganizationList: () => ({ userMemberships: { data: [] } }),
+}));
 vi.mock('./VerificationPage', async () => {
   const { ComputeVerification } = await import('./ComputeVerification');
   return { VerificationPage: ComputeVerification };

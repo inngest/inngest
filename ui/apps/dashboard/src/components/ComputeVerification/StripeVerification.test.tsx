@@ -147,8 +147,13 @@ describe('Stripe verification orchestration', () => {
     });
     setup();
     fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
-    await screen.findByText('Authentication canceled');
+    await screen.findByText(/Your bank couldn’t verify this card/);
     expect(mocks.run).toHaveBeenCalledTimes(1);
+    // The failed SetupIntent is dropped, so the next submit starts with a new card.
+    fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
+    await waitFor(() =>
+      expect(mocks.createPaymentMethod).toHaveBeenCalledTimes(2),
+    );
   });
   it('never submits a payment method after Stripe validation fails', async () => {
     mocks.createPaymentMethod.mockResolvedValue({

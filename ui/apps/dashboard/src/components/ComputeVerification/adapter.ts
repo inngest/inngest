@@ -129,6 +129,15 @@ export function adaptVerification(
       state.status = 'unavailable';
       break;
   }
+  // The email check runs on its own when the page opens. Show the email screen
+  // only once a check came back, not while the first one is in flight.
+  if (
+    state.status === 'verification' &&
+    state.email === 'needs-attention' &&
+    !state.originatingAccount &&
+    transient.action !== 'email'
+  )
+    state.status = 'loading';
   return state;
 }
 
@@ -137,6 +146,8 @@ export function allowsSandboxList(
   status: Summary['status'] | undefined,
   enabled: boolean,
 ) {
-  if (!status || status === 'REQUIRED' || status === 'SUSPENDED') return false;
+  // Without a status, such as when the verification read fails, keep the plan's entitlement.
+  if (!status) return enabled;
+  if (status === 'REQUIRED' || status === 'SUSPENDED') return false;
   return status === 'VERIFIED' || status === 'EXEMPT' || enabled;
 }
