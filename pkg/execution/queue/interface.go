@@ -20,8 +20,8 @@ type DequeueOptions struct {
 	// that wake parked partitions on capacity release should wait for
 	// CapacityReleaseNotifier.CapacityReleased instead of waking at dequeue.
 	CapacityLeased bool
-	// ExpectedLeaseID makes Redis dequeue conditional on still owning this live lease.
-	ExpectedLeaseID *ulid.ULID
+	// MatchItemLease requires the stored lease to match the item's live lease.
+	MatchItemLease bool
 }
 
 // DequeueCapacityLeased marks the dequeued item as holding a capacity lease
@@ -30,17 +30,18 @@ func DequeueCapacityLeased() DequeueOptionFn {
 	return func(o *DequeueOptions) { o.CapacityLeased = true }
 }
 
-// DequeueWithLease requires Redis to check lease ownership atomically with all
-// dequeue mutations. A missing, replaced or expired lease leaves the item intact.
-func DequeueWithLease(id ulid.ULID) DequeueOptionFn {
-	return func(o *DequeueOptions) { o.ExpectedLeaseID = &id }
+// DequeueMatchItemLease checks the item's live lease atomically with deletion.
+// A missing, replaced or expired lease leaves the item intact.
+func DequeueMatchItemLease() DequeueOptionFn {
+	return func(o *DequeueOptions) { o.MatchItemLease = true }
 }
 
 type RequeueOptions struct {
 	// CapacityLeased has the same meaning as DequeueOptions.CapacityLeased.
 	CapacityLeased bool
-	// ExpectedLeaseID makes Redis requeue conditional on the observed lease.
-	ExpectedLeaseID *ulid.ULID
+	// MatchItemLease requires the stored lease to match the item's lease.
+	// A nil item lease requires no stored lease; expired matching leases are allowed.
+	MatchItemLease bool
 }
 
 // RequeueCapacityLeased marks the requeued item as holding a capacity lease
@@ -49,10 +50,10 @@ func RequeueCapacityLeased() RequeueOptionFn {
 	return func(o *RequeueOptions) { o.CapacityLeased = true }
 }
 
-// RequeueWithLease checks the observed Redis lease atomically before requeueing.
-// Unlike dequeue, expired leases are allowed; a zero ID requires no stored lease.
-func RequeueWithLease(id ulid.ULID) RequeueOptionFn {
-	return func(o *RequeueOptions) { o.ExpectedLeaseID = &id }
+// RequeueMatchItemLease checks the item's observed lease atomically before
+// requeueing. Expired leases are allowed; a nil item lease requires no stored lease.
+func RequeueMatchItemLease() RequeueOptionFn {
+	return func(o *RequeueOptions) { o.MatchItemLease = true }
 }
 
 type RequeueOptionFn func(o *RequeueOptions)

@@ -109,11 +109,14 @@ func (q *queue) dequeue(ctx context.Context, i osqueue.QueueItem, allowExpiredLe
 	}
 
 	expectedLeaseID := ""
-	if o.ExpectedLeaseID != nil {
-		if *o.ExpectedLeaseID == (ulid.ULID{}) && !allowExpiredLease {
+	if o.MatchItemLease {
+		if (i.LeaseID == nil || *i.LeaseID == (ulid.ULID{})) && !allowExpiredLease {
 			return osqueue.ErrQueueItemLeaseMismatch
 		}
-		expectedLeaseID = o.ExpectedLeaseID.String()
+		expectedLeaseID = (ulid.ULID{}).String()
+		if i.LeaseID != nil {
+			expectedLeaseID = i.LeaseID.String()
+		}
 	}
 
 	args, err := StrSlice([]any{
@@ -220,6 +223,16 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		at = now
 	}
 
+	// Capture the observed lease before clearing it from the requeued payload.
+	observedLeaseID := i.LeaseID
+	expectedLeaseID := ""
+	if o.MatchItemLease {
+		expectedLeaseID = (ulid.ULID{}).String()
+		if observedLeaseID != nil {
+			expectedLeaseID = observedLeaseID.String()
+		}
+	}
+
 	// Unset any lease ID as this is requeued.
 	i.LeaseID = nil
 	// Bump GenerationID so the next dispatch supersedes the previous one.
@@ -267,10 +280,12 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 					l.Warn("could not find event for refreshing throttle before requeue")
 
 					var dequeueOpts []osqueue.DequeueOptionFn
-					if o.ExpectedLeaseID != nil {
-						dequeueOpts = append(dequeueOpts, osqueue.DequeueWithLease(*o.ExpectedLeaseID))
+					if o.MatchItemLease {
+						dequeueOpts = append(dequeueOpts, osqueue.DequeueMatchItemLease())
 					}
-					err := q.dequeue(ctx, i, true, dequeueOpts...)
+					cleanupItem := i
+					cleanupItem.LeaseID = observedLeaseID
+					err := q.dequeue(ctx, cleanupItem, true, dequeueOpts...)
 					if err != nil && !errors.Is(err, osqueue.ErrQueueItemNotFound) {
 						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
 					}
@@ -316,11 +331,6 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		if idx != "" {
 			keys = append(keys, idx)
 		}
-	}
-
-	expectedLeaseID := ""
-	if o.ExpectedLeaseID != nil {
-		expectedLeaseID = o.ExpectedLeaseID.String()
 	}
 
 	args, err := StrSlice([]any{

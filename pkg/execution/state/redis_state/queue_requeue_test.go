@@ -1157,7 +1157,7 @@ func TestQueueRequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
 
-func TestRequeueWithLeaseRejectsStaleScavenger(t *testing.T) {
+func TestRequeueMatchItemLeaseRejectsStaleScavenger(t *testing.T) {
 	for _, observedLease := range []bool{false, true} {
 		t.Run(fmt.Sprintf("observed_lease=%t", observedLease), func(t *testing.T) {
 			r, rc := initRedis(t)
@@ -1171,11 +1171,9 @@ func TestRequeueWithLeaseRejectsStaleScavenger(t *testing.T) {
 			item.Data.Identifier.RunID = ulid.Make()
 			item, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Hour), osqueue.EnqueueOpts{PassthroughJobId: true})
 			require.NoError(t, err)
-			expected := ulid.ULID{}
 			if observedLease {
-				lease, err := shard.Lease(ctx, item, time.Minute, clock.Now())
+				_, err := shard.Lease(ctx, item, time.Minute, clock.Now())
 				require.NoError(t, err)
-				expected = *lease
 				clock.Advance(2 * time.Minute)
 			}
 			stale, err := shard.LoadQueueItem(ctx, item.ID)
@@ -1184,12 +1182,12 @@ func TestRequeueWithLeaseRejectsStaleScavenger(t *testing.T) {
 			_, err = shard.Lease(ctx, item, time.Minute, clock.Now())
 			require.NoError(t, err)
 			before := r.Dump()
-			err = shard.Requeue(ctx, *stale, clock.Now(), osqueue.RequeueWithLease(expected))
+			err = shard.Requeue(ctx, *stale, clock.Now(), osqueue.RequeueMatchItemLease())
 			require.ErrorIs(t, err, osqueue.ErrQueueItemLeaseMismatch)
 			require.Equal(t, before, r.Dump(), "a stale scavenger must preserve the new lease and all indexes")
 			current, err := shard.LoadQueueItem(ctx, item.ID)
 			require.NoError(t, err)
-			require.NoError(t, shard.Requeue(ctx, *current, clock.Now().Add(time.Hour), osqueue.RequeueWithLease(*current.LeaseID)))
+			require.NoError(t, shard.Requeue(ctx, *current, clock.Now().Add(time.Hour), osqueue.RequeueMatchItemLease()))
 		})
 	}
 }

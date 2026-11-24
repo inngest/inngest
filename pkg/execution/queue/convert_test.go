@@ -15,6 +15,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -1184,13 +1185,14 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 // aligned with the queue-proxy request fields that carry them between client
 // and server.
 func TestQueueProxyVariadicOptionCompatibilityGuard(t *testing.T) {
-	coverage := fieldCoverage{covered: []string{"CapacityLeased", "ExpectedLeaseID"}}
+	coverage := fieldCoverage{covered: []string{"CapacityLeased", "MatchItemLease"}}
 	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), coverage)
 	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), coverage)
 	for _, msg := range []proto.Message{&pb.RequeueRequest{}, &pb.DequeueRequest{}} {
-		field := msg.ProtoReflect().Descriptor().Fields().ByName("expected_lease_id")
+		field := msg.ProtoReflect().Descriptor().Fields().ByName("match_item_lease")
 		require.NotNil(t, field)
-		require.True(t, field.HasPresence(), "absent and explicit zero leases must remain distinct")
+		require.Equal(t, protoreflect.BoolKind, field.Kind())
+		require.NotNil(t, msg.ProtoReflect().Descriptor().Fields().ByName("item"))
 	}
 	require.NotNil(t, pb.File_queue_v1_producer_proto.Services().ByName("ProducerService").Methods().ByName("RequeueWithLease"))
 	require.NotNil(t, pb.File_queue_v1_consumer_proto.Services().ByName("ConsumerService").Methods().ByName("DequeueWithLease"))

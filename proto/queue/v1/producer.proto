@@ -33,13 +33,13 @@ message RequeueRequest {
   QueueItem item = 2;
   google.protobuf.Timestamp at = 3;
   bool capacity_leased = 4;
-  optional string expected_lease_id = 5;
+  bool match_item_lease = 5;
 }
 
 message RequeueResponse {}
 
 message RequeueWithLeaseRequest {
-  // expected_lease_id must be present, including the zero ULID for no lease.
+  // match_item_lease must be true; a nil item lease requires no stored lease.
   RequeueRequest request = 1;
 }
 

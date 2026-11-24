@@ -22,13 +22,13 @@ const (
 )
 
 type DequeueRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ShardName       string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
-	Item            *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	CapacityLeased  bool                   `protobuf:"varint,3,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
-	ExpectedLeaseId *string                `protobuf:"bytes,4,opt,name=expected_lease_id,json=expectedLeaseId,proto3,oneof" json:"expected_lease_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
+	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	CapacityLeased bool                   `protobuf:"varint,3,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	MatchItemLease bool                   `protobuf:"varint,4,opt,name=match_item_lease,json=matchItemLease,proto3" json:"match_item_lease,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DequeueRequest) Reset() {
@@ -82,11 +82,11 @@ func (x *DequeueRequest) GetCapacityLeased() bool {
 	return false
 }
 
-func (x *DequeueRequest) GetExpectedLeaseId() string {
-	if x != nil && x.ExpectedLeaseId != nil {
-		return *x.ExpectedLeaseId
+func (x *DequeueRequest) GetMatchItemLease() bool {
+	if x != nil {
+		return x.MatchItemLease
 	}
-	return ""
+	return false
 }
 
 type DequeueResponse struct {
@@ -127,7 +127,7 @@ func (*DequeueResponse) Descriptor() ([]byte, []int) {
 
 type DequeueWithLeaseRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// expected_lease_id must identify the caller's live lease.
+	// match_item_lease must be true and the item must carry the caller's live lease.
 	Request       *DequeueRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -210,14 +210,13 @@ var File_queue_v1_consumer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_consumer_proto_rawDesc = "" +
 	"\n" +
-	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"\xc8\x01\n" +
+	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"\xab\x01\n" +
 	"\x0eDequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12'\n" +
-	"\x0fcapacity_leased\x18\x03 \x01(\bR\x0ecapacityLeased\x12/\n" +
-	"\x11expected_lease_id\x18\x04 \x01(\tH\x00R\x0fexpectedLeaseId\x88\x01\x01B\x14\n" +
-	"\x12_expected_lease_id\"\x11\n" +
+	"\x0fcapacity_leased\x18\x03 \x01(\bR\x0ecapacityLeased\x12(\n" +
+	"\x10match_item_lease\x18\x04 \x01(\bR\x0ematchItemLease\"\x11\n" +
 	"\x0fDequeueResponse\"M\n" +
 	"\x17DequeueWithLeaseRequest\x122\n" +
 	"\arequest\x18\x01 \x01(\v2\x18.queue.v1.DequeueRequestR\arequest\"\x1a\n" +
@@ -266,7 +265,6 @@ func file_queue_v1_consumer_proto_init() {
 		return
 	}
 	file_queue_v1_types_proto_init()
-	file_queue_v1_consumer_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

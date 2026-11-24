@@ -145,14 +145,14 @@ func (x *EnqueueResponse) GetShardName() string {
 }
 
 type RequeueRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ShardName       string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
-	Item            *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	At              *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
-	CapacityLeased  bool                   `protobuf:"varint,4,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
-	ExpectedLeaseId *string                `protobuf:"bytes,5,opt,name=expected_lease_id,json=expectedLeaseId,proto3,oneof" json:"expected_lease_id,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
+	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	At             *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	CapacityLeased bool                   `protobuf:"varint,4,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	MatchItemLease bool                   `protobuf:"varint,5,opt,name=match_item_lease,json=matchItemLease,proto3" json:"match_item_lease,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RequeueRequest) Reset() {
@@ -213,11 +213,11 @@ func (x *RequeueRequest) GetCapacityLeased() bool {
 	return false
 }
 
-func (x *RequeueRequest) GetExpectedLeaseId() string {
-	if x != nil && x.ExpectedLeaseId != nil {
-		return *x.ExpectedLeaseId
+func (x *RequeueRequest) GetMatchItemLease() bool {
+	if x != nil {
+		return x.MatchItemLease
 	}
-	return ""
+	return false
 }
 
 type RequeueResponse struct {
@@ -258,7 +258,7 @@ func (*RequeueResponse) Descriptor() ([]byte, []int) {
 
 type RequeueWithLeaseRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// expected_lease_id must be present, including the zero ULID for no lease.
+	// match_item_lease must be true; a nil item lease requires no stored lease.
 	Request       *RequeueRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -609,15 +609,14 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x0fEnqueueResponse\x12'\n" +
 	"\x04item\x18\x01 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12\x1d\n" +
 	"\n" +
-	"shard_name\x18\x02 \x01(\tR\tshardName\"\xf4\x01\n" +
+	"shard_name\x18\x02 \x01(\tR\tshardName\"\xd7\x01\n" +
 	"\x0eRequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12'\n" +
-	"\x0fcapacity_leased\x18\x04 \x01(\bR\x0ecapacityLeased\x12/\n" +
-	"\x11expected_lease_id\x18\x05 \x01(\tH\x00R\x0fexpectedLeaseId\x88\x01\x01B\x14\n" +
-	"\x12_expected_lease_id\"\x11\n" +
+	"\x0fcapacity_leased\x18\x04 \x01(\bR\x0ecapacityLeased\x12(\n" +
+	"\x10match_item_lease\x18\x05 \x01(\bR\x0ematchItemLease\"\x11\n" +
 	"\x0fRequeueResponse\"M\n" +
 	"\x17RequeueWithLeaseRequest\x122\n" +
 	"\arequest\x18\x01 \x01(\v2\x18.queue.v1.RequeueRequestR\arequest\"\x1a\n" +
@@ -710,7 +709,6 @@ func file_queue_v1_producer_proto_init() {
 		return
 	}
 	file_queue_v1_types_proto_init()
-	file_queue_v1_producer_proto_msgTypes[2].OneofWrappers = []any{}
 	file_queue_v1_producer_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

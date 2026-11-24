@@ -452,9 +452,9 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
 
-func TestQueueDequeueWithLease(t *testing.T) {
+func TestQueueDequeueMatchItemLease(t *testing.T) {
 	for _, backlog := range []bool{false, true} {
-		for _, state := range []string{"owned", "replaced", "cleared", "expired", "zero", "missing"} {
+		for _, state := range []string{"owned", "replaced", "cleared", "expired", "zero", "nil", "missing"} {
 			t.Run(fmt.Sprintf("backlog=%t/%s", backlog, state), func(t *testing.T) {
 				r, rc := initRedis(t)
 				t.Cleanup(rc.Close)
@@ -470,21 +470,22 @@ func TestQueueDequeueWithLease(t *testing.T) {
 				lease, err := shard.Lease(ctx, item, time.Minute, clock.Now())
 				require.NoError(t, err)
 				item.LeaseID = lease
-				expected := *lease
 				switch state {
 				case "replaced":
-					expected = ulid.Make()
+					item.LeaseID = new(ulid.Make())
 				case "cleared":
 					require.NoError(t, shard.Requeue(ctx, item, clock.Now().Add(time.Hour)))
 				case "expired":
 					clock.Advance(2 * time.Minute)
 				case "zero":
-					expected = ulid.ULID{}
+					item.LeaseID = new(ulid.ULID{})
+				case "nil":
+					item.LeaseID = nil
 				case "missing":
 					require.NoError(t, shard.Dequeue(ctx, item))
 				}
 				before := r.Dump()
-				err = shard.Dequeue(ctx, item, osqueue.DequeueWithLease(expected))
+				err = shard.Dequeue(ctx, item, osqueue.DequeueMatchItemLease())
 				switch state {
 				case "owned":
 					require.NoError(t, err)
