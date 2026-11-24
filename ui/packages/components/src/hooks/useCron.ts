@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Cron from 'croner';
 import cronstrue from 'cronstrue';
 
-const timezonePattern = /^TZ=([A-Za-z\/_]+)\s+/;
+const timezonePattern = /^(?:CRON_)?TZ=(\S+)\s+/;
 
 const getCron = (schedule: string) => {
   const [expression, timezone] = splitExpressionAndTimezone(schedule);
