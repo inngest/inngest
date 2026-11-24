@@ -31,10 +31,11 @@ type QuackMergeColumn = quack.MergeColumn
 // retry it. Multi-writer upserts into one lake table need a single writer,
 // those properties, or retries on this error. The MERGE is a single
 // auto-committed statement and the rows stay buffered when Flush fails, so
-// calling Flush again re-runs it (Close doesn't, it releases the pooled conn
-// even if its final Flush fails).
+// calling Flush again re-runs it, on a new session if the failed Flush's ctx
+// ended mid-statement (Close doesn't, it releases the pooled conn even if
+// its final Flush fails).
 type QuackMergeAppender struct {
-	session *quack.Session
+	session quackAppenderSession
 	schema  string
 	table   string
 	cfg     QuackMergeConfig
@@ -79,7 +80,7 @@ func NewQuackMergeAppenderFromConn(ctx context.Context, driverConn driver.Conn, 
 }
 
 func newQuackMergeAppenderFromDriverConn(ctx context.Context, driverConn any, catalog, schema, table string, cfg QuackMergeConfig, columns []QuackMergeColumn) (*QuackMergeAppender, error) {
-	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, schema, "quack merge appender")
+	sess, err := newQuackAppenderSession(ctx, driverConn, catalog, schema, "quack merge appender")
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,11 @@ func (a *QuackMergeAppender) Flush(ctx context.Context) error {
 	if len(a.rows) == 0 {
 		return nil
 	}
-	if err := a.session.Merge(ctx, a.schema, a.table, a.cfg, a.columns, a.rows); err != nil {
+	sess, err := a.session.current(ctx)
+	if err != nil {
+		return err
+	}
+	if err := sess.Merge(ctx, a.schema, a.table, a.cfg, a.columns, a.rows); err != nil {
 		return err
 	}
 	a.rows = a.rows[:0]
