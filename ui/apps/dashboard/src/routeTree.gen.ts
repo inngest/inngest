@@ -19,6 +19,7 @@ import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
 import { Route as AuthedBillingRouteRouteImport } from './routes/_authed/billing/route'
 import { Route as AuthedIntentRouteRouteImport } from './routes/_authed/intent/route'
 import { Route as AuthedSettingsRouteRouteImport } from './routes/_authed/settings/route'
+import { Route as AuthedVerifyRouteImport } from './routes/_authed/verify'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
@@ -162,6 +163,11 @@ const AuthedIntentRouteRoute = AuthedIntentRouteRouteImport.update({
 const AuthedSettingsRouteRoute = AuthedSettingsRouteRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedVerifyRoute = AuthedVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
   getParentRoute: () => AuthedRoute,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -726,6 +732,7 @@ export interface FileRoutesByFullPath {
   '/sign-out': typeof authSignOutRoute
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
+  '/verify': typeof AuthedVerifyRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -831,6 +838,7 @@ export interface FileRoutesByTo {
   '/sign-out': typeof authSignOutRoute
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
+  '/verify': typeof AuthedVerifyRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -927,6 +935,7 @@ export interface FileRoutesById {
   '/(auth)/sign-out': typeof authSignOutRoute
   '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
+  '/_authed/verify': typeof AuthedVerifyRoute
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
@@ -1035,6 +1044,7 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/switch-organization'
     | '/user-setup'
+    | '/verify'
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
@@ -1140,6 +1150,7 @@ export interface FileRouteTypes {
     | '/sign-out'
     | '/switch-organization'
     | '/user-setup'
+    | '/verify'
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
@@ -1235,6 +1246,7 @@ export interface FileRouteTypes {
     | '/(auth)/sign-out'
     | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
+    | '/_authed/verify'
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
@@ -1424,6 +1436,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthedSettingsRouteRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/verify': {
+      id: '/_authed/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof AuthedVerifyRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/api/chat': {
@@ -2476,6 +2495,7 @@ interface AuthedRouteChildren {
   AuthedBillingRouteRoute: typeof AuthedBillingRouteRouteWithChildren
   AuthedIntentRouteRoute: typeof AuthedIntentRouteRouteWithChildren
   AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren
+  AuthedVerifyRoute: typeof AuthedVerifyRoute
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute
   AuthedEnvIndexRoute: typeof AuthedEnvIndexRoute
@@ -2491,6 +2511,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedBillingRouteRoute: AuthedBillingRouteRouteWithChildren,
   AuthedIntentRouteRoute: AuthedIntentRouteRouteWithChildren,
   AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
+  AuthedVerifyRoute: AuthedVerifyRoute,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
   AuthedEnvIndexRoute: AuthedEnvIndexRoute,

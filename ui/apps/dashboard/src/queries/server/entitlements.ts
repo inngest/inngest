@@ -1,4 +1,7 @@
+import { ClientError } from 'graphql-request';
 import { graphql } from '@/gql';
+import type { SandboxEntitlementsQuery } from '@/gql/graphql';
+import { allowsSandboxList } from '@/components/ComputeVerification/adapter';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { createServerFn } from '@tanstack/react-start';
 
@@ -33,6 +36,7 @@ const sandboxEntitlementsDocument = graphql(`
   query SandboxEntitlements {
     account {
       id
+      computeVerification { status }
       entitlements: ents {
         sandboxes {
           enabled
@@ -42,11 +46,26 @@ const sandboxEntitlementsDocument = graphql(`
   }
 `);
 
-// Whether the account's current plan grants sandbox access.
+// UI access: verification takes precedence; legacy accounts retain their entitlement gate.
 export const getSandboxesEnabled = createServerFn({
   method: 'GET',
 }).handler(async () => {
-  const response = await graphqlAPI.request(sandboxEntitlementsDocument);
+  let account: SandboxEntitlementsQuery['account'];
+  try {
+    ({ account } = await graphqlAPI.request(sandboxEntitlementsDocument));
+  } catch (error) {
+    // A failed verification read is a field error next to partial data. Keep
+    // the entitlement, and let allowsSandboxList fall back to it.
+    const data =
+      error instanceof ClientError
+        ? (error.response.data as SandboxEntitlementsQuery | undefined)
+        : undefined;
+    if (!data?.account) throw error;
+    account = data.account;
+  }
 
-  return response.account.entitlements.sandboxes.enabled;
+  return allowsSandboxList(
+    account.computeVerification?.status,
+    account.entitlements.sandboxes.enabled,
+  );
 });

@@ -87,7 +87,17 @@ function ScenarioDemo({
     setState((current) => ({ ...current, pending: true }));
     await new Promise((resolve) => window.setTimeout(resolve, 650));
     if (generation.current !== currentGeneration) return;
-    setState((current) => ({ ...current, ...update, pending: false }));
+    setState((current) => ({
+      ...current,
+      ...update,
+      pending: false,
+      status:
+        (update.email ?? current.email) === 'complete' &&
+        (update.phone ?? current.phone) === 'complete' &&
+        (update.card ?? current.card) === 'complete'
+          ? 'complete'
+          : update.status ?? current.status,
+    }));
   }
 
   function selectContext(selected: VerificationState['selectedAccount']) {

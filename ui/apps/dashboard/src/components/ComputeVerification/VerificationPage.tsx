@@ -1,12 +1,11 @@
+import { useLocation } from '@tanstack/react-router';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import TopBar from '../Layout/TopBar';
 import BottomBar from '../Layout/BottomBar';
 import { ComputeVerification, VerificationLayout } from './ComputeVerification';
 import type { VerificationProps } from './types';
 
-/** Host beneath existing app providers when the integration owner adds the route.
- * Shell services remain the existing ones; verification itself has no integrations.
- */
+/** Keep the existing app navigation available throughout verification. */
 export function VerificationPage({
   profile,
   showOnboardingWidget,
@@ -15,6 +14,7 @@ export function VerificationPage({
   profile: ProfileDisplayType;
   showOnboardingWidget: () => void;
 }) {
+  const href = useLocation({ select: (location) => location.href });
   return (
     <VerificationLayout
       header={
@@ -22,6 +22,7 @@ export function VerificationPage({
           focused
           profile={profile}
           showOnboardingWidget={showOnboardingWidget}
+          organizationRedirectUrl={href}
         />
       }
       footer={<BottomBar focused />}

@@ -1,8 +1,8 @@
 import { Header } from '@inngest/components/Header/Header';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
-import SandboxesEmptyState from '@/components/Sandboxes/SandboxesEmptyState';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { SandboxesAccess } from '@/components/Sandboxes/SandboxesAccess';
 import { SandboxesLayout } from '@/components/Sandboxes/SandboxesLayout';
 import { SandboxesList } from '@/components/Sandboxes/SandboxesList';
 import { getSandboxesEnabled } from '@/queries/server/entitlements';
@@ -28,7 +28,7 @@ function SandboxesPage() {
       ) : (
         <div className="bg-canvasBase h-full w-full overflow-y-auto">
           <ClientOnly>
-            <SandboxesEmptyState />
+            <SandboxesAccess />
           </ClientOnly>
         </div>
       )}

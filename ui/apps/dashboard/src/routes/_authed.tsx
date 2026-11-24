@@ -70,7 +70,11 @@ function Authed() {
     from: '/_authed/oauth/authorize/',
     shouldThrow: false,
   });
-  if (oauthApproval || mcpApproval) {
+  const verification = useMatch({
+    from: '/_authed/verify',
+    shouldThrow: false,
+  });
+  if (oauthApproval || mcpApproval || verification) {
     return <Outlet />;
   }
 

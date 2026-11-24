@@ -13,6 +13,7 @@ export const codeErrors: Record<CodeError, string> = {
   temporary: 'We couldn’t verify the code. Try again.',
 };
 export const cardErrors: Record<CardError, string> = {
+  'name-required': 'Enter the name on your card.',
   'non-us': 'Use a card issued in the United States to continue.',
   prepaid:
     'Prepaid cards are unsupported. Use a US-issued credit or debit card.',

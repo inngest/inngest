@@ -16,6 +16,7 @@ export type CodeError =
   | 'too-many-attempts'
   | 'temporary';
 export type CardError =
+  | 'name-required'
   | 'non-us'
   | 'prepaid'
   | 'already-used'
@@ -27,6 +28,9 @@ export type VerificationState = {
   entrySource: EntrySource;
   canVerify: boolean;
   status:
+    | 'complete'
+    | 'rate-limited'
+    | 'finalizing'
     | 'loading'
     | 'verification'
     | 'early-access-unavailable'
