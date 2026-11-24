@@ -1,0 +1,20 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+modulus(9::i8, 3::i8) = 0::i8
+modulus(10::i8, -3::i8) = 1::i8
+modulus(32767::i16, 1000::i16) = 767::i16
+modulus(-2147483647::i32, 300000000::i32) = -47483647::i32
+modulus(-9223372036854775800::i64, -80000000000000::i64) = -12036854775800::i64
+modulus(5::i8, null::i8?) = null::i8?
+modulus(null::i64?, 1::i64) = null::i64?
+modulus(null::i64?, null::i64?) = null::i64?
+
+# on_domain_error: Examples demonstrating operation when the divisor is 0
+modulus(5::i8, 0::i8) [on_domain_error:NULL] = null::i8?
+modulus(5::i8, 0::i8) [on_domain_error:ERROR] = <!ERROR>
+
+# division_type: Examples demonstrating truncate and floor division types
+modulus(8::i8, -3::i8) [division_type:TRUNCATE] = 2::i8
+modulus(8::i8, -3::i8) [division_type:FLOOR] = -1::i8

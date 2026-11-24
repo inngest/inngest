@@ -1,0 +1,1 @@
+WITH x AS (SELECT * REPLACE (lower(status) AS status) RENAME (run_id AS id) FROM runs) SELECT id, status FROM x

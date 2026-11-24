@@ -17,7 +17,7 @@ Feature-status snapshot: `FINDINGS/duckdb-insights.md`.
 This package never touches the database except in `execute.go` — parsing,
 validation, and rewriting are pure functions over
 `pkg/duckdb/parser`'s AST. It has no dependency on `cqrs`/`pkg/db/duckdb`
-beyond `duckdb.DuckLakeAlias` (a string constant) and `duckdb.Open`/
+beyond `driver.LakeAlias`/`schema.MacroSchema` (string constants) and `duckdb.Open`/
 `Migrate` in its own integration tests.
 
 ## Where things live
@@ -46,7 +46,7 @@ testdata/queries/transpile/*.out  their expected Transpile() output (goldie)
 ```
 
 Physical schema this package reads from: six `CREATE MACRO ... AS TABLE`
-statements in `pkg/db/duckdb/migrations/000002_insights_views.sql`.
+statements in `pkg/db/duckdb/views.sql`.
 
 ## Architecture, in one pass
 
@@ -86,9 +86,10 @@ This has already caused four real bugs, found by systematically re-auditing
 - `GroupByItem`'s `*parser.GroupingSets` case — its `Sets` field holds more
   `GroupByItem`s that need recursing into, not a bare `Expr` list.
 - `stmt.Distinct.On` (`SELECT DISTINCT ON (...)`).
-- `*parser.StarExpr`'s `Qualifier`/`Exclude` — `StarExpr.Children()`
-  returns `nil` (they're plain `[]string`, not `Expr`/`Ident` nodes), so
-  nothing walks into them without an explicit `checkStar` visitor case.
+- `*parser.StarExpr`'s `Qualifier`/`Exclude` (and `Replace`'s/`Rename`'s
+  column names) — they're plain strings, not `Expr`/`Ident` nodes, so
+  nothing walks into them without an explicit `checkStar` visitor case
+  (`StarExpr.Children()` only returns the `REPLACE` entries' expressions).
 
 **If you add support for a new clause shape, or `pkg/duckdb/parser` adds a
 new field to `SelectStatement`/`GroupByItem`/anything else this package

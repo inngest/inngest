@@ -1,0 +1,18 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+min((20, -3, 1, -10, 0, 5)::i8) = -10::i8?
+min((-32768, 32767, 20000, -30000)::i16) = -32768::i16?
+min((-214748648, 214748647, 21470048, 4000000)::i32) = -214748648::i32?
+min((2000000000, -3217908979, 629000000, -100000000, 0, 987654321)::i64) = -3217908979::i64?
+min((2.5, 0, 5.0, -2.5, -7.5)::fp32) = -7.5::fp32?
+min((1.5e+308, 1.5e+10, -1.5e+8, -1.5e+7, -1.5e+70)::fp64) = -1.5e+70::fp64?
+
+# null_handling: Examples with null as input or output
+min((Null, inf)::fp64) = inf::fp64?
+min((Null, Null, Null)::i16) = Null::i16?
+min(()::i16) = Null::i16?
+min((2000000000, Null, 629000000, -100000000, Null, 987654321)::i64) = -100000000::i64?
+min((Null, -inf, -1.5e+8, -1.5e+7, -1.5e+70)::fp64) = -inf::fp64?
+min((1.5e+308, 1.5e+10, Null, -1.5e+7, Null)::fp64) = -1.5e+7::fp64?

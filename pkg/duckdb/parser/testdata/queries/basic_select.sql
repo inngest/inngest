@@ -23,3 +23,7 @@ SELECT a FROM t ORDER BY a DESC, b;
 SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5;
 
 SELECT "group", t."order" AS "select" FROM "table" AS t;
+
+SELECT t.* EXCLUDE (b) REPLACE (CAST(a AS JSON) AS a, upper(c) AS c) FROM t;
+
+SELECT * EXCLUDE (x) RENAME (t.a AS b, c AS "select") FROM t;

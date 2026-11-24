@@ -1,0 +1,20 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+divide(25::i8, 5::i8) = 5::i8
+divide(200::i16, -100::i16) = -2::i16
+divide(60000::i32, 200::i32) = 300::i32
+divide(4000000000::i64, -5000::i64) = -800000::i64
+
+# division_by_zero: Examples demonstrating division by zero
+divide(5::i8, 0::i8) [on_division_by_zero:NAN] = null::i8?
+divide(5::i8, 0::i8) [on_division_by_zero:ERROR] = <!ERROR>
+
+# overflow: Examples demonstrating overflow behavior
+divide(-9223372036854775808::i64, -1::i64) [overflow:ERROR] = <!ERROR>
+divide(-128::i8, -1::i8) [overflow:SATURATE] = 127::i8
+
+# floating_exception: Examples demonstrating exceptional floating point cases
+divide(1.5e+208::fp64, 1.5e-200::fp64) = inf::fp64
+divide(1.5e+200::fp64, -1.5e-208::fp64) = -inf::fp64

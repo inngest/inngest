@@ -42,6 +42,14 @@ func (sp QueueShadowPartition) KeyQueuesEnabled(ctx context.Context, q *QueueOpt
 	return q.AllowKeyQueues(ctx, *sp.AccountID, *sp.EnvID, *sp.FunctionID)
 }
 
+func (sp QueueShadowPartition) KeyQueueRefillAllowed(ctx context.Context, q *QueueOptions) bool {
+	if sp.SystemQueueName != nil || sp.AccountID == nil || sp.EnvID == nil || sp.FunctionID == nil || q.AllowKeyQueueRefill == nil {
+		return true
+	}
+
+	return q.AllowKeyQueueRefill(ctx, *sp.AccountID, *sp.EnvID, *sp.FunctionID)
+}
+
 func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
 	fnID := uuid.Nil
 	if sp.FunctionID != nil {

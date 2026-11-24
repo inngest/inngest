@@ -9,6 +9,8 @@ import (
 
 func TestScopesForEndpoints(t *testing.T) {
 	endpoints := []apiv2endpoint.Endpoint{
+		{AuthzPermission: "accounts:read:get"},
+		{AuthzPermission: "accounts:read:usage"},
 		{AuthzPermission: "apps:read:get"},
 		{AuthzPermission: "apps:read:list"},
 		{AuthzPermission: "functions:write:invoke"},
@@ -21,6 +23,7 @@ func TestScopesForEndpoints(t *testing.T) {
 	}
 
 	require.Equal(t, []string{
+		"accounts:read:*",
 		"apps:read:*",
 		"functions:write:*",
 		"webhooks:write:*",
@@ -29,6 +32,7 @@ func TestScopesForEndpoints(t *testing.T) {
 
 func TestCLIScopesExcludeNonDelegatableKeys(t *testing.T) {
 	scopes := CLIScopes()
+	require.Contains(t, scopes, "accounts:read:*")
 	require.Contains(t, scopes, "events:read:*")
 
 	require.Contains(t, scopes, "apps:read:*")

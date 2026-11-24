@@ -123,7 +123,7 @@ SelectStatement
     Literal(1,10)
     Literal(1,5)
 
--- SELECT "group", t."order" AS "select" FROM "table" AS t;
+-- SELECT "group", t."order" AS "select" FROM "table" AS t
 SelectStatement
   SelectItem()
     Ident(group)
@@ -131,4 +131,25 @@ SelectStatement
     Ident(t.order)
   FromClause
     BaseTableRef(table,alias=t)
+
+-- SELECT t.* EXCLUDE (b) REPLACE (CAST(a AS JSON) AS a, upper(c) AS c) FROM t
+SelectStatement
+  SelectItem()
+    StarExpr(t,exclude=[b],replace=[a c])
+      SelectItem(a)
+        CastExpr(try=false)
+          Ident(a)
+          TypeName("JSON")
+      SelectItem(c)
+        FunctionExpr(upper,distinct=false)
+          Ident(c)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT * EXCLUDE (x) RENAME (t.a AS b, c AS "select") FROM t;
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[x],rename=[t.a->b c->select])
+  FromClause
+    BaseTableRef(t,alias=)
 

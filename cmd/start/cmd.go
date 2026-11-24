@@ -151,9 +151,9 @@ func Command() *cli.Command {
 				Name:     "duckdb",
 				// `inngest start` always persists, so with
 				// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true this writes an
-				// on-disk DuckLake catalog — into --postgres-uri's database
-				// when set (see pkg/devserver's duckLakeOptionsFor).
-				Usage: "Enable the experimental DuckDB dual-write POC. Requires EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true, and when --postgres-uri is set, stores the DuckLake catalog tables in that same Postgres database",
+				// on-disk Iceberg lake's catalog into --postgres-uri's
+				// database when set (see pkg/devserver's icebergConfigFor).
+				Usage: "Enable the experimental DuckDB dual-write POC. Requires EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true, and when --postgres-uri is set, stores the Iceberg catalog tables in that same Postgres database",
 				Value: false,
 			},
 			&cli.BoolFlag{

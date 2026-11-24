@@ -238,6 +238,12 @@ func selectAliases(stmt *parser.SelectStatement) map[string]bool {
 		if item.Alias != "" {
 			aliases[strings.ToLower(item.Alias)] = true
 		}
+		// A star's RENAME names an output column too.
+		if star, ok := item.Expr.(*parser.StarExpr); ok {
+			for _, r := range star.Rename {
+				aliases[strings.ToLower(r.To)] = true
+			}
+		}
 	}
 	return aliases
 }
@@ -569,12 +575,13 @@ func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 }
 
 // checkStar validates a StarExpr's Qualifier (if given) resolves to a
-// known table in scope, and every name in Exclude is a real column of the
-// table(s) that star would expand to — StarExpr.Children() returns nil
-// (Qualifier/Exclude are plain string slices, not Expr/Ident nodes), so
-// without this explicit case neither field is ever checked: "SELECT
-// bogus_alias.*" or "SELECT * EXCLUDE (nonexistent_column)" would
-// otherwise reach remapTables/DuckDB completely unvalidated.
+// known table in scope, and every name in Exclude, Replace and Rename is a
+// real column of the table(s) that star would expand to — those names are
+// plain strings, not Expr/Ident nodes (only a REPLACE entry's expression
+// is a child, which the walk checks like any other), so without this
+// explicit case none of them is ever checked: "SELECT bogus_alias.*" or
+// "SELECT * EXCLUDE (nonexistent_column)" would otherwise reach
+// remapTables/DuckDB completely unvalidated.
 func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 	if len(s.Qualifier) > 1 {
 		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported qualifier %q", strings.Join(s.Qualifier, "."))}
@@ -604,6 +611,45 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 		}
 		if !found {
 			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", raw)}
+		}
+	}
+
+	// REPLACE and RENAME entries name a column the star (after EXCLUDE)
+	// expands to.
+	expanded := func(x excludeName) bool {
+		for _, e := range entries {
+			if e.hidden() || x.qualifier != "" && !strings.EqualFold(x.qualifier, e.alias) {
+				continue
+			}
+			for _, name := range e.table.columnOrder {
+				if !x.matches(e.alias, name) {
+					continue
+				}
+				excluded := false
+				for i := range s.Exclude {
+					if ex, _, ok := parseExcludeName(s, i); ok && ex.matches(e.alias, name) {
+						excluded = true
+					}
+				}
+				if !excluded {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for _, r := range s.Replace {
+		if !expanded(excludeName{column: r.Alias}) {
+			return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown column %q in REPLACE", r.Alias)}
+		}
+	}
+	for _, r := range s.Rename {
+		x, raw, ok := parseStarColumnName(r.From)
+		if !ok {
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported RENAME entry %q", raw)}
+		}
+		if !expanded(x) {
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in RENAME", raw)}
 		}
 	}
 	return nil

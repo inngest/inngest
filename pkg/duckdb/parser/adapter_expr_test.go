@@ -302,25 +302,88 @@ func TestAdaptCase(t *testing.T) {
 }
 
 func TestAdaptStarWithExclude(t *testing.T) {
-	e := parseExprForTest(t, "t.* EXCLUDE (a, b)")
-	s, ok := e.(*StarExpr)
-	require.True(t, ok)
-	require.Equal(t, []string{"t"}, s.Qualifier)
-	require.Equal(t, []string{"a", "b"}, s.Exclude)
+	// EXCEPT is DuckDB's synonym for EXCLUDE; Write prints either as
+	// EXCLUDE.
+	for _, kw := range []string{"EXCLUDE", "EXCEPT"} {
+		e := parseExprForTest(t, "t.* "+kw+" (a, b)")
+		s, ok := e.(*StarExpr)
+		require.True(t, ok)
+		require.Equal(t, []string{"t"}, s.Qualifier)
+		require.Equal(t, []string{"a", "b"}, s.Exclude)
+	}
+	stmt, err := ParseString("SELECT * EXCEPT a FROM t")
+	require.NoError(t, err)
+	require.Equal(t, "SELECT * EXCLUDE (a) FROM t", String(stmt))
 }
 
-func TestAdaptStarReplaceAndRenameRejected(t *testing.T) {
-	// StarExpr doesn't model REPLACE/RENAME; they must error, not vanish.
-	cases := []struct{ sql, want string }{
-		{"SELECT * REPLACE (a + 1 AS a) FROM t", "REPLACE"},
-		{"SELECT t.* EXCLUDE (b) REPLACE (a + 1 AS a) FROM t", "REPLACE"},
-		{"SELECT * RENAME (a AS b) FROM t", "RENAME"},
-		{"SELECT * RENAME a AS b FROM t", "RENAME"},
-	}
-	for _, c := range cases {
+func TestAdaptStarWithReplace(t *testing.T) {
+	for _, c := range []struct {
+		sql, want string
+		replaced  []string
+	}{
+		{"SELECT * REPLACE (a + 1 AS a) FROM t", "SELECT * REPLACE (a + 1 AS a) FROM t", []string{"a"}},
+		{"SELECT * REPLACE a::JSON AS a FROM t", "SELECT * REPLACE (a::JSON AS a) FROM t", []string{"a"}},
+		{"SELECT t.* EXCLUDE (b) REPLACE (a + 1 AS a, upper(c) AS c) FROM t", "SELECT t.* EXCLUDE (b) REPLACE (a + 1 AS a, upper(c) AS c) FROM t", []string{"a", "c"}},
+	} {
 		t.Run(c.sql, func(t *testing.T) {
-			_, err := ParseString(c.sql)
-			require.ErrorContains(t, err, c.want)
+			stmt, err := ParseString(c.sql)
+			require.NoError(t, err)
+			s, ok := stmt.Columns[0].Expr.(*StarExpr)
+			require.True(t, ok)
+			var replaced []string
+			for _, r := range s.Replace {
+				replaced = append(replaced, r.Alias)
+			}
+			require.Equal(t, c.replaced, replaced)
+
+			out := String(stmt)
+			require.Equal(t, c.want, out)
+			reparsed, err := ParseString(out)
+			require.NoError(t, err)
+			require.Equal(t, out, String(reparsed))
+
+			// The replacing expressions are walked like any other.
+			idents := &identCollector{}
+			Walk(idents, stmt)
+			require.Contains(t, idents.names, "a")
+		})
+	}
+}
+
+// identCollector collects every Ident's last part.
+type identCollector struct{ names []string }
+
+func (c *identCollector) Visit(n Node) Visitor {
+	if id, ok := n.(*Ident); ok {
+		c.names = append(c.names, id.Parts[len(id.Parts)-1])
+	}
+	return c
+}
+
+func TestAdaptStarWithRename(t *testing.T) {
+	for _, c := range []struct {
+		sql, want string
+		renamed   []StarRename
+	}{
+		{"SELECT * RENAME (a AS b) FROM t", "SELECT * RENAME (a AS b) FROM t", []StarRename{{From: []string{"a"}, To: "b"}}},
+		{"SELECT * RENAME a AS b FROM t", "SELECT * RENAME (a AS b) FROM t", []StarRename{{From: []string{"a"}, To: "b"}}},
+		{
+			"SELECT * EXCLUDE (x) REPLACE (a + 1 AS a) RENAME (t.a AS \"select\", c AS d) FROM t",
+			"SELECT * EXCLUDE (x) REPLACE (a + 1 AS a) RENAME (t.a AS \"select\", c AS d) FROM t",
+			[]StarRename{{From: []string{"t", "a"}, To: "select"}, {From: []string{"c"}, To: "d"}},
+		},
+	} {
+		t.Run(c.sql, func(t *testing.T) {
+			stmt, err := ParseString(c.sql)
+			require.NoError(t, err)
+			s, ok := stmt.Columns[0].Expr.(*StarExpr)
+			require.True(t, ok)
+			require.Equal(t, c.renamed, s.Rename)
+			out := String(stmt)
+			require.Equal(t, c.want, out)
+			reparsed, err := ParseString(out)
+			require.NoError(t, err)
+			require.Equal(t, out, String(reparsed))
 		})
 	}
 }

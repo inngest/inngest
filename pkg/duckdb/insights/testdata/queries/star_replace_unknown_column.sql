@@ -1,0 +1,1 @@
+SELECT * REPLACE (1 AS nope) FROM runs

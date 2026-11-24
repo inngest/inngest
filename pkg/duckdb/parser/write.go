@@ -690,6 +690,26 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 		}
 		sw.str(")")
 	}
+	if len(s.Replace) > 0 {
+		sw.str(" REPLACE (")
+		for i, r := range s.Replace {
+			sw.sep(i, ", ")
+			sw.exprTop(r.Expr)
+			sw.str(" AS ")
+			writeIdentPart(sw, r.Alias)
+		}
+		sw.str(")")
+	}
+	if len(s.Rename) > 0 {
+		sw.str(" RENAME (")
+		for i, r := range s.Rename {
+			sw.sep(i, ", ")
+			writeDottedName(sw, r.From)
+			sw.str(" AS ")
+			writeIdentPart(sw, r.To)
+		}
+		sw.str(")")
+	}
 }
 
 // listExpr prints both ListExpr shapes: Paren=false is a bracketed array

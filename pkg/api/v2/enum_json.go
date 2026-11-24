@@ -55,8 +55,8 @@ func (m responseEnumMarshaler) Marshal(v any) ([]byte, error) {
 		marshaler := *m.JSONPb
 		marshaler.EmitDefaultValues = true
 		m.JSONPb = &marshaler
-	case *apiv2.ListEventsResponse, *apiv2.GetEventResponse, *apiv2.ListAppSyncsResponse, *apiv2.GetAppSyncResponse:
-		// preserve user strings and empty lists
+	case *apiv2.ListEventsResponse, *apiv2.GetEventResponse, *apiv2.ListAppSyncsResponse, *apiv2.GetAppSyncResponse, *apiv2.GetAccountUsageResponse:
+		// preserve user strings, empty lists, and zero counts
 		marshaler := *m.JSONPb
 		marshaler.EmitDefaultValues = true
 		return marshaler.Marshal(v)

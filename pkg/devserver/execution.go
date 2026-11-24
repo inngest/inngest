@@ -154,11 +154,11 @@ func newDualWrite(
 		data: primary,
 	}
 
-	// --persist alone does not write an on-disk DuckLake catalog.  that also
+	// --persist alone does not write an on-disk Iceberg lake.  that also
 	// needs EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE, so --duckdb without it
-	// dual-writes to an in-memory catalog.  a persisted catalog uses the
-	// database of StartOpts.PostgresURI as its catalog store when it is set
-	// (see duckLakeOptionsFor).
+	// dual-writes to an in-memory catalog.  a persisted lake's embedded
+	// catalog uses the database of StartOpts.PostgresURI as its catalog store
+	// when it is set (see icebergConfigFor).
 	listener, _, readDB := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && exp.duckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI)
 	if listener == nil {
 		return dw
@@ -269,6 +269,13 @@ func newExecutor(p executorParams) (execution.Executor, error) {
 		executor.WithRateLimiter(p.RateLimiter),
 		executor.WithLogger(p.Log),
 		executor.WithFunctionLoader(p.CQRS.(state.FunctionLoader)),
+		executor.WithAppNameLoader(func(ctx context.Context, appID uuid.UUID) (string, error) {
+			app, err := p.CQRS.GetAppByID(ctx, appID)
+			if err != nil {
+				return "", err
+			}
+			return app.Name, nil
+		}),
 		executor.WithRealtimePublisher(p.Broadcaster),
 		executor.WithSigningKeyLoader(func(ctx context.Context, envID uuid.UUID) ([]byte, error) {
 			// for httpv2, ensuring we sign sync and async requests using the new driver.

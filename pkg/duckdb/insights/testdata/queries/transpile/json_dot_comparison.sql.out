@@ -1,5 +1,5 @@
 {
-  "sql": "WITH __inngest_events AS NOT MATERIALIZED (SELECT * FROM inngest.insights_events(?, ?)) SELECT id, data.user.id AS user_id, json_extract_string(data.n, '$') AS n_text FROM __inngest_events AS events WHERE json_extract_string(data.user.id, '$') = 'u1' AND TRY_CAST(data.n AS DOUBLE) \u003e 5 AND json_extract_string(data.name, '$') LIKE 'a%' AND starts_with(json_extract_string(data.user.id, '$') || '-', 'u') ORDER BY data.n LIMIT 1000",
+  "sql": "WITH __inngest_events AS NOT MATERIALIZED (SELECT * FROM inngest_local.insights_events(?, ?)) SELECT id, data.user.id AS user_id, json_extract_string(data.n, '$') AS n_text FROM __inngest_events AS events WHERE json_extract_string(data.user.id, '$') = 'u1' AND TRY_CAST(data.n AS DOUBLE) \u003e 5 AND json_extract_string(data.name, '$') LIKE 'a%' AND starts_with(json_extract_string(data.user.id, '$') || '-', 'u') ORDER BY data.n LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

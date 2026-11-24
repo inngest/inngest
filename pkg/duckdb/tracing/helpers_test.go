@@ -10,12 +10,12 @@ import (
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 )
 
-// newTestDuckDB opens a real duckdb subprocess with no DuckLake attachment —
-// a plain in-memory database, nothing written to disk. Migrate(ModeMemory)
-// creates the "inngest" schema directly (rather than relying on a
-// DuckLake ATTACH to alias it) and neuters the DuckLake-only SET
-// SORTED/PARTITIONED BY DDL (see Migrate's doc comment), so every table
-// these tests exercise is a native, non-DuckLake DuckDB table.
+// newTestDuckDB opens a real duckdb subprocess with no lake attachment — a
+// plain in-memory database, nothing written to disk. Migrate(ModeMemory)
+// creates the "inngest" schema directly (rather than relying on a lake
+// ATTACH to alias it) and drops the Iceberg-only table clauses (see
+// Migrate's doc comment), so every table these tests exercise is a native
+// DuckDB table.
 func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	t.Helper()
 	binPath, err := exec.LookPath("duckdb")

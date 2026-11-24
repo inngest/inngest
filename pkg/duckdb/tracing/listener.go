@@ -1020,6 +1020,13 @@ func defaultSetupOpts() setupOpts {
 	}
 }
 
+// WithBatchInterval sets how long each table's batcher buffers before
+// flushing (default 200ms). On an Iceberg lake every flush is a commit (and
+// a snapshot), so the persisted devserver lake flushes less often.
+func WithBatchInterval(d time.Duration) Option {
+	return func(o *setupOpts) { o.batchInterval = d }
+}
+
 // Closer is implemented by the listener NewListener returns. Callers hold
 // an execution.SyncLifecycleListener, so reaching this requires a type
 // assertion (`l.(tracing.Closer)`), as pkg/devserver's stopDualWrite does.

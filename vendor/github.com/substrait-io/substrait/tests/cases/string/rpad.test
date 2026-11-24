@@ -1,0 +1,13 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+rpad('abcdef'::str, 10::i32, ' '::str) = 'abcdef    '::str
+rpad('abcdef    '::str, 20::i32, '1'::str) = 'abcdef    1111111111'::str
+rpad('    abcdef'::str, 20::i32, '1'::str) = '    abcdef1111111111'::str
+rpad('abcdef'::str, 6::i32, ' '::str) = 'abcdef'::str
+rpad('abcdef'::str, 20::i32, 'aabb'::str) = 'abcdefaabbaabbaabbaa'::str
+rpad('abcdef'::str, 4::i32, ' '::str) = 'abcd'::str
+rpad('abcdef'::str, -1::i32, ' '::str) = ''::str
+rpad(null::str?, 4::i32, ' '::str) = null::str?
+rpad('abcdef'::str, 10::i32, null::str?) = null::str?

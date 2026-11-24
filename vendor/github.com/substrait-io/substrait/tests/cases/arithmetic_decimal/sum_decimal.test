@@ -1,0 +1,16 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+sum((0, -1, 2, 20)::dec<2, 0>) = 21::dec?<38, 0>
+sum((2000000, -3217908, 629000, -100000, 0, 987654)::dec<7, 0>) = 298746::dec?<38, 0>
+sum((2.5, 0, 5.0, -2.5, -7.5)::dec<2, 1>) = -2.5::dec?<38, 2>
+sum((2.5000007152557373046875, 7.0000007152557373046875, 0, 7.0000007152557373046875)::dec<23, 22>) = 16.5000021457672119140625::dec?<38, 22>
+
+# overflow: Examples demonstrating overflow behavior
+sum((99999999999999999999999999999999999999, 1, 1, 1, 1, 99999999999999999999999999999999999999)::dec<38, 0>) [overflow:ERROR] = <!ERROR>
+
+# null_handling: Examples with null as input or output
+sum((Null, Null, Null)::dec<1, 0>) = Null::dec?<38, 0>
+sum(()::dec<1, 0>) = Null::dec?<38, 0>
+sum((200000, Null, 629000, -10000, 0, 987621)::dec<6, 0>) = 1806621::dec?<38, 0>

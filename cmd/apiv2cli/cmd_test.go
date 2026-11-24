@@ -1496,6 +1496,32 @@ func TestSubmitFeedbackCommand(t *testing.T) {
 	require.Equal(t, map[string]any{"feedback": "More examples please", "operation": "get_run", "email": "dev@example.com"}, gotBody)
 }
 
+func TestGetAccountUsageCommand(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	const response = `{"data":{"executions":"12500","executionsLimit":"50000","periodStart":"2026-11-01T00:00:00Z","periodEnd":"2026-12-01T00:00:00Z","executionCap":{"limit":"50000","enforced":true},"seats":{"used":"2","limit":"5"},"limits":{"concurrentSteps":"5","workers":"3"}}}`
+	var method, path, env, query, body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, path, env, query = r.Method, r.URL.Path, r.Header.Get("X-Inngest-Env"), r.URL.RawQuery
+		data, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		body = string(data)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(response))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	var out bytes.Buffer
+	cmd.Writer = &out
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "get-account-usage", "--api-host", srv.URL}))
+	require.Equal(t, http.MethodGet, method)
+	require.Equal(t, "/api/v2/account/usage", path)
+	require.Empty(t, env)
+	require.Empty(t, query)
+	require.Empty(t, body)
+	require.JSONEq(t, response, out.String())
+}
+
 func TestUpdateWebhookCommand(t *testing.T) {
 	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
 	const id = "11111111-1111-1111-1111-111111111111"

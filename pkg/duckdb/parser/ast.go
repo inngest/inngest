@@ -245,9 +245,29 @@ type StarExpr struct {
 	// qualified entry only excludes that table's column. It may be left
 	// nil on a hand-built StarExpr, which then prints Exclude as-is.
 	ExcludeParts [][]string
+	// Replace is each REPLACE entry, `* REPLACE (x::JSON AS x)`: the
+	// column the entry's Alias names comes out as its Expr instead, in
+	// place.
+	Replace []*SelectItem
+	// Rename is each RENAME entry, `* RENAME (a AS b)`: the column From
+	// names comes out named To.
+	Rename []StarRename
 }
 
-func (s *StarExpr) Children() []Node { return nil }
+// StarRename is one `* RENAME` entry. From is the column's dotted name as
+// written (`t.a` is [t a]), To the new name.
+type StarRename struct {
+	From []string
+	To   string
+}
+
+func (s *StarExpr) Children() []Node {
+	var out []Node
+	for _, r := range s.Replace {
+		out = append(out, r)
+	}
+	return out
+}
 func (s *StarExpr) String() string {
 	names := make([]string, len(s.ExcludeParts))
 	for i, p := range s.ExcludeParts {
@@ -256,7 +276,22 @@ func (s *StarExpr) String() string {
 	if len(names) == 0 {
 		names = s.Exclude
 	}
-	return fmt.Sprintf("StarExpr(%s,exclude=%v)", strings.Join(s.Qualifier, "."), names)
+	out := fmt.Sprintf("StarExpr(%s,exclude=%v", strings.Join(s.Qualifier, "."), names)
+	if len(s.Replace) > 0 {
+		replaced := make([]string, len(s.Replace))
+		for i, r := range s.Replace {
+			replaced[i] = r.Alias
+		}
+		out += fmt.Sprintf(",replace=%v", replaced)
+	}
+	if len(s.Rename) > 0 {
+		renamed := make([]string, len(s.Rename))
+		for i, r := range s.Rename {
+			renamed[i] = strings.Join(r.From, ".") + "->" + r.To
+		}
+		out += fmt.Sprintf(",rename=%v", renamed)
+	}
+	return out + ")"
 }
 
 type SubqueryExpr struct {

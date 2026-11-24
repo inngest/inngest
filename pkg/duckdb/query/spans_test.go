@@ -94,7 +94,7 @@ func TestGetSpansByRunIDAttachesMetadataViaJoin(t *testing.T) {
 }
 
 // TestGetSpansByRunIDAgreesWithMetadataRollup seeds one fixture and checks
-// GetSpansByRunID and inngest.run_metadata_rollup pick the same row per
+// GetSpansByRunID and inngest_local.run_metadata_rollup pick the same row per
 // kind: a later emission that drops a key, a null value, a created_at tie,
 // and user/internal kinds w/ the same prefix-stripped name.
 func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
@@ -133,7 +133,7 @@ func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
 
 	var user, internal any
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT user_metadata, internal_metadata FROM inngest.run_metadata_rollup() WHERE run_id = ? AND span_id = ?;`,
+		`SELECT user_metadata, internal_metadata FROM inngest_local.run_metadata_rollup() WHERE run_id = ? AND span_id = ?;`,
 		runID.String(), "root-span",
 	).Scan(&user, &internal))
 

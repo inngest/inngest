@@ -1,0 +1,7 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding.yaml'
+
+# basic: Basic examples without any special cases
+ceil(2.25::fp32) = 3::fp32
+ceil(2.0000007152557373046875::fp64) = 3::fp64
+ceil(-65.500000001223334444::fp64) = -65::fp64
