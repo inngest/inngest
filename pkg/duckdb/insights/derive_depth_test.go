@@ -32,7 +32,7 @@ func TestTranspileDeepNestingIsFast(t *testing.T) {
 	for shape, q := range nestedSubqueryShapes(30) {
 		start := time.Now()
 		_, err := Transpile(q, uuid.New(), uuid.New())
-		require.NoError(t, err, shape)
+		require.ErrorContains(t, err, "nesting depth is limited to", shape)
 		require.Less(t, time.Since(start), 2*time.Second, shape)
 	}
 }

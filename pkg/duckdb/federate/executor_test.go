@@ -590,3 +590,30 @@ func TestExecutorUnreadUnnestKeepsDeltaRows(t *testing.T) {
 		require.Equal(t, map[string]string{"n": "2"}, got)
 	})
 }
+
+func TestExecutorRejectsNilTenantUnlessAllTenants(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		_, err := f.exec.Query(context.Background(), Query{
+			AccountID: uuid.Nil, EnvID: f.env, From: f.from, To: f.to,
+			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
+			Tables: []Table{TableSpans}, RowCap: 100, Select: sel(`SELECT span_id FROM spans`),
+		})
+		require.ErrorContains(t, err, "AccountID and EnvID are required")
+
+		_, err = f.exec.Query(context.Background(), Query{
+			AccountID: f.account, EnvID: uuid.Nil, From: f.from, To: f.to,
+			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
+			Tables: []Table{TableSpans}, RowCap: 100, Select: sel(`SELECT span_id FROM spans`),
+		})
+		require.ErrorContains(t, err, "AccountID and EnvID are required")
+
+		// AllTenants permits nil AccountID/EnvID.
+		rows, err := f.exec.Query(context.Background(), Query{
+			AllTenants: true, From: f.from, To: f.to,
+			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
+			Tables: []Table{TableSpans}, RowCap: 100, Select: sel(`SELECT span_id FROM spans`),
+		})
+		require.NoError(t, err)
+		require.NoError(t, rows.Close())
+	})
+}

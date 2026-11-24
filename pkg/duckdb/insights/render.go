@@ -205,12 +205,13 @@ func (r *TranspileResult) Federated() ([]federate.Table, map[federate.Table][]fe
 			}
 			view := r.cat.tables[table].view
 			if r.cat.raw {
-				return TableCTE{Select: macroSelect(view, params...), Prelude: prelude}, nil
+				return TableCTE{Select: macroSelect(view, params...), Prelude: prelude, NotMaterialized: true}, nil
 			}
 			return TableCTE{
-				Select:  macroSelect(view, append(tenantParams(), params...)...),
-				Args:    []any{r.accountID.String(), r.envID.String()},
-				Prelude: prelude,
+				Select:          macroSelect(view, append(tenantParams(), params...)...),
+				Args:            []any{r.accountID.String(), r.envID.String()},
+				Prelude:         prelude,
+				NotMaterialized: true,
 			}, nil
 		})
 	}

@@ -3,6 +3,7 @@ package federate
 import (
 	"context"
 	"database/sql"
+	sqldriver "database/sql/driver"
 	"errors"
 	"fmt"
 	"slices"
@@ -115,6 +116,9 @@ func (r *Rows) Close() error {
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	if q.Select == nil && q.Render == nil {
 		return nil, fmt.Errorf("federate: query has no Select or Render")
+	}
+	if !q.AllTenants && (q.AccountID == uuid.Nil || q.EnvID == uuid.Nil) {
+		return nil, fmt.Errorf("federate: AccountID and EnvID are required unless AllTenants is set")
 	}
 	if slices.Contains(q.Tables, TableRuns) && !q.RunsCollapsed {
 		return nil, ErrRunsNotCollapsed
@@ -302,9 +306,17 @@ func sameColumns(got, want []Column) error {
 	return nil
 }
 
+const releaseConnTimeout = 5 * time.Second
+
 // releaseConn restores the session setting Query changed and returns the
-// connection to the pool.
+// connection to the pool. If RESET fails or times out, the dirty connection is
+// discarded rather than returned to the pool.
 func releaseConn(conn *sql.Conn) error {
-	_, _ = conn.ExecContext(context.Background(), "RESET preserve_insertion_order;")
+	ctx, cancel := context.WithTimeout(context.Background(), releaseConnTimeout)
+	_, err := conn.ExecContext(ctx, "RESET preserve_insertion_order;")
+	cancel()
+	if err != nil {
+		_ = conn.Raw(func(any) error { return sqldriver.ErrBadConn })
+	}
 	return conn.Close()
 }

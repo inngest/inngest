@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -207,4 +208,23 @@ func TestKeyListTimeBucketUsesExplicitUTCOrigin(t *testing.T) {
 	rendered, err := render(stmt)
 	require.NoError(t, err)
 	require.Contains(t, rendered, "time_bucket(INTERVAL 1800 SECOND, queued_at, TIMESTAMPTZ '1970-01-01 00:00:00+00:00')")
+}
+
+func TestExecutorAggregateRejectsNilTenant(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		q := AggregateQuery{
+			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
+			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
+			Table: TableSpans, Aggs: []Agg{{Func: AggCount, As: "n"}}, RowCap: 100,
+		}
+		q1 := q
+		q1.AccountID = uuid.Nil
+		_, err := f.exec.Aggregate(context.Background(), q1)
+		require.ErrorContains(t, err, "AccountID and EnvID are required")
+
+		q2 := q
+		q2.EnvID = uuid.Nil
+		_, err = f.exec.Aggregate(context.Background(), q2)
+		require.ErrorContains(t, err, "AccountID and EnvID are required")
+	})
 }

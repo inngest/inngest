@@ -1391,7 +1391,7 @@ func init() {
 			description: "If string contains the regex, replaces the matching part with replacement. A set of optional regex options can be set.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_replacestring-pattern-replacement-options",
 			signature:   "regexp_replace(string, pattern, replacement[, options])",
-			returnType:  withArity(3, 4, fixedType(ColumnTypeString)),
+			returnType:  withArity(3, 4, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"regexp_split_to_array": {
 			description: "Splits the string along the regex. A set of optional regex options can be set.",
@@ -1409,7 +1409,7 @@ func init() {
 			description: "Replaces any occurrences of the source with target in string.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#replacestring-source-target",
 			signature:   "replace(string, source, target)",
-			returnType:  withArity(3, 3, fixedType(ColumnTypeString)),
+			returnType:  withArity(3, 3, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"reverse": {
 			description: "Reverses the string.",

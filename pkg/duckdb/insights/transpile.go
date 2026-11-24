@@ -90,10 +90,10 @@ var pipeline = []stage{
 	stageCheckReservedNames,
 	stageValidate,
 	stageExtractQueryInfo,
-	stageExtractPushdown,
 	stageBuildColumnHints,
 	stageRewriteArrayOfStructAccess,
 	stageRewriteJSONDotComparison,
+	stageExtractPushdown,
 	stageRemapTables,
 	stageAddDefaultLimit,
 }

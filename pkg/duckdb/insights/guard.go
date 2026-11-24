@@ -81,7 +81,7 @@ func checkRenderedSQL(ctx context.Context, db *sql.DB, query string, cat catalog
 			macros[t.view] = true
 		}
 	}
-	return checkRenderedNode(tree.Statements[0], ctes, macros)
+	return checkRenderedNode(tree.Statements[0], ctes, macros, cat.raw, true, false)
 }
 
 // collectCTENames gathers every CTE name defined anywhere in n. Scope is
@@ -111,12 +111,25 @@ func collectCTENames(n any, into map[string]bool) {
 	}
 }
 
-func checkRenderedNode(n any, ctes, macros map[string]bool) error {
+func checkRenderedNode(n any, ctes, macros map[string]bool, raw, topLevel, inReservedCTE bool) error {
 	switch v := n.(type) {
 	case map[string]any:
+		// Top-level statement wrapper (SELECT_STATEMENT): keep topLevel=true
+		// only when descending into the root query node so only its own WITH
+		// clause can define reserved __inngest_* CTEs permitted to call table macros.
+		if topLevel && v["node"] != nil && v["cte_map"] == nil {
+			for k, child := range v {
+				if err := checkRenderedNode(child, ctes, macros, raw, k == "node", false); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		// A FROM-clause table function may only be a logical table's macro
-		// or UNNEST (the one table function scope.go admits); its arguments
-		// are then checked like any other expression.
+		// (inside a top-level __inngest_* CTE, with positional parameter args
+		// for tenant scoping in non-raw mode) or UNNEST (the one table function
+		// scope.go admits); its arguments are then checked like any other
+		// expression.
 		if v["type"] == "TABLE_FUNCTION" {
 			fn, _ := v["function"].(map[string]any)
 			name, fnSchema := strings.ToLower(str(fn["function_name"])), str(fn["schema"])
@@ -125,14 +138,27 @@ func checkRenderedNode(n any, ctes, macros map[string]bool) error {
 			if str(fn["catalog"]) != "" || !macro && !unnest {
 				return fmt.Errorf("rendered query reads from table function %q, which is not allowed", str(fn["function_name"]))
 			}
-			if err := checkRenderedNode(fn["arguments"], ctes, macros); err != nil {
+			if macro {
+				if !inReservedCTE {
+					return fmt.Errorf("rendered query reads from table macro %q outside a reserved CTE, which is not allowed", str(fn["function_name"]))
+				}
+				if !raw {
+					if err := checkMacroTenantParams(fn); err != nil {
+						return err
+					}
+				}
+			}
+			if err := checkRenderedNode(fn["children"], ctes, macros, raw, false, false); err != nil {
+				return err
+			}
+			if err := checkRenderedNode(fn["arguments"], ctes, macros, raw, false, false); err != nil {
 				return err
 			}
 			for k, child := range v {
 				if k == "function" {
 					continue
 				}
-				if err := checkRenderedNode(child, ctes, macros); err != nil {
+				if err := checkRenderedNode(child, ctes, macros, raw, false, false); err != nil {
 					return err
 				}
 			}
@@ -148,16 +174,54 @@ func checkRenderedNode(n any, ctes, macros map[string]bool) error {
 				return fmt.Errorf("rendered query references table %q, which is not a logical table or CTE", name)
 			}
 		}
-		for _, child := range v {
-			if err := checkRenderedNode(child, ctes, macros); err != nil {
+		for k, child := range v {
+			if k == "cte_map" {
+				if cm, ok := child.(map[string]any); ok {
+					entries, _ := cm["map"].([]any)
+					for _, e := range entries {
+						em, ok := e.(map[string]any)
+						if !ok {
+							continue
+						}
+						reserved := topLevel && strings.HasPrefix(strings.ToLower(str(em["key"])), TableCTEPrefix)
+						if err := checkRenderedNode(em["value"], ctes, macros, raw, false, reserved); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+			}
+			// Only keep inReservedCTE when walking the CTE's direct SELECT
+			// body (query_node -> from_table); any nested subquery or
+			// expression clears it.
+			keepReserved := inReservedCTE && (k == "query_node" || k == "from_table")
+			if err := checkRenderedNode(child, ctes, macros, raw, false, keepReserved); err != nil {
 				return err
 			}
 		}
 	case []any:
 		for _, child := range v {
-			if err := checkRenderedNode(child, ctes, macros); err != nil {
+			if err := checkRenderedNode(child, ctes, macros, raw, false, false); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// checkMacroTenantParams verifies that a non-raw table macro call binds its
+// first two positional arguments (account_id, env_id) via '?' parameters rather
+// than literal values.
+func checkMacroTenantParams(fn map[string]any) error {
+	args, _ := fn["arguments"].([]any)
+	if len(args) < 2 {
+		return fmt.Errorf("rendered query calls table macro %q without tenant parameters, which is not allowed", str(fn["function_name"]))
+	}
+	for i := range 2 {
+		arg, _ := args[i].(map[string]any)
+		expr, _ := arg["expression"].(map[string]any)
+		if str(arg["name"]) != "" || str(expr["type"]) != "VALUE_PARAMETER" {
+			return fmt.Errorf("rendered query calls table macro %q with non-parameter tenant argument, which is not allowed", str(fn["function_name"]))
 		}
 	}
 	return nil
