@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api"
@@ -82,13 +86,13 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	probes := []probe{
 		{
 			component: "api",
-			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("port"), api.HealthPath),
+			url:       probeURL(scheme, host, cmd.Int("port"), api.HealthPath),
 		},
 	}
 	if !cmd.Bool("skip-connect-gateway") {
 		probes = append(probes, probe{
 			component: "connect-gateway",
-			url:       fmt.Sprintf("%s://%s:%d%s", scheme, host, cmd.Int("connect-gateway-port"), connect.ReadyPath),
+			url:       probeURL(scheme, host, cmd.Int("connect-gateway-port"), connect.ReadyPath),
 		})
 	}
 
@@ -117,6 +121,24 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		return cli.Exit("", 1)
 	}
 	return nil
+}
+
+func probeURL(scheme, host string, port int, path string) string {
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		// Preserve the bracketed form accepted before normalizing raw IPv6 hosts.
+		// Parse it first so an already-escaped zone is not escaped twice.
+		if u, err := url.Parse("//" + host); err == nil {
+			host = u.Hostname()
+		} else {
+			host = host[1 : len(host)-1]
+		}
+	}
+	u := url.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Path:   path,
+	}
+	return u.String()
 }
 
 func probeOnce(ctx context.Context, client *http.Client, url string, verbose bool) error {
