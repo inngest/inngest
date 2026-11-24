@@ -25,7 +25,7 @@ func TestRuntimeDefaultsToServeAndDerivedURLs(t *testing.T) {
 	require.Equal(t, "http://127.0.0.1:8288", rt.APIURL.String())
 	require.Equal(t, "http://127.0.0.1:8288", rt.EventURL.String())
 	require.Equal(t, "test", rt.EventKey)
-	require.Equal(t, 60*time.Second, rt.Timeout)
+	require.Equal(t, 3*time.Minute, rt.Timeout)
 }
 
 func TestRuntimeSupportsExplicitOverridePaths(t *testing.T) {
@@ -51,4 +51,31 @@ func TestRuntimeSupportsExplicitOverridePaths(t *testing.T) {
 	require.Equal(t, "http://127.0.0.1:8488", rt.EventURL.String())
 	require.Equal(t, "evt-key", rt.EventKey)
 	require.Equal(t, 15*time.Second, rt.Timeout)
+}
+
+func TestRuntimeHonorsExplicitTimeout(t *testing.T) {
+	t.Parallel()
+
+	for _, timeout := range []string{"50ms", "60s", "2m", "5m"} {
+		t.Run(timeout, func(t *testing.T) {
+			rt, err := (Config{Timeout: timeout}).Runtime()
+			require.NoError(t, err)
+			expected, err := time.ParseDuration(timeout)
+			require.NoError(t, err)
+			require.Equal(t, expected, rt.Timeout)
+		})
+	}
+}
+
+func TestRuntimeDefaultCoversRetryBudget(t *testing.T) {
+	t.Parallel()
+
+	rt, err := (Config{}).Runtime()
+	require.NoError(t, err)
+	// retry-basic permits two retry waits and six other request/response
+	// waits. Trigger submission can also use the client's 30-second timeout.
+	retryWaits := 2 * 45 * time.Second
+	requestAndResponseWaits := 6 * 5 * time.Second
+	triggerTimeout := 30 * time.Second
+	require.Greater(t, rt.Timeout, retryWaits+requestAndResponseWaits+triggerTimeout)
 }

@@ -12,15 +12,15 @@ import (
 // The CLI and file-based config can both be partial, so runners should consume
 // this concrete structure instead of repeating URL/default logic.
 type RuntimeConfig struct {
-	Transport      Transport  `json:"transport"`
-	SDKURL         *url.URL   `json:"sdk_url,omitempty"`
-	IntrospectURL  *url.URL   `json:"introspect_url,omitempty"`
-	DevURL         *url.URL   `json:"dev_url,omitempty"`
-	APIURL         *url.URL   `json:"api_url,omitempty"`
-	EventURL       *url.URL   `json:"event_url,omitempty"`
-	EventKey       string     `json:"event_key,omitempty"`
-	SigningKey     string     `json:"signing_key,omitempty"`
-	Timeout        time.Duration `json:"timeout"`
+	Transport     Transport     `json:"transport"`
+	SDKURL        *url.URL      `json:"sdk_url,omitempty"`
+	IntrospectURL *url.URL      `json:"introspect_url,omitempty"`
+	DevURL        *url.URL      `json:"dev_url,omitempty"`
+	APIURL        *url.URL      `json:"api_url,omitempty"`
+	EventURL      *url.URL      `json:"event_url,omitempty"`
+	EventKey      string        `json:"event_key,omitempty"`
+	SigningKey    string        `json:"signing_key,omitempty"`
+	Timeout       time.Duration `json:"timeout"`
 }
 
 // Runtime resolves the user-facing config into concrete URLs and defaults.
@@ -31,8 +31,10 @@ type RuntimeConfig struct {
 func (c Config) Runtime() (RuntimeConfig, error) {
 	rt := RuntimeConfig{
 		Transport: c.Transport,
-		Timeout:   c.TimeoutOrDefault(60 * time.Second),
-		EventKey:  c.Dev.EventKey,
+		// retry-basic can spend 120 seconds waiting for requests and responses,
+		// in addition to submitting its trigger. Leave room for both retries.
+		Timeout:    c.TimeoutOrDefault(3 * time.Minute),
+		EventKey:   c.Dev.EventKey,
 		SigningKey: c.Dev.SigningKey,
 	}
 
