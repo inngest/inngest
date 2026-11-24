@@ -105,14 +105,38 @@ func (t Type) String() string {
 		return "TIMESTAMP_MS"
 	case TypeTimestampNS:
 		return "TIMESTAMP_NS"
+	case TypeEnum:
+		return "ENUM"
+	case TypeList:
+		return "LIST"
+	case TypeStruct:
+		return "STRUCT"
+	case TypeMap:
+		return "MAP"
 	case TypeUUID:
 		return "UUID"
+	case TypeUnion:
+		return "UNION"
+	case TypeBit:
+		return "BIT"
+	case TypeTimeTZ:
+		return "TIME WITH TIME ZONE"
 	case TypeTimestampTZ:
-		return "TIMESTAMPTZ"
+		return "TIMESTAMP WITH TIME ZONE"
 	case TypeUHugeInt:
 		return "UHUGEINT"
+	case TypeArray:
+		return "ARRAY"
+	case TypeBignum:
+		return "BIGNUM"
 	case TypeSQLNull:
 		return "SQLNULL"
+	case TypeTimeNS:
+		return "TIME_NS"
+	case TypeGeometry:
+		return "GEOMETRY"
+	case TypeVariant:
+		return "VARIANT"
 	case TypeTimestampTZNS:
 		return "TIMESTAMPTZ_NS"
 	default:
@@ -122,8 +146,9 @@ func (t Type) String() string {
 
 // ColumnInfo describes a single column in a DuckDB query result.
 type ColumnInfo struct {
-	Name string
-	Type Type
+	Name     string
+	Type     Type
+	TypeName string
 }
 
 // cResult matches struct duckdb_result in duckdb.h (6 x 8 = 48 bytes on 64-bit).
@@ -151,4 +176,23 @@ type cStringT struct {
 type cHugeInt struct {
 	lower uint64
 	upper int64
+}
+
+// cUHugeInt matches struct duckdb_uhugeint in duckdb.h.
+type cUHugeInt struct {
+	lower uint64
+	upper uint64
+}
+
+// cListEntry matches struct duckdb_list_entry in duckdb.h.
+type cListEntry struct {
+	offset uint64
+	length uint64
+}
+
+// cInterval matches struct duckdb_interval in duckdb.h.
+type cInterval struct {
+	months int32
+	days   int32
+	micros int64
 }

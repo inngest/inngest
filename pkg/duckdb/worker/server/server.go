@@ -43,6 +43,8 @@ type Opts struct {
 	DBPath string
 	// StateDir is the cache directory used when LibPath is empty.
 	StateDir string
+	// AllowUnsignedExtensions enables loading unsigned local extensions.
+	AllowUnsignedExtensions bool
 	// Config holds optional DuckDB database configuration parameters.
 	Config map[string]string
 }
@@ -82,7 +84,15 @@ func Serve(ctx context.Context, opts Opts) error {
 	}
 	defer lib.Close()
 
-	db, err := lib.Open(opts.DBPath, opts.Config)
+	cfg := make(map[string]string, len(opts.Config)+1)
+	for k, v := range opts.Config {
+		cfg[k] = v
+	}
+	if opts.AllowUnsignedExtensions {
+		cfg["allow_unsigned_extensions"] = "true"
+	}
+
+	db, err := lib.Open(opts.DBPath, cfg)
 	if err != nil {
 		return fmt.Errorf("duckdb worker: opening database: %w", err)
 	}
@@ -186,13 +196,14 @@ type Server struct {
 	socketPath string
 	closed     bool
 
-	nextID       atomic.Uint64
-	shutdownOnce sync.Once
-	shutdownCh   chan struct{}
+	registerTFOnce sync.Once
+	nextID         atomic.Uint64
+	shutdownOnce   sync.Once
+	shutdownCh     chan struct{}
 	closeOnce    sync.Once
 	closeDone    chan struct{}
 	closeErr     error
-	wg           sync.WaitGroup
+	wg             sync.WaitGroup
 }
 
 // New constructs a Server backed by db.
@@ -229,6 +240,12 @@ func isLoopbackHost(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+func (s *Server) ensureStreamTableFunction(conn *libduckdb.Conn) {
+	s.registerTFOnce.Do(func() {
+		_ = conn.RegisterStreamTableFunction()
+	})
 }
 
 // ListenAndServe binds a Unix domain socket or TCP listener at addr and serves
@@ -433,7 +450,10 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 	}
 	switch req.Op {
 	case worker.OpPing:
-		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, Version: s.version, PID: os.Getpid()})
+		s.mu.RLock()
+		active := len(s.sessions)
+		s.mu.RUnlock()
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, Version: s.version, PID: os.Getpid(), ActiveSessions: active})
 		return true
 
 	case worker.OpOpenSession:
@@ -442,6 +462,7 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
+		s.ensureStreamTableFunction(conn)
 		id := s.nextSessionID()
 		s.mu.Lock()
 		if s.closed {
@@ -487,7 +508,7 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 		err := sess.conn.Exec(req.SQL)
 		sess.endRequest(req.RequestID)
 		if err != nil {
-			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
 			return true
 		}
 		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
@@ -501,42 +522,17 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 		}
 		sess.beginRequest(req.RequestID)
 		defer sess.endRequest(req.RequestID)
-		res, err := sess.conn.Query(req.SQL)
-		if err != nil {
-			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
-			return true
-		}
-		defer res.Close()
+		return s.streamQueryResult(c, sess, req.SQL)
 
-		libCols := res.Columns()
-		wireCols := make([]worker.ColumnInfo, len(libCols))
-		for i, col := range libCols {
-			wireCols[i] = worker.ColumnInfo{Name: col.Name, Type: worker.ColumnType(col.Type)}
-		}
-		if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindMeta, Columns: wireCols}); err != nil {
+	case worker.OpQueryStream:
+		sess := s.getSession(req.SessionID)
+		if sess == nil {
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown session %q", req.SessionID)})
 			return false
 		}
-
-		for {
-			rows, err := res.NextChunk()
-			if err != nil {
-				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
-				return true
-			}
-			if rows == nil {
-				break
-			}
-			if err := worker.WriteFrame(c, worker.Response{
-				Kind: worker.KindChunk,
-				Rows: worker.EncodeRows(wireCols, rows),
-			}); err != nil {
-				return false
-			}
-		}
-		if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindDone}); err != nil {
-			return false
-		}
-		return true
+		sess.beginRequest(req.RequestID)
+		defer sess.endRequest(req.RequestID)
+		return s.handleQueryStream(c, sess, req)
 
 	case worker.OpShutdown:
 		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK})
@@ -547,6 +543,227 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: fmt.Sprintf("unknown op %q", req.Op)})
 		return true
 	}
+}
+
+func (s *Server) streamQueryResult(c net.Conn, sess *session, sql string) bool {
+	res, err := sess.conn.Query(sql)
+	if err != nil {
+		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+		return true
+	}
+	defer res.Close()
+
+	libCols := res.Columns()
+	wireCols := make([]worker.ColumnInfo, len(libCols))
+	for i, col := range libCols {
+		wireCols[i] = worker.ColumnInfo{
+			Name:     col.Name,
+			Type:     worker.ColumnType(col.Type),
+			TypeName: col.TypeName,
+		}
+	}
+	if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindMeta, Columns: wireCols}); err != nil {
+		return false
+	}
+
+	for {
+		rows, err := res.NextChunk()
+		if err != nil {
+			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+			return true
+		}
+		if rows == nil {
+			break
+		}
+		if err := worker.WriteFrame(c, worker.Response{
+			Kind: worker.KindChunk,
+			Rows: worker.EncodeRows(wireCols, rows),
+		}); err != nil {
+			if errors.Is(err, worker.ErrFrameTooLarge) {
+				_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()})
+				return true
+			}
+			return false
+		}
+	}
+	if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindDone}); err != nil {
+		return false
+	}
+	return true
+}
+
+func (s *Server) handleQueryStream(c net.Conn, sess *session, req *worker.Request) bool {
+	var writeMu sync.Mutex
+	var writeClosed bool
+	writeResp := func(resp worker.Response, terminal bool) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if writeClosed {
+			return net.ErrClosed
+		}
+		err := worker.WriteFrame(c, resp)
+		if terminal || err != nil {
+			writeClosed = true
+		}
+		return err
+	}
+
+	streams := make(map[string]*libduckdb.Stream, len(req.StreamIDs))
+	for _, id := range req.StreamIDs {
+		st := libduckdb.RegisterStream(id)
+		streamID := id
+		st.SetOnConsume(func(n int64) {
+			_ = writeResp(worker.Response{
+				Kind:     worker.KindStreamCredit,
+				StreamID: streamID,
+				Bytes:    n,
+			}, false)
+		})
+		streams[id] = st
+	}
+	defer func() {
+		for _, id := range req.StreamIDs {
+			libduckdb.UnregisterStream(id)
+		}
+	}()
+
+	var sourceFailed atomic.Bool
+	readerDone := make(chan struct{})
+	go func() {
+		defer close(readerDone)
+		remaining := len(streams)
+		for remaining > 0 {
+			var frame worker.Request
+			if err := worker.ReadFrame(c, &frame); err != nil {
+				for _, st := range streams {
+					st.CloseWithError(err)
+				}
+				return
+			}
+			st := streams[frame.StreamID]
+			switch frame.Op {
+			case worker.OpStreamData:
+				if st == nil {
+					continue
+				}
+				chunks, err := worker.DecodeBatch(frame.Blob)
+				if err != nil {
+					for _, other := range streams {
+						other.CloseWithError(err)
+					}
+					sess.conn.Interrupt()
+					return
+				}
+				blobBytes := int64(len(frame.Blob))
+				if len(chunks) == 0 {
+					if blobBytes > 0 {
+						_ = writeResp(worker.Response{
+							Kind:     worker.KindStreamCredit,
+							StreamID: frame.StreamID,
+							Bytes:    blobBytes,
+						}, false)
+					}
+					continue
+				}
+				perChunkCredit := blobBytes / int64(len(chunks))
+				for ci, ch := range chunks {
+					libCols := make([]libduckdb.StreamColumn, len(ch.Columns))
+					for i, col := range ch.Columns {
+						libCols[i] = libduckdb.StreamColumn{
+							Kind:   libduckdb.StreamColumnKind(col.Kind),
+							Nulls:  col.Nulls,
+							UUIDs:  col.UUIDs,
+							Int64s: col.Int64s,
+							Bools:  col.Bools,
+							Bytes:  col.Bytes,
+							Ends:   col.Ends,
+						}
+					}
+					credit := perChunkCredit
+					if ci == len(chunks)-1 {
+						credit = blobBytes - perChunkCredit*int64(len(chunks)-1)
+					}
+					if err := st.Push(libduckdb.StreamChunk{RowCount: ch.RowCount, Columns: libCols, CreditBytes: credit}); err != nil {
+						if errors.Is(err, libduckdb.ErrStreamQueueOverflow) {
+							for _, other := range streams {
+								other.CloseWithError(err)
+							}
+							sess.conn.Interrupt()
+							return
+						}
+						break
+					}
+				}
+			case worker.OpStreamEOF:
+				if st != nil {
+					st.Close()
+				}
+				remaining--
+			case worker.OpStreamError:
+				sourceFailed.Store(true)
+				srcErr := errors.New(frame.Error)
+				for _, other := range streams {
+					other.CloseWithError(srcErr)
+				}
+				sess.conn.Interrupt()
+				return
+			}
+		}
+	}()
+
+	res, err := sess.conn.Query(req.SQL)
+	if err != nil {
+		code := worker.ErrCodeStatement
+		if sourceFailed.Load() {
+			code = worker.ErrCodeStreamSource
+		}
+		_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()}, true)
+		return false
+	}
+	defer res.Close()
+
+	libCols := res.Columns()
+	wireCols := make([]worker.ColumnInfo, len(libCols))
+	for i, col := range libCols {
+		wireCols[i] = worker.ColumnInfo{
+			Name:     col.Name,
+			Type:     worker.ColumnType(col.Type),
+			TypeName: col.TypeName,
+		}
+	}
+	if err := writeResp(worker.Response{Kind: worker.KindMeta, Columns: wireCols}, false); err != nil {
+		return false
+	}
+
+	for {
+		rows, err := res.NextChunk()
+		if err != nil {
+			code := worker.ErrCodeStatement
+			if sourceFailed.Load() {
+				code = worker.ErrCodeStreamSource
+			}
+			_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: code, Error: err.Error()}, true)
+			return false
+		}
+		if rows == nil {
+			break
+		}
+		if err := writeResp(worker.Response{
+			Kind: worker.KindChunk,
+			Rows: worker.EncodeRows(wireCols, rows),
+		}, false); err != nil {
+			if errors.Is(err, worker.ErrFrameTooLarge) {
+				writeMu.Lock()
+				writeClosed = false
+				writeMu.Unlock()
+				_ = writeResp(worker.Response{Kind: worker.KindError, ErrorCode: worker.ErrCodeStatement, Error: err.Error()}, true)
+				return true
+			}
+			return false
+		}
+	}
+	_ = writeResp(worker.Response{Kind: worker.KindDone}, true)
+	return false
 }
 
 func (s *Server) getSession(id string) *session {

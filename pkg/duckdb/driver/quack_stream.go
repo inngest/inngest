@@ -5,57 +5,41 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 )
 
-// QuackStream feeds one relation of a query directly from Go, over quack's
-// SEND_DATA mechanism, with no table in between. The query reads it through
-// QuackStreamScan's table function (columns c0, c1, ... typed per Columns),
-// and QueryContext feeds it while the query runs, so rows arrive as the
-// source produces them.
-//
-// A stream can be read once: a query that reads it more than once must put
-// the scan in a MATERIALIZED CTE.
+// QuackStream feeds one relation of a query directly from Go into the DuckDB
+// worker's `scan_data_from_quack_client` table function.
 type QuackStream struct {
-	ID      string
-	Columns []QuackColumnKind
-	// Next returns the next rows (one value per column, in Columns' wire
-	// forms, as for QuackAppender.AppendRow), or io.EOF once done. Any
-	// other error aborts the query and is returned from QueryContext. It's
-	// called from its own goroutine and must honor ctx.
-	Next func(ctx context.Context) ([][]any, error)
-	// NextEncoded, when set, replaces Next for a producer that encodes its
-	// own batches with EncodeQuackVectors (column-major, no per-value
-	// boxing): it returns a batch's blob and chunk count, or io.EOF.
+	ID          string
+	Columns     []QuackColumnKind
+	Next        func(ctx context.Context) ([][]any, error)
 	NextEncoded func(ctx context.Context) (blob []byte, chunks uint64, err error)
 }
 
-// QuackVector is one column of a batch in column-major form; see
-// EncodeQuackVectors.
-type QuackVector = quack.Vector
+// QuackVector is one column of a batch in column-major form; see EncodeQuackVectors.
+type QuackVector = worker.Vector
 
 // EncodeQuackVectors encodes equal-length vectors as a stream batch for
-// QuackStream.NextEncoded: the same bytes the row path writes for the same
-// values.
+// QuackStream.NextEncoded.
 func EncodeQuackVectors(vectors []QuackVector) (blob []byte, chunks uint64, err error) {
-	return quack.EncodeVectors(vectors)
+	return worker.EncodeVectors(vectors)
 }
 
 // NewQuackStreamID returns a fresh stream id.
-func NewQuackStreamID() (string, error) { return quack.NewStreamID() }
+func NewQuackStreamID() (string, error) { return worker.NewStreamID() }
 
-// QuackStreamScan returns the table function that reads stream id in a
-// query, e.g. scan_data_from_quack_client('id', NULL::STRUCT(c0 VARCHAR), ordered := true):
-// its rows are typed by columns, in fields c0, c1, ...
+// QuackStreamScan returns the table function that reads stream id in a query:
+// `scan_data_from_quack_client('id', NULL::STRUCT(c0 VARCHAR), ordered := true)`.
 func QuackStreamScan(id string, columns []QuackColumnKind) (*parser.TableFunctionRef, error) {
 	if len(columns) == 0 {
 		return nil, fmt.Errorf("duckdb: quack stream: no columns")
 	}
 	fields := make([]*parser.TypeField, len(columns))
 	for i, k := range columns {
-		name, err := quack.StreamColumnType(k)
+		name, err := worker.StreamColumnType(k)
 		if err != nil {
 			return nil, err
 		}
@@ -78,21 +62,16 @@ func QuackStreamScan(id string, columns []QuackColumnKind) (*parser.TableFunctio
 	}, nil
 }
 
-// errQuackStreamsTransport is returned for a stream query on a connection
-// that isn't quack.
-var errQuackStreamsTransport = errors.New("duckdb: quack streams require a quack-transport connection (Options.QuackAddr)")
+var errQuackStreamsTransport = errors.New("duckdb: streams require a worker-transport connection")
 
-// streamQuerier is a transport that can run a statement reading quack
-// streams.
 type streamQuerier interface {
-	QueryWithStreams(ctx context.Context, sqlText string, streams []quack.SendStream) (cols []string, types []string, rows []result.Row, err error)
+	QueryWithStreams(ctx context.Context, sqlText string, streams []worker.SendStream) (cols []string, types []string, rows []result.Row, err error)
 }
 
 type quackStreamsKey struct{}
 
-// WithQuackStreams attaches streams to ctx: a QueryContext on a quack
-// connection with this ctx feeds them while its query runs. Only quack
-// connections support it; any other transport fails the query.
+// WithQuackStreams attaches streams to ctx: a QueryContext with this ctx feeds
+// them while its query runs.
 func WithQuackStreams(ctx context.Context, streams ...QuackStream) context.Context {
 	return context.WithValue(ctx, quackStreamsKey{}, streams)
 }
@@ -102,10 +81,10 @@ func quackStreamsFrom(ctx context.Context) []QuackStream {
 	return streams
 }
 
-func toSendStreams(streams []QuackStream) []quack.SendStream {
-	out := make([]quack.SendStream, len(streams))
+func toSendStreams(streams []QuackStream) []worker.SendStream {
+	out := make([]worker.SendStream, len(streams))
 	for i, s := range streams {
-		out[i] = quack.SendStream{ID: s.ID, Columns: s.Columns, Next: s.Next, NextEncoded: s.NextEncoded}
+		out[i] = worker.SendStream{ID: s.ID, Columns: s.Columns, Next: s.Next, NextEncoded: s.NextEncoded}
 	}
 	return out
 }

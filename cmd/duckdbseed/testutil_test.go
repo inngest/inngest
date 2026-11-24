@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"os/exec"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
@@ -12,32 +11,23 @@ import (
 
 func requireDuckDBOnPath(t *testing.T) {
 	t.Helper()
-	if _, err := lookDuckDBBinary(); err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
+	t.Setenv("DUCKDB_BINARY", binPath)
 }
 
 func requireQuackExtension(t *testing.T) {
 	t.Helper()
-	binPath, err := lookDuckDBBinary()
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
-	cmd := exec.Command(binPath, ":memory:", "-c", "INSTALL quack; LOAD quack;")
-	if err := cmd.Run(); err != nil {
-		t.Skip("quack extension not installable in this environment; skipping")
-	}
+	requireDuckDBOnPath(t)
 }
 
-// newTestDB opens a fresh DuckDB subprocess (Iceberg lake attached, schema
-// migrated, quack enabled with parallelism connections) rooted at a temp
+// newTestDB opens a fresh DuckDB worker (Iceberg lake attached, schema
+// migrated, with parallelism connections) rooted at a temp
 // directory, and returns both the connector (needed for additional
 // concurrent connections — see InsertGeneratedRuns) and the *sql.DB (for
 // ordinary querying). Both are closed automatically at test cleanup.
 func newTestDB(t *testing.T, parallelism int) (*driver.Connector, *sql.DB) {
 	t.Helper()
 	requireDuckDBOnPath(t)
-	requireQuackExtension(t)
 	dir := t.TempDir()
 
 	connector, db, closeDB, err := openDuckDB(t.Context(), dir, parallelism)

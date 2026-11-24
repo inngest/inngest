@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,8 +21,8 @@ func TestStartProcessWithQuackTransport(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, isQuack := p.sess.(*quack.Session)
-	require.True(t, isQuack, "process should have swapped its active session to the quack transport once bootstrapped")
+	_, isWorker := p.sess.(*workerSessionExecer)
+	require.True(t, isWorker, "process should be using the worker transport")
 
 	require.NoError(t, p.healthCheck(t.Context()))
 
@@ -53,9 +52,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1);")
 	require.NoError(t, err)
 
-	pidBefore := p.cmd.Process.Pid
-	require.NoError(t, p.cmd.Process.Kill())
-	_, _ = p.cmd.Process.Wait()
+	pidBefore := killSubprocess(t, p)
 
 	// :memory: state (including the CREATE TABLE above) does not survive a
 	// real crash — same as the jsonlines path — so the pre-crash table is
@@ -73,12 +70,12 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 
 	p.mu.Lock()
 	disabled := p.isDisabledLocked()
-	pidAfter := p.cmd.Process.Pid
-	_, stillQuack := p.sess.(*quack.Session)
+	pidAfter := p.client.PID()
+	_, stillWorker := p.sess.(*workerSessionExecer)
 	p.mu.Unlock()
 	require.False(t, disabled)
 	require.NotEqual(t, pidBefore, pidAfter)
-	require.True(t, stillQuack, "the restarted process must still be using the quack transport, not have fallen back to jsonlines")
+	require.True(t, stillWorker, "the restarted process must still be using the worker transport")
 }
 
 // TestQuackCancelledQueryDoesNotRestartSubprocess pins the fix for a real
@@ -116,7 +113,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	_, _, err = p.Exec(t.Context(), "SET threads=1;")
 	require.NoError(t, err)
 
-	pidBefore := p.cmd.Process.Pid
+	pidBefore := p.pid()
 
 	// A genuinely slow, single-threaded query -- confirmed empirically to
 	// take several seconds -- so cancelling it below lands mid-flight
@@ -143,7 +140,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	}
 
 	p.mu.Lock()
-	pidAfter := p.cmd.Process.Pid
+	pidAfter := p.client.PID()
 	disabled := p.isDisabledLocked()
 	p.mu.Unlock()
 	require.Equal(t, pidBefore, pidAfter, "a cancelled query must not respawn the subprocess")

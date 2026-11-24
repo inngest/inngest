@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# Bumps the pinned DuckDB CLI build in pkg/duckdb/driver/pinned.go to DuckDB's
-# latest GitHub release (or to an explicit tag passed as the first argument,
-# e.g. "v2.0.0"), re-downloading each platform's release archive to recompute
-# pinnedChecksums and checking them against the digests GitHub publishes for
-# the release. Regenerates pinned.go wholesale (rather than patching it in
-# place) so the file always matches its own generator.
+# Bumps the pinned DuckDB shared library build in pkg/duckdb/driver/pinned_lib.go
+# to DuckDB's latest GitHub release (or to an explicit tag passed as the first
+# argument, e.g. "v2.0.0"), re-downloading each platform's release archive to
+# recompute pinnedLibChecksums and checking them against the digests GitHub
+# publishes for the release. Regenerates pinned_lib.go wholesale (rather than
+# patching it in place) so the file always matches its own generator.
 
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-target="${repo_root}/pkg/duckdb/driver/pinned.go"
+target="${repo_root}/pkg/duckdb/driver/pinned_lib.go"
 api="https://api.github.com/repos/duckdb/duckdb/releases"
 
 sha256_of() {
@@ -39,10 +39,10 @@ echo "Release: ${version}"
 
 base_url="https://github.com/duckdb/duckdb/releases/download/${version}/"
 assets=(
-    "duckdb-cli-osx-universal.tar.gz"
-    "duckdb-cli-linux-amd64.tar.gz"
-    "duckdb-cli-linux-arm64.tar.gz"
-    "duckdb-cli-windows-amd64.tar.gz"
+    "duckdb-shared-libs-osx-universal.tar.gz"
+    "duckdb-shared-libs-linux-amd64.tar.gz"
+    "duckdb-shared-libs-linux-arm64.tar.gz"
+    "duckdb-shared-libs-windows-amd64.tar.gz"
 )
 
 workdir="$(mktemp -d)"
@@ -71,21 +71,21 @@ cat >"${target}" <<EOF
 
 package driver
 
-// PinnedVersion is the DuckDB CLI release this package downloads and runs
-// against: a tagged GitHub release, which EnsureBinary (download.go) fetches
-// from defaultInstallBaseURL.
+// PinnedVersion is the DuckDB release this package downloads and runs against:
+// a tagged GitHub release, which EnsureLibrary (libdownload.go) fetches from
+// defaultInstallBaseURL.
 const PinnedVersion = "${version}"
 
-// pinnedChecksums are the SHA256 digests of each pinned-version release
-// archive EnsureBinary might download, keyed by asset name. They were
-// computed by downloading each archive at pin time and checked against the
-// digests GitHub publishes for the release, so EnsureBinary fails closed on
-// corruption or tampering in transit.
-var pinnedChecksums = map[string]string{
-	"duckdb-cli-osx-universal.tar.gz": "${checksums[duckdb-cli-osx-universal.tar.gz]}",
-	"duckdb-cli-linux-amd64.tar.gz":   "${checksums[duckdb-cli-linux-amd64.tar.gz]}",
-	"duckdb-cli-linux-arm64.tar.gz":   "${checksums[duckdb-cli-linux-arm64.tar.gz]}",
-	"duckdb-cli-windows-amd64.tar.gz": "${checksums[duckdb-cli-windows-amd64.tar.gz]}",
+// pinnedLibChecksums are the SHA256 digests of each pinned-version DuckDB
+// shared library release archive EnsureLibrary might download, keyed by asset
+// name. Digests were computed by downloading each archive at pin time and
+// checked against the digests GitHub publishes for the release, so
+// EnsureLibrary fails closed on corruption or tampering in transit.
+var pinnedLibChecksums = map[string]string{
+	"duckdb-shared-libs-osx-universal.tar.gz": "${checksums[duckdb-shared-libs-osx-universal.tar.gz]}",
+	"duckdb-shared-libs-linux-amd64.tar.gz":   "${checksums[duckdb-shared-libs-linux-amd64.tar.gz]}",
+	"duckdb-shared-libs-linux-arm64.tar.gz":   "${checksums[duckdb-shared-libs-linux-arm64.tar.gz]}",
+	"duckdb-shared-libs-windows-amd64.tar.gz": "${checksums[duckdb-shared-libs-windows-amd64.tar.gz]}",
 }
 EOF
 

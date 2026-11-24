@@ -68,18 +68,21 @@ jobs:
         with:
           go-version-file: ./go.mod
 
-      - name: Cache pinned DuckDB binary and extensions
+      - name: Cache pinned DuckDB library and extensions
         uses: actions/cache@v4
         with:
           path: |
-            ${{ runner.temp }}/duckdb-state/bin
+            ${{ runner.temp }}/duckdb-state/lib
             ~/.duckdb/extensions
-          key: duckdb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pkg/duckdb/driver/pinned.go') }}
+          key: duckdb-lib-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pkg/duckdb/driver/pinned_lib.go') }}
 
-      - name: Install pinned DuckDB binary
+      - name: Install DuckDB worker and pinned libduckdb
         run: |
-          go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state"
-          dirname "$(find "$RUNNER_TEMP/duckdb-state/bin" -type f -name duckdb)" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/duckdb-state/bin"
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/duckdb-state/bin/inngest-duckdb-worker" ./cmd/inngest-duckdb-worker
+          echo "$RUNNER_TEMP/duckdb-state/bin" >> "$GITHUB_PATH"
+          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1 | awk '{print $NF}')"
+          echo "DUCKDB_LIB_PATH=$LIB_PATH" >> "$GITHUB_ENV"
 
       - name: Smoke
         run: scripts/duckdb-smoke.sh -race
@@ -108,18 +111,21 @@ jobs:
       # Without a duckdb binary on PATH every DuckDB test skips, so none of
       # pkg/duckdb's coverage reaches Codecov. Same pinned binary as
       # duckdb-smoke below.
-      - name: Cache pinned DuckDB binary and extensions
+      - name: Cache pinned DuckDB library and extensions
         uses: actions/cache@v4
         with:
           path: |
-            ${{ runner.temp }}/duckdb-state/bin
+            ${{ runner.temp }}/duckdb-state/lib
             ~/.duckdb/extensions
-          key: duckdb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pkg/duckdb/driver/pinned.go') }}
+          key: duckdb-lib-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pkg/duckdb/driver/pinned_lib.go') }}
 
-      - name: Install pinned DuckDB binary
+      - name: Install DuckDB worker and pinned libduckdb
         run: |
-          go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state"
-          dirname "$(find "$RUNNER_TEMP/duckdb-state/bin" -type f -name duckdb)" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/duckdb-state/bin"
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/duckdb-state/bin/inngest-duckdb-worker" ./cmd/inngest-duckdb-worker
+          echo "$RUNNER_TEMP/duckdb-state/bin" >> "$GITHUB_PATH"
+          LIB_PATH="$(go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state" | tail -n1 | awk '{print $NF}')"
+          echo "DUCKDB_LIB_PATH=$LIB_PATH" >> "$GITHUB_ENV"
 
       - name: Test
         run: |

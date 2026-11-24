@@ -12,8 +12,8 @@
 
 set -euo pipefail
 
-command -v duckdb >/dev/null || {
-	echo "duckdb not found on PATH; run 'go run ./cmd duckdb download' and add the binary's directory to PATH" >&2
+command -v inngest-duckdb-worker >/dev/null || {
+	echo "inngest-duckdb-worker not found on PATH; build ./cmd/inngest-duckdb-worker and add it to PATH" >&2
 	exit 1
 }
 command -v jq >/dev/null || {
@@ -22,12 +22,12 @@ command -v jq >/dev/null || {
 }
 
 # package => -run pattern. Covers process close/restart, pooled-connection
-# restart recovery, quack append, quack cancel, migrations (incl. persistent reopen),
-# listener shutdown flush, dual-write -> query round trips, and the
-# duckdbseed appender against the real schema (catches column drift).
+# restart recovery, streaming append, cancel, worker RPCs, migrations (incl.
+# persistent reopen), listener shutdown flush, dual-write -> query round trips,
+# and the duckdbseed appender against the real schema (catches column drift).
 declare -A SMOKE=(
-	[./pkg/duckdb/driver]='^(TestConnectorCloseTerminatesSubprocess|TestExecTriggersRestartAfterCrash|TestQuackTransportSurvivesRestart|TestPooledQuackConn.*|TestQuackAppenderWritesRowsIntoRealTable|TestQuackBootstrapErrorDoesNotLeakToken|TestQuackCancelledQueryDoesNotRestartSubprocess)$'
-	[./pkg/duckdb/driver/internal/quack]='^TestQuackSession(HandshakeAndExec|FetchesAllRowsWhenResultExceedsOneInlineResponse|StatementErrorMapsToErrStatementFailed)$'
+	[./pkg/duckdb/driver]='^(TestConnectorCloseTerminatesSubprocess|TestExecTriggersRestartAfterCrash|TestWorkerReportsExactColumnOrder|TestAtomicMultiTableCommit)$'
+	[./pkg/duckdb/worker/server]='^TestWorker'
 	[./pkg/db/duckdb]='^TestMigrate'
 	[./pkg/duckdb/tracing]='^(TestNewListenerEndToEnd.*|TestBatcherDrainsChannelOnStopBeforeExiting)$'
 	[./pkg/duckdb/query]='^TestDualWriteThenDuckDBQueryRoundTrip$'

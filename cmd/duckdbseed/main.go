@@ -293,11 +293,13 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 }
 
 func lookDuckDBBinary() (string, error) {
-	path, err := exec.LookPath("duckdb")
-	if err != nil {
-		return "", fmt.Errorf("duckdb binary not found on PATH: %w", err)
+	if p := os.Getenv("DUCKDB_BINARY"); p != "" {
+		return p, nil
 	}
-	return path, nil
+	if p, err := exec.LookPath("inngest-duckdb-worker"); err == nil {
+		return p, nil
+	}
+	return "", nil
 }
 
 func sameDir(a, b string) bool {

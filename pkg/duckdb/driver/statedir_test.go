@@ -28,16 +28,17 @@ func TestConnectPrefersCachedPinnedBinaryOverPath(t *testing.T) {
 	pathBin := RequireDuckDBBinary(t)
 
 	stateDir := t.TempDir()
-	cached := BinaryPath(stateDir)
+	cached := filepath.Join(stateDir, "bin", workerBinaryName())
 	copyExecutable(t, pathBin, cached)
+	t.Setenv("PATH", filepath.Dir(cached)+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	c := &Connector{opts: Options{DBFile: ":memory:", StateDir: stateDir}}
 	_, err := c.Connect(t.Context())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = c.Close() })
 
-	require.Equal(t, cached, c.proc.binaryPath,
-		"Connect must resolve the cached pinned binary under StateDir, not a PATH lookup")
+	require.Equal(t, cached, c.proc.workerBinary,
+		"Connect must resolve the inngest-duckdb-worker binary when WorkerBinary/BinaryPath is unset")
 }
 
 // TestConnectIsolatesExtensionsUnderStateDir proves that when Options.StateDir

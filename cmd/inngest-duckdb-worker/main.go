@@ -27,6 +27,7 @@ func run(args []string) error {
 	dbPath := fs.String("db", "", "DuckDB database file path (empty for in-memory)")
 	stateDir := fs.String("state-dir", "", "Directory for cached libduckdb downloads")
 	authToken := fs.String("auth-token", "", "Shared auth token required on RPCs (falls back to INNGEST_DUCKDB_WORKER_AUTH_TOKEN; required for non-loopback TCP)")
+	allowUnsigned := fs.Bool("allow-unsigned-extensions", false, "Allow loading unsigned DuckDB extensions")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -47,11 +48,12 @@ func run(args []string) error {
 	defer stop()
 
 	return server.Serve(ctx, server.Opts{
-		ListenAddr: addr,
-		HealthAddr: *healthAddr,
-		AuthToken:  token,
-		LibPath:    *libPath,
-		DBPath:     *dbPath,
-		StateDir:   *stateDir,
+		ListenAddr:              addr,
+		HealthAddr:              *healthAddr,
+		AuthToken:               token,
+		LibPath:                 *libPath,
+		DBPath:                  *dbPath,
+		StateDir:                *stateDir,
+		AllowUnsignedExtensions: *allowUnsigned,
 	})
 }

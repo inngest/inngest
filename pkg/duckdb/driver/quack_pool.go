@@ -3,49 +3,39 @@ package driver
 import (
 	"context"
 	"errors"
+	"time"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/duckdb/worker"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// errQuackUnavailable is returned when no quack listener is published and the
+// errQuackUnavailable is returned when no worker endpoint is published and the
 // process isn't disabled — in practice, after Connector.Close.
-var errQuackUnavailable = errors.New("duckdb: quack listener is not running")
+var errQuackUnavailable = errors.New("duckdb: worker is not running")
 
-// quackEndpoint is one bootstrapped quack listener. gen identifies which
-// subprocess spawn it belongs to (process.quackGen at bootstrap time).
-type quackEndpoint struct {
-	listenURL string
-	token     string
-	gen       uint64
+// workerEndpoint is one bootstrapped worker client. gen identifies which
+// worker spawn it belongs to (process.quackGen at bootstrap time).
+type workerEndpoint struct {
+	client *worker.Client
+	gen    uint64
 }
 
-// pooledQuackConn is the sqlExecer behind every connection beyond the first
-// when Options.QuackConns > 1. It owns at most one quack.Session, tagged with
-// the generation of the listener it was opened against, and re-handshakes
-// whenever that generation is no longer the live one — so a subprocess
-// restart never leaves it talking to a dead listener with stale
-// credentials.
-//
-// database/sql never uses one driver.Conn from two goroutines at once, so
-// its fields need no locking of their own.
+// pooledQuackConn is the sqlExecer behind every concurrent worker session
+// beyond the primary one (Options.QuackConns > 1 and Connector.OpenShared).
+// It owns at most one *worker.Session, tagged with the generation of the
+// worker it was opened against, and transparently re-opens whenever that
+// generation is no longer the live one.
 type pooledQuackConn struct {
-	p    *process
-	sess *quack.Session
-	gen  uint64
-	// gated makes a handshake for a first session or to replace an abandoned
-	// one fail w/ ErrTooManyAbandoned while p.abandoned is at its cap (see
-	// Options.MaxAbandonedStatements). That's where pile-up happens: an
-	// abandoned statement keeps running server-side while its connection
-	// moves on to a fresh session. A re-handshake only because the
-	// subprocess restarted isn't gated (the restart killed everything
-	// abandoned on it, and their cancels then fail fast).
+	p     *process
+	sess  *worker.Session
+	exec  *workerSessionExecer
+	gen   uint64
 	gated bool
 }
 
 func (c *pooledQuackConn) Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error) {
-	err = c.run(ctx, func(s *quack.Session) error {
+	err = c.run(ctx, func(s *workerSessionExecer) error {
 		var e error
 		cols, rows, e = s.Exec(ctx, sqlText)
 		return e
@@ -54,7 +44,7 @@ func (c *pooledQuackConn) Exec(ctx context.Context, sqlText string) (cols []stri
 }
 
 func (c *pooledQuackConn) Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error) {
-	err = c.run(ctx, func(s *quack.Session) error {
+	err = c.run(ctx, func(s *workerSessionExecer) error {
 		var e error
 		cols, types, rows, e = s.Query(ctx, sqlText)
 		return e
@@ -62,9 +52,8 @@ func (c *pooledQuackConn) Query(ctx context.Context, sqlText string) (cols []str
 	return cols, types, rows, err
 }
 
-// QueryWithStreams is process.QueryWithStreams on c's own session.
-func (c *pooledQuackConn) QueryWithStreams(ctx context.Context, sqlText string, streams []quack.SendStream) (cols []string, types []string, rows []result.Row, err error) {
-	err = c.run(ctx, onceOnly(func(s *quack.Session) error {
+func (c *pooledQuackConn) QueryWithStreams(ctx context.Context, sqlText string, streams []worker.SendStream) (cols []string, types []string, rows []result.Row, err error) {
+	err = c.run(ctx, onceOnly(func(s *workerSessionExecer) error {
 		var e error
 		cols, types, rows, e = s.QueryWithStreams(ctx, sqlText, streams)
 		return e
@@ -72,19 +61,16 @@ func (c *pooledQuackConn) QueryWithStreams(ctx context.Context, sqlText string, 
 	return cols, types, rows, err
 }
 
-// run executes fn on a current session, applying the same failure policy as
-// process.runWithRestartLocked: statement errors and caller cancellation are
-// surfaced as-is; any other failure restarts the subprocess (at most once
-// per generation, across every connection) and retries fn once.
-func (c *pooledQuackConn) run(ctx context.Context, fn func(*quack.Session) error) error {
+func (c *pooledQuackConn) run(ctx context.Context, fn func(*workerSessionExecer) error) error {
 	gen, err := c.attempt(ctx, fn)
 	if err == nil || !c.shouldRecover(ctx, err) {
 		return err
 	}
 
-	logger.StdlibLogger(ctx).Warn("duckdb: pooled quack connection failed; recovering",
-		"transport", "quack", "generation", gen, "error", err)
+	logger.StdlibLogger(ctx).Warn("duckdb: pooled worker connection failed; recovering",
+		"transport", "worker", "generation", gen, "error", err)
 	c.sess = nil
+	c.exec = nil
 	if rerr := c.p.recoverQuack(ctx, gen, err); rerr != nil {
 		return rerr
 	}
@@ -95,14 +81,8 @@ func (c *pooledQuackConn) run(ctx context.Context, fn func(*quack.Session) error
 	return err
 }
 
-// attempt runs fn once, first re-handshaking if there's no session yet, the
-// live listener's generation differs from the session's, or the session was
-// abandoned mid-statement (see quack.Session.Abandoned). The last can happen
-// outside attempt too, since the quack appenders drive the session from
-// currentSession directly. It returns the generation fn ran against (or
-// tried to handshake with) for recoverQuack.
-func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) error) (uint64, error) {
-	ep, err := c.p.currentQuackEndpoint(ctx)
+func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*workerSessionExecer) error) (uint64, error) {
+	ep, err := c.p.currentWorkerEndpoint(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -110,54 +90,51 @@ func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) e
 		if c.gated && (c.sess == nil || c.sess.Abandoned()) && c.p.tooManyAbandoned() {
 			return ep.gen, ErrTooManyAbandoned
 		}
-		sess, err := quack.NewSession(ctx, ep.listenURL, ep.token, quack.WithAbandonedCounter(&c.p.abandoned))
+		sess, err := ep.client.OpenSession(ctx, worker.WithAbandonedCounter(&c.p.abandoned))
 		if err != nil {
 			c.sess = nil
+			c.exec = nil
 			return ep.gen, err
 		}
 		switch {
 		case c.sess == nil:
 		case c.sess.Abandoned():
-			logger.StdlibLogger(ctx).Debug("duckdb: pooled quack session re-handshaked after an abandoned statement",
-				"transport", "quack", "abandoned_connection_id", c.sess.ConnectionID(), "connection_id", sess.ConnectionID())
+			logger.StdlibLogger(ctx).Debug("duckdb: pooled worker session reopened after an abandoned statement",
+				"transport", "worker", "abandoned_session_id", c.sess.ID(), "session_id", sess.ID())
 		default:
-			logger.StdlibLogger(ctx).Debug("duckdb: pooled quack session re-handshaked after subprocess restart",
-				"transport", "quack", "stale_generation", c.gen, "generation", ep.gen, "connection_id", sess.ConnectionID())
+			logger.StdlibLogger(ctx).Debug("duckdb: pooled worker session reopened after subprocess restart",
+				"transport", "worker", "stale_generation", c.gen, "generation", ep.gen, "session_id", sess.ID())
 		}
-		c.sess, c.gen = sess, ep.gen
+		c.sess = sess
+		c.exec = &workerSessionExecer{sess: sess}
+		c.gen = ep.gen
 	}
-	return c.gen, fn(c.sess)
+	return c.gen, fn(c.exec)
 }
 
-// Close disconnects c's session, if any, so closing a pooled connection
-// (database/sql's idle eviction, *sql.DB.Close of an OpenShared handle, ...)
-// doesn't leave its server-side connection behind (the server only drops it
-// on a DisconnectMessage, or w/ the subprocess). Best effort: a failure is
-// logged, not returned, since the connection is going away regardless.
 func (c *pooledQuackConn) Close() error {
 	if c.sess == nil {
 		return nil
 	}
 	sess := c.sess
 	c.sess = nil
-	if ep := c.p.quackEP.Load(); ep == nil || ep.gen != c.gen {
-		return nil // its listener is gone along w/ the subprocess
+	c.exec = nil
+	if ep := c.p.workerEP.Load(); ep == nil || ep.gen != c.gen {
+		return nil
 	}
-	if err := sess.Close(context.Background()); err != nil {
-		logger.StdlibLogger(context.Background()).Debug("duckdb: failed to disconnect a closed pooled quack connection",
-			"transport", "quack", "connection_id", sess.ConnectionID(), "error", err)
+	closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sess.Close(closeCtx); err != nil {
+		logger.StdlibLogger(context.Background()).Debug("duckdb: failed to disconnect a closed pooled worker connection",
+			"transport", "worker", "session_id", sess.ID(), "error", err)
 	}
 	return nil
 }
 
-// currentSession returns a session against the live listener,
-// re-handshaking if needed (including when the last statement on it, from
-// an appender or otherwise, was abandoned), for callers (the quack
-// appenders) that drive protocol messages sqlExecer doesn't cover.
-func (c *pooledQuackConn) currentSession(ctx context.Context) (*quack.Session, error) {
-	var sess *quack.Session
-	if err := c.run(ctx, func(s *quack.Session) error {
-		sess = s
+func (c *pooledQuackConn) currentSession(ctx context.Context) (*worker.Session, error) {
+	var sess *worker.Session
+	if err := c.run(ctx, func(s *workerSessionExecer) error {
+		sess = s.sess
 		return nil
 	}); err != nil {
 		return nil, err
@@ -168,19 +145,15 @@ func (c *pooledQuackConn) currentSession(ctx context.Context) (*quack.Session, e
 func (c *pooledQuackConn) shouldRecover(ctx context.Context, err error) bool {
 	switch {
 	case errors.Is(err, result.ErrStatementFailed),
-		errors.Is(err, quack.ErrStreamSource),
+		errors.Is(err, worker.ErrStreamSource),
 		errors.Is(err, ErrDisabled),
 		errors.Is(err, errQuackUnavailable),
 		errors.Is(err, ErrTooManyAbandoned):
 		return false
 	}
-	// Same reasoning as runWithRestartLocked: a quack request aborted by the
-	// caller's own ctx leaves nothing behind that a restart would fix.
 	return ctx.Err() == nil
 }
 
-// tooManyAbandoned reports whether p.abandoned is at its cap (see
-// Options.MaxAbandonedStatements).
 func (p *process) tooManyAbandoned() bool {
 	limit := p.maxAbandoned
 	if limit <= 0 {

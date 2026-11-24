@@ -56,6 +56,23 @@ func TestIcebergBootstrapStmts(t *testing.T) {
 	require.Error(t, err)
 	_, err = icebergBootstrapStmts(IcebergOptions{URI: "http://x"}, nil)
 	require.Error(t, err)
+
+	sharedStmts, err := icebergBootstrapStmtsForWorker(IcebergOptions{
+		URI:       "http://127.0.0.1:1234/",
+		Warehouse: "inngest",
+		Token:     "tok",
+	}, nil, true)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"INSTALL httpfs;",
+		"LOAD httpfs;",
+		"INSTALL iceberg;",
+		"LOAD iceberg;",
+		"CREATE OR REPLACE SECRET inngest_iceberg (TYPE iceberg, TOKEN 'tok');",
+		"ATTACH IF NOT EXISTS 'inngest' AS inngest (TYPE iceberg, URI 'http://127.0.0.1:1234', SECRET inngest_iceberg, DEFAULT_SCHEMA 'main');",
+		"CREATE SCHEMA IF NOT EXISTS inngest.main;",
+	}, sharedStmts)
+	require.NotContains(t, strings.Join(sharedStmts, "\n"), "DETACH")
 }
 
 // TestIcebergAttachReadWrite covers what dual-write and the federated reads

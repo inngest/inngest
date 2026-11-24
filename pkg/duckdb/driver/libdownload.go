@@ -6,16 +6,38 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 )
 
+// defaultInstallBaseURL is where EnsureLibrary downloads
+// duckdb-shared-libs-<dist>.tar.gz assets from.
+const defaultInstallBaseURL = "https://github.com/duckdb/duckdb/releases/download/" + PinnedVersion + "/"
+
+// maxDownloadSize bounds the release archive download.
+const maxDownloadSize = 200 << 20 // 200MB
+
 // maxLibExtractSize bounds the extracted shared library size (the macOS
 // universal libduckdb.dylib is ~135MB, so 300MB gives generous headroom).
 const maxLibExtractSize = 300 << 20 // 300MB
+
+// BinaryPath is an alias for LibraryPath retained for compatibility with
+// callers such as `inngest duckdb download`.
+func BinaryPath(stateDir string) string {
+	return LibraryPath(stateDir)
+}
+
+// EnsureBinary is an alias for EnsureLibrary retained for compatibility with
+// callers such as `inngest duckdb download`.
+func EnsureBinary(ctx context.Context, stateDir string) (string, error) {
+	return EnsureLibrary(ctx, stateDir)
+}
 
 // libraryName returns the shared library filename for the current OS.
 func libraryName() string {
@@ -88,6 +110,33 @@ func ensureLibrary(ctx context.Context, stateDir, baseURL string, checksums map[
 		return "", err
 	}
 	return path, nil
+}
+
+// fetchBytes GETs url with ctx and returns its body, capped at maxDownloadSize.
+func fetchBytes(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, url)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, maxDownloadSize))
+}
+
+// verifyChecksum checks that sha256(data) matches want (lowercase hex).
+func verifyChecksum(data []byte, want string) error {
+	sum := sha256.Sum256(data)
+	got := hex.EncodeToString(sum[:])
+	if got != want {
+		return fmt.Errorf("duckdb: checksum mismatch: got %s, want %s", got, want)
+	}
+	return nil
 }
 
 func verifyAndExtractLibrary(archive []byte, wantSHA256, wantEntry string) ([]byte, error) {

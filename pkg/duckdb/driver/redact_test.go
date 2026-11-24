@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/stretchr/testify/require"
 )
@@ -44,19 +43,19 @@ func TestRedactErrScrubsSecretsButKeepsClassification(t *testing.T) {
 	require.Equal(t, "sekrit", nilRedactor.redact("sekrit"))
 }
 
-// TestQuackBootstrapErrorDoesNotLeakToken drives a real bootstrap failure
+// TestIcebergBootstrapErrorDoesNotLeakToken drives a real bootstrap failure
 // whose DuckDB error echoes the failing statement, and checks the token
 // never reaches the returned error.
-func TestQuackBootstrapErrorDoesNotLeakToken(t *testing.T) {
+func TestIcebergBootstrapErrorDoesNotLeakToken(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	duckdbtest.RequireQuackExtension(t, binPath)
 
-	// A non-loopback host makes quack_serve itself fail after the token is
-	// already part of the statement.
-	addr := "192.0.2.1:0"
 	const token = "do-not-leak-this-token"
-	_, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &addr, withQuackServeToken(token))
+	ice := &IcebergOptions{
+		URI:       "http://127.0.0.1:1",
+		Warehouse: "test_wh",
+		Token:     token,
+	}
+	_, err := startProcessWithLake(t.Context(), binPath, ":memory:", ice, nil)
 	require.Error(t, err)
-	require.False(t, strings.Contains(err.Error(), token), "bootstrap error leaked the quack token: %v", err)
-	require.Contains(t, err.Error(), "CALL quack_serve")
+	require.False(t, strings.Contains(err.Error(), token), "bootstrap error leaked the Iceberg token: %v", err)
 }

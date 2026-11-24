@@ -17,8 +17,8 @@ func TestAtomicMultiTableCommit(t *testing.T) {
 		quack *string
 		want  bool
 	}{
-		"jsonlines": {nil, false},
-		"quack":     {&quackAddr, true},
+		"default":   {nil, true},
+		"quackAddr": {&quackAddr, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: c.quack})

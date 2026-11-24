@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -24,10 +23,7 @@ import (
 // a follow-up query queue behind anything still running on it.
 func newTestQuackDuckDB(t *testing.T) *sql.DB {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	addr := driver.EphemeralQuackAddr
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath:             binPath,
@@ -115,10 +111,7 @@ func TestExecuteCallerCancellationIsNotATimeLimit(t *testing.T) {
 // message instead of piling up more. The constant-folded levenshtein ignores
 // its interrupt (see driver.TestQuackAbandonedStatementsAreCapped).
 func TestExecuteTooManyAbandonedQueries(t *testing.T) {
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	addr := driver.EphemeralQuackAddr
 	connector, primary, err := driver.OpenConnector(t.Context(), driver.Options{
 		BinaryPath:             binPath,

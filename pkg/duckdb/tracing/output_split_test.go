@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"os/exec"
 	"testing"
 	"time"
 
@@ -105,10 +104,7 @@ func TestOutputSplitEndToEnd(t *testing.T) {
 
 func openOutputSplitLake(t *testing.T) *sql.DB {
 	t.Helper()
-	binPath, err := exec.LookPath("duckdb")
-	if err != nil {
-		t.Skip("duckdb binary not found on PATH; skipping")
-	}
+	binPath := driver.RequireDuckDBBinary(t)
 	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", Iceberg: icebergtest.Start(t)})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
