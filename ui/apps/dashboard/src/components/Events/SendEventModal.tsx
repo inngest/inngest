@@ -4,7 +4,10 @@ import {
   type SendEventConfig,
   type SharedSendEventModalProps,
 } from '@inngest/components/SendEvent/SendEventModal';
-import { type EventPayload } from '@inngest/components/SendEvent/utils';
+import {
+  shellQuote,
+  type EventPayload,
+} from '@inngest/components/SendEvent/utils';
 import ky from 'ky';
 import { useQuery } from 'urql';
 
@@ -92,9 +95,11 @@ await inngest.send(${JSON.stringify(payload, null, 2)});`;
   const generateCloudCurlCode = useCallback(
     (payload: EventPayload | EventPayload[]) => {
       return `curl ${sendEventURL} \\${
-        isBranchChild ? `\n  -H "x-inngest-env: ${envName}" \\` : ''
+        isBranchChild
+          ? `\n  -H ${shellQuote(`x-inngest-env: ${envName}`)} \\`
+          : ''
       }
-  --data '${JSON.stringify(payload)}'`;
+  --data ${shellQuote(JSON.stringify(payload))}`;
     },
     [sendEventURL, isBranchChild, envName],
   );

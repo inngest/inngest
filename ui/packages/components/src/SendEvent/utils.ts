@@ -16,10 +16,19 @@ const inngest = new Inngest({ name: 'My App' });
 await inngest.send(${JSON.stringify(payload, null, 2)});`;
 };
 
+/**
+ * Quotes a value as a single POSIX shell word. Everything inside single quotes
+ * is literal, so the only character that needs handling is the single quote
+ * itself: close the quoted string, emit an escaped quote, and reopen it.
+ */
+export const shellQuote = (value: string): string => {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+};
+
 export const generateCurlCode = (payload: EventPayload | EventPayload[]): string => {
   return `curl http://localhost:8288/e/dev_key \\
   -H "Content-Type: application/json" \\
-  --data '${JSON.stringify(payload)}'`;
+  --data ${shellQuote(JSON.stringify(payload))}`;
 };
 
 export const copyToClipboard = async (text: string): Promise<void> => {
