@@ -374,11 +374,13 @@ type SyncLifecycleListener interface {
 // each emission is the full value for its kind and readers can just collapse
 // to the latest one per (run_id, span_id, kind).
 type MetadataEntry struct {
-	AccountID  uuid.UUID
-	EnvID      uuid.UUID
-	AppID      uuid.UUID
-	FunctionID uuid.UUID
-	RunID      ulid.ULID
+	AccountID    uuid.UUID
+	EnvID        uuid.UUID
+	AppID        uuid.UUID
+	AppName      string
+	FunctionID   uuid.UUID
+	FunctionSlug string
+	RunID        ulid.ULID
 	Parent     *meta.SpanReference
 	Kind       metadata.Kind
 	Scope      metadata.Scope

@@ -347,18 +347,21 @@ func TestInsertRunMetadataBucketAt(t *testing.T) {
 	appID, functionID := uuid.NewString(), uuid.NewString()
 	stepType := "groupExperiment"
 	require.NoError(t, NewDuckDBInserter(db).InsertRunMetadata(t.Context(), []RunMetadata{{
-		AccountID: uuid.NewString(), EnvID: uuid.NewString(), AppID: appID, FunctionID: functionID,
-		RunID: ulid.Make().String(), RunQueuedAt: time.Now(), SpanID: "span", Scope: "step",
+		AccountID: uuid.NewString(), EnvID: uuid.NewString(), AppID: appID, AppName: "my-app",
+		FunctionID: functionID, FunctionSlug: "my-app-fn", RunID: ulid.Make().String(),
+		RunQueuedAt: time.Now(), SpanID: "span", Scope: "step",
 		Kind: "inngest.test", Values: json.RawMessage(`{"a":1}`), CreatedAt: time.Now(),
 		StepType: &stepType,
 	}}))
 
 	var bucketAt time.Time
-	var gotAppID, gotFunctionID string
+	var gotAppID, gotAppName, gotFunctionID, gotFunctionSlug string
 	var gotStepType *string
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT app_id, function_id, step_type, bucket_at FROM inngest.run_metadata").Scan(&gotAppID, &gotFunctionID, &gotStepType, &bucketAt))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT app_id, app_name, function_id, function_slug, step_type, bucket_at FROM inngest.run_metadata").Scan(&gotAppID, &gotAppName, &gotFunctionID, &gotFunctionSlug, &gotStepType, &bucketAt))
 	require.Equal(t, appID, gotAppID)
+	require.Equal(t, "my-app", gotAppName)
 	require.Equal(t, functionID, gotFunctionID)
+	require.Equal(t, "my-app-fn", gotFunctionSlug)
 	require.NotNil(t, gotStepType)
 	require.Equal(t, stepType, *gotStepType)
 	require.False(t, bucketAt.Before(before), "bucket_at %s is before the insert (%s)", bucketAt, before)

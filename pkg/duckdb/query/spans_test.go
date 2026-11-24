@@ -31,8 +31,8 @@ func seedMetadataRow(t *testing.T, ctx context.Context, m *Manager, accountID, e
 	t.Helper()
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.run_metadata
-		 (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+		 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, 'test-app', ?, 'test-fn', ?, ?, ?, ?, ?, ?);`,
 		accountID.String(), envID.String(), runID.String(), createdAt, appID.String(), functionID.String(),
 		spanID, scope, kind, isUser, json.RawMessage(values), createdAt,
 	)

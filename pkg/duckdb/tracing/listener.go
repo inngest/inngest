@@ -552,11 +552,13 @@ func (l *listener) OnMetadataEntry(ctx context.Context, entry execution.Metadata
 	spanID := tracing.SpanContextFromMetadata(entry.Parent).SpanID().String()
 
 	m := RunMetadata{
-		AccountID:   entry.AccountID.String(),
-		EnvID:       entry.EnvID.String(),
-		AppID:       entry.AppID.String(),
-		FunctionID:  entry.FunctionID.String(),
-		RunID:       entry.RunID.String(),
+		AccountID:    entry.AccountID.String(),
+		EnvID:        entry.EnvID.String(),
+		AppID:        entry.AppID.String(),
+		AppName:      entry.AppName,
+		FunctionID:   entry.FunctionID.String(),
+		FunctionSlug: entry.FunctionSlug,
+		RunID:        entry.RunID.String(),
 		RunQueuedAt: ulid.Time(entry.RunID.Time()),
 		SpanID:      spanID,
 		Scope:       entry.Scope.String(),

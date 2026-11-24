@@ -251,8 +251,10 @@ type MetadataRow struct {
 	EnvID       uuid.UUID
 	RunID       string
 	RunQueuedAt time.Time
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
+	AppID        uuid.UUID
+	AppName      string
+	FunctionID   uuid.UUID
+	FunctionSlug string
 	SpanID      string
 	Scope       string
 	StepID      *string

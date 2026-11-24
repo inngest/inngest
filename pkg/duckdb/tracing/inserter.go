@@ -65,11 +65,13 @@ type Event struct {
 
 // RunMetadata is one metadata emission, as OnMetadataEntry produces it.
 type RunMetadata struct {
-	AccountID   string
-	EnvID       string
-	AppID       string
-	FunctionID  string
-	RunID       string
+	AccountID    string
+	EnvID        string
+	AppID        string
+	AppName      string
+	FunctionID   string
+	FunctionSlug string
+	RunID        string
 	RunQueuedAt time.Time
 	SpanID      string
 	Scope       string
@@ -232,7 +234,7 @@ func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error
 }
 
 var runMetadataColumns = []string{
-	"account_id", "env_id", "app_id", "function_id", "run_id", "run_queued_at", "span_id", "scope", "kind",
+	"account_id", "env_id", "app_id", "app_name", "function_id", "function_slug", "run_id", "run_queued_at", "span_id", "scope", "kind",
 	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt", "step_type", "bucket_at",
 }
 
@@ -241,7 +243,7 @@ func (d *DuckDBInserter) InsertRunMetadata(ctx context.Context, entries []RunMet
 	rows := make([][]any, len(entries))
 	for i, m := range entries {
 		rows[i] = []any{
-			m.AccountID, m.EnvID, m.AppID, m.FunctionID, m.RunID, m.RunQueuedAt, m.SpanID, m.Scope, m.Kind,
+			m.AccountID, m.EnvID, m.AppID, m.AppName, m.FunctionID, m.FunctionSlug, m.RunID, m.RunQueuedAt, m.SpanID, m.Scope, m.Kind,
 			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt), nullable(m.StepType), bucketAt,
 		}
 	}

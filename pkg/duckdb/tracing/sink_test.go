@@ -173,16 +173,18 @@ func TestListenerWithSinkSendsEntitiesSynchronously(t *testing.T) {
 	l.OnEventReceived(context.Background(), event.NewBaseTrackedEvent(event.Event{Name: "app/direct"}, nil))
 	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
 	l.OnMetadataEntry(context.Background(), execution.MetadataEntry{
-		AccountID:  md.ID.Tenant.AccountID,
-		EnvID:      md.ID.Tenant.EnvID,
-		AppID:      md.ID.Tenant.AppID,
-		FunctionID: md.ID.FunctionID,
-		RunID:      md.ID.RunID,
-		Parent:     tracing.RunSpanRefFromMetadata(&md),
-		Kind:       metadata.Kind("test.kind"),
-		Scope:      enums.MetadataScopeRun,
-		Values:     metadata.Values{"foo": json.RawMessage(`"bar"`)},
-		CreatedAt:  time.Now(),
+		AccountID:    md.ID.Tenant.AccountID,
+		EnvID:        md.ID.Tenant.EnvID,
+		AppID:        md.ID.Tenant.AppID,
+		AppName:      "test-app",
+		FunctionID:   md.ID.FunctionID,
+		FunctionSlug: "test-app-fn",
+		RunID:        md.ID.RunID,
+		Parent:       tracing.RunSpanRefFromMetadata(&md),
+		Kind:         metadata.Kind("test.kind"),
+		Scope:        enums.MetadataScopeRun,
+		Values:       metadata.Values{"foo": json.RawMessage(`"bar"`)},
+		CreatedAt:    time.Now(),
 	})
 
 	// No Eventually: a direct Sink sees everything before the hooks return.
@@ -201,7 +203,9 @@ func TestListenerWithSinkSendsEntitiesSynchronously(t *testing.T) {
 
 	require.Len(t, sink.metadata, 1)
 	require.Equal(t, md.ID.Tenant.AppID.String(), sink.metadata[0].AppID)
+	require.Equal(t, "test-app", sink.metadata[0].AppName)
 	require.Equal(t, md.ID.FunctionID.String(), sink.metadata[0].FunctionID)
+	require.Equal(t, "test-app-fn", sink.metadata[0].FunctionSlug)
 	require.Equal(t, md.ID.RunID.String(), sink.metadata[0].RunID)
 	require.Equal(t, metadata.Kind("test.kind").Suffix(), sink.metadata[0].Kind)
 	require.Nil(t, sink.metadata[0].StepID, "run-scoped metadata has no step")

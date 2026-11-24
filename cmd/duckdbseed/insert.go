@@ -93,7 +93,7 @@ var (
 	// duckdb-quack server) for event_ids' VARCHAR->LIST casting above.
 	metadataColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, // app_id, function_id
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt, step_type
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
@@ -239,7 +239,7 @@ func metadataRowValues(m MetadataRow) []any {
 	}
 	return []any{
 		m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt,
-		m.AppID, m.FunctionID,
+		m.AppID, m.AppName, m.FunctionID, m.FunctionSlug,
 		m.SpanID, m.Scope,
 		stepID, stepIndex, stepAttempt, stepType,
 		m.Kind, strconv.FormatBool(m.IsUser),

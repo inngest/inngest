@@ -57,8 +57,8 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at, bucket_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?, now());`,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, span_id, scope, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, 'run', 'inngest.experiment', false, ?, ?, now());`,
 		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
 		"span-1", `{"variant":"a"}`, now,
 	)
@@ -159,8 +159,8 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	insertSpan("step-1", rootSpanID, now.Add(2*time.Second))
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, step_id, step_index, step_attempt, step_type, kind, is_user, values, created_at, bucket_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 'step', ?, 1, 1, 'run', 'user.custom', true, '{"n":2}', ?, now());`,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, span_id, scope, step_id, step_index, step_attempt, step_type, kind, is_user, values, created_at, bucket_at)
+		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, 'step', ?, 1, 1, 'run', 'user.custom', true, '{"n":2}', ?, now());`,
 		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(), "step-1", "step-1", now,
 	)
 	require.NoError(t, err)
