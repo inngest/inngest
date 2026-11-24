@@ -195,6 +195,23 @@ func TestCapacityLeaseRepairLowRateBoundsBackoff(t *testing.T) {
 	require.True(t, result.retryAt.After(clock.Now().Add(PartitionLookahead)))
 }
 
+func TestCapacityLeaseRepairSkipsFlagsForHealthyItems(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+	q, s, p := repairBudgetProcessor(t, clock, "healthy", nil)
+	valid := s.items[3]
+	ordinary := *valid
+	ordinary.ID, ordinary.RefilledFrom, ordinary.CapacityLease = "ordinary", "", nil
+	q.AllowKeyQueueCapacityLeaseRepair = func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+		t.Fatal("healthy items must not evaluate the repair flag")
+		return false
+	}
+	kept, result, err := q.requeueExpiredCapacityLeases(t.Context(), p, []*QueueItem{valid, &ordinary})
+	require.NoError(t, err)
+	require.Len(t, kept, 2)
+	require.Zero(t, result.attempts)
+	require.Zero(t, s.calls.Load())
+}
+
 func TestCapacityLeaseRepairTimeBudget(t *testing.T) {
 	for _, tc := range []struct {
 		name               string

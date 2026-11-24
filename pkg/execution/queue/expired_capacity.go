@@ -81,10 +81,10 @@ func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *Qu
 		// their routing before requeueing. Never refresh/delete from a stale
 		// cleanup snapshot outside the conditional Redis mutation.
 		legacyThrottle := item != nil && item.Data.Throttle != nil && item.Data.Throttle.KeyExpressionHash == ""
-		if item == nil || legacyThrottle || !q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, *item) ||
-			item.RefilledFrom == "" || item.CapacityLease == nil ||
+		if item == nil || legacyThrottle || item.RefilledFrom == "" || item.CapacityLease == nil ||
 			!item.CapacityLease.LeaseID.Timestamp().Before(now) ||
-			item.IsLeased(now) || item.AtMS > now.UnixMilli() {
+			item.IsLeased(now) || item.AtMS > now.UnixMilli() ||
+			!q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, *item) {
 			kept = append(kept, item)
 			continue
 		}
