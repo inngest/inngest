@@ -114,15 +114,8 @@ func (p *replPump) cycle() {
 	p.n++
 	if p.n%64 == 0 {
 		for _, s := range p.sinks {
-			followerHousekeep(s)
+			s.FollowerHousekeep()
 		}
-	}
-}
-
-// followerHousekeep runs every step of the follower housekeeping once.
-func followerHousekeep(m *Manager) {
-	for range FollowerHousekeepSteps {
-		m.FollowerHousekeepStep()
 	}
 }
 
@@ -1273,41 +1266,13 @@ func TestReplicaReplayExpires(t *testing.T) {
 		require.NotEqual(t, first.Leases[0].LeaseID, again.Leases[0].LeaseID)
 	}
 
-	// the retry left a new record.  the one nobody retried is swept.
-	require.Equal(t, 2, follower.acqIdem.len())
-	followerHousekeep(follower)
-	require.Equal(t, 1, follower.acqIdem.len(), "the sweep removed the expired record")
-}
-
-// TestFollowerHousekeepStepSweepsOneStripe checks that one step drops the
-// expired records of one stripe, and that FollowerHousekeepSteps steps drop
-// all of them from any start.
-func TestFollowerHousekeepStepSweepsOneStripe(t *testing.T) {
-	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
-	follower := newReplFollower(t, clock)
-	expired := clock.Now().UnixMilli()
-	live := expired + 1
-
-	const perStripe = 3
-	fill := func() {
-		for k := range uint64(perStripe * ttlStripes) {
-			follower.acqIdem.set(k, &acquireRecord{}, expired)
-			follower.extIdem.set(k, &constraintapi.CapacityExtendLeaseResponse{}, expired)
-			follower.semIdem.set(k, 1, expired)
-		}
-		follower.acqIdem.set(perStripe*ttlStripes, &acquireRecord{}, live)
-	}
-	total := func() int {
-		return follower.acqIdem.len() + follower.extIdem.len() + follower.semIdem.len()
-	}
-
-	fill()
-	// stop in the middle of a pass.  the next pass starts there.
-	for step := 1; step <= 100; step++ {
-		follower.FollowerHousekeepStep()
-		require.Equal(t, 3*perStripe*(ttlStripes-step)+1, total(), "after step %d", step)
-	}
-	fill()
-	followerHousekeep(follower)
-	require.Equal(t, 1, total(), "a full pass keeps only the record that is not expired")
+	// housekeeping keeps the record of the retry until it expires.  then it
+	// frees every record.
+	follower.FollowerHousekeep()
+	hit, err := follower.Acquire(ctx, shape.acquire(clock, "late", 1))
+	require.NoError(t, err)
+	require.True(t, hit.OperationIdempotencyHit)
+	clock.Advance(constraintapi.OperationIdempotencyTTL)
+	follower.FollowerHousekeep()
+	require.Zero(t, follower.acqIdem.len())
 }

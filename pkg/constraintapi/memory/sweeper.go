@@ -92,15 +92,15 @@ type setDrop struct {
 	deletedAtMS int64
 }
 
-// housekeep sweeps the idempotency maps, frees slab pages, drops counters
-// that read zero or expired, and drops constraint sets nobody used.  the
-// caller has the housekeeping mutex.
+// housekeep frees expired idempotency records, frees slab pages, drops
+// counters that read zero or expired, and drops constraint sets nobody used.
+// the caller has the housekeeping mutex.
 func (m *Manager) housekeep(nowMS int64) {
-	m.acqIdem.sweep(nowMS)
-	m.extIdem.sweep(nowMS)
-	m.relIdem.sweep(nowMS)
-	m.checkIdem.sweep(nowMS)
-	m.semIdem.sweep(nowMS)
+	m.acqIdem.rotate(nowMS)
+	m.extIdem.rotate(nowMS)
+	m.relIdem.rotate(nowMS)
+	m.checkIdem.rotate(nowMS)
+	m.semIdem.rotate(nowMS)
 
 	m.slab.freePages()
 

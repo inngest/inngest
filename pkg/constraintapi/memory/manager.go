@@ -110,9 +110,6 @@ type Manager struct {
 	follower bool
 	nonceSet bool
 	replSets map[uint64]*constraintSet
-	// followerStep is the stripe the next FollowerHousekeepStep sweeps.  only
-	// the goroutine that calls Apply touches it.
-	followerStep int
 
 	stop      chan struct{}
 	done      chan struct{}

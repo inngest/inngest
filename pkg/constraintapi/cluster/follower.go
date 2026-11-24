@@ -11,12 +11,8 @@ import (
 )
 
 // followerHousekeepEvery is how often a follower frees what it no longer
-// needs.  the work is split in steps of equal spacing, so the goroutine that
-// acknowledges stops for one step at a time.
-const (
-	followerHousekeepEvery = 5 * time.Second
-	followerHousekeepStep  = followerHousekeepEvery / memory.FollowerHousekeepSteps
-)
+// needs.
+const followerHousekeepEvery = 5 * time.Second
 
 var (
 	// errStaleTerm means the stream comes from a primary that was replaced.
@@ -213,9 +209,9 @@ func (f *follower) serve(s Stream) error {
 			}
 		}
 
-		if now := time.Now(); now.Sub(housekept) > followerHousekeepStep {
+		if now := time.Now(); now.Sub(housekept) > followerHousekeepEvery {
 			housekept = now
-			mgr.FollowerHousekeepStep()
+			mgr.FollowerHousekeep()
 		}
 	}
 }

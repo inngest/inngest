@@ -10,6 +10,9 @@ import (
 // the byte limit so a tail of many small chunks stays inside it.
 const chunkOverhead = 64
 
+// tailBlock is how many chunks one block of a tail has.
+const tailBlock = 1024
+
 // tailChunk is one run of encoded records.  data is never changed, so a
 // message can share it.
 type tailChunk struct {
@@ -30,10 +33,16 @@ type tail struct {
 	// next is the LSN after the last record.  with no chunks it is the only
 	// LSN the tail covers.
 	next uint64
-	// chunks[head:] are the chunks the tail has.
-	chunks []tailChunk
+	// blocks contains the chunks in order.  the oldest chunk is at position
+	// head of the first block, and n is how many chunks the tail has.  a
+	// chunk never moves.  moving 500,000 chunks to the front of one slice
+	// stops the goroutine that appends for 13 to 17 ms during a GC cycle.
+	blocks []*[tailBlock]tailChunk
 	head   int
-	bytes  int
+	n      int
+	// spare is an empty block.  the next block the tail adds is this one.
+	spare *[tailBlock]tailChunk
+	bytes int
 }
 
 func newTail(maxBytes int, window time.Duration) *tail {
@@ -52,10 +61,17 @@ func (t *tail) reset(base uint64) {
 }
 
 func (t *tail) resetLocked(next uint64) {
-	t.chunks = nil
+	t.blocks = nil
 	t.head = 0
+	t.n = 0
 	t.bytes = 0
 	t.next = next
+}
+
+// chunk returns chunk i, where chunk 0 is the oldest.
+func (t *tail) chunk(i int) *tailChunk {
+	i += t.head
+	return &t.blocks[i/tailBlock][i%tailBlock]
 }
 
 // append adds count records encoded in data that start at first.  the tail
@@ -69,12 +85,21 @@ func (t *tail) append(first uint64, count int, data []byte, now time.Time) {
 	if first != t.next {
 		t.resetLocked(first)
 	}
-	t.chunks = append(t.chunks, tailChunk{
+	if t.head+t.n == len(t.blocks)*tailBlock {
+		b := t.spare
+		t.spare = nil
+		if b == nil {
+			b = new([tailBlock]tailChunk)
+		}
+		t.blocks = append(t.blocks, b)
+	}
+	t.n++
+	*t.chunk(t.n - 1) = tailChunk{
 		first: first,
 		count: count,
 		at:    now,
 		data:  data,
-	})
+	}
 	t.bytes += len(data) + chunkOverhead
 	t.next = first + uint64(count)
 	t.evictLocked(now)
@@ -89,31 +114,28 @@ func (t *tail) evict(now time.Time) {
 }
 
 func (t *tail) evictLocked(now time.Time) {
-	for t.head < len(t.chunks) {
-		c := &t.chunks[t.head]
+	for t.n > 0 {
+		c := t.chunk(0)
 		if t.bytes <= t.maxBytes && now.Sub(c.at) <= t.window {
 			break
 		}
 		t.bytes -= len(c.data) + chunkOverhead
 		*c = tailChunk{}
 		t.head++
-	}
-	switch {
-	case t.head == len(t.chunks):
-		t.chunks = t.chunks[:0]
-		t.head = 0
-	case t.head > 64 && t.head > len(t.chunks)/2:
-		n := copy(t.chunks, t.chunks[t.head:])
-		clear(t.chunks[n:])
-		t.chunks = t.chunks[:n]
-		t.head = 0
+		t.n--
+		if t.head == tailBlock {
+			t.spare = t.blocks[0]
+			t.blocks[0] = nil
+			t.blocks = t.blocks[1:]
+			t.head = 0
+		}
 	}
 }
 
 // firstLocked is the lowest LSN the tail can serve.
 func (t *tail) firstLocked() uint64 {
-	if t.head < len(t.chunks) {
-		return t.chunks[t.head].first
+	if t.n > 0 {
+		return t.chunk(0).first
 	}
 	return t.next
 }
@@ -142,25 +164,29 @@ func (t *tail) read(from uint64, limit int) (first uint64, count int, data []byt
 	if from == t.next {
 		return from, 0, nil, true
 	}
-	live := t.chunks[t.head:]
 	// the chunk that has from is the last one that starts at or below it.
-	i := sort.Search(len(live), func(i int) bool { return live[i].first > from }) - 1
+	i := sort.Search(t.n, func(i int) bool { return t.chunk(i).first > from }) - 1
+	start := t.chunk(i)
 	end := i + 1
-	size := len(live[i].data)
-	count = live[i].count
-	for end < len(live) && (limit <= 0 || size+len(live[end].data) <= limit) {
-		size += len(live[end].data)
-		count += live[end].count
+	size := len(start.data)
+	count = start.count
+	for end < t.n {
+		c := t.chunk(end)
+		if limit > 0 && size+len(c.data) > limit {
+			break
+		}
+		size += len(c.data)
+		count += c.count
 		end++
 	}
 	if end == i+1 {
-		return live[i].first, count, live[i].data, true
+		return start.first, count, start.data, true
 	}
 	data = make([]byte, 0, size)
-	for _, c := range live[i:end] {
-		data = append(data, c.data...)
+	for j := i; j < end; j++ {
+		data = append(data, t.chunk(j).data...)
 	}
-	return live[i].first, count, data, true
+	return start.first, count, data, true
 }
 
 // size returns the bytes the tail counts against its limit and how many
@@ -168,8 +194,8 @@ func (t *tail) read(from uint64, limit int) (first uint64, count int, data []byt
 func (t *tail) size() (bytes, records int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	for _, c := range t.chunks[t.head:] {
-		records += c.count
+	for i := range t.n {
+		records += t.chunk(i).count
 	}
 	return t.bytes, records
 }

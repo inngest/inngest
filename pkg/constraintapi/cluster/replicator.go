@@ -34,12 +34,25 @@ const (
 
 	// maxIdleDrain is the longest the drain loop sleeps when the log is idle.
 	maxIdleDrain = 16 * time.Millisecond
+
+	// slowCommitAfter is how long records may wait for the acknowledgement
+	// of a follower before the primary logs a warning.  the primary removes
+	// a follower only after AckTimeout.  until then a request at commit
+	// level all waits, and this line is the only sign of which follower it
+	// waits for.
+	slowCommitAfter = time.Second
+
+	// slowWarnEvery is the least time between two warnings about the same
+	// follower.
+	slowWarnEvery = time.Second
 )
 
-// pendingHandle is one drain cycle's handle and the last LSN it covers.
+// pendingHandle is one drain cycle's handle, the last LSN it covers and
+// when the cycle ran.
 type pendingHandle struct {
 	lsn uint64
 	b   *memory.Batch
+	at  time.Time
 }
 
 // followerConn is one follower's stream on the primary.
@@ -131,8 +144,11 @@ type replicator struct {
 	broken    map[string]bool
 	expanding map[string]*expansion
 	shrinkTry map[string]time.Time
-	started   time.Time
-	stopped   bool
+	// slowWarn is when the primary last logged that it waits for a
+	// follower.
+	slowWarn map[string]time.Time
+	started  time.Time
+	stopped  bool
 
 	// drainBuf and scratch belong to the drain goroutine.  the records of a
 	// cycle are encoded at once and not kept, so both are used again.
@@ -163,6 +179,7 @@ func newReplicator(r *replica, mgr *memory.Manager, log *memory.Log, term, lastL
 		broken:    map[string]bool{},
 		expanding: map[string]*expansion{},
 		shrinkTry: map[string]time.Time{},
+		slowWarn:  map[string]time.Time{},
 		started:   time.Now(),
 		joins:     make(chan joinRequest, 16),
 		stopCh:    make(chan struct{}),
@@ -241,9 +258,9 @@ func (rp *replicator) encode(recs []memory.Record) []byte {
 // appendLocked gives the records their LSNs, keeps them encoded in the tail
 // and queues the handle.  it does not keep recs.
 func (rp *replicator) appendLocked(recs []memory.Record, h *memory.Batch) {
+	now := time.Now()
 	if len(recs) > 0 {
 		// a follower that had everything starts its silence now.
-		now := time.Now()
 		for node, acked := range rp.acks {
 			if acked == rp.lastLSN {
 				rp.progress[node] = now
@@ -263,6 +280,7 @@ func (rp *replicator) appendLocked(recs []memory.Record, h *memory.Batch) {
 	rp.pending = append(rp.pending, pendingHandle{
 		lsn: rp.lastLSN,
 		b:   h,
+		at:  now,
 	})
 	rp.resolveLocked()
 }
@@ -346,6 +364,12 @@ func (rp *replicator) maintainLocked(now time.Time) {
 	cfg := &rp.r.n.cfg
 	me := cfg.Name
 
+	if len(rp.pending) > 0 {
+		if waited := now.Sub(rp.pending[0].at); waited > cfg.slowCommit() {
+			rp.warnSlowLocked(now, waited)
+		}
+	}
+
 	for _, node := range rp.row.InSync {
 		if node == me {
 			continue
@@ -389,6 +413,34 @@ func (rp *replicator) maintainLocked(now time.Time) {
 			// it stopped while the primary waited on it.  stop waiting.
 			delete(rp.expanding, node)
 			rp.dropLocked(fc)
+		}
+	}
+}
+
+// warnSlowLocked logs every follower whose acknowledgement the oldest
+// records wait for.  waited is how long they have waited.  one follower gets
+// one line in slowWarnEvery at most.
+func (rp *replicator) warnSlowLocked(now time.Time, waited time.Duration) {
+	lsn := rp.pending[0].lsn
+	warn := func(node string) {
+		if node == rp.r.n.cfg.Name || rp.acks[node] >= lsn || now.Sub(rp.slowWarn[node]) < slowWarnEvery {
+			return
+		}
+		rp.slowWarn[node] = now
+		rp.r.n.log().Warn("records wait for the acknowledgement of a follower",
+			"shard", rp.r.shard,
+			"follower", node,
+			"waited", waited,
+			"acked", rp.acks[node],
+			"last", rp.lastLSN,
+		)
+	}
+	for _, node := range rp.row.InSync {
+		warn(node)
+	}
+	for node := range rp.expanding {
+		if !slices.Contains(rp.row.InSync, node) {
+			warn(node)
 		}
 	}
 }

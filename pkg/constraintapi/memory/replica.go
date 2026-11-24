@@ -218,28 +218,16 @@ func (m *Manager) addCell(p *atomic.Pointer[semaphoreCell], key cellKey, delta i
 	}
 }
 
-// FollowerHousekeepSteps is the number of FollowerHousekeepStep calls that
-// free everything a follower no longer needs.
-const FollowerHousekeepSteps = ttlStripes
-
-// FollowerHousekeepStep frees a part of what a follower no longer needs.
-// every call drops the expired acquire, extend and semaphore idempotency
-// records of one stripe.  one call in FollowerHousekeepSteps also drops slab
-// pages with no live lease, counters at zero and expired rate limit and
-// throttle cells.  it keeps every constraint set, because the primary logs a
-// definition once and may use it again.  call it from the goroutine that
-// calls Apply.  that goroutine acknowledges records, and a sweep of every
-// stripe in one call stops acknowledgements for as long as it takes.
-func (m *Manager) FollowerHousekeepStep() {
+// FollowerHousekeep frees what a follower no longer needs.  it frees expired
+// acquire, extend and semaphore idempotency records, slab pages with no live
+// lease, counters at zero and expired rate limit and throttle cells.  it
+// keeps every constraint set, because the primary logs a definition once and
+// may use it again.  call it from the goroutine that calls Apply.
+func (m *Manager) FollowerHousekeep() {
 	nowMS := m.nowMS()
-	i := m.followerStep
-	m.followerStep = (i + 1) % FollowerHousekeepSteps
-	m.acqIdem.sweepStripe(i, nowMS)
-	m.extIdem.sweepStripe(i, nowMS)
-	m.semIdem.sweepStripe(i, nowMS)
-	if i != 0 {
-		return
-	}
+	m.acqIdem.rotate(nowMS)
+	m.extIdem.rotate(nowMS)
+	m.semIdem.rotate(nowMS)
 	m.slab.freeIdlePages()
 	m.sems.Range(func(k, v any) bool {
 		if v.(*semaphoreCell).kill() {

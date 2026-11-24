@@ -27,6 +27,13 @@ const (
 	window = time.Minute
 	// requestsPerOp is the number of requests one Op sends.
 	requestsPerOp = 2
+	// watchSleep is how long the watch goroutine sleeps each time.
+	watchSleep = time.Millisecond
+	// slowAcquire is the latency from which an acquire is counted as slow
+	// and logged.
+	slowAcquire = 250 * time.Millisecond
+	// slowLogsPerSecond is the most slow acquires one second logs.
+	slowLogsPerSecond = 5
 )
 
 // Config is one run.
@@ -119,12 +126,67 @@ type part struct {
 	// behind its schedule because its last Op was slow, so it also counts
 	// the requests a stall delayed.
 	sched hist
+	// late is the longest time in nanoseconds the watch goroutine woke
+	// after its sleep was over.
+	late atomic.Int64
+	// slow counts the acquires that took slowAcquire or longer.
+	slow atomic.Int64
+}
+
+// watch sleeps watchSleep at a time until the measured time ends.  it
+// records in the part of each sleep how long after its end the goroutine
+// woke.  no request is in that time, so a late wake means the process or the
+// machine stopped the goroutine, and a slow acquire with no late wake near
+// it comes from the cluster.
+func watch(parts []part, from, until time.Time) {
+	for {
+		start := time.Now()
+		if !start.Before(until) {
+			return
+		}
+		time.Sleep(watchSleep)
+		if start.Before(from) {
+			continue
+		}
+		parts[start.Sub(from)/window].wokeLate(time.Since(start) - watchSleep)
+	}
+}
+
+// wokeLate keeps d when it is the longest so far.
+func (p *part) wokeLate(d time.Duration) {
+	for {
+		worst := p.late.Load()
+		if int64(d) <= worst || p.late.CompareAndSwap(worst, int64(d)) {
+			return
+		}
+	}
+}
+
+// logLimit allows slowLogsPerSecond log lines in one second.
+type logLimit struct {
+	mu     sync.Mutex
+	second int64
+	n      int
+}
+
+// allow reports whether a line for the time at may be logged.
+func (l *logLimit) allow(at time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if s := at.Unix(); s != l.second {
+		l.second = s
+		l.n = 0
+	}
+	l.n++
+	return l.n <= slowLogsPerSecond
 }
 
 // Run sends the load of cfg for the warm up and the measured time, and
-// reports req/s and the percentiles of the measured time.  the benchmark
-// must run with -benchtime=1x.  a run longer than one minute also logs one
-// line per minute.
+// reports req/s and the percentiles of the measured time.  it also reports
+// the latest wake of the watch goroutine as late-max-µs and the number of
+// acquires of slowAcquire or longer as slow-acquires, and it logs the time
+// of day of a slow acquire.  the benchmark must run with -benchtime=1x.  a
+// run longer than one minute also logs one line per minute.
 func Run(b *testing.B, cfg Config) {
 	b.Helper()
 	measure := defaultSeconds * time.Second
@@ -145,12 +207,18 @@ func Run(b *testing.B, cfg Config) {
 		k      atomic.Int64
 		failed atomic.Bool
 		wg     sync.WaitGroup
+		limit  logLimit
 	)
 	ctx := context.Background()
 	b.ResetTimer()
 	begin := time.Now()
 	from := begin.Add(warmFor)
 	until := from.Add(measure)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		watch(parts, from, until)
+	}()
 	for i := range cfg.Callers {
 		wg.Add(1)
 		go func() {
@@ -190,17 +258,25 @@ func Run(b *testing.B, cfg Config) {
 				p.ops.Add(1)
 				p.service.add(took)
 				p.sched.add(late + took)
+				if took >= slowAcquire {
+					p.slow.Add(1)
+					if limit.allow(now) {
+						b.Logf("slow acquire sent at %s took %s", now.Format("15:04:05.000"), took)
+					}
+				}
 			}
 		}()
 	}
 	wg.Wait()
 	b.StopTimer()
 
-	var ops int64
+	var ops, late, slow int64
 	var service, sched []*hist
 	for i := range parts {
 		p := &parts[i]
 		ops += p.ops.Load()
+		late = max(late, p.late.Load())
+		slow += p.slow.Load()
 		service = append(service, &p.service)
 		sched = append(sched, &p.sched)
 		if len(parts) == 1 {
@@ -208,8 +284,8 @@ func Run(b *testing.B, cfg Config) {
 		}
 		length := min(window, measure-time.Duration(i)*window)
 		sv, sc := summarize(&p.service), summarize(&p.sched)
-		b.Logf("minute %d: %.0f req/s, p50 %.0f µs, p99 %.0f µs, p99.9 %.0f µs, max %.0f µs, from the schedule p99 %.0f µs, p99.9 %.0f µs",
-			i+1, float64(requestsPerOp*p.ops.Load())/length.Seconds(), sv.at(0.5), sv.at(0.99), sv.at(0.999), sv.at(1), sc.at(0.99), sc.at(0.999))
+		b.Logf("minute %d: %.0f req/s, p50 %.0f µs, p99 %.0f µs, p99.9 %.0f µs, max %.0f µs, from the schedule p99 %.0f µs, p99.9 %.0f µs, latest wake %d µs, slow acquires %d",
+			i+1, float64(requestsPerOp*p.ops.Load())/length.Seconds(), sv.at(0.5), sv.at(0.99), sv.at(0.999), sv.at(1), sc.at(0.99), sc.at(0.999), p.late.Load()/1e3, p.slow.Load())
 	}
 	sv := summarize(service...)
 	b.ReportMetric(0, "ns/op")
@@ -218,6 +294,8 @@ func Run(b *testing.B, cfg Config) {
 	b.ReportMetric(sv.at(0.99), "p99-µs")
 	b.ReportMetric(sv.at(0.999), "p999-µs")
 	b.ReportMetric(sv.at(1), "max-µs")
+	b.ReportMetric(float64(late)/1e3, "late-max-µs")
+	b.ReportMetric(float64(slow), "slow-acquires")
 	if period > 0 {
 		sc := summarize(sched...)
 		b.ReportMetric(sc.at(0.99), "sched-p99-µs")

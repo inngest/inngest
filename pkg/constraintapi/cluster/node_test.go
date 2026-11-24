@@ -1,10 +1,12 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"sort"
@@ -15,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/constraintapi/memory"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -500,6 +503,104 @@ func TestPrimaryKillLosesNoAnsweredGrant(t *testing.T) {
 	require.NoError(t, l.checkErrors())
 	require.NoError(t, l.checkExtendable(check, rt))
 	require.Greater(t, len(l.events), 100)
+}
+
+// logLines collects what the nodes of a test log.
+type logLines struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (l *logLines) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+// with returns the JSON log lines whose message is msg.
+func (l *logLines) with(t testing.TB, msg string) []map[string]any {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []map[string]any
+	for _, line := range bytes.Split(l.buf.Bytes(), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var m map[string]any
+		require.NoError(t, json.Unmarshal(line, &m), "line %q", line)
+		if m["msg"] == msg {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// TestSlowFollowerIsLogged checks that the primary logs which follower a
+// request at level all waits for, well before the acknowledgement timeout,
+// and that the request is answered when the follower goes on.
+func TestSlowFollowerIsLogged(t *testing.T) {
+	const msg = "records wait for the acknowledgement of a follower"
+	lines := &logLines{}
+	logr := logger.From(context.Background(),
+		logger.WithLoggerWriter(lines),
+		logger.WithHandler(logger.JSONHandler),
+		logger.WithLoggerLevel(slog.LevelWarn),
+	)
+	c := newNodeClusterCfg(t, 3, 1, 3, func(cfg *Config) {
+		cfg.AckTimeout = 8 * slowCommitAfter
+		cfg.Logger = logr
+	})
+	rt := &testRouter{c: c}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	row := c.Table().Shards[0]
+	slow := followersOf(row)[1]
+	acct := newTestAccount(t, c, 0, 100)
+	_, err := acct.acquire(ctx, rt, constraintapi.CommitLevelAll)
+	require.NoError(t, err)
+	require.Empty(t, lines.with(t, msg))
+
+	c.net.Stall(row.Primary, slow)
+	start := time.Now()
+	req := acct.acquireReq(constraintapi.CommitLevelAll)
+	answered := make(chan error, 1)
+	go func() {
+		_, err := rt.Acquire(ctx, req)
+		if err != nil {
+			answered <- err
+			return
+		}
+		answered <- nil
+	}()
+	require.Eventually(t, func() bool {
+		return len(lines.with(t, msg)) > 0
+	}, 4*slowCommitAfter, 10*time.Millisecond)
+	require.GreaterOrEqual(t, time.Since(start), slowCommitAfter)
+	select {
+	case err := <-answered:
+		t.Fatalf("a grant at level all was answered with a follower stalled: %v", err)
+	default:
+	}
+
+	c.net.Unstall(row.Primary, slow)
+	select {
+	case err := <-answered:
+		require.NoError(t, err)
+	case <-time.After(4 * slowCommitAfter):
+		t.Fatal("the grant at level all was not answered after the follower went on")
+	}
+	require.Contains(t, c.Table().Shards[0].InSync, slow, "the follower stayed in the in-sync set")
+
+	// every line names the stalled follower, and it gets one line a second.
+	got := lines.with(t, msg)
+	require.LessOrEqual(t, len(got), 3)
+	for _, m := range got {
+		require.Equal(t, slow, m["follower"])
+		require.Equal(t, row.Primary, m["node"])
+		require.EqualValues(t, 0, m["shard"])
+		require.GreaterOrEqual(t, m["waited"], float64(slowCommitAfter))
+	}
 }
 
 func TestCommitLevelsWithStalledFollower(t *testing.T) {

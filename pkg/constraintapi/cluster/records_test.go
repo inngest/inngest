@@ -475,6 +475,29 @@ func BenchmarkDecodeRecords(b *testing.B) {
 	}
 }
 
+// TestDecodeRecordsAllocations checks that a decode into a buffer that is
+// used again allocates the lease list of each grant and nothing else.
+func TestDecodeRecordsAllocations(t *testing.T) {
+	batch := mixedBatch(rand.New(rand.NewSource(6)), benchBatch)
+	grants := 0
+	for _, r := range batch {
+		if r.Kind == memory.RecGrant {
+			grants++
+		}
+	}
+	require.NotZero(t, grants)
+	buf := AppendRecords(nil, batch)
+	recs, err := DecodeRecords(nil, buf)
+	require.NoError(t, err)
+
+	allocs := testing.AllocsPerRun(100, func() {
+		if recs, err = DecodeRecords(recs[:0], buf); err != nil {
+			t.Fatal(err)
+		}
+	})
+	require.Equal(t, float64(grants), allocs)
+}
+
 // TestIdempotencyFieldsOnTheWire checks what a grant and an extend pay for
 // their idempotency record, and that no other kind may claim one.
 func TestIdempotencyFieldsOnTheWire(t *testing.T) {

@@ -52,6 +52,10 @@ type Config struct {
 
 	// ManagerOptions are passed to every memory.Manager the node builds.
 	ManagerOptions []memory.Option
+
+	// Logger receives the log lines of the node.  nil means the standard
+	// logger.
+	Logger logger.Logger
 }
 
 func (c *Config) defaults() error {
@@ -88,6 +92,13 @@ func (c *Config) defaults() error {
 // proposeTimeout bounds one proposal to the coordinator.
 func (c *Config) proposeTimeout() time.Duration {
 	return 4 * c.AckTimeout
+}
+
+// slowCommit is how long records may wait for the acknowledgement of a
+// follower before the primary logs a warning.  it is below AckTimeout, so
+// the warning comes before the primary proposes to remove the follower.
+func (c *Config) slowCommit() time.Duration {
+	return min(slowCommitAfter, c.AckTimeout/2)
 }
 
 // retryInterval is how often a replica looks at its row again with no
@@ -151,10 +162,14 @@ func NewNode(cfg Config) (*Node, error) {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	logr := cfg.Logger
+	if logr == nil {
+		logr = logger.StdlibLogger(ctx)
+	}
 	n := &Node{
 		cfg:      cfg,
 		bootID:   uuid.NewString(),
-		logr:     logger.StdlibLogger(ctx).With("node", cfg.Name),
+		logr:     logr.With("node", cfg.Name),
 		ctx:      ctx,
 		cancel:   cancel,
 		replicas: map[int]*replica{},

@@ -112,6 +112,82 @@ func TestTailEvictsByAge(t *testing.T) {
 	require.True(t, tl.covers(100))
 }
 
+// TestTailOverManyBlocks runs a tail that is several blocks long through
+// more appends than it keeps, and checks at every step that it covers and
+// returns exactly the newest chunks.
+func TestTailOverManyBlocks(t *testing.T) {
+	now := time.Now()
+	// every LSN from base on has an encoding of the same length.
+	const base = 100_000
+	const live = 2*tailBlock + 500
+	per := len(lsnChunk(base, 1)) + chunkOverhead
+	tl := newTail(live*per, time.Hour)
+
+	total := 7*tailBlock + 13
+	for i := range total {
+		lsn := uint64(base + i)
+		tl.append(lsn, 1, lsnChunk(lsn, 1), now)
+
+		oldest := uint64(base + max(0, i-live+1))
+		require.True(t, tl.covers(oldest), "append %d", i)
+		require.False(t, tl.covers(oldest-1), "append %d", i)
+		if i%97 != 0 {
+			continue
+		}
+		bytes, records := tl.size()
+		require.Equal(t, int(lsn-oldest+1), records, "append %d", i)
+		require.Equal(t, records*per, bytes, "append %d", i)
+
+		// a read from the oldest record returns every chunk, in order.
+		first, count, data, ok := tl.read(oldest, 0)
+		require.True(t, ok)
+		require.Equal(t, oldest, first)
+		require.Equal(t, records, count)
+		requireRun(t, data, oldest, count)
+
+		// a read from the middle with a limit starts at the chunk asked for.
+		mid := oldest + uint64(records/2)
+		first, count, data, ok = tl.read(mid, 3*len(lsnChunk(mid, 1)))
+		require.True(t, ok)
+		require.Equal(t, mid, first)
+		require.Equal(t, min(3, records-records/2), count)
+		requireRun(t, data, mid, count)
+	}
+
+	// records that do not follow the last one replace the tail, and it goes
+	// on from there.
+	tl.append(1_000_000, 1, lsnChunk(1_000_000, 1), now)
+	require.False(t, tl.covers(uint64(base+total)))
+	_, records := tl.size()
+	require.Equal(t, 1, records)
+	for i := 1; i < 2*tailBlock; i++ {
+		lsn := uint64(1_000_000 + i)
+		tl.append(lsn, 1, lsnChunk(lsn, 1), now)
+	}
+	first, count, data, ok := tl.read(1_000_000, 0)
+	require.True(t, ok)
+	require.Equal(t, uint64(1_000_000), first)
+	require.Equal(t, 2*tailBlock, count)
+	requireRun(t, data, 1_000_000, count)
+}
+
+// TestTailAppendDoesNotAllocate checks that a full tail takes an append
+// with no allocation, because it uses the block it emptied again.
+func TestTailAppendDoesNotAllocate(t *testing.T) {
+	now := time.Now()
+	data := lsnChunk(1, 1)
+	tl := newTail(3*tailBlock*(len(data)+chunkOverhead), time.Hour)
+	lsn := uint64(0)
+	add := func() {
+		lsn++
+		tl.append(lsn, 1, data, now)
+	}
+	for range 10 * tailBlock {
+		add()
+	}
+	require.Zero(t, testing.AllocsPerRun(20*tailBlock, add))
+}
+
 func TestTailReadReturnsWholeChunks(t *testing.T) {
 	now := time.Now()
 	tl := newTail(1<<20, time.Hour)
