@@ -103,6 +103,18 @@ func withSizeLimit(next functionTypeResolver) functionTypeResolver {
 	}
 }
 
+// isNonGrowingReplace reports whether a replace(str, from, to) call has string
+// literal from/to arguments with len(to) <= len(from), so it can never grow
+// the string.
+func isNonGrowingReplace(name string, args []parser.Expr) bool {
+	if name != "replace" || len(args) < 3 {
+		return false
+	}
+	search, ok1 := stringLiteral(args[1])
+	repl, ok2 := stringLiteral(args[2])
+	return ok1 && ok2 && len(repl) <= len(search)
+}
+
 // replaceExpansionFactor checks a replace/regexp_replace call's replacement
 // argument (args[2]) and returns its worst-case per-character expansion factor.
 // Requiring a short string literal prevents both self-referential expansion
@@ -118,10 +130,8 @@ func replaceExpansionFactor(name string, args []parser.Expr) (int, string) {
 	if len(repl) > maxReplaceLiteralLen {
 		return 0, fmt.Sprintf("replacement string is limited to %d characters", maxReplaceLiteralLen)
 	}
-	if name == "replace" {
-		if search, ok := stringLiteral(args[1]); ok && len(search) > 0 && len(repl) <= len(search) {
-			return 1, ""
-		}
+	if isNonGrowingReplace(name, args) {
+		return 1, ""
 	}
 	return max(1, len(repl)), ""
 }
@@ -428,67 +438,101 @@ func checkSizeComposition(stmt *parser.SelectStatement) error {
 }
 
 // checkCTELimit rejects queries whose WITH clause defines more than maxCTEs
-// CTEs or whose CTE reference chain exceeds maxCTEs, bounding non-recursive
-// CTE doubling chains (WITH c1 AS (...), c2 AS (SELECT s||s||s||s FROM c1), ...).
+// CTEs or whose CTE / derived-table / subquery nesting chain exceeds maxCTEs,
+// bounding non-recursive doubling chains via CTEs (WITH c1 AS (...), c2 AS
+// (SELECT s||s||s||s FROM c1), ...) or nested FROM subqueries (SELECT s||s
+// FROM (SELECT s||s FROM ...)).
 func checkCTELimit(stmt *parser.SelectStatement) error {
-	var walk func(n parser.Node, depths map[string]int) error
-	walk = func(n parser.Node, depths map[string]int) error {
+	var walk func(n parser.Node, depths map[string]int) (int, error)
+	walk = func(n parser.Node, depths map[string]int) (int, error) {
 		if n == nil {
-			return nil
+			return 0, nil
 		}
-		if sel, ok := n.(*parser.SelectStatement); ok && sel.With != nil {
-			if len(sel.With.CTEs) > maxCTEs {
-				c := sel.With.CTEs[maxCTEs]
-				return sizeCompositionError(c, fmt.Sprintf("queries may define at most %d CTEs", maxCTEs))
+		switch x := n.(type) {
+		case *parser.BaseTableRef:
+			if len(x.Name) == 1 {
+				return depths[strings.ToLower(x.Name[0])], nil
 			}
-			nextDepths := make(map[string]int, len(depths)+len(sel.With.CTEs))
-			for k, v := range depths {
-				nextDepths[k] = v
+			return 0, nil
+		case *parser.TableSubqueryRef:
+			subDepth, err := walk(x.Select, depths)
+			if err != nil {
+				return 0, err
 			}
-			for _, cte := range sel.With.CTEs {
-				if err := walk(cte.Select, nextDepths); err != nil {
-					return err
+			d := subDepth + 1
+			if d > maxCTEs {
+				return 0, sizeCompositionError(x, fmt.Sprintf("CTE and subquery nesting depth is limited to %d", maxCTEs))
+			}
+			return d, nil
+		case *parser.SubqueryExpr:
+			subDepth, err := walk(x.Select, depths)
+			if err != nil {
+				return 0, err
+			}
+			d := subDepth + 1
+			if d > maxCTEs {
+				return 0, sizeCompositionError(x, fmt.Sprintf("CTE and subquery nesting depth is limited to %d", maxCTEs))
+			}
+			return d, nil
+		case *parser.SelectStatement:
+			if x.With != nil {
+				if len(x.With.CTEs) > maxCTEs {
+					c := x.With.CTEs[maxCTEs]
+					return 0, sizeCompositionError(c, fmt.Sprintf("queries may define at most %d CTEs", maxCTEs))
 				}
-				// Depth is 1 + max depth of any visible CTE this CTE references.
-				maxRef := 0
-				parser.Walk(visitFunc(func(sub parser.Node) bool {
-					if ref, ok := sub.(*parser.BaseTableRef); ok && len(ref.Name) == 1 {
-						if d := nextDepths[strings.ToLower(ref.Name[0])]; d > maxRef {
-							maxRef = d
-						}
+				nextDepths := make(map[string]int, len(depths)+len(x.With.CTEs))
+				for k, v := range depths {
+					nextDepths[k] = v
+				}
+				for _, cte := range x.With.CTEs {
+					subDepth, err := walk(cte.Select, nextDepths)
+					if err != nil {
+						return 0, err
 					}
-					return true
-				}), cte.Select)
-				d := maxRef + 1
-				if d > maxCTEs {
-					return sizeCompositionError(cte, fmt.Sprintf("CTE chain depth is limited to %d", maxCTEs))
+					d := subDepth + 1
+					if d > maxCTEs {
+						return 0, sizeCompositionError(cte, fmt.Sprintf("CTE and subquery nesting depth is limited to %d", maxCTEs))
+					}
+					nextDepths[strings.ToLower(cte.Name)] = d
 				}
-				nextDepths[strings.ToLower(cte.Name)] = d
+				maxDepth := 0
+				for _, c := range x.Children() {
+					if c == parser.Node(x.With) {
+						continue
+					}
+					d, err := walk(c, nextDepths)
+					if err != nil {
+						return 0, err
+					}
+					if d > maxDepth {
+						maxDepth = d
+					}
+				}
+				return maxDepth, nil
 			}
-			for _, c := range sel.Children() {
-				if c == parser.Node(sel.With) {
-					continue
-				}
-				if err := walk(c, nextDepths); err != nil {
-					return err
-				}
-			}
-			return nil
 		}
+		maxDepth := 0
 		for _, c := range n.Children() {
-			if err := walk(c, depths); err != nil {
-				return err
+			d, err := walk(c, depths)
+			if err != nil {
+				return 0, err
+			}
+			if d > maxDepth {
+				maxDepth = d
 			}
 		}
-		return nil
+		return maxDepth, nil
 	}
-	return walk(stmt, nil)
+	_, err := walk(stmt, nil)
+	return err
 }
 
-// checkReplaceNesting caps both the AST nesting depth of replace/regexp_replace
-// calls (maxReplaceDepth) and the cumulative count and expansion product of
-// expanding replace/regexp_replace calls across the entire query (including
-// across CTEs and subqueries), preventing exponential string expansion.
+// checkReplaceNesting caps both the AST nesting depth of amplifying
+// replace/regexp_replace calls (maxReplaceDepth) and the cumulative count and
+// expansion product of expanding replace/regexp_replace calls across the
+// entire query (including across CTEs and subqueries), preventing exponential
+// string expansion. Non-growing literal replace calls (len(to) <= len(from))
+// do not count toward the depth cap.
 func checkReplaceNesting(stmt *parser.SelectStatement) error {
 	expandingCount := 0
 	cumulativeFactor := 1
@@ -501,13 +545,16 @@ func checkReplaceNesting(stmt *parser.SelectStatement) error {
 		if f, ok := n.(*parser.FunctionExpr); ok {
 			name := strings.ToLower(strings.Join(f.Name, "."))
 			if replaceFunctions[name] {
-				nextDepth := depth + 1
-				if nextDepth > maxReplaceDepth {
-					return sizeCompositionError(f, fmt.Sprintf("%s nesting depth is limited to %d", strings.ToUpper(name), maxReplaceDepth))
-				}
 				fFactor, problem := replaceExpansionFactor(name, f.Args)
 				if problem != "" {
 					return nil // validate already rejected it
+				}
+				nextDepth := depth
+				if !isNonGrowingReplace(name, f.Args) {
+					nextDepth = depth + 1
+					if nextDepth > maxReplaceDepth {
+						return sizeCompositionError(f, fmt.Sprintf("%s nesting depth is limited to %d", strings.ToUpper(name), maxReplaceDepth))
+					}
 				}
 				nextFactor := factor * fFactor
 				if nextFactor > maxSizeArgument {
