@@ -7,7 +7,8 @@ before:
     - make build-ui
 
 builds:
-  - env:
+  - id: inngest
+    env:
       - CGO_ENABLED=0
     main: ./cmd/
     binary: inngest
@@ -22,9 +23,28 @@ builds:
     goarch:
       - amd64
       - arm64
+  - id: inngest-duckdb-worker
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/inngest-duckdb-worker
+    binary: inngest-duckdb-worker
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
 
 dockers:
   - id: inngest-amd64
+    ids:
+      - inngest
     goos: linux
     goarch: amd64
     skip_push: false
@@ -41,6 +61,8 @@ dockers:
     - "--label=org.opencontainers.image.version={{.Version}}"
     - "--platform=linux/amd64"
   - id: inngest-arm64
+    ids:
+      - inngest
     goos: linux
     goarch: arm64
     skip_push: false
@@ -67,7 +89,20 @@ docker_manifests:
       - inngest/inngest:{{ .Tag }}-arm64v8
 
 archives:
-  - format_overrides:
+  - id: inngest
+    ids:
+      - inngest
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE.md
+  - id: inngest-duckdb-worker
+    ids:
+      - inngest-duckdb-worker
+    name_template: "inngest-duckdb-worker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
       - goos: windows
         formats:
           - zip
@@ -101,6 +136,8 @@ changelog:
 
 homebrew_casks:
   - name: inngest
+    ids:
+      - inngest
 
     # https://github.com/inngest/homebrew-tap
     repository:
