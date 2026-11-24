@@ -221,7 +221,7 @@ export function useComputeVerification(targetAccountID: string) {
     const checks = latest?.computeVerification?.checks ?? [];
     if (
       latest?.computeVerification?.status === 'REQUIRED' &&
-      (checks.every((check) => check.passed) ||
+      ((checks.length >= 3 && checks.every((check) => check.passed)) ||
         !checks.some((check) => check.kind === 'EMAIL' && check.passed))
     )
       await run({ kind: 'email' });

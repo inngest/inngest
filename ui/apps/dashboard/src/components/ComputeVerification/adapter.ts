@@ -130,12 +130,12 @@ export function adaptVerification(
       break;
   }
   // The email check runs on its own when the page opens. Show the email screen
-  // only once a check came back, not while the first one is in flight.
+  // only once a step came back, not while the first check is in flight.
   if (
     state.status === 'verification' &&
     state.email === 'needs-attention' &&
     !state.originatingAccount &&
-    transient.action !== 'email'
+    transient.action === undefined
   )
     state.status = 'loading';
   return state;

@@ -99,10 +99,17 @@ function StripeFields({
         });
         if (!mounted.current) return;
         if (result.error) {
-          // The bank refused 3D Secure, so this SetupIntent can't succeed.
-          // The next submit starts over with a new card.
+          if (result.error.type === 'api_connection_error') {
+            // The SetupIntent is still waiting for 3D Secure; retry it.
+            setError(cardErrors.temporary);
+            return;
+          }
+          // The user closed the popup or the bank refused 3D Secure, so this
+          // SetupIntent can't succeed. The next submit starts over with the card.
           secret.current = undefined;
-          setError(cardErrors.bank);
+          setError(
+            'Card authentication didn’t complete. Try again or use a different card.',
+          );
           return;
         }
         if (!result.setupIntent) {

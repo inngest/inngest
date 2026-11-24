@@ -147,13 +147,31 @@ describe('Stripe verification orchestration', () => {
     });
     setup();
     fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
-    await screen.findByText(/Your bank couldn’t verify this card/);
+    await screen.findByText(/Card authentication didn’t complete/);
     expect(mocks.run).toHaveBeenCalledTimes(1);
     // The failed SetupIntent is dropped, so the next submit starts with a new card.
     fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
     await waitFor(() =>
       expect(mocks.createPaymentMethod).toHaveBeenCalledTimes(2),
     );
+  });
+  it('retries the same authentication after a Stripe connection error', async () => {
+    mocks.run.mockResolvedValue({
+      error: null,
+      cardClientSecret: 'seti_secret',
+    });
+    mocks.handleNextAction.mockResolvedValue({
+      error: { type: 'api_connection_error', message: 'Network error' },
+    });
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
+    await screen.findByText('We couldn’t verify this card. Try again.');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit card' }));
+    await waitFor(() =>
+      expect(mocks.handleNextAction).toHaveBeenCalledTimes(2),
+    );
+    expect(mocks.createPaymentMethod).toHaveBeenCalledTimes(1);
+    expect(mocks.run).toHaveBeenCalledTimes(1);
   });
   it('never submits a payment method after Stripe validation fails', async () => {
     mocks.createPaymentMethod.mockResolvedValue({
