@@ -25,16 +25,24 @@ func Lease(
 		}
 
 		cancelCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
+		renewDone := make(chan struct{})
 
 		go func() {
+			defer close(renewDone)
 			for {
 				select {
 				case <-cancelCtx.Done():
 					// Stop renewing the lease.
 					return
 				case <-time.After(interval):
-					if leaseID, err = renew(ctx, leaseID); err != nil {
+					if cancelCtx.Err() != nil {
+						return
+					}
+					nextLeaseID, err := renew(cancelCtx, leaseID)
+					if err != nil {
+						if cancelCtx.Err() != nil {
+							return
+						}
 						// cancel the ctx, as the lease failed.
 						cancel()
 						logger.StdlibLogger(ctx).Error(
@@ -42,12 +50,17 @@ func Lease(
 							"error", err,
 							"lease_operation", name,
 						)
+						return
 					}
+					leaseID = nextLeaseID
 				}
 			}
 		}()
 
 		defer func() {
+			// Join any in-flight renewal before reading the final ID and revoking.
+			cancel()
+			<-renewDone
 			if err := revoke(ctx, leaseID); err != nil {
 				logger.StdlibLogger(ctx).Warn(
 					"failed to revoke lease",
