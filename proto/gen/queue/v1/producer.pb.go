@@ -145,13 +145,14 @@ func (x *EnqueueResponse) GetShardName() string {
 }
 
 type RequeueRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
-	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	At             *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
-	CapacityLeased bool                   `protobuf:"varint,4,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ShardName       string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
+	Item            *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	At              *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	CapacityLeased  bool                   `protobuf:"varint,4,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	ExpectedLeaseId *string                `protobuf:"bytes,5,opt,name=expected_lease_id,json=expectedLeaseId,proto3,oneof" json:"expected_lease_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RequeueRequest) Reset() {
@@ -212,6 +213,13 @@ func (x *RequeueRequest) GetCapacityLeased() bool {
 	return false
 }
 
+func (x *RequeueRequest) GetExpectedLeaseId() string {
+	if x != nil && x.ExpectedLeaseId != nil {
+		return *x.ExpectedLeaseId
+	}
+	return ""
+}
+
 type RequeueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -248,6 +256,87 @@ func (*RequeueResponse) Descriptor() ([]byte, []int) {
 	return file_queue_v1_producer_proto_rawDescGZIP(), []int{3}
 }
 
+type RequeueWithLeaseRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// expected_lease_id must be present, including the zero ULID for no lease.
+	Request       *RequeueRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequeueWithLeaseRequest) Reset() {
+	*x = RequeueWithLeaseRequest{}
+	mi := &file_queue_v1_producer_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequeueWithLeaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequeueWithLeaseRequest) ProtoMessage() {}
+
+func (x *RequeueWithLeaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_producer_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequeueWithLeaseRequest.ProtoReflect.Descriptor instead.
+func (*RequeueWithLeaseRequest) Descriptor() ([]byte, []int) {
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RequeueWithLeaseRequest) GetRequest() *RequeueRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+type RequeueWithLeaseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequeueWithLeaseResponse) Reset() {
+	*x = RequeueWithLeaseResponse{}
+	mi := &file_queue_v1_producer_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequeueWithLeaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequeueWithLeaseResponse) ProtoMessage() {}
+
+func (x *RequeueWithLeaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_producer_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequeueWithLeaseResponse.ProtoReflect.Descriptor instead.
+func (*RequeueWithLeaseResponse) Descriptor() ([]byte, []int) {
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{5}
+}
+
 type RequeueByJobIDRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ShardName     string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
@@ -260,7 +349,7 @@ type RequeueByJobIDRequest struct {
 
 func (x *RequeueByJobIDRequest) Reset() {
 	*x = RequeueByJobIDRequest{}
-	mi := &file_queue_v1_producer_proto_msgTypes[4]
+	mi := &file_queue_v1_producer_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -272,7 +361,7 @@ func (x *RequeueByJobIDRequest) String() string {
 func (*RequeueByJobIDRequest) ProtoMessage() {}
 
 func (x *RequeueByJobIDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_producer_proto_msgTypes[4]
+	mi := &file_queue_v1_producer_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -285,7 +374,7 @@ func (x *RequeueByJobIDRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequeueByJobIDRequest.ProtoReflect.Descriptor instead.
 func (*RequeueByJobIDRequest) Descriptor() ([]byte, []int) {
-	return file_queue_v1_producer_proto_rawDescGZIP(), []int{4}
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RequeueByJobIDRequest) GetShardName() string {
@@ -324,7 +413,7 @@ type RequeueByJobIDResponse struct {
 
 func (x *RequeueByJobIDResponse) Reset() {
 	*x = RequeueByJobIDResponse{}
-	mi := &file_queue_v1_producer_proto_msgTypes[5]
+	mi := &file_queue_v1_producer_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -336,7 +425,7 @@ func (x *RequeueByJobIDResponse) String() string {
 func (*RequeueByJobIDResponse) ProtoMessage() {}
 
 func (x *RequeueByJobIDResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_producer_proto_msgTypes[5]
+	mi := &file_queue_v1_producer_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -349,7 +438,7 @@ func (x *RequeueByJobIDResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequeueByJobIDResponse.ProtoReflect.Descriptor instead.
 func (*RequeueByJobIDResponse) Descriptor() ([]byte, []int) {
-	return file_queue_v1_producer_proto_rawDescGZIP(), []int{5}
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{7}
 }
 
 type EnqueueOptions struct {
@@ -368,7 +457,7 @@ type EnqueueOptions struct {
 
 func (x *EnqueueOptions) Reset() {
 	*x = EnqueueOptions{}
-	mi := &file_queue_v1_producer_proto_msgTypes[6]
+	mi := &file_queue_v1_producer_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -380,7 +469,7 @@ func (x *EnqueueOptions) String() string {
 func (*EnqueueOptions) ProtoMessage() {}
 
 func (x *EnqueueOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_producer_proto_msgTypes[6]
+	mi := &file_queue_v1_producer_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -393,7 +482,7 @@ func (x *EnqueueOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnqueueOptions.ProtoReflect.Descriptor instead.
 func (*EnqueueOptions) Descriptor() ([]byte, []int) {
-	return file_queue_v1_producer_proto_rawDescGZIP(), []int{6}
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *EnqueueOptions) GetPassthroughJobId() bool {
@@ -457,7 +546,7 @@ type CallerLease struct {
 
 func (x *CallerLease) Reset() {
 	*x = CallerLease{}
-	mi := &file_queue_v1_producer_proto_msgTypes[7]
+	mi := &file_queue_v1_producer_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -469,7 +558,7 @@ func (x *CallerLease) String() string {
 func (*CallerLease) ProtoMessage() {}
 
 func (x *CallerLease) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_producer_proto_msgTypes[7]
+	mi := &file_queue_v1_producer_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -482,7 +571,7 @@ func (x *CallerLease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CallerLease.ProtoReflect.Descriptor instead.
 func (*CallerLease) Descriptor() ([]byte, []int) {
-	return file_queue_v1_producer_proto_rawDescGZIP(), []int{7}
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CallerLease) GetShards() []string {
@@ -520,14 +609,19 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x0fEnqueueResponse\x12'\n" +
 	"\x04item\x18\x01 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12\x1d\n" +
 	"\n" +
-	"shard_name\x18\x02 \x01(\tR\tshardName\"\xad\x01\n" +
+	"shard_name\x18\x02 \x01(\tR\tshardName\"\xf4\x01\n" +
 	"\x0eRequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12'\n" +
-	"\x0fcapacity_leased\x18\x04 \x01(\bR\x0ecapacityLeased\"\x11\n" +
-	"\x0fRequeueResponse\"\xa0\x01\n" +
+	"\x0fcapacity_leased\x18\x04 \x01(\bR\x0ecapacityLeased\x12/\n" +
+	"\x11expected_lease_id\x18\x05 \x01(\tH\x00R\x0fexpectedLeaseId\x88\x01\x01B\x14\n" +
+	"\x12_expected_lease_id\"\x11\n" +
+	"\x0fRequeueResponse\"M\n" +
+	"\x17RequeueWithLeaseRequest\x122\n" +
+	"\arequest\x18\x01 \x01(\v2\x18.queue.v1.RequeueRequestR\arequest\"\x1a\n" +
+	"\x18RequeueWithLeaseResponse\"\xa0\x01\n" +
 	"\x15RequeueByJobIDRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12\x15\n" +
@@ -546,10 +640,11 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\vCallerLease\x12\x16\n" +
 	"\x06shards\x18\x01 \x03(\tR\x06shards\x12\x19\n" +
 	"\blease_id\x18\x02 \x01(\tR\aleaseId\x12\x19\n" +
-	"\bat_limit\x18\x03 \x01(\bR\aatLimit2\xec\x01\n" +
+	"\bat_limit\x18\x03 \x01(\bR\aatLimit2\xc9\x02\n" +
 	"\x0fProducerService\x12@\n" +
 	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +
-	"\aRequeue\x12\x18.queue.v1.RequeueRequest\x1a\x19.queue.v1.RequeueResponse\"\x00\x12U\n" +
+	"\aRequeue\x12\x18.queue.v1.RequeueRequest\x1a\x19.queue.v1.RequeueResponse\"\x00\x12[\n" +
+	"\x10RequeueWithLease\x12!.queue.v1.RequeueWithLeaseRequest\x1a\".queue.v1.RequeueWithLeaseResponse\"\x00\x12U\n" +
 	"\x0eRequeueByJobID\x12\x1f.queue.v1.RequeueByJobIDRequest\x1a .queue.v1.RequeueByJobIDResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
 
 var (
@@ -564,44 +659,49 @@ func file_queue_v1_producer_proto_rawDescGZIP() []byte {
 	return file_queue_v1_producer_proto_rawDescData
 }
 
-var file_queue_v1_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_queue_v1_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_queue_v1_producer_proto_goTypes = []any{
-	(*EnqueueRequest)(nil),         // 0: queue.v1.EnqueueRequest
-	(*EnqueueResponse)(nil),        // 1: queue.v1.EnqueueResponse
-	(*RequeueRequest)(nil),         // 2: queue.v1.RequeueRequest
-	(*RequeueResponse)(nil),        // 3: queue.v1.RequeueResponse
-	(*RequeueByJobIDRequest)(nil),  // 4: queue.v1.RequeueByJobIDRequest
-	(*RequeueByJobIDResponse)(nil), // 5: queue.v1.RequeueByJobIDResponse
-	(*EnqueueOptions)(nil),         // 6: queue.v1.EnqueueOptions
-	(*CallerLease)(nil),            // 7: queue.v1.CallerLease
-	(*Item)(nil),                   // 8: queue.v1.Item
-	(*timestamppb.Timestamp)(nil),  // 9: google.protobuf.Timestamp
-	(*QueueItem)(nil),              // 10: queue.v1.QueueItem
-	(*Scope)(nil),                  // 11: queue.v1.Scope
-	(*durationpb.Duration)(nil),    // 12: google.protobuf.Duration
+	(*EnqueueRequest)(nil),           // 0: queue.v1.EnqueueRequest
+	(*EnqueueResponse)(nil),          // 1: queue.v1.EnqueueResponse
+	(*RequeueRequest)(nil),           // 2: queue.v1.RequeueRequest
+	(*RequeueResponse)(nil),          // 3: queue.v1.RequeueResponse
+	(*RequeueWithLeaseRequest)(nil),  // 4: queue.v1.RequeueWithLeaseRequest
+	(*RequeueWithLeaseResponse)(nil), // 5: queue.v1.RequeueWithLeaseResponse
+	(*RequeueByJobIDRequest)(nil),    // 6: queue.v1.RequeueByJobIDRequest
+	(*RequeueByJobIDResponse)(nil),   // 7: queue.v1.RequeueByJobIDResponse
+	(*EnqueueOptions)(nil),           // 8: queue.v1.EnqueueOptions
+	(*CallerLease)(nil),              // 9: queue.v1.CallerLease
+	(*Item)(nil),                     // 10: queue.v1.Item
+	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
+	(*QueueItem)(nil),                // 12: queue.v1.QueueItem
+	(*Scope)(nil),                    // 13: queue.v1.Scope
+	(*durationpb.Duration)(nil),      // 14: google.protobuf.Duration
 }
 var file_queue_v1_producer_proto_depIdxs = []int32{
-	8,  // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
-	9,  // 1: queue.v1.EnqueueRequest.at:type_name -> google.protobuf.Timestamp
-	6,  // 2: queue.v1.EnqueueRequest.opts:type_name -> queue.v1.EnqueueOptions
-	10, // 3: queue.v1.EnqueueResponse.item:type_name -> queue.v1.QueueItem
-	10, // 4: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
-	9,  // 5: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
-	9,  // 6: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
-	11, // 7: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
-	12, // 8: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
-	7,  // 9: queue.v1.EnqueueOptions.caller_lease:type_name -> queue.v1.CallerLease
-	0,  // 10: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
-	2,  // 11: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
-	4,  // 12: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
-	1,  // 13: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
-	3,  // 14: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
-	5,  // 15: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
-	13, // [13:16] is the sub-list for method output_type
-	10, // [10:13] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	10, // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
+	11, // 1: queue.v1.EnqueueRequest.at:type_name -> google.protobuf.Timestamp
+	8,  // 2: queue.v1.EnqueueRequest.opts:type_name -> queue.v1.EnqueueOptions
+	12, // 3: queue.v1.EnqueueResponse.item:type_name -> queue.v1.QueueItem
+	12, // 4: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
+	11, // 5: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
+	2,  // 6: queue.v1.RequeueWithLeaseRequest.request:type_name -> queue.v1.RequeueRequest
+	11, // 7: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
+	13, // 8: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
+	14, // 9: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
+	9,  // 10: queue.v1.EnqueueOptions.caller_lease:type_name -> queue.v1.CallerLease
+	0,  // 11: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
+	2,  // 12: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
+	4,  // 13: queue.v1.ProducerService.RequeueWithLease:input_type -> queue.v1.RequeueWithLeaseRequest
+	6,  // 14: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
+	1,  // 15: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
+	3,  // 16: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
+	5,  // 17: queue.v1.ProducerService.RequeueWithLease:output_type -> queue.v1.RequeueWithLeaseResponse
+	7,  // 18: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
+	15, // [15:19] is the sub-list for method output_type
+	11, // [11:15] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_producer_proto_init() }
@@ -610,14 +710,15 @@ func file_queue_v1_producer_proto_init() {
 		return
 	}
 	file_queue_v1_types_proto_init()
-	file_queue_v1_producer_proto_msgTypes[6].OneofWrappers = []any{}
+	file_queue_v1_producer_proto_msgTypes[2].OneofWrappers = []any{}
+	file_queue_v1_producer_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queue_v1_producer_proto_rawDesc), len(file_queue_v1_producer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -10,6 +10,8 @@ option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
 service ProducerService {
   rpc Enqueue(EnqueueRequest) returns (EnqueueResponse) {}
   rpc Requeue(RequeueRequest) returns (RequeueResponse) {}
+  // A distinct RPC makes older proxies reject rather than ignore the condition.
+  rpc RequeueWithLease(RequeueWithLeaseRequest) returns (RequeueWithLeaseResponse) {}
   rpc RequeueByJobID(RequeueByJobIDRequest) returns (RequeueByJobIDResponse) {}
 }
 
@@ -31,9 +33,17 @@ message RequeueRequest {
   QueueItem item = 2;
   google.protobuf.Timestamp at = 3;
   bool capacity_leased = 4;
+  optional string expected_lease_id = 5;
 }
 
 message RequeueResponse {}
+
+message RequeueWithLeaseRequest {
+  // expected_lease_id must be present, including the zero ULID for no lease.
+  RequeueRequest request = 1;
+}
+
+message RequeueWithLeaseResponse {}
 
 message RequeueByJobIDRequest {
   string shard_name = 1;
