@@ -439,7 +439,17 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 	if p.iceberg == nil {
 		return nil
 	}
-	stmts, err := icebergBootstrapStmtsForWorker(*p.iceberg, p.localExtensionPaths, p.workerSocket != "")
+	alreadyAttached := false
+	if p.workerSocket != "" {
+		// On a shared external worker, check whether LakeAlias is already
+		// attached so subsequent clients never DETACH it out from under
+		// active readers, while a fresh worker still creates LakeNamespace
+		// before attaching with DEFAULT_SCHEMA.
+		if _, rows, err := p.sess.Exec(ctx, fmt.Sprintf("SELECT 1 FROM duckdb_databases() WHERE database_name = '%s';", LakeAlias)); err == nil && len(rows) > 0 {
+			alreadyAttached = true
+		}
+	}
+	stmts, err := icebergBootstrapStmtsForWorker(*p.iceberg, p.localExtensionPaths, alreadyAttached)
 	if err != nil {
 		return err
 	}
