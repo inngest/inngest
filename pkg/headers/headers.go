@@ -145,8 +145,8 @@ func parseRetryTime(retry string) *time.Time {
 	}
 	if len(retry) <= 7 {
 		// Assume this is an int;  no dates can be <= 7 characters.
-		secs, _ := strconv.Atoi(retry)
-		if secs > 0 {
+		secs, err := strconv.Atoi(retry)
+		if err == nil && (secs > 0 || retry == "0") {
 			parsed := time.Now().UTC().Truncate(time.Second).Add(time.Second * time.Duration(secs))
 			return &parsed
 		}
