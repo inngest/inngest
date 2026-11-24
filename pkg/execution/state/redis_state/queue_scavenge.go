@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
@@ -112,8 +114,18 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 					continue
 				}
+				if qi.IsLeased(q.Clock.Now()) {
+					continue // A stale index entry must not scavenge a fresh lease.
+				}
+				expectedLeaseID := ulid.ULID{}
+				if qi.LeaseID != nil {
+					expectedLeaseID = *qi.LeaseID
+				}
 				qi.ScavengeCount++
-				if err := q.Requeue(ctx, qi, q.Clock.Now()); err != nil {
+				if err := q.Requeue(ctx, qi, q.Clock.Now(), osqueue.RequeueWithLease(expectedLeaseID)); err != nil {
+					if errors.Is(err, osqueue.ErrQueueItemLeaseMismatch) {
+						continue // A worker or migration owns a newer lease.
+					}
 					resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
 					continue
 				}
