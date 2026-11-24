@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"sync"
 	"time"
@@ -20,7 +21,8 @@ type Coordinator interface {
 	// Propose applies one command.  an error that wraps ErrRejected means
 	// the command did not fit the table.
 	Propose(ctx context.Context, cmd Command) error
-	// Report says this node is alive and how far each replica has got.
+	// Report says this node is alive and how far each replica has got.  an
+	// error that wraps ErrRemoved means the table replaced the node.
 	Report(ctx context.Context, r Report) error
 }
 
@@ -249,6 +251,9 @@ func (h *memHandle) Report(ctx context.Context, r Report) error {
 	defer c.mu.Unlock()
 	if _, cut := c.cut[h.id]; cut {
 		return ErrUnavailable
+	}
+	if by, ok := c.table.Removed[r.Node]; ok {
+		return fmt.Errorf("%w by node %q", ErrRemoved, by)
 	}
 	// a report from a boot ID the table does not have comes from a process
 	// that has not registered or that was replaced.  it must not keep the

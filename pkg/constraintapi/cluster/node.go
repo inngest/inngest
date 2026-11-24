@@ -117,6 +117,8 @@ type Node struct {
 	listener io.Closer
 	table    atomic.Pointer[Table]
 	draining atomic.Bool
+	// removed is true after the table replaced this node.
+	removed atomic.Bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -216,6 +218,10 @@ func (n *Node) run() {
 		if err == nil {
 			break
 		}
+		if errors.Is(err, ErrRemoved) {
+			n.retire()
+			return
+		}
 		select {
 		case <-time.After(n.cfg.DialBackoff):
 		case <-n.ctx.Done():
@@ -224,6 +230,10 @@ func (n *Node) run() {
 	}
 	for {
 		tbl, ch := n.cfg.Coordinator.Table()
+		if _, ok := tbl.Removed[n.cfg.Name]; ok {
+			n.retire()
+			return
+		}
 		n.observe(tbl)
 		select {
 		case <-ch:
@@ -231,6 +241,24 @@ func (n *Node) run() {
 			return
 		}
 	}
+}
+
+// Removed reports whether the table replaced this node.  the node is closed
+// then, and a process with this name cannot join again.
+func (n *Node) Removed() bool {
+	return n.removed.Load()
+}
+
+// retire closes the node after another node got its seats.  a node that
+// goes on would answer requests from state that no primary sends records
+// to.
+func (n *Node) retire() {
+	if !n.removed.CompareAndSwap(false, true) {
+		return
+	}
+	n.logr.Warn("the node was replaced and stops")
+	// Close waits for the goroutine that calls retire.
+	go func() { _ = n.Close() }()
 }
 
 // observe gives every replica its row.  a table that does not have this
@@ -290,12 +318,18 @@ func (n *Node) heartbeat() {
 		}
 		n.mu.Unlock()
 		ctx, cancel := context.WithTimeout(n.ctx, n.cfg.proposeTimeout())
-		_ = n.cfg.Coordinator.Report(ctx, Report{
+		err := n.cfg.Coordinator.Report(ctx, Report{
 			Node:   n.cfg.Name,
 			BootID: n.bootID,
 			LSN:    lsn,
 		})
 		cancel()
+		// a node that Raft no longer sends the table to learns here that it
+		// was replaced.
+		if errors.Is(err, ErrRemoved) {
+			n.retire()
+			return
+		}
 	}
 }
 

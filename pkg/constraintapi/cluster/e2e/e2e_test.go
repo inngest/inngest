@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi/cluster/tcp"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -158,6 +159,7 @@ func (a *account) extend(ctx context.Context, cl *cluster.Client, lease ulid.ULI
 // e2eCluster is the three processes of the test.
 type e2eCluster struct {
 	t     *testing.T
+	tr    cluster.Transport
 	procs []*process
 }
 
@@ -237,8 +239,11 @@ func (c *e2eCluster) waitReady(step string, wantInSync int) {
 // in-memory stores.  everything else uses TCP on loopback.
 func startCluster(t *testing.T) *e2eCluster {
 	t.Helper()
-	c := &e2eCluster{t: t}
 	tr := tcp.New()
+	c := &e2eCluster{
+		t:  t,
+		tr: tr,
+	}
 	t.Cleanup(func() {
 		for _, p := range c.procs {
 			p.stop()
@@ -293,20 +298,69 @@ func startCluster(t *testing.T) *e2eCluster {
 		require.NoError(t, err, "step \"start coordinator\": node %s", p.name)
 	}
 	for _, p := range c.procs {
-		var err error
-		p.node, err = cluster.NewNode(cluster.Config{
-			Name:              p.name,
-			Addr:              p.addr,
-			Transport:         tr,
-			Coordinator:       p.coord,
-			Mux:               p.mux,
-			AckTimeout:        e2eAckTimeout,
-			HeartbeatInterval: e2eHeartbeatInterval,
-			DialBackoff:       10 * time.Millisecond,
-		})
-		require.NoError(t, err, "step \"start node\": node %s", p.name)
+		c.startNode(p)
 	}
 	return c
+}
+
+func (c *e2eCluster) startNode(p *process) {
+	c.t.Helper()
+	var err error
+	p.node, err = cluster.NewNode(cluster.Config{
+		Name:              p.name,
+		Addr:              p.addr,
+		Transport:         c.tr,
+		Coordinator:       p.coord,
+		Mux:               p.mux,
+		AckTimeout:        e2eAckTimeout,
+		HeartbeatInterval: e2eHeartbeatInterval,
+		DialBackoff:       10 * time.Millisecond,
+	})
+	require.NoError(c.t, err, "step \"start node\": node %s", p.name)
+}
+
+// join starts one more process with an empty Raft store.  its coordinator
+// asks the processes that run to add it, and its node registers.
+func (c *e2eCluster) join(name string) *process {
+	c.t.Helper()
+	mux := cluster.NewMux()
+	ln, err := c.tr.Listen("127.0.0.1:0", mux.Accept)
+	require.NoError(c.t, err, "step \"listen\": node %s", name)
+	raftAddr := raft.ServerAddress("raft-" + name)
+	_, raftNet := raft.NewInmemTransport(raftAddr)
+	p := &process{
+		name:     name,
+		addr:     ln.(*tcp.Listener).Addr().String(),
+		mux:      mux,
+		listener: ln,
+		raftNet:  raftNet,
+	}
+	var seeds []string
+	for _, other := range c.live() {
+		seeds = append(seeds, other.addr)
+		other.raftNet.Connect(raftAddr, raftNet)
+		raftNet.Connect(other.raftNet.LocalAddr(), other.raftNet)
+	}
+	c.procs = append(c.procs, p)
+	p.coord, err = raftcoord.New(raftcoord.Config{
+		ID:   name,
+		Addr: p.addr,
+		Peers: []raftcoord.Peer{{
+			ID:       name,
+			RaftAddr: string(raftAddr),
+			Addr:     p.addr,
+		}},
+		Join:              seeds,
+		Transport:         c.tr,
+		Mux:               mux,
+		HeartbeatInterval: e2eHeartbeatInterval,
+		HeartbeatTimeout:  e2eHeartbeatTimeout,
+		RaftTransport:     raftNet,
+		InMemory:          true,
+	})
+	require.NoError(c.t, err, "step \"start coordinator\": node %s", name)
+	c.startNode(p)
+	return p
 }
 
 // kill stops a process with no drain and cuts its Raft transport off from
@@ -318,10 +372,11 @@ func (c *e2eCluster) kill(p *process) {
 	}
 }
 
-func TestFailoverThroughRaftTCPAndClient(t *testing.T) {
-	c := startCluster(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*e2eWait)
-	defer cancel()
+// open creates the shards, connects a client and takes two leases for every
+// account.  the accounts cover every shard.
+func (c *e2eCluster) open(ctx context.Context) (*cluster.Client, []*account, []grant) {
+	t := c.t
+	t.Helper()
 
 	// every node registers through its own coordinator once Raft has a
 	// leader.
@@ -397,11 +452,20 @@ func TestFailoverThroughRaftTCPAndClient(t *testing.T) {
 		}
 	}
 
+	return cl, accounts, grants
+}
+
+func TestFailoverThroughRaftTCPAndClient(t *testing.T) {
+	c := startCluster(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*e2eWait)
+	defer cancel()
+	cl, accounts, grants := c.open(ctx)
+
 	// the node that leads the most shards stops with every in-sync set
 	// full, so every shard it leads has two other copies.
-	step = "shutdown"
+	step := "shutdown"
 	c.waitReady(step, e2eRF)
-	tbl = c.table()
+	tbl := c.table()
 	leads := map[string][]int{}
 	for shard, row := range tbl.Shards {
 		leads[row.Primary] = append(leads[row.Primary], shard)
@@ -438,6 +502,87 @@ func TestFailoverThroughRaftTCPAndClient(t *testing.T) {
 	}
 
 	step = "grant after the shutdown"
+	for _, a := range accounts {
+		_, err := a.acquire(ctx, cl)
+		require.NoError(t, err, "step %q: shard %d, account %s, table %s", step, a.shard, a.id, c.tableString())
+	}
+}
+
+// TestReplaceNodeThroughRaftTCPAndClient stops one of three processes and
+// gives its seats and its Raft vote to a fourth one.  then it stops a second
+// one of the first three.  the two that are left have a Raft leader only
+// with the vote of the new process, and every lease from before the first
+// stop is still there.
+func TestReplaceNodeThroughRaftTCPAndClient(t *testing.T) {
+	c := startCluster(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*e2eWait)
+	defer cancel()
+	cl, accounts, grants := c.open(ctx)
+
+	step := "first shutdown"
+	c.waitReady(step, e2eRF)
+	dead := c.procs[2]
+	c.kill(dead)
+	c.waitReady(step, e2eRF-1)
+
+	step = "join"
+	joined := c.join("n3")
+	require.Eventually(t, func() bool {
+		_, ok := c.table().Nodes[joined.name]
+		return ok
+	}, e2eWait, 5*time.Millisecond, "step %q: the new node did not register, table %s", step, c.tableString())
+
+	step = "replace"
+	var err error
+	require.Eventually(t, func() bool {
+		rctx, done := context.WithTimeout(ctx, 2*time.Second)
+		defer done()
+		err = c.procs[0].coord.ReplaceNode(rctx, dead.name, joined.name)
+		return err == nil
+	}, e2eWait, 10*time.Millisecond, "step %q: the table did not take the command, table %s", step, c.tableString())
+	started := time.Now()
+	c.waitReady(step, e2eRF)
+	t.Logf("the new node was in every in-sync set %s after the command", time.Since(started).Round(time.Millisecond))
+	for shard, row := range c.table().Shards {
+		require.Contains(t, row.InSync, joined.name, "step %q: shard %d", step, shard)
+		require.NotContains(t, row.Replicas, dead.name, "step %q: shard %d", step, shard)
+	}
+	want := []raftcoord.Member{
+		{
+			ID:    c.procs[0].name,
+			Voter: true,
+		},
+		{
+			ID:    c.procs[1].name,
+			Voter: true,
+		},
+		{
+			ID:    joined.name,
+			Voter: true,
+		},
+	}
+	for _, p := range c.live() {
+		require.Eventually(t, func() bool {
+			got, err := p.coord.Members()
+			return err == nil && assert.ObjectsAreEqual(want, got)
+		}, e2eWait, 5*time.Millisecond, "step %q: the Raft membership of %s is wrong", step, p.name)
+	}
+
+	// the second process to stop leads at least one shard when it can.
+	step = "second shutdown"
+	second := c.procs[0]
+	if c.table().Shards[0].Primary == c.procs[1].name {
+		second = c.procs[1]
+	}
+	c.kill(second)
+	c.waitReady(step, e2eRF-1)
+
+	step = "extend after the second shutdown"
+	for _, g := range grants {
+		_, err := g.account.extend(ctx, cl, g.lease)
+		require.NoError(t, err, "step %q: shard %d, account %s, lease %s, table %s", step, g.shard, g.account.id, g.lease, c.tableString())
+	}
+	step = "grant after the second shutdown"
 	for _, a := range accounts {
 		_, err := a.acquire(ctx, cl)
 		require.NoError(t, err, "step %q: shard %d, account %s, table %s", step, a.shard, a.id, c.tableString())

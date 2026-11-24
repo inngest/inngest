@@ -15,12 +15,21 @@ import (
 // the table is unchanged.
 var ErrRejected = errors.New("cluster: command rejected")
 
+// ErrRemoved is returned to a node that was replaced.  it wraps ErrRejected.
+// the node has no shard any more and its name is never used again, so it
+// must stop.
+var ErrRemoved = fmt.Errorf("%w: the node was replaced", ErrRejected)
+
 // NodeInfo is what the table knows about one node.
 type NodeInfo struct {
 	Addr string
 	// BootID is drawn at every process start.  a change of it tells the
 	// table that the node lost its memory.
 	BootID string
+	// Voter is true when the node must have a vote in the coordinator.  a
+	// node that replaces a voter gets it.  false says nothing about the
+	// vote of a node.
+	Voter bool `json:",omitempty"`
 }
 
 // ShardRow is the table's record of one shard.
@@ -48,6 +57,9 @@ type Table struct {
 	// NextNonce is the next shard nonce.  a nonce is never issued twice.
 	NextNonce uint32
 	Nodes     map[string]NodeInfo
+	// Removed has every node that was replaced, and the node that took its
+	// place.  a removed node cannot register again.
+	Removed map[string]string `json:",omitempty"`
 	// Shards is empty until Init.
 	Shards []ShardRow
 }
@@ -103,12 +115,24 @@ type MovePrimary struct {
 	Node  string
 }
 
+// ReplaceNode gives every replica seat of Old to New and removes Old from
+// the table.  Old must be out of every in-sync set, so the command loses no
+// record.  New must be registered.  New starts outside the in-sync sets and
+// joins them by state transfer.  Voter says that Old had a vote in the
+// coordinator, and New gets it.
+type ReplaceNode struct {
+	Old   string
+	New   string
+	Voter bool
+}
+
 func (Init) kind() string         { return "init" }
 func (RegisterNode) kind() string { return "register_node" }
 func (ShrinkInSync) kind() string { return "shrink_in_sync" }
 func (ExpandInSync) kind() string { return "expand_in_sync" }
 func (ElectPrimary) kind() string { return "elect_primary" }
 func (MovePrimary) kind() string  { return "move_primary" }
+func (ReplaceNode) kind() string  { return "replace_node" }
 
 type commandEnvelope struct {
 	Type string          `json:"type"`
@@ -146,6 +170,8 @@ func DecodeCommand(b []byte) (Command, error) {
 		return decodeCommand[ElectPrimary](env.Cmd)
 	case MovePrimary{}.kind():
 		return decodeCommand[MovePrimary](env.Cmd)
+	case ReplaceNode{}.kind():
+		return decodeCommand[ReplaceNode](env.Cmd)
 	}
 	return nil, fmt.Errorf("cluster: unknown command type %q", env.Type)
 }
@@ -162,6 +188,7 @@ func decodeCommand[C Command](b []byte) (Command, error) {
 func (t *Table) Clone() *Table {
 	c := *t
 	c.Nodes = maps.Clone(t.Nodes)
+	c.Removed = maps.Clone(t.Removed)
 	c.Shards = slices.Clone(t.Shards)
 	for i := range c.Shards {
 		c.Shards[i].Replicas = slices.Clone(c.Shards[i].Replicas)
@@ -195,6 +222,8 @@ func (t *Table) Apply(cmd Command) error {
 		err = t.electPrimary(c.Shard, c.Epoch, c.Node, false)
 	case MovePrimary:
 		err = t.electPrimary(c.Shard, c.Epoch, c.Node, true)
+	case ReplaceNode:
+		err = t.replaceNode(c)
 	default:
 		err = rejectf("unknown command %T", cmd)
 	}
@@ -261,6 +290,9 @@ func (t *Table) registerNode(c RegisterNode) error {
 	if c.ID == "" || c.BootID == "" {
 		return rejectf("node ID or boot ID is empty")
 	}
+	if by, ok := t.Removed[c.ID]; ok {
+		return fmt.Errorf("%w by node %q", ErrRemoved, by)
+	}
 	old, known := t.Nodes[c.ID]
 	if t.Nodes == nil {
 		t.Nodes = map[string]NodeInfo{}
@@ -268,6 +300,7 @@ func (t *Table) registerNode(c RegisterNode) error {
 	t.Nodes[c.ID] = NodeInfo{
 		Addr:   c.Addr,
 		BootID: c.BootID,
+		Voter:  old.Voter,
 	}
 	if !known || old.BootID == c.BootID {
 		return nil
@@ -298,6 +331,56 @@ func (t *Table) registerNode(c RegisterNode) error {
 			row.Term++
 		}
 	}
+	return nil
+}
+
+func (t *Table) replaceNode(c ReplaceNode) error {
+	if c.Old == "" || c.New == "" || c.Old == c.New {
+		return rejectf("replace node %q by node %q", c.Old, c.New)
+	}
+	if by, ok := t.Removed[c.Old]; ok {
+		if by != c.New {
+			return rejectf("node %q was replaced by node %q", c.Old, by)
+		}
+		// the same command again changes nothing.
+		return nil
+	}
+	info, ok := t.Nodes[c.New]
+	if !ok {
+		return rejectf("node %q is not registered", c.New)
+	}
+	_, known := t.Nodes[c.Old]
+	for i := range t.Shards {
+		row := &t.Shards[i]
+		if !slices.Contains(row.Replicas, c.Old) {
+			continue
+		}
+		known = true
+		if slices.Contains(row.InSync, c.Old) {
+			return rejectf("node %q is in sync on shard %d", c.Old, i)
+		}
+		if slices.Contains(row.Replicas, c.New) {
+			return rejectf("node %q is already a replica of shard %d", c.New, i)
+		}
+	}
+	if !known {
+		return rejectf("no node %q", c.Old)
+	}
+
+	for i := range t.Shards {
+		row := &t.Shards[i]
+		if j := slices.Index(row.Replicas, c.Old); j >= 0 {
+			row.Replicas[j] = c.New
+			row.Epoch++
+		}
+	}
+	delete(t.Nodes, c.Old)
+	if t.Removed == nil {
+		t.Removed = map[string]string{}
+	}
+	t.Removed[c.Old] = c.New
+	info.Voter = info.Voter || c.Voter
+	t.Nodes[c.New] = info
 	return nil
 }
 

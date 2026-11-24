@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -602,6 +603,11 @@ func TestCommandJSONRoundTrip(t *testing.T) {
 			Epoch: 8,
 			Node:  "b",
 		},
+		ReplaceNode{
+			Old:   "c",
+			New:   "d",
+			Voter: true,
+		},
 	}
 	for _, cmd := range cmds {
 		b, err := EncodeCommand(cmd)
@@ -713,4 +719,175 @@ func TestTableShardOf(t *testing.T) {
 	big := newTable(t, 256)
 	require.Equal(t, 199, big.ShardOf(uuid.MustParse("00000000-0000-0000-0000-000000000001")))
 	require.Equal(t, 3, big.ShardOf(uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")))
+}
+
+// shrunk returns a table with 3 shards at RF 3 where node c is out of every
+// in-sync set and no shard has c as its primary, as after c died.  node d is
+// registered.
+func shrunk(t *testing.T) *Table {
+	t.Helper()
+	tbl := newTable(t, 3)
+	for i := range tbl.Shards {
+		if tbl.Shards[i].Primary == "c" {
+			require.NoError(t, tbl.Apply(MovePrimary{
+				Shard: i,
+				Epoch: tbl.Shards[i].Epoch,
+				Node:  "a",
+			}))
+			continue
+		}
+		require.NoError(t, tbl.Apply(ShrinkInSync{
+			Shard: i,
+			Epoch: tbl.Shards[i].Epoch,
+			Node:  "c",
+		}))
+	}
+	require.NoError(t, tbl.Apply(RegisterNode{
+		ID:     "d",
+		Addr:   "d-addr",
+		BootID: "d-boot-1",
+	}))
+	return tbl
+}
+
+func TestTableReplaceNode(t *testing.T) {
+	tbl := shrunk(t)
+	before := tbl.Clone()
+	require.NoError(t, tbl.Apply(ReplaceNode{
+		Old:   "c",
+		New:   "d",
+		Voter: true,
+	}))
+
+	require.Equal(t, before.Version+1, tbl.Version)
+	for i, row := range tbl.Shards {
+		was := before.Shards[i]
+		require.NotContains(t, row.Replicas, "c", "shard %d", i)
+		require.Equal(t, slices.Index(was.Replicas, "c"), slices.Index(row.Replicas, "d"), "d has the seat c had")
+		require.Len(t, row.Replicas, 3)
+		require.Equal(t, was.InSync, row.InSync, "d is not in sync before a state transfer")
+		require.Equal(t, was.Primary, row.Primary)
+		require.Equal(t, was.Term, row.Term)
+		require.Equal(t, was.Nonce, row.Nonce)
+		require.Equal(t, was.Epoch+1, row.Epoch)
+	}
+	require.NotContains(t, tbl.Nodes, "c")
+	require.Equal(t, map[string]string{"c": "d"}, tbl.Removed)
+	require.Equal(t, NodeInfo{
+		Addr:   "d-addr",
+		BootID: "d-boot-1",
+		Voter:  true,
+	}, tbl.Nodes["d"])
+
+	// d joins the in-sync set as any replica does.
+	require.NoError(t, tbl.Apply(ExpandInSync{
+		Shard: 0,
+		Epoch: tbl.Shards[0].Epoch,
+		Node:  "d",
+	}))
+}
+
+func TestTableReplaceNodeAgain(t *testing.T) {
+	tbl := shrunk(t)
+	cmd := ReplaceNode{
+		Old: "c",
+		New: "d",
+	}
+	require.NoError(t, tbl.Apply(cmd))
+	after := tbl.Clone()
+
+	require.NoError(t, tbl.Apply(cmd), "the same command again is not an error")
+	after.Version++
+	require.Equal(t, after, tbl)
+
+	require.NoError(t, tbl.Apply(RegisterNode{
+		ID:     "e",
+		Addr:   "e-addr",
+		BootID: "e-boot-1",
+	}))
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "c",
+		New: "e",
+	})
+}
+
+func TestTableReplaceNodeRejected(t *testing.T) {
+	tbl := shrunk(t)
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "c",
+		New: "e",
+	})
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "c",
+		New: "c",
+	})
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "",
+		New: "d",
+	})
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "x",
+		New: "d",
+	})
+	// a is in sync, so its seats still have records that only it and b have.
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "a",
+		New: "d",
+	})
+	// b is already a replica of every shard c is in.
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "c",
+		New: "b",
+	})
+}
+
+// TestTableReplaceNodeInSyncOnOneShard checks that one shard with the old
+// node in sync refuses the whole command, so no shard changes.
+func TestTableReplaceNodeInSyncOnOneShard(t *testing.T) {
+	tbl := shrunk(t)
+	require.NoError(t, tbl.Apply(ExpandInSync{
+		Shard: 1,
+		Epoch: tbl.Shards[1].Epoch,
+		Node:  "c",
+	}))
+	requireRejected(t, tbl, ReplaceNode{
+		Old: "c",
+		New: "d",
+	})
+}
+
+func TestTableRemovedNodeCannotRegister(t *testing.T) {
+	tbl := shrunk(t)
+	require.NoError(t, tbl.Apply(ReplaceNode{
+		Old: "c",
+		New: "d",
+	}))
+	before := tbl.Clone()
+	err := tbl.Apply(RegisterNode{
+		ID:     "c",
+		Addr:   "c-addr",
+		BootID: "c-boot-2",
+	})
+	require.ErrorIs(t, err, ErrRemoved)
+	require.ErrorIs(t, err, ErrRejected)
+	require.Equal(t, before, tbl)
+}
+
+func TestTableRegisterKeepsVoter(t *testing.T) {
+	tbl := shrunk(t)
+	require.NoError(t, tbl.Apply(ReplaceNode{
+		Old:   "c",
+		New:   "d",
+		Voter: true,
+	}))
+	require.NoError(t, tbl.Apply(RegisterNode{
+		ID:     "d",
+		Addr:   "d-addr-2",
+		BootID: "d-boot-2",
+	}))
+	require.Equal(t, NodeInfo{
+		Addr:   "d-addr-2",
+		BootID: "d-boot-2",
+		Voter:  true,
+	}, tbl.Nodes["d"])
 }
