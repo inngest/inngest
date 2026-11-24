@@ -157,3 +157,60 @@ func TestPooledQuackConnAfterCloseFailsFast(t *testing.T) {
 	_, _, err = sess.Exec(ctx, "SELECT 1;")
 	require.ErrorIs(t, err, errQuackUnavailable)
 }
+
+// TestPooledQuackConnRecoversAfterCooldown pins that a pooled-only workload
+// (no primary-connection traffic) recovers once the post-failed-restart
+// cooldown expires, while an explicitly closed process stays closed.
+func TestPooledQuackConnRecoversAfterCooldown(t *testing.T) {
+	c, _ := openPooledForTest(t, 4)
+	ctx := t.Context()
+
+	now := time.Now()
+	var clockMu sync.Mutex
+	c.proc.mu.Lock()
+	origBinary := c.proc.binaryPath
+	c.proc.now = func() time.Time {
+		clockMu.Lock()
+		defer clockMu.Unlock()
+		return now
+	}
+	c.proc.mu.Unlock()
+
+	pooled, err := c.proc.openQuackConn(ctx)
+	require.NoError(t, err)
+	_, _, err = pooled.Exec(ctx, "SELECT 1;")
+	require.NoError(t, err)
+
+	// Force the first restart attempt to fail so the process enters cooldown
+	// with quackEP == nil.
+	c.proc.mu.Lock()
+	c.proc.binaryPath = "/nonexistent/duckdb-binary"
+	c.proc.mu.Unlock()
+	killSubprocess(t, c.proc)
+
+	_, _, err = pooled.Exec(ctx, "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+
+	// While still inside cooldown, pooled calls fail fast with ErrDisabled.
+	_, _, err = pooled.Exec(ctx, "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled)
+
+	// Restore binary and advance past cooldown: pooled caller alone must
+	// trigger restart and succeed.
+	c.proc.mu.Lock()
+	c.proc.binaryPath = origBinary
+	c.proc.mu.Unlock()
+	clockMu.Lock()
+	now = now.Add(restartCooldowns[0] + time.Second)
+	clockMu.Unlock()
+
+	_, rows, err := pooled.Exec(ctx, "SELECT 42 AS n;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	// Explicit close must keep the process closed rather than restarting.
+	require.NoError(t, c.Close())
+	_, _, err = pooled.Exec(ctx, "SELECT 1;")
+	require.ErrorIs(t, err, errQuackUnavailable)
+	require.Nil(t, c.proc.quackEP.Load())
+}
