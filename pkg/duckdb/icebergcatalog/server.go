@@ -101,8 +101,8 @@ type Server struct {
 	tables tableCache
 	// fast is nil w/o Options.CatalogDB.
 	fast *fastPath
-	// io caches FileIO instances when fast is nil (for remote GC/purge).
-	io ioCache
+	// io loads per-operation FileIO instances when fast is nil (for remote GC/purge).
+	io ioLoader
 	// now is the clock snapshot ages are measured against (tests swap it).
 	now func() time.Time
 }
@@ -119,13 +119,13 @@ func New(cat Catalog, opts Options) *Server {
 
 func (s *Server) getFileIO(ctx context.Context, loc string) (icebergio.IO, error) {
 	if s.fast != nil {
-		return s.fast.io.get(ctx, s.fast.props, loc)
+		return s.fast.io.load(ctx, s.fast.props, loc)
 	}
 	var props iceberg.Properties
 	if s.opts.CatalogDB != nil {
 		props = s.opts.CatalogDB.Properties
 	}
-	return s.io.get(ctx, props, loc)
+	return s.io.load(ctx, props, loc)
 }
 
 // endpoints is advertised in GET /v1/config so clients know what we support.

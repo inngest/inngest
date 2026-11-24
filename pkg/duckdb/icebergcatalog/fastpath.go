@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/url"
 	"path"
 	"regexp"
 	"slices"
@@ -74,9 +73,8 @@ type fastPath struct {
 	probed bool
 	v0     bool
 
-	// io caches FileIO instances per scheme+host so commits don't rebuild
-	// AWS SDK clients on every write.
-	io ioCache
+	// io loads a per-operation FileIO bound to the caller's context.
+	io ioLoader
 
 	// beforeSwap, when non-nil, runs right before the CAS (tests use it to
 	// commit underneath an in-flight commit).
@@ -86,32 +84,15 @@ type fastPath struct {
 	afterSwap func(error) error
 }
 
-// ioCache caches icebergio.IO instances keyed by scheme+host (or "local" for
-// local paths) so callers don't recreate AWS SDK clients on every commit/GC.
-type ioCache struct {
-	mu     sync.Mutex
-	m      map[string]icebergio.IO
+// ioLoader loads an icebergio.IO per operation using the caller's context so
+// S3/remote Create, Remove, and RemoveAll calls honor request cancellation and
+// deadlines (iceberg-go's blobfs binds the LoadFS ctx into those methods).
+type ioLoader struct {
 	loadFS func(ctx context.Context, props map[string]string, location string) (icebergio.IO, error)
 }
 
-func ioCacheKey(loc string) string {
-	u, err := url.Parse(loc)
-	if err != nil || isLocal(u) {
-		return "local"
-	}
-	return u.Scheme + "://" + u.Host
-}
-
-func (c *ioCache) get(ctx context.Context, props iceberg.Properties, loc string) (icebergio.IO, error) {
-	key := ioCacheKey(loc)
-	c.mu.Lock()
-	if fsys, ok := c.m[key]; ok {
-		c.mu.Unlock()
-		return fsys, nil
-	}
-	loader := c.loadFS
-	c.mu.Unlock()
-
+func (l *ioLoader) load(ctx context.Context, props iceberg.Properties, loc string) (icebergio.IO, error) {
+	loader := l.loadFS
 	if loader == nil {
 		loader = icebergio.LoadFS
 	}
@@ -119,28 +100,10 @@ func (c *ioCache) get(ctx context.Context, props iceberg.Properties, loc string)
 	if ioProps == nil {
 		ioProps = iceberg.Properties{}
 	}
-	// Detach cancellation from the caller's request ctx so the cached FileIO
-	// (e.g. an S3 client) isn't bound to the first HTTP request's lifetime,
-	// while still preserving context values such as utils.WithAwsConfig.
-	baseCtx := context.Background()
-	if ctx != nil {
-		baseCtx = context.WithoutCancel(ctx)
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	fsys, err := loader(baseCtx, ioProps, loc)
-	if err != nil {
-		return nil, err
-	}
-	c.mu.Lock()
-	if c.m == nil {
-		c.m = map[string]icebergio.IO{}
-	}
-	if existing, ok := c.m[key]; ok {
-		c.mu.Unlock()
-		return existing, nil
-	}
-	c.m[key] = fsys
-	c.mu.Unlock()
-	return fsys, nil
+	return loader(ctx, ioProps, loc)
 }
 
 func newFastPath(c *CatalogDB) *fastPath {
@@ -317,7 +280,7 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 	}
 	// Never merge table-level md.Properties() into FileIO config: a client
 	// must not be able to override s3.endpoint/credentials/HTTP settings.
-	fsys, err := f.io.get(ctx, f.props, loc)
+	fsys, err := f.io.load(ctx, f.props, loc)
 	if err != nil {
 		return nil, "", err
 	}
