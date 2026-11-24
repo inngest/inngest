@@ -39,7 +39,7 @@ export default function UpdateApp({
           url: inputUrl,
           id: app.id,
         },
-      });
+      }).unwrap();
       toast.success('The URL was successfully updated.');
       console.log('Edited app URL:', response);
     } catch (error) {
