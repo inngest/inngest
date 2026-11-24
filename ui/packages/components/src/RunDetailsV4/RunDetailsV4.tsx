@@ -315,6 +315,7 @@ export const RunDetailsV4 = ({
             )}
           </div>
           <Tabs
+            label="Run trace"
             tabs={[
               {
                 label: (

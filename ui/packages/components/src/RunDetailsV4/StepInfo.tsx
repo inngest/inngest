@@ -438,6 +438,7 @@ export const StepInfo = ({
         <div className="flex-1">
           <Tabs
             defaultActive={'attributes'}
+            label="Step attributes"
             tabs={[
               {
                 label: 'Attributes',
@@ -494,6 +495,7 @@ export const StepInfo = ({
             ) : (
               <Tabs
                 defaultActive={result?.error ? 'error' : prettyOutput ? 'output' : ''}
+                label="Step data"
                 tabs={[
                   ...(prettyInput
                     ? [
