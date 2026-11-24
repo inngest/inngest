@@ -5,10 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -461,16 +463,55 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 }
 
 // ensureIcebergNamespace creates LakeNamespace on the Iceberg REST catalog via
-// POST <URI>/v1/namespaces (treating 200 OK and 409 Conflict as success) so a
-// shared external worker can ATTACH IF NOT EXISTS with DEFAULT_SCHEMA without
-// ever detaching the shared catalog.
+// POST <URI>/v1[/<prefix>]/namespaces (respecting any prefix returned by
+// GET <URI>/v1/config?warehouse=..., and treating 200 OK and 409 Conflict as
+// success) so a shared external worker can ATTACH IF NOT EXISTS with
+// DEFAULT_SCHEMA without ever detaching the shared catalog.
 func ensureIcebergNamespace(ctx context.Context, opts IcebergOptions) error {
 	if opts.URI == "" {
 		return errors.New("empty iceberg URI")
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	endpoint := strings.TrimRight(opts.URI, "/") + "/v1/namespaces"
+	base := strings.TrimRight(opts.URI, "/")
+	cl := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	var prefix string
+	cfgURL := base + "/v1/config"
+	if opts.Warehouse != "" {
+		cfgURL += "?warehouse=" + url.QueryEscape(opts.Warehouse)
+	}
+	if cfgReq, err := http.NewRequestWithContext(reqCtx, http.MethodGet, cfgURL, nil); err == nil {
+		if opts.Token != "" {
+			cfgReq.Header.Set("Authorization", "Bearer "+opts.Token)
+		}
+		if cfgResp, err := cl.Do(cfgReq); err == nil {
+			if cfgResp.StatusCode == http.StatusOK {
+				var parsed struct {
+					Defaults  map[string]string `json:"defaults"`
+					Overrides map[string]string `json:"overrides"`
+				}
+				if json.NewDecoder(io.LimitReader(cfgResp.Body, 1<<20)).Decode(&parsed) == nil {
+					if p := parsed.Overrides["prefix"]; p != "" {
+						prefix = p
+					} else if p := parsed.Defaults["prefix"]; p != "" {
+						prefix = p
+					}
+				}
+			}
+			_, _ = io.Copy(io.Discard, io.LimitReader(cfgResp.Body, 4096))
+			_ = cfgResp.Body.Close()
+		}
+	}
+
+	endpoint := base + "/v1/namespaces"
+	if p := strings.Trim(prefix, "/"); p != "" {
+		endpoint = base + "/v1/" + p + "/namespaces"
+	}
 	body := []byte(fmt.Sprintf(`{"namespace":[%q]}`, LakeNamespace))
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
@@ -479,11 +520,6 @@ func ensureIcebergNamespace(ctx context.Context, opts IcebergOptions) error {
 	req.Header.Set("Content-Type", "application/json")
 	if opts.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+opts.Token)
-	}
-	cl := &http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
 	}
 	resp, err := cl.Do(req)
 	if err != nil {
