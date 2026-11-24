@@ -13,6 +13,10 @@ var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
 // debounce item or pointer is missing on the shard.
 var ErrDebounceNotFound = fmt.Errorf("debounce not found")
 
+// ErrQueueProxyUnsupportedOption prevents silently dropping a condition that the
+// queue-proxy protocol cannot carry.
+var ErrQueueProxyUnsupportedOption = fmt.Errorf("queue proxy does not support requested option")
+
 func NewKeyError(err error, key string) error {
 	return KeyError{
 		cause: err,

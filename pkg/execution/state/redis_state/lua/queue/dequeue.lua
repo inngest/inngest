@@ -45,6 +45,7 @@ local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
 local expectedLeaseID = ARGV[7]
 local nowMS = tonumber(ARGV[8])
+local allowExpiredLease = ARGV[9] == "1"
 
 -- $include(get_partition_item.lua)
 -- $include(decode_ulid_time.lua)
@@ -61,7 +62,14 @@ if expectedLeaseID ~= nil and expectedLeaseID ~= "" then
     return 1
   end
   local item = cjson.decode(stored)
-  if item.leaseID ~= expectedLeaseID or nowMS == nil or decode_ulid_time(expectedLeaseID) <= nowMS then
+  local currentLeaseID = item.leaseID
+  if currentLeaseID == nil or currentLeaseID == cjson.null then
+    currentLeaseID = "00000000000000000000000000"
+  end
+  if currentLeaseID ~= expectedLeaseID then
+    return 2
+  end
+  if not allowExpiredLease and (nowMS == nil or decode_ulid_time(expectedLeaseID) <= nowMS) then
     return 2
   end
 end

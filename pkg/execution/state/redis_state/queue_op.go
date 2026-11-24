@@ -33,6 +33,12 @@ func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osqueue.DequeueOptionFn) error {
+	return q.dequeue(ctx, i, false, options...)
+}
+
+// Scavenger cleanup may delete an unchanged expired lease, but it must still
+// compare ownership atomically. Public guarded dequeue requires a live lease.
+func (q *queue) dequeue(ctx context.Context, i osqueue.QueueItem, allowExpiredLease bool, options ...osqueue.DequeueOptionFn) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -104,7 +110,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 
 	expectedLeaseID := ""
 	if o.ExpectedLeaseID != nil {
-		if *o.ExpectedLeaseID == (ulid.ULID{}) {
+		if *o.ExpectedLeaseID == (ulid.ULID{}) && !allowExpiredLease {
 			return osqueue.ErrQueueItemLeaseMismatch
 		}
 		expectedLeaseID = o.ExpectedLeaseID.String()
@@ -120,6 +126,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		int(idempotency.Seconds()),
 		expectedLeaseID,
 		q.Clock.Now().UnixMilli(),
+		allowExpiredLease,
 	})
 	if err != nil {
 		return err
@@ -259,7 +266,11 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 				if errors.Is(err, state.ErrEventNotFound) {
 					l.Warn("could not find event for refreshing throttle before requeue")
 
-					err := q.Dequeue(ctx, i)
+					var dequeueOpts []osqueue.DequeueOptionFn
+					if o.ExpectedLeaseID != nil {
+						dequeueOpts = append(dequeueOpts, osqueue.DequeueWithLease(*o.ExpectedLeaseID))
+					}
+					err := q.dequeue(ctx, i, true, dequeueOpts...)
 					if err != nil && !errors.Is(err, osqueue.ErrQueueItemNotFound) {
 						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
 					}

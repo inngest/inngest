@@ -1184,8 +1184,19 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 // aligned with the queue-proxy request fields that carry them between client
 // and server.
 func TestQueueProxyVariadicOptionCompatibilityGuard(t *testing.T) {
-	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
-	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
+	coverage := fieldCoverage{
+		covered: []string{"CapacityLeased"},
+		ignored: map[string]string{"ExpectedLeaseID": "Redis-only condition; ValidateForQueueProxy rejects it before an RPC (enforced below and by the Cloud client tests)"},
+	}
+	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), coverage)
+	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), coverage)
+
+	require.NoError(t, (RequeueOptions{CapacityLeased: true}).ValidateForQueueProxy())
+	require.NoError(t, (DequeueOptions{CapacityLeased: true}).ValidateForQueueProxy())
+	for _, lease := range []ulid.ULID{{}, ulid.Make()} {
+		require.ErrorIs(t, (RequeueOptions{ExpectedLeaseID: &lease}).ValidateForQueueProxy(), ErrQueueProxyUnsupportedOption)
+		require.ErrorIs(t, (DequeueOptions{ExpectedLeaseID: &lease}).ValidateForQueueProxy(), ErrQueueProxyUnsupportedOption)
+	}
 	require.NotNil(t, (&pb.RequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
 	require.NotNil(t, (&pb.DequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
 }

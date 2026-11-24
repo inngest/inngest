@@ -727,3 +727,19 @@ func semaphoreReleaseFromProto(value pb.SemaphoreReleaseMode) (constraintapi.Sem
 		return constraintapi.SemaphoreReleaseAuto, fmt.Errorf("semaphore release: unknown mode %s", value)
 	}
 }
+
+// ValidateForQueueProxy rejects options that cannot be carried by the protocol.
+func (o RequeueOptions) ValidateForQueueProxy() error {
+	if o.ExpectedLeaseID != nil {
+		return fmt.Errorf("%w: ExpectedLeaseID", ErrQueueProxyUnsupportedOption)
+	}
+	return nil
+}
+
+// ValidateForQueueProxy rejects options that cannot be carried by the protocol.
+func (o DequeueOptions) ValidateForQueueProxy() error {
+	if o.ExpectedLeaseID != nil {
+		return fmt.Errorf("%w: ExpectedLeaseID", ErrQueueProxyUnsupportedOption)
+	}
+	return nil
+}
