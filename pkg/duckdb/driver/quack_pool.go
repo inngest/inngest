@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/duckdb/worker"
@@ -121,7 +122,9 @@ func (c *pooledQuackConn) Close() error {
 	if ep := c.p.workerEP.Load(); ep == nil || ep.gen != c.gen {
 		return nil
 	}
-	if err := sess.Close(context.Background()); err != nil {
+	closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sess.Close(closeCtx); err != nil {
 		logger.StdlibLogger(context.Background()).Debug("duckdb: failed to disconnect a closed pooled worker connection",
 			"transport", "worker", "session_id", sess.ID(), "error", err)
 	}

@@ -1,11 +1,14 @@
 package driver
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -439,21 +442,61 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 	if p.iceberg == nil {
 		return nil
 	}
-	alreadyAttached := false
-	if p.workerSocket != "" {
-		// On a shared external worker, check whether LakeAlias is already
-		// attached so subsequent clients never DETACH it out from under
-		// active readers, while a fresh worker still creates LakeNamespace
-		// before attaching with DEFAULT_SCHEMA.
-		if _, rows, err := p.sess.Exec(ctx, fmt.Sprintf("SELECT 1 FROM duckdb_databases() WHERE database_name = '%s';", LakeAlias)); err == nil && len(rows) > 0 {
-			alreadyAttached = true
-		}
-	}
-	stmts, err := icebergBootstrapStmtsForWorker(*p.iceberg, p.localExtensionPaths, alreadyAttached)
+	sharedWorker := p.workerSocket != ""
+	stmts, err := icebergBootstrapStmtsForWorker(*p.iceberg, p.localExtensionPaths, sharedWorker)
 	if err != nil {
 		return err
 	}
-	return p.bootstrapExecLocked(ctx, "Iceberg", stmts)
+	err = p.bootstrapExecLocked(ctx, "Iceberg", stmts)
+	if err != nil && sharedWorker {
+		// On a shared external worker we never DETACH LakeAlias (another
+		// client may be reading concurrently). If ATTACH with DEFAULT_SCHEMA
+		// failed because LakeNamespace doesn't exist yet on a fresh catalog,
+		// create the namespace via the Iceberg REST API and retry once.
+		if nsErr := ensureIcebergNamespace(ctx, *p.iceberg); nsErr == nil {
+			err = p.bootstrapExecLocked(ctx, "Iceberg", stmts)
+		}
+	}
+	return err
+}
+
+// ensureIcebergNamespace creates LakeNamespace on the Iceberg REST catalog via
+// POST <URI>/v1/namespaces (treating 200 OK and 409 Conflict as success) so a
+// shared external worker can ATTACH IF NOT EXISTS with DEFAULT_SCHEMA without
+// ever detaching the shared catalog.
+func ensureIcebergNamespace(ctx context.Context, opts IcebergOptions) error {
+	if opts.URI == "" {
+		return errors.New("empty iceberg URI")
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	endpoint := strings.TrimRight(opts.URI, "/") + "/v1/namespaces"
+	body := []byte(fmt.Sprintf(`{"namespace":[%q]}`, LakeNamespace))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if opts.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+opts.Token)
+	}
+	cl := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusConflict {
+		return nil
+	}
+	return fmt.Errorf("create namespace status %d", resp.StatusCode)
 }
 
 func icebergBootstrapStmts(opts IcebergOptions, localExtensionPaths map[string]string) ([]string, error) {
