@@ -143,6 +143,7 @@ type process struct {
 	out           *os.File
 	jlSess        *jsonlines.Session
 	started       bool
+	closed        bool
 	disabledUntil time.Time
 	restartFails  int
 	// now overrides time.Now for tests exercising restart cooldown backoff.
@@ -154,6 +155,12 @@ func (p *process) clockNow() time.Time {
 		return p.now()
 	}
 	return time.Now()
+}
+
+// isClosedLocked assumes mu is held and reports whether the process has been
+// explicitly closed (as opposed to being temporarily down in/after cooldown).
+func (p *process) isClosedLocked() bool {
+	return p.closed || (p.procCtx != nil && p.procCtx.Err() != nil)
 }
 
 // isDisabledLocked assumes mu is held and reports whether the process is
@@ -541,15 +548,29 @@ func (p *process) openPooledQuackConn(ctx context.Context, gated bool) (sqlExece
 // currentQuackEndpoint returns the live quack listener's endpoint. When none
 // is published it waits on mu, which an in-flight restart holds, and
 // re-checks — so a pooled connection racing a restart gets the new listener
-// rather than a spurious error.
-func (p *process) currentQuackEndpoint() (*quackEndpoint, error) {
+// rather than a spurious error. If the process wasn't explicitly closed and
+// cooldown has expired, it triggers a restart so pooled-only callers can
+// recover without a primary-connection statement.
+func (p *process) currentQuackEndpoint(ctx context.Context) (*quackEndpoint, error) {
 	if ep := p.quackEP.Load(); ep != nil {
 		return ep, nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.isClosedLocked() {
+		return nil, errQuackUnavailable
+	}
 	if p.isDisabledLocked() {
 		return nil, ErrDisabled
+	}
+	if ep := p.quackEP.Load(); ep != nil {
+		return ep, nil
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err := p.restartAfterFailureLocked(ctx, errQuackUnavailable); err != nil {
+		return nil, err
 	}
 	if ep := p.quackEP.Load(); ep != nil {
 		return ep, nil
@@ -566,6 +587,9 @@ func (p *process) currentQuackEndpoint() (*quackEndpoint, error) {
 func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.isClosedLocked() {
+		return errQuackUnavailable
+	}
 	if p.isDisabledLocked() {
 		return ErrDisabled
 	}
@@ -929,6 +953,9 @@ func onceOnly(fn func(*quack.Session) error) func(*quack.Session) error {
 // tearing down the pool while this call is in flight) can never observe or
 // produce a half-restarted process.
 func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) error {
+	if p.isClosedLocked() {
+		return errQuackUnavailable
+	}
 	var err error
 	if !p.started {
 		err = errors.New("duckdb: subprocess not running")
@@ -1117,6 +1144,7 @@ func (p *process) closeLocked(ctx context.Context) error {
 func (p *process) close(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.closed = true
 	return p.closeLocked(ctx)
 }
 
