@@ -139,3 +139,18 @@ func TestServerPingReturnsPID(t *testing.T) {
 	require.Equal(t, "v-test-pid", resp.Version)
 	require.Equal(t, os.Getpid(), resp.PID)
 }
+
+func TestServerDistinctSessionIDPrefixes(t *testing.T) {
+	srv1 := New(nil, "v1")
+	srv2 := New(nil, "v2")
+
+	require.Len(t, srv1.instanceID, 16)
+	require.Len(t, srv2.instanceID, 16)
+	require.NotEqual(t, srv1.instanceID, srv2.instanceID)
+
+	id1 := srv1.nextSessionID()
+	id2 := srv2.nextSessionID()
+	require.Equal(t, "s-"+srv1.instanceID+"-1", id1)
+	require.Equal(t, "s-"+srv2.instanceID+"-1", id2)
+	require.NotEqual(t, id1, id2)
+}

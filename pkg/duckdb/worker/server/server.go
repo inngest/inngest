@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -172,9 +174,10 @@ func (sess *session) interrupt(reqID uint64) {
 // Server serves DuckDB queries over a Unix domain socket, maintaining
 // concurrent per-session libduckdb connections.
 type Server struct {
-	db        *libduckdb.DB
-	version   string
-	authToken string
+	db         *libduckdb.DB
+	version    string
+	authToken  string
+	instanceID string
 
 	mu         sync.RWMutex
 	sessions   map[string]*session
@@ -194,14 +197,21 @@ type Server struct {
 
 // New constructs a Server backed by db.
 func New(db *libduckdb.DB, version string) *Server {
+	var buf [8]byte
+	_, _ = rand.Read(buf[:])
 	return &Server{
 		db:         db,
 		version:    version,
+		instanceID: hex.EncodeToString(buf[:]),
 		sessions:   make(map[string]*session),
 		conns:      make(map[net.Conn]struct{}),
 		shutdownCh: make(chan struct{}),
 		closeDone:  make(chan struct{}),
 	}
+}
+
+func (s *Server) nextSessionID() string {
+	return fmt.Sprintf("s-%s-%d", s.instanceID, s.nextID.Add(1))
 }
 
 // SetAuthToken configures a shared secret required on every RPC request.
@@ -432,7 +442,7 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
 		}
-		id := fmt.Sprintf("s-%d", s.nextID.Add(1))
+		id := s.nextSessionID()
 		s.mu.Lock()
 		if s.closed {
 			s.mu.Unlock()
