@@ -609,3 +609,31 @@ func TestExpiredCapacityRepairActivationGate(t *testing.T) {
 		})
 	}
 }
+
+// The zero-generation fence is a rollout prerequisite, not part of the repair
+// activation flag. Fresh legacy snapshots still lease; superseded ones do not.
+func TestGenerationZeroFenceWithRepairDisabled(t *testing.T) {
+	f := newCapacityRecoveryFixture(t, 25)
+	f.repairEnabled = false
+	f.enqueue(1)
+	f.refill()
+	items, err := f.shard.Peek(t.Context(), f.partition(), f.clock.Now(), 1)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	item := *items[0]
+	item.GenerationID = 0
+	f.store(item)
+	stale := item
+	item.LeaseID, err = f.shard.Lease(t.Context(), item, queue.QueueLeaseDuration, f.clock.Now())
+	require.NoError(t, err, "a current generation-zero snapshot must still lease")
+	require.NoError(t, f.shard.Requeue(t.Context(), item, f.clock.Now()))
+	_, err = f.shard.Lease(t.Context(), stale, queue.QueueLeaseDuration, f.clock.Now())
+	require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "the fence is active even while automatic repair is off")
+	f.refill()
+	items, err = f.shard.Peek(t.Context(), f.partition(), f.clock.Now(), 1)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, 1, items[0].GenerationID)
+	_, err = f.shard.Lease(t.Context(), *items[0], queue.QueueLeaseDuration, f.clock.Now())
+	require.NoError(t, err, "a current post-requeue snapshot must still lease")
+}

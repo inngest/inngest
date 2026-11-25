@@ -18,10 +18,11 @@ import (
 
 type repairBudgetTestShard struct {
 	*mockShardForIterator
-	clock  *clockwork.FakeClock
-	items  []*QueueItem
-	calls  atomic.Int32
-	repair func(context.Context) error
+	clock      *clockwork.FakeClock
+	items      []*QueueItem
+	calls      atomic.Int32
+	repair     func(context.Context) error
+	beforePeek func()
 }
 
 func (s *repairBudgetTestShard) Requeue(ctx context.Context, _ QueueItem, _ time.Time, _ ...RequeueOptionFn) error {
@@ -39,6 +40,9 @@ func (s *repairBudgetTestShard) PartitionLease(_ context.Context, _ *QueuePartit
 }
 
 func (s *repairBudgetTestShard) Peek(context.Context, *QueuePartition, time.Time, int64) ([]*QueueItem, error) {
+	if s.beforePeek != nil {
+		s.beforePeek()
+	}
 	return s.items, nil
 }
 
@@ -289,4 +293,74 @@ func TestProcessPartitionDefersRepairButDispatchesReservations(t *testing.T) {
 	clock.Advance(s.partitionRequeueAt.Sub(clock.Now()) + time.Millisecond)
 	q.addContinue(t.Context(), p, 2)
 	require.Len(t, q.continues, 1, "continuations resume when the repair backoff expires")
+}
+
+func TestDisabledCapacityLeaseRepairIsNoOp(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*queueProcessor, *repairBudgetTestShard, *QueuePartition)
+	}{
+		{"missing option", func(q *queueProcessor, _ *repairBudgetTestShard, _ *QueuePartition) {
+			q.AllowKeyQueueCapacityLeaseRepair = nil
+		}},
+		{"flag false", func(q *queueProcessor, _ *repairBudgetTestShard, _ *QueuePartition) {
+			q.AllowKeyQueueCapacityLeaseRepair = func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return false }
+		}},
+		{"key queues off", func(q *queueProcessor, _ *repairBudgetTestShard, _ *QueuePartition) {
+			q.AllowKeyQueues = func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return false }
+		}},
+		{"no expired reservations", func(_ *queueProcessor, s *repairBudgetTestShard, _ *QueuePartition) { s.items = s.items[3:] }},
+		{"empty peek", func(_ *queueProcessor, s *repairBudgetTestShard, _ *QueuePartition) { s.items = nil }},
+		{"lease expires during disabled flag lookup", func(q *queueProcessor, s *repairBudgetTestShard, p *QueuePartition) {
+			p.LeaseID = ptrULID(s.clock.Now().Add(PartitionLeaseDuration))
+			q.AllowKeyQueueCapacityLeaseRepair = func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+				s.clock.Advance(PartitionLeaseDuration)
+				return false
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clock := clockwork.NewFakeClock()
+			budget, err := NewKeyQueueCapacityLeaseRepairBudget(DefaultKeyQueueCapacityLeaseRepairLimits())
+			require.NoError(t, err)
+			q, s, p := repairBudgetProcessor(t, clock, "test", budget)
+			p.LeaseID = ptrULID(clock.Now().Add(-time.Second))
+			tc.setup(q, s, p)
+			kept, result, err := q.requeueExpiredCapacityLeases(t.Context(), p, s.items)
+			require.NoError(t, err, "repair must not add lease validation to a disabled/unneeded pass")
+			require.Equal(t, s.items, kept)
+			require.Zero(t, result)
+			require.Zero(t, s.calls.Load())
+			budget.shards.Range(func(_, _ any) bool { t.Error("disabled repair allocated shard budget"); return false })
+		})
+	}
+}
+
+func TestDisabledCapacityLeaseRepairPreservesLateDispatch(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+	q, s, p := repairBudgetProcessor(t, clock, "test", nil)
+	q.AllowKeyQueueCapacityLeaseRepair = nil
+	s.items = s.items[3:]
+	s.beforePeek = func() { clock.Advance(PartitionLeaseDuration + time.Second) }
+	dispatched := 0
+	err := q.ProcessPartition(t.Context(), p, 0, false, func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
+		require.Equal(t, "valid", item.I.ID)
+		dispatched++
+		q.Semaphore().Release(1)
+		return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, dispatched, "ordinary item leasing remains responsible for ownership after a slow peek")
+	require.Zero(t, s.calls.Load())
+	require.False(t, s.partitionRequeueForceAt)
+	require.True(t, s.partitionRequeueAt.After(clock.Now().Add(PartitionRequeueExtension-time.Second)))
+}
+
+func TestEnabledCapacityLeaseRepairRejectsExpiredPartitionLease(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+	q, s, p := repairBudgetProcessor(t, clock, "test", nil)
+	p.LeaseID = ptrULID(clock.Now().Add(-time.Second))
+	_, _, err := q.requeueExpiredCapacityLeases(t.Context(), p, s.items)
+	require.ErrorIs(t, err, ErrPartitionLeaseMismatch)
+	require.Zero(t, s.calls.Load())
 }

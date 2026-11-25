@@ -30,6 +30,18 @@ func (q *queueProcessor) capacityLeaseRepairRetryAt(partitionID string) time.Tim
 	return time.Time{}
 }
 
+func (q *queueProcessor) canRepairExpiredCapacityLease(ctx context.Context, item *QueueItem, now time.Time) bool {
+	if item == nil {
+		return false
+	}
+	// Legacy throttle payloads need ordinary admission to refresh routing. Never
+	// refresh/delete them from a cleanup snapshot outside the guarded mutation.
+	legacyThrottle := item.Data.Throttle != nil && item.Data.Throttle.KeyExpressionHash == ""
+	return !legacyThrottle && item.RefilledFrom != "" && item.CapacityLease != nil &&
+		item.CapacityLease.LeaseID.Timestamp().Before(now) && !item.IsLeased(now) &&
+		item.AtMS <= now.UnixMilli() && q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, *item)
+}
+
 func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *QueuePartition, items []*QueueItem) ([]*QueueItem, capacityLeaseRepairResult, error) {
 	result := capacityLeaseRepairResult{}
 	defer func() {
@@ -43,6 +55,19 @@ func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *Qu
 		}
 	}()
 	if q.Shard().Kind() != enums.QueueShardKindRedis || q.CapacityManager == nil || p.LeaseID == nil {
+		return items, result, nil
+	}
+	first := -1
+	for i, item := range items {
+		if q.canRepairExpiredCapacityLease(ctx, item, q.Clock().Now()) {
+			first = i
+			break
+		}
+	}
+	if first == -1 {
+		// Disabled or unnecessary repair is a no-op: do not add partition-lease
+		// validation, context deadlines, filtering, or repair budget allocation
+		// to ordinary dispatch. Item leasing retains its existing safeguards.
 		return items, result, nil
 	}
 	remaining := p.LeaseID.Timestamp().Sub(q.Clock().Now())
@@ -60,6 +85,7 @@ func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *Qu
 	defer cancel()
 
 	kept := make([]*QueueItem, 0, len(items))
+	kept = append(kept, items[:first]...)
 	var shardBudget *capacityLeaseRepairShardBudget
 	var acquired bool
 	defer func() {
@@ -75,16 +101,12 @@ func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *Qu
 		result.retryAt = q.Clock().Now().Add(wait + time.Duration(rnd.Uint64n(uint64(time.Second))))
 		result.reason = reason
 	}
-	for _, item := range items {
+	for i := first; i < len(items); i++ {
+		item := items[i]
 		now := q.Clock().Now()
-		// Legacy throttle payloads need the ordinary admission path to refresh
-		// their routing before requeueing. Never refresh/delete from a stale
-		// cleanup snapshot outside the conditional Redis mutation.
-		legacyThrottle := item != nil && item.Data.Throttle != nil && item.Data.Throttle.KeyExpressionHash == ""
-		if item == nil || legacyThrottle || item.RefilledFrom == "" || item.CapacityLease == nil ||
-			!item.CapacityLease.LeaseID.Timestamp().Before(now) ||
-			item.IsLeased(now) || item.AtMS > now.UnixMilli() ||
-			!q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, *item) {
+		// The first candidate already passed the processor's flag check. The
+		// shard checks it again before mutation, including activation changes.
+		if i != first && !q.canRepairExpiredCapacityLease(ctx, item, now) {
 			kept = append(kept, item)
 			continue
 		}
