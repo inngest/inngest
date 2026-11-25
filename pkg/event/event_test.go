@@ -140,6 +140,32 @@ func TestEventValidateName(t *testing.T) {
 	}
 }
 
+func TestEventValidateTimestamp(t *testing.T) {
+	tests := []struct {
+		name    string
+		ts      int64
+		wantErr string
+	}{
+		{name: "unset"},
+		{name: "valid", ts: 1700000000000},
+		{name: "before 1980", ts: -1, wantErr: "timestamp is before Jan 1, 1980"},
+		{name: "after 2100", ts: 4102444800001, wantErr: "timestamp is after Jan 1, 2100"},
+		// 3616724959280246832 * 1_000_000 wraps int64 to a time in Dec 2000.
+		{name: "overflows nanoseconds", ts: 3616724959280246832, wantErr: "timestamp is after Jan 1, 2100"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := (Event{Name: "test/event", Timestamp: tt.ts}).Validate(t.Context())
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestEventValidateSessions(t *testing.T) {
 	t.Run("allows valid sessions", func(t *testing.T) {
 		evt := Event{
