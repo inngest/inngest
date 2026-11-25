@@ -16,6 +16,19 @@ message Deploy {
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
   google.protobuf.Timestamp finished_at = 10;
+  // sync is the app sync of a serve deploy, which starts when status is
+  // ready.  it is unset before then and for connect deploys.
+  DeploySync sync = 11;
+}
+
+message DeploySync {
+  // syncing, synced, or failed.
+  string status = 1;
+  // error says why a failed sync failed.
+  string error = 2;
+  // url is the sync's page in the Inngest dashboard.  it is empty while the
+  // sync has no page yet.
+  string url = 3;
 }
 
 // runtime config such as ENV and CMD comes from the image archive.
@@ -46,7 +59,7 @@ message DeployConfig {
 }
 
 message DeploySpec {
-  // memory is in MiB.  omission uses 2048 MiB.
+  // memory is in MiB.  omission uses 1024 MiB per vCPU, and at least 2048 MiB.
   optional uint32 memory = 1;
   // cpu is in vCPUs.  omission uses 1 vCPU.
   optional uint32 cpu = 2;
@@ -58,7 +71,7 @@ message DeployConnectConfig {
 }
 
 message DeployServeConfig {
-  // omission selects a port from the image's exposed ports at launch.
+  // omission probes each port that the app listens on at launch.
   optional uint32 port = 1;
   // omission uses /api/inngest inside the workload.
   optional string path = 2;
