@@ -14,6 +14,7 @@ import {
 import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
 import StoreProvider from '@/components/StoreProvider';
+import cloudDeployCss from '@/components/DeployToCloud/DeployToCloudPopover.css?url';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -30,6 +31,10 @@ export const Route = createRootRoute({
       },
     ],
     links: [
+      {
+        rel: 'stylesheet',
+        href: cloudDeployCss,
+      },
       {
         rel: 'stylesheet',
         href: globalsCss,

@@ -9,6 +9,7 @@ import {
 import { useQuickstart } from '../Quickstart/QuickstartProvider';
 
 import { SettingsMenu } from '../NavigationV2/SettingsMenu';
+import { DeployToCloudPopover } from '../DeployToCloud/DeployToCloudPopover';
 
 export default function TopBar() {
   const { completion, isDevServer } = useQuickstart();
@@ -36,11 +37,12 @@ export default function TopBar() {
             <InngestLogo className="text-basis" width={96} />
           </Link>
         )}
-        <span className="text-primary-intense text-[11px] font-medium leading-none">
+        <span className="text-primary-intense hidden text-[11px] font-medium leading-none sm:inline">
           DEVELOPMENT SERVER
         </span>
       </div>
       <div className="flex items-center gap-3">
+        {isDevServer && <DeployToCloudPopover />}
         <SettingsMenu />
       </div>
     </header>
