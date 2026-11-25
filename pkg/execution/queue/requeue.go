@@ -43,16 +43,19 @@ func (q *queueProducer) Requeue(ctx context.Context, shardName string, i QueueIt
 
 // RequeueByJobID requires scope to include account, environment, and function
 // IDs. It prefers the account's current shard and falls back to shardName while
-// a migration has not copied the item yet.
+// a migration has not copied the item yet. When scope names the item's kind,
+// the current shard is resolved the way Enqueue resolved it. An empty shardName
+// means there is no fallback shard to try.
 func (q *queueProducer) RequeueByJobID(ctx context.Context, scope Scope, shardName string, jobID string, at time.Time) error {
 	if err := scope.ValidateIDs(); err != nil {
 		return err
 	}
 
-	current, resolveErr := q.shards.Resolve(ctx, scope, nil)
+	kind := q.routingKind(scope)
+	current, resolveErr := q.shards.Resolve(ctx, scope, kind)
 	if resolveErr == nil {
 		err := current.RequeueByJobID(ctx, jobID, at)
-		if err == nil || current.Name() == shardName || !errors.Is(err, ErrQueueItemNotFound) {
+		if err == nil || shardName == "" || current.Name() == shardName || !errors.Is(err, ErrQueueItemNotFound) {
 			return err
 		}
 	}
@@ -71,9 +74,19 @@ func (q *queueProducer) RequeueByJobID(ctx context.Context, scope Scope, shardNa
 
 	// The routing handoff may have committed between the destination and source
 	// attempts. One re-resolution closes that single-transaction race window.
-	current, resolveErr = q.shards.Resolve(ctx, scope, nil)
+	current, resolveErr = q.shards.Resolve(ctx, scope, kind)
 	if resolveErr != nil || current.Name() == source.Name() {
 		return err
 	}
 	return current.RequeueByJobID(ctx, jobID, at)
+}
+
+// routingKind mirrors selectShard: only kinds mapped to a system queue are
+// routed by kind; anything else routes by account.
+func (q *queueProducer) routingKind(scope Scope) *string {
+	if scope.QueueItemKind == "" || q.defaultQueueNameForItemKind(scope.QueueItemKind) == nil {
+		return nil
+	}
+	kind := scope.QueueItemKind
+	return &kind
 }

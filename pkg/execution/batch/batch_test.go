@@ -1219,12 +1219,28 @@ type enqueued struct {
 	at   time.Time
 }
 
+type requeued struct {
+	scope     queue.Scope
+	shardName string
+	jobID     string
+	at        time.Time
+}
+
 type fakeProducer struct {
 	queue.Producer
 
-	mu    sync.Mutex
-	items []enqueued
-	err   error
+	mu         sync.Mutex
+	items      []enqueued
+	err        error
+	requeues   []requeued
+	requeueErr error
+}
+
+func (p *fakeProducer) RequeueByJobID(_ context.Context, scope queue.Scope, shardName string, jobID string, at time.Time) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requeues = append(p.requeues, requeued{scope: scope, shardName: shardName, jobID: jobID, at: at})
+	return p.requeueErr
 }
 
 func (p *fakeProducer) Enqueue(_ context.Context, item queue.Item, at time.Time, _ queue.EnqueueOpts) error {
@@ -1242,21 +1258,30 @@ func TestScheduleExecution(t *testing.T) {
 	fnID := uuid.New()
 
 	tests := []struct {
-		name      string
-		acctID    uuid.UUID
-		err       error
-		wantErr   bool
-		wantQueue string
+		name       string
+		acctID     uuid.UUID
+		runNow     bool
+		err        error
+		requeueErr error
+		wantErr    bool
+		wantQueue  string
+		// wantRequeue is whether an existing job is moved to now.
+		wantRequeue bool
 	}{
 		{name: "shared queue", acctID: uuid.New(), wantQueue: queue.KindScheduleBatch},
 		{name: "per-function queue", acctID: splitAcct, wantQueue: fmt.Sprintf("%s:%s", queue.KindScheduleBatch, fnID)},
-		{name: "item exists", acctID: uuid.New(), err: queue.ErrQueueItemExists},
+		{name: "run-now enqueues when no job exists", acctID: uuid.New(), runNow: true, wantQueue: queue.KindScheduleBatch},
+		{name: "timeout schedule leaves an existing job alone", acctID: uuid.New(), err: queue.ErrQueueItemExists},
+		{name: "run-now moves the existing timeout job to now", acctID: uuid.New(), runNow: true, err: queue.ErrQueueItemExists, wantRequeue: true},
+		{name: "run-now ignores a job that is already running", acctID: uuid.New(), runNow: true, err: queue.ErrQueueItemExists, requeueErr: queue.ErrQueueItemAlreadyLeased, wantRequeue: true},
+		{name: "run-now ignores a job that already ran", acctID: uuid.New(), runNow: true, err: queue.ErrQueueItemExists, requeueErr: queue.ErrQueueItemNotFound, wantRequeue: true},
+		{name: "run-now does not fail when the move fails", acctID: uuid.New(), runNow: true, err: queue.ErrQueueItemExists, requeueErr: errors.New("boom"), wantRequeue: true},
 		{name: "enqueue error", acctID: uuid.New(), err: errors.New("boom"), wantErr: true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			q := &fakeProducer{err: tc.err}
+			q := &fakeProducer{err: tc.err, requeueErr: tc.requeueErr}
 			bm := NewRedisBatchManager(nil, q, WithoutBuffer(), WithSplitBatchPartitionByFunction(
 				func(_ context.Context, acctID uuid.UUID) bool { return acctID == splitAcct },
 			))
@@ -1271,6 +1296,9 @@ func TestScheduleExecution(t *testing.T) {
 				},
 				At: time.Now().Add(time.Minute),
 			}
+			if tc.runNow {
+				opts.At = time.Now()
+			}
 
 			err := bm.ScheduleExecution(context.Background(), opts)
 			if tc.wantErr {
@@ -1278,6 +1306,23 @@ func TestScheduleExecution(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			if !tc.wantRequeue {
+				require.Empty(t, q.requeues)
+			} else {
+				require.Len(t, q.requeues, 1)
+				rq := q.requeues[0]
+				require.Equal(t, opts.JobID(), rq.jobID)
+				require.Equal(t, "", rq.shardName)
+				require.WithinDuration(t, time.Now(), rq.at, 5*time.Second)
+				require.Equal(t, queue.Scope{
+					IsSystem:      true,
+					AccountID:     tc.acctID,
+					EnvID:         opts.WorkspaceID,
+					FunctionID:    fnID,
+					QueueItemKind: queue.KindScheduleBatch,
+				}, rq.scope)
+			}
 			if tc.err != nil {
 				return
 			}

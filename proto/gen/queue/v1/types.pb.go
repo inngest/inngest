@@ -236,11 +236,14 @@ func (x *QueueItem) GetCapacityLease() *CapacityLease {
 }
 
 type Scope struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	IsSystem      bool                   `protobuf:"varint,1,opt,name=is_system,json=isSystem,proto3" json:"is_system,omitempty"`
-	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	EnvId         string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
-	FunctionId    string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	IsSystem   bool                   `protobuf:"varint,1,opt,name=is_system,json=isSystem,proto3" json:"is_system,omitempty"`
+	AccountId  string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EnvId      string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	FunctionId string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// queue_item_kind optionally names the kind of an existing item the scope
+	// refers to, so lookups by job ID route to the shard Enqueue chose for it.
+	QueueItemKind string `protobuf:"bytes,5,opt,name=queue_item_kind,json=queueItemKind,proto3" json:"queue_item_kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -299,6 +302,13 @@ func (x *Scope) GetEnvId() string {
 func (x *Scope) GetFunctionId() string {
 	if x != nil {
 		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *Scope) GetQueueItemKind() string {
+	if x != nil {
+		return x.QueueItemKind
 	}
 	return ""
 }
@@ -1094,14 +1104,15 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\t_lease_idB\r\n" +
 	"\v_queue_nameB\x15\n" +
 	"\x13_idempotency_periodB\x11\n" +
-	"\x0f_capacity_lease\"{\n" +
+	"\x0f_capacity_lease\"\xa3\x01\n" +
 	"\x05Scope\x12\x1b\n" +
 	"\tis_system\x18\x01 \x01(\bR\bisSystem\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12\x15\n" +
 	"\x06env_id\x18\x03 \x01(\tR\x05envId\x12\x1f\n" +
 	"\vfunction_id\x18\x04 \x01(\tR\n" +
-	"functionId\"L\n" +
+	"functionId\x12&\n" +
+	"\x0fqueue_item_kind\x18\x05 \x01(\tR\rqueueItemKind\"L\n" +
 	"\rCapacityLease\x12\x19\n" +
 	"\blease_id\x18\x01 \x01(\tR\aleaseId\x12 \n" +
 	"\fissued_at_ms\x18\x02 \x01(\x03R\n" +

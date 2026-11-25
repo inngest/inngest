@@ -209,3 +209,53 @@ func TestProducerRequeueByJobIDRetriesCurrentShardAfterMigrationHandoff(t *testi
 	require.Equal(t, 1, source.requeueByIDCalls)
 	require.Equal(t, 2, destination.requeueByIDCalls)
 }
+
+func TestProducerRequeueByJobIDRoutesByItemKind(t *testing.T) {
+	const kind = "schedule-batch"
+	tests := []struct {
+		name     string
+		mapping  map[string]string
+		itemKind string
+		wantKind *string
+	}{
+		{name: "mapped kind routes like enqueue", mapping: map[string]string{kind: kind}, itemKind: kind, wantKind: func() *string { k := kind; return &k }()},
+		{name: "unmapped kind routes by account", mapping: map[string]string{}, itemKind: kind},
+		{name: "no kind routes by account", mapping: map[string]string{kind: kind}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shard := &requeueRoutingShard{name: "shard"}
+			var gotKind *string
+			registry := mustShardRegistry(t,
+				map[string]QueueShard{"shard": shard},
+				WithShardSelector(func(_ context.Context, _ Scope, k *string) (QueueShard, error) {
+					gotKind = k
+					return shard, nil
+				}),
+			)
+			producer := &queueProducer{shards: registry, queueKindMapping: tt.mapping}
+			scope := Scope{IsSystem: true, AccountID: uuid.New(), EnvID: uuid.New(), FunctionID: uuid.New(), QueueItemKind: tt.itemKind}
+
+			require.NoError(t, producer.RequeueByJobID(context.Background(), scope, "", "job-1", time.Now()))
+			require.Equal(t, tt.wantKind, gotKind)
+			require.Equal(t, 1, shard.requeueByIDCalls)
+		})
+	}
+}
+
+func TestProducerRequeueByJobIDWithoutFallbackShard(t *testing.T) {
+	shard := &requeueRoutingShard{name: "shard", requeueByIDErr: ErrQueueItemNotFound}
+	registry := mustShardRegistry(t,
+		map[string]QueueShard{"shard": shard},
+		WithShardSelector(func(context.Context, Scope, *string) (QueueShard, error) {
+			return shard, nil
+		}),
+	)
+	producer := &queueProducer{shards: registry}
+	scope := Scope{AccountID: uuid.New(), EnvID: uuid.New(), FunctionID: uuid.New()}
+
+	err := producer.RequeueByJobID(context.Background(), scope, "", "job-1", time.Now())
+	require.ErrorIs(t, err, ErrQueueItemNotFound)
+	require.Equal(t, 1, shard.requeueByIDCalls)
+}

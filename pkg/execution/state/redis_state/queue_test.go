@@ -1997,6 +1997,51 @@ func TestQueueRequeueByJobID(t *testing.T) {
 		})
 	})
 
+	t.Run("It moves a system queue job earlier", func(t *testing.T) {
+		// A full batch pulls its schedule-batch timeout job forward to now.
+		r.FlushDB()
+
+		queueName := osqueue.KindScheduleBatch
+		jid := "ws:batch"
+		later := time.Now().Add(time.Minute).Truncate(time.Millisecond)
+		item := osqueue.QueueItem{
+			ID:          jid,
+			FunctionID:  wsA,
+			WorkspaceID: wsA,
+			Data: osqueue.Item{
+				Kind:      osqueue.KindScheduleBatch,
+				QueueName: &queueName,
+				Identifier: state.Identifier{
+					AccountID:   uuid.New(),
+					WorkspaceID: wsA,
+					WorkflowID:  wsA,
+				},
+			},
+			QueueName: &queueName,
+		}
+		_, err := shard.EnqueueItem(ctx, item, later, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		qp := getSystemPartition(t, r, queueName)
+		found, err := shard.Peek(ctx, &qp, time.Now().Add(time.Second), 5)
+		require.NoError(t, err)
+		require.Empty(t, found, "the job should not be due before the requeue")
+
+		now := time.Now().Truncate(time.Millisecond)
+		require.NoError(t, shard.RequeueByJobID(ctx, jid, now))
+
+		found, err = shard.Peek(ctx, &qp, now.Add(time.Second), 5)
+		require.NoError(t, err)
+		require.Len(t, found, 1)
+		require.LessOrEqual(t, found[0].AtMS, now.Add(time.Second).UnixMilli())
+
+		// The partition must be due too, or the processor never peeks the job.
+		parts, err := shard.PartitionPeek(ctx, true, now.Add(time.Second), 10)
+		require.NoError(t, err)
+		require.Len(t, parts, 1)
+		require.Equal(t, queueName, parts[0].ID)
+	})
+
 	t.Run("It requeues the 5th job to a later time", func(t *testing.T) {
 		r.FlushDB()
 
