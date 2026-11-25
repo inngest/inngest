@@ -26,6 +26,7 @@ type DequeueRequest struct {
 	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
 	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
 	CapacityLeased bool                   `protobuf:"varint,3,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	MatchItemLease bool                   `protobuf:"varint,4,opt,name=match_item_lease,json=matchItemLease,proto3" json:"match_item_lease,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -81,6 +82,13 @@ func (x *DequeueRequest) GetCapacityLeased() bool {
 	return false
 }
 
+func (x *DequeueRequest) GetMatchItemLease() bool {
+	if x != nil {
+		return x.MatchItemLease
+	}
+	return false
+}
+
 type DequeueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -117,19 +125,105 @@ func (*DequeueResponse) Descriptor() ([]byte, []int) {
 	return file_queue_v1_consumer_proto_rawDescGZIP(), []int{1}
 }
 
+type DequeueWithLeaseRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// match_item_lease must be true and the item must carry the caller's live lease.
+	Request       *DequeueRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DequeueWithLeaseRequest) Reset() {
+	*x = DequeueWithLeaseRequest{}
+	mi := &file_queue_v1_consumer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DequeueWithLeaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DequeueWithLeaseRequest) ProtoMessage() {}
+
+func (x *DequeueWithLeaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_consumer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DequeueWithLeaseRequest.ProtoReflect.Descriptor instead.
+func (*DequeueWithLeaseRequest) Descriptor() ([]byte, []int) {
+	return file_queue_v1_consumer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DequeueWithLeaseRequest) GetRequest() *DequeueRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+type DequeueWithLeaseResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DequeueWithLeaseResponse) Reset() {
+	*x = DequeueWithLeaseResponse{}
+	mi := &file_queue_v1_consumer_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DequeueWithLeaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DequeueWithLeaseResponse) ProtoMessage() {}
+
+func (x *DequeueWithLeaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_consumer_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DequeueWithLeaseResponse.ProtoReflect.Descriptor instead.
+func (*DequeueWithLeaseResponse) Descriptor() ([]byte, []int) {
+	return file_queue_v1_consumer_proto_rawDescGZIP(), []int{3}
+}
+
 var File_queue_v1_consumer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_consumer_proto_rawDesc = "" +
 	"\n" +
-	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"\x81\x01\n" +
+	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"\xab\x01\n" +
 	"\x0eDequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12'\n" +
-	"\x0fcapacity_leased\x18\x03 \x01(\bR\x0ecapacityLeased\"\x11\n" +
-	"\x0fDequeueResponse2S\n" +
+	"\x0fcapacity_leased\x18\x03 \x01(\bR\x0ecapacityLeased\x12(\n" +
+	"\x10match_item_lease\x18\x04 \x01(\bR\x0ematchItemLease\"\x11\n" +
+	"\x0fDequeueResponse\"M\n" +
+	"\x17DequeueWithLeaseRequest\x122\n" +
+	"\arequest\x18\x01 \x01(\v2\x18.queue.v1.DequeueRequestR\arequest\"\x1a\n" +
+	"\x18DequeueWithLeaseResponse2\xb0\x01\n" +
 	"\x0fConsumerService\x12@\n" +
-	"\aDequeue\x12\x18.queue.v1.DequeueRequest\x1a\x19.queue.v1.DequeueResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
+	"\aDequeue\x12\x18.queue.v1.DequeueRequest\x1a\x19.queue.v1.DequeueResponse\"\x00\x12[\n" +
+	"\x10DequeueWithLease\x12!.queue.v1.DequeueWithLeaseRequest\x1a\".queue.v1.DequeueWithLeaseResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
 
 var (
 	file_queue_v1_consumer_proto_rawDescOnce sync.Once
@@ -143,21 +237,26 @@ func file_queue_v1_consumer_proto_rawDescGZIP() []byte {
 	return file_queue_v1_consumer_proto_rawDescData
 }
 
-var file_queue_v1_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_queue_v1_consumer_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_queue_v1_consumer_proto_goTypes = []any{
-	(*DequeueRequest)(nil),  // 0: queue.v1.DequeueRequest
-	(*DequeueResponse)(nil), // 1: queue.v1.DequeueResponse
-	(*QueueItem)(nil),       // 2: queue.v1.QueueItem
+	(*DequeueRequest)(nil),           // 0: queue.v1.DequeueRequest
+	(*DequeueResponse)(nil),          // 1: queue.v1.DequeueResponse
+	(*DequeueWithLeaseRequest)(nil),  // 2: queue.v1.DequeueWithLeaseRequest
+	(*DequeueWithLeaseResponse)(nil), // 3: queue.v1.DequeueWithLeaseResponse
+	(*QueueItem)(nil),                // 4: queue.v1.QueueItem
 }
 var file_queue_v1_consumer_proto_depIdxs = []int32{
-	2, // 0: queue.v1.DequeueRequest.item:type_name -> queue.v1.QueueItem
-	0, // 1: queue.v1.ConsumerService.Dequeue:input_type -> queue.v1.DequeueRequest
-	1, // 2: queue.v1.ConsumerService.Dequeue:output_type -> queue.v1.DequeueResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 0: queue.v1.DequeueRequest.item:type_name -> queue.v1.QueueItem
+	0, // 1: queue.v1.DequeueWithLeaseRequest.request:type_name -> queue.v1.DequeueRequest
+	0, // 2: queue.v1.ConsumerService.Dequeue:input_type -> queue.v1.DequeueRequest
+	2, // 3: queue.v1.ConsumerService.DequeueWithLease:input_type -> queue.v1.DequeueWithLeaseRequest
+	1, // 4: queue.v1.ConsumerService.Dequeue:output_type -> queue.v1.DequeueResponse
+	3, // 5: queue.v1.ConsumerService.DequeueWithLease:output_type -> queue.v1.DequeueWithLeaseResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_consumer_proto_init() }
@@ -172,7 +271,7 @@ func file_queue_v1_consumer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queue_v1_consumer_proto_rawDesc), len(file_queue_v1_consumer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

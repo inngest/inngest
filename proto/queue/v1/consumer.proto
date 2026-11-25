@@ -7,12 +7,22 @@ option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
 
 service ConsumerService {
   rpc Dequeue(DequeueRequest) returns (DequeueResponse) {}
+  // A distinct RPC makes older proxies reject rather than ignore the condition.
+  rpc DequeueWithLease(DequeueWithLeaseRequest) returns (DequeueWithLeaseResponse) {}
 }
 
 message DequeueRequest {
   string shard_name = 1;
   QueueItem item = 2;
   bool capacity_leased = 3;
+  bool match_item_lease = 4;
 }
 
 message DequeueResponse {}
+
+message DequeueWithLeaseRequest {
+  // match_item_lease must be true and the item must carry the caller's live lease.
+  DequeueRequest request = 1;
+}
+
+message DequeueWithLeaseResponse {}
