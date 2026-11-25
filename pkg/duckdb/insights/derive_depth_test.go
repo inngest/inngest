@@ -2,6 +2,7 @@ package insights
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,11 +53,17 @@ func TestTranspileAcceptsWithInsideSubquery(t *testing.T) {
 }
 
 func BenchmarkTranspileNestedSubqueries(b *testing.B) {
-	for _, depth := range []int{4, 16, 64} {
+	for _, depth := range []int{4, maxCTEs, 16, 64} {
+		wantErr := depth > maxCTEs
 		for shape, q := range nestedSubqueryShapes(depth) {
 			b.Run(fmt.Sprintf("%s/depth=%d", shape, depth), func(b *testing.B) {
 				for b.Loop() {
-					if _, err := Transpile(q, uuid.New(), uuid.New()); err != nil {
+					_, err := Transpile(q, uuid.New(), uuid.New())
+					if wantErr {
+						if err == nil || !strings.Contains(err.Error(), "nesting depth is limited to") {
+							b.Fatalf("expected nesting depth error, got %v", err)
+						}
+					} else if err != nil {
 						b.Fatal(err)
 					}
 				}
