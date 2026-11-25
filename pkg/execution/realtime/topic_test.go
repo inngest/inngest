@@ -368,7 +368,7 @@ func TestTopicRecoveryExhaustionDisconnectsClients(t *testing.T) {
 						clientErr = err
 						return
 					}
-					defer conn.CloseNow()
+					defer func() { _ = conn.CloseNow() }()
 					close(connected)
 					_, _, clientErr = conn.Read(ctx)
 					return
