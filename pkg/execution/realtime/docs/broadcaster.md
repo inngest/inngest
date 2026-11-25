@@ -53,6 +53,18 @@ Retries are async (they don't block fan-out to other subscriptions). If all retr
 3. Keepalives are sent every 15s. After 3 consecutive failures, the subscription is closed.
 4. `Unsubscribe` / `CloseSubscription` removes the subscription. When the last subscriber leaves a topic, the Redis subscription is cancelled.
 
+## Redis subscription recovery
+
+If `Receive` returns before the first Redis subscription acknowledgement, `Subscribe` returns an error. Concurrent subscribers to the same topic wait for the same acknowledgement and observe the same startup failure.
+
+After an established subscription is interrupted, the broadcaster retries `Receive` with exponential backoff and jitter (initially 50–100ms, capped at 1–2s). The client connection remains open while recovery is attempted. Redis must acknowledge the subscription within `BroadcasterOpts.SubscriptionRecoveryTimeout` (default 30s). The timeout also interrupts a `Receive` call that is still waiting for confirmation; it is disarmed on acknowledgement so it does not limit the healthy connection's lifetime.
+
+If recovery times out, or the topic worker panics, the broadcaster detaches and closes the affected client subscriptions so clients can reconnect. Other clients on unrelated topics stay connected. SSE handlers observe an explicit close signal, including on HTTP/2. Clients must support reconnecting and restoring their subscriptions.
+
+The last unsubscribe cancels recovery. A replacement worker waits for its predecessor's Redis cleanup before subscribing, preventing a late `UNSUBSCRIBE` from stopping the replacement.
+
+Recovery records `realtime_subscription_recovery_total` with `result:attempt|recovered|exhausted`, `realtime_subscription_recovery_duration_ms`, and Redis errors with `op:subscribe`. Recovery does **not** buffer or replay messages published during a disconnection. Rueidis may also reconnect internally without returning from `Receive`; these metrics describe broadcaster-level recovery after `Receive` exits.
+
 ## Shutdown
 
 `Close` sends a `closing` message to all subscribers (so they can reconnect to a healthy instance), then waits for a grace period (default 5min) before force-closing connections and cancelling all `runTopic` goroutines.

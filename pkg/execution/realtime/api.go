@@ -240,6 +240,11 @@ func (a *api) GetSSE(w http.ResponseWriter, r *http.Request) {
 				"reason":   "client_disconnect",
 			},
 		})
+	case <-sub.done:
+		metrics.IncrRealtimeDisconnectionsTotal(ctx, metrics.CounterOpt{
+			PkgName: "realtime",
+			Tags:    map[string]any{"protocol": "sse", "reason": "server_close"},
+		})
 	case <-timeout.C:
 		// Connection timeout
 		logger.StdlibLogger(ctx).Info("SSE connection timeout", "acct_id", auth.AccountID(), "sse_id", sub.id)
