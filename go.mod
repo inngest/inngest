@@ -8,7 +8,7 @@ require (
 	github.com/99designs/gqlgen v0.17.27
 	github.com/MauriceGit/skiplist v0.0.0-20211105230623-77f5c8d3e145
 	github.com/VividCortex/ewma v1.2.0
-	github.com/alicebob/miniredis/v2 v2.40.0
+	github.com/alicebob/miniredis/v2 v2.41.0
 	github.com/andybalholm/brotli v1.2.3
 	github.com/apache/iceberg-go v0.7.0
 	github.com/aws/aws-lambda-go v1.41.0
