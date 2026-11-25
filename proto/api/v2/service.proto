@@ -1514,6 +1514,16 @@ service V2 {
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
+  rpc GetComputeAccess(GetComputeAccessRequest) returns (ComputeAccessResponse) {
+    option (google.api.http) = { get: "/compute/access" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Check whether a deploy can start"
+      description: "Returns whether the account can deploy to hosted compute now and, when it can't, the error code and message a deploy would get. When code is verification_required, an account admin verifies the account at verify_url. inngest deploy calls this before it builds."
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
 
   rpc CreateSandbox(CreateSandboxRequest) returns (CreateSandboxResponse) {
     option (google.api.http) = {

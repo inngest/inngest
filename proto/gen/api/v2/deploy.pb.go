@@ -818,6 +818,159 @@ func (x *DeployResponse) GetData() *Deploy {
 	return nil
 }
 
+type GetComputeAccessRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetComputeAccessRequest) Reset() {
+	*x = GetComputeAccessRequest{}
+	mi := &file_api_v2_deploy_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetComputeAccessRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetComputeAccessRequest) ProtoMessage() {}
+
+func (x *GetComputeAccessRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_deploy_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetComputeAccessRequest.ProtoReflect.Descriptor instead.
+func (*GetComputeAccessRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_deploy_proto_rawDescGZIP(), []int{12}
+}
+
+// ComputeAccess says whether a deploy to hosted compute can start now.
+type ComputeAccess struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Allowed bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	// code and message are the error a deploy gets when allowed is false, such
+	// as verification_required.
+	Code    string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	// verify_url is where an account admin verifies the account.  it is set
+	// when code is verification_required.
+	VerifyUrl     string `protobuf:"bytes,4,opt,name=verify_url,json=verifyUrl,proto3" json:"verify_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ComputeAccess) Reset() {
+	*x = ComputeAccess{}
+	mi := &file_api_v2_deploy_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ComputeAccess) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComputeAccess) ProtoMessage() {}
+
+func (x *ComputeAccess) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_deploy_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComputeAccess.ProtoReflect.Descriptor instead.
+func (*ComputeAccess) Descriptor() ([]byte, []int) {
+	return file_api_v2_deploy_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ComputeAccess) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *ComputeAccess) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ComputeAccess) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ComputeAccess) GetVerifyUrl() string {
+	if x != nil {
+		return x.VerifyUrl
+	}
+	return ""
+}
+
+type ComputeAccessResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *ComputeAccess         `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ComputeAccessResponse) Reset() {
+	*x = ComputeAccessResponse{}
+	mi := &file_api_v2_deploy_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ComputeAccessResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComputeAccessResponse) ProtoMessage() {}
+
+func (x *ComputeAccessResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_deploy_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComputeAccessResponse.ProtoReflect.Descriptor instead.
+func (*ComputeAccessResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_deploy_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ComputeAccessResponse) GetData() *ComputeAccess {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type ListDeploysRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -826,7 +979,7 @@ type ListDeploysRequest struct {
 
 func (x *ListDeploysRequest) Reset() {
 	*x = ListDeploysRequest{}
-	mi := &file_api_v2_deploy_proto_msgTypes[12]
+	mi := &file_api_v2_deploy_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -838,7 +991,7 @@ func (x *ListDeploysRequest) String() string {
 func (*ListDeploysRequest) ProtoMessage() {}
 
 func (x *ListDeploysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_deploy_proto_msgTypes[12]
+	mi := &file_api_v2_deploy_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -851,7 +1004,7 @@ func (x *ListDeploysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDeploysRequest.ProtoReflect.Descriptor instead.
 func (*ListDeploysRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_deploy_proto_rawDescGZIP(), []int{12}
+	return file_api_v2_deploy_proto_rawDescGZIP(), []int{15}
 }
 
 type ListDeploysResponse struct {
@@ -864,7 +1017,7 @@ type ListDeploysResponse struct {
 
 func (x *ListDeploysResponse) Reset() {
 	*x = ListDeploysResponse{}
-	mi := &file_api_v2_deploy_proto_msgTypes[13]
+	mi := &file_api_v2_deploy_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -876,7 +1029,7 @@ func (x *ListDeploysResponse) String() string {
 func (*ListDeploysResponse) ProtoMessage() {}
 
 func (x *ListDeploysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_deploy_proto_msgTypes[13]
+	mi := &file_api_v2_deploy_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -889,7 +1042,7 @@ func (x *ListDeploysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDeploysResponse.ProtoReflect.Descriptor instead.
 func (*ListDeploysResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_deploy_proto_rawDescGZIP(), []int{13}
+	return file_api_v2_deploy_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListDeploysResponse) GetData() []*Deploy {
@@ -976,7 +1129,16 @@ const file_api_v2_deploy_proto_rawDesc = "" +
 	"\x13CancelDeployRequest\x12\x1b\n" +
 	"\tdeploy_id\x18\x01 \x01(\tR\bdeployId\"4\n" +
 	"\x0eDeployResponse\x12\"\n" +
-	"\x04data\x18\x01 \x01(\v2\x0e.api.v2.DeployR\x04data\"\x14\n" +
+	"\x04data\x18\x01 \x01(\v2\x0e.api.v2.DeployR\x04data\"\x19\n" +
+	"\x17GetComputeAccessRequest\"v\n" +
+	"\rComputeAccess\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x1d\n" +
+	"\n" +
+	"verify_url\x18\x04 \x01(\tR\tverifyUrl\"B\n" +
+	"\x15ComputeAccessResponse\x12)\n" +
+	"\x04data\x18\x01 \x01(\v2\x15.api.v2.ComputeAccessR\x04data\"\x14\n" +
 	"\x12ListDeploysRequest\"9\n" +
 	"\x13ListDeploysResponse\x12\"\n" +
 	"\x04data\x18\x01 \x03(\v2\x0e.api.v2.DeployR\x04dataB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
@@ -993,7 +1155,7 @@ func file_api_v2_deploy_proto_rawDescGZIP() []byte {
 	return file_api_v2_deploy_proto_rawDescData
 }
 
-var file_api_v2_deploy_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_api_v2_deploy_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_api_v2_deploy_proto_goTypes = []any{
 	(*Deploy)(nil),                   // 0: api.v2.Deploy
 	(*CreateDeployRequest)(nil),      // 1: api.v2.CreateDeployRequest
@@ -1007,30 +1169,34 @@ var file_api_v2_deploy_proto_goTypes = []any{
 	(*GetDeployRequest)(nil),         // 9: api.v2.GetDeployRequest
 	(*CancelDeployRequest)(nil),      // 10: api.v2.CancelDeployRequest
 	(*DeployResponse)(nil),           // 11: api.v2.DeployResponse
-	(*ListDeploysRequest)(nil),       // 12: api.v2.ListDeploysRequest
-	(*ListDeploysResponse)(nil),      // 13: api.v2.ListDeploysResponse
-	nil,                              // 14: api.v2.CreateDeployResponse.UploadHeadersEntry
-	(*timestamppb.Timestamp)(nil),    // 15: google.protobuf.Timestamp
+	(*GetComputeAccessRequest)(nil),  // 12: api.v2.GetComputeAccessRequest
+	(*ComputeAccess)(nil),            // 13: api.v2.ComputeAccess
+	(*ComputeAccessResponse)(nil),    // 14: api.v2.ComputeAccessResponse
+	(*ListDeploysRequest)(nil),       // 15: api.v2.ListDeploysRequest
+	(*ListDeploysResponse)(nil),      // 16: api.v2.ListDeploysResponse
+	nil,                              // 17: api.v2.CreateDeployResponse.UploadHeadersEntry
+	(*timestamppb.Timestamp)(nil),    // 18: google.protobuf.Timestamp
 }
 var file_api_v2_deploy_proto_depIdxs = []int32{
-	15, // 0: api.v2.Deploy.created_at:type_name -> google.protobuf.Timestamp
-	15, // 1: api.v2.Deploy.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 2: api.v2.Deploy.finished_at:type_name -> google.protobuf.Timestamp
+	18, // 0: api.v2.Deploy.created_at:type_name -> google.protobuf.Timestamp
+	18, // 1: api.v2.Deploy.updated_at:type_name -> google.protobuf.Timestamp
+	18, // 2: api.v2.Deploy.finished_at:type_name -> google.protobuf.Timestamp
 	2,  // 3: api.v2.CreateDeployRequest.config:type_name -> api.v2.DeployConfig
 	3,  // 4: api.v2.DeployConfig.spec:type_name -> api.v2.DeploySpec
 	4,  // 5: api.v2.DeployConfig.connect:type_name -> api.v2.DeployConnectConfig
 	5,  // 6: api.v2.DeployConfig.serve:type_name -> api.v2.DeployServeConfig
 	6,  // 7: api.v2.DeployConfig.serve_config:type_name -> api.v2.DeployServeRuntimeConfig
 	0,  // 8: api.v2.CreateDeployResponse.data:type_name -> api.v2.Deploy
-	15, // 9: api.v2.CreateDeployResponse.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 10: api.v2.CreateDeployResponse.upload_headers:type_name -> api.v2.CreateDeployResponse.UploadHeadersEntry
+	18, // 9: api.v2.CreateDeployResponse.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 10: api.v2.CreateDeployResponse.upload_headers:type_name -> api.v2.CreateDeployResponse.UploadHeadersEntry
 	0,  // 11: api.v2.DeployResponse.data:type_name -> api.v2.Deploy
-	0,  // 12: api.v2.ListDeploysResponse.data:type_name -> api.v2.Deploy
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	13, // 12: api.v2.ComputeAccessResponse.data:type_name -> api.v2.ComputeAccess
+	0,  // 13: api.v2.ListDeploysResponse.data:type_name -> api.v2.Deploy
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_deploy_proto_init() }
@@ -1052,7 +1218,7 @@ func file_api_v2_deploy_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_deploy_proto_rawDesc), len(file_api_v2_deploy_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

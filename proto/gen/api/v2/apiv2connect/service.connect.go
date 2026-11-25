@@ -102,6 +102,8 @@ const (
 	V2ListDeploysProcedure = "/api.v2.V2/ListDeploys"
 	// V2CancelDeployProcedure is the fully-qualified name of the V2's CancelDeploy RPC.
 	V2CancelDeployProcedure = "/api.v2.V2/CancelDeploy"
+	// V2GetComputeAccessProcedure is the fully-qualified name of the V2's GetComputeAccess RPC.
+	V2GetComputeAccessProcedure = "/api.v2.V2/GetComputeAccess"
 	// V2CreateSandboxProcedure is the fully-qualified name of the V2's CreateSandbox RPC.
 	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
 	// V2ListSandboxesProcedure is the fully-qualified name of the V2's ListSandboxes RPC.
@@ -241,6 +243,7 @@ type V2Client interface {
 	GetDeploy(context.Context, *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error)
 	ListDeploys(context.Context, *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error)
 	CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	GetComputeAccess(context.Context, *connect.Request[v2.GetComputeAccessRequest]) (*connect.Response[v2.ComputeAccessResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -497,6 +500,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2CancelDeployProcedure,
 			connect.WithSchema(v2Methods.ByName("CancelDeploy")),
+			connect.WithClientOptions(opts...),
+		),
+		getComputeAccess: connect.NewClient[v2.GetComputeAccessRequest, v2.ComputeAccessResponse](
+			httpClient,
+			baseURL+V2GetComputeAccessProcedure,
+			connect.WithSchema(v2Methods.ByName("GetComputeAccess")),
 			connect.WithClientOptions(opts...),
 		),
 		createSandbox: connect.NewClient[v2.CreateSandboxRequest, v2.CreateSandboxResponse](
@@ -819,6 +828,7 @@ type v2Client struct {
 	getDeploy                  *connect.Client[v2.GetDeployRequest, v2.DeployResponse]
 	listDeploys                *connect.Client[v2.ListDeploysRequest, v2.ListDeploysResponse]
 	cancelDeploy               *connect.Client[v2.CancelDeployRequest, v2.DeployResponse]
+	getComputeAccess           *connect.Client[v2.GetComputeAccessRequest, v2.ComputeAccessResponse]
 	createSandbox              *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
 	listSandboxes              *connect.Client[v2.ListSandboxesRequest, v2.ListSandboxesResponse]
 	getSandbox                 *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
@@ -1031,6 +1041,11 @@ func (c *v2Client) ListDeploys(ctx context.Context, req *connect.Request[v2.List
 // CancelDeploy calls api.v2.V2.CancelDeploy.
 func (c *v2Client) CancelDeploy(ctx context.Context, req *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
 	return c.cancelDeploy.CallUnary(ctx, req)
+}
+
+// GetComputeAccess calls api.v2.V2.GetComputeAccess.
+func (c *v2Client) GetComputeAccess(ctx context.Context, req *connect.Request[v2.GetComputeAccessRequest]) (*connect.Response[v2.ComputeAccessResponse], error) {
+	return c.getComputeAccess.CallUnary(ctx, req)
 }
 
 // CreateSandbox calls api.v2.V2.CreateSandbox.
@@ -1306,6 +1321,7 @@ type V2Handler interface {
 	GetDeploy(context.Context, *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error)
 	ListDeploys(context.Context, *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error)
 	CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	GetComputeAccess(context.Context, *connect.Request[v2.GetComputeAccessRequest]) (*connect.Response[v2.ComputeAccessResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -1558,6 +1574,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2CancelDeployProcedure,
 		svc.CancelDeploy,
 		connect.WithSchema(v2Methods.ByName("CancelDeploy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetComputeAccessHandler := connect.NewUnaryHandler(
+		V2GetComputeAccessProcedure,
+		svc.GetComputeAccess,
+		connect.WithSchema(v2Methods.ByName("GetComputeAccess")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateSandboxHandler := connect.NewUnaryHandler(
@@ -1910,6 +1932,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListDeploysHandler.ServeHTTP(w, r)
 		case V2CancelDeployProcedure:
 			v2CancelDeployHandler.ServeHTTP(w, r)
+		case V2GetComputeAccessProcedure:
+			v2GetComputeAccessHandler.ServeHTTP(w, r)
 		case V2CreateSandboxProcedure:
 			v2CreateSandboxHandler.ServeHTTP(w, r)
 		case V2ListSandboxesProcedure:
@@ -2143,6 +2167,10 @@ func (UnimplementedV2Handler) ListDeploys(context.Context, *connect.Request[v2.L
 
 func (UnimplementedV2Handler) CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelDeploy is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetComputeAccess(context.Context, *connect.Request[v2.GetComputeAccessRequest]) (*connect.Response[v2.ComputeAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetComputeAccess is not implemented"))
 }
 
 func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {

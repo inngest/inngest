@@ -53,6 +53,7 @@ const (
 	V2_GetDeploy_FullMethodName                  = "/api.v2.V2/GetDeploy"
 	V2_ListDeploys_FullMethodName                = "/api.v2.V2/ListDeploys"
 	V2_CancelDeploy_FullMethodName               = "/api.v2.V2/CancelDeploy"
+	V2_GetComputeAccess_FullMethodName           = "/api.v2.V2/GetComputeAccess"
 	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
@@ -142,6 +143,7 @@ type V2Client interface {
 	GetDeploy(ctx context.Context, in *GetDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
 	ListDeploys(ctx context.Context, in *ListDeploysRequest, opts ...grpc.CallOption) (*ListDeploysResponse, error)
 	CancelDeploy(ctx context.Context, in *CancelDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
+	GetComputeAccess(ctx context.Context, in *GetComputeAccessRequest, opts ...grpc.CallOption) (*ComputeAccessResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
@@ -523,6 +525,16 @@ func (c *v2Client) CancelDeploy(ctx context.Context, in *CancelDeployRequest, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeployResponse)
 	err := c.cc.Invoke(ctx, V2_CancelDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetComputeAccess(ctx context.Context, in *GetComputeAccessRequest, opts ...grpc.CallOption) (*ComputeAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ComputeAccessResponse)
+	err := c.cc.Invoke(ctx, V2_GetComputeAccess_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1066,6 +1078,7 @@ type V2Server interface {
 	GetDeploy(context.Context, *GetDeployRequest) (*DeployResponse, error)
 	ListDeploys(context.Context, *ListDeploysRequest) (*ListDeploysResponse, error)
 	CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error)
+	GetComputeAccess(context.Context, *GetComputeAccessRequest) (*ComputeAccessResponse, error)
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
@@ -1221,6 +1234,9 @@ func (UnimplementedV2Server) ListDeploys(context.Context, *ListDeploysRequest) (
 }
 func (UnimplementedV2Server) CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelDeploy not implemented")
+}
+func (UnimplementedV2Server) GetComputeAccess(context.Context, *GetComputeAccessRequest) (*ComputeAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetComputeAccess not implemented")
 }
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
@@ -1974,6 +1990,24 @@ func _V2_CancelDeploy_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).CancelDeploy(ctx, req.(*CancelDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetComputeAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetComputeAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetComputeAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetComputeAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetComputeAccess(ctx, req.(*GetComputeAccessRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2941,6 +2975,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelDeploy",
 			Handler:    _V2_CancelDeploy_Handler,
+		},
+		{
+			MethodName: "GetComputeAccess",
+			Handler:    _V2_GetComputeAccess_Handler,
 		},
 		{
 			MethodName: "CreateSandbox",
