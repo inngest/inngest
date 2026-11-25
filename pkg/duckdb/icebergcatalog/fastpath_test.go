@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -382,4 +383,35 @@ func TestParseMetadataVersion(t *testing.T) {
 			t.Errorf("%s: got %d want %d", loc, got, want)
 		}
 	}
+}
+
+// A swap that errs ambiguously (IE the UPDATE committed and its response
+// was lost) must leave the metadata.json it wrote: the catalog may point
+// at it.
+func TestFastPathAmbiguousSwapKeepsMetadata(t *testing.T) {
+	ft := newFastTable(t, []string{"app"}, "")
+	ft.mustCommit("", snapshotUpdates(1, snapLoc(ft, 1)))
+
+	ft.srv.fast.afterSwap = func(err error) error {
+		ft.srv.fast.afterSwap = nil
+		if err != nil {
+			t.Fatalf("swap: %v", err)
+		}
+		return errors.New("error updating table information: driver: bad connection")
+	}
+	before := metadataJSONs(t, ft.loc)
+	if status, body := ft.commit(assertMain(1), snapshotUpdates(2, snapLoc(ft, 2))); status < 500 {
+		t.Fatalf("expected the commit to fail, got %d %v", status, body)
+	}
+	if got := metadataJSONs(t, ft.loc); len(got) != len(before)+1 {
+		t.Fatalf("expected the written metadata.json to stay, got %v (was %v)", got, before)
+	}
+	// The swap did land, and what it points at is still there.
+	if got := ft.stored().Metadata().CurrentSnapshot().SnapshotID; got != 2 {
+		t.Fatalf("stored current snapshot %d", got)
+	}
+	if status, body := do(t, ft.ts, "GET", ft.path, ""); status != 200 {
+		t.Fatalf("load: %d %v", status, body)
+	}
+	ft.mustCommit(assertMain(2), snapshotUpdates(3, snapLoc(ft, 3)))
 }

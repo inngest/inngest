@@ -1446,3 +1446,99 @@ func TestDebugAPIsReportStoreName(t *testing.T) {
 		})
 	}
 }
+
+// TestDuplicatesOnEmptyBatch covers events that arrive again after the batch
+// holding them already ran. The redelivered events land on the next, empty
+// batch: that batch must not get metadata, and must not get a job that would
+// only find it empty.
+func TestDuplicatesOnEmptyBatch(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		// pending leaves the first batch open, so the duplicate lands on a
+		// batch that still holds its events.
+		pending bool
+		// buffered appends through the in-memory buffer, which schedules jobs
+		// itself; otherwise Append and BulkAppend write directly.
+		buffered     bool
+		bulk         bool
+		wantSchedule bool
+	}{
+		{name: "append to empty batch"},
+		{name: "bulk append to empty batch", bulk: true},
+		{name: "buffered flush to empty batch", buffered: true},
+		{name: "buffered flush to pending batch", buffered: true, pending: true, wantSchedule: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+			producer := &fakeProducer{}
+			opts := []RedisBatchManagerOpt{WithoutBuffer()}
+			if tc.buffered {
+				opts = []RedisBatchManagerOpt{WithBufferSettings(10*time.Millisecond, 1)}
+			}
+			mgr := NewRedisBatchManager(bc, producer, opts...)
+			t.Cleanup(func() { _ = mgr.Close() })
+
+			fnID := uuid.New()
+			fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+			item := BatchItem{
+				AccountID:   uuid.New(),
+				WorkspaceID: uuid.New(),
+				AppID:       uuid.New(),
+				FunctionID:  fnID,
+				EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
+				Event:       event.Event{Name: "test/event"},
+			}
+			add := func() string {
+				if tc.bulk {
+					res, err := mgr.BulkAppend(ctx, []BatchItem{item}, fn)
+					require.NoError(t, err)
+					return res.BatchID
+				}
+				res, err := mgr.Append(ctx, item, fn)
+				require.NoError(t, err)
+				return res.BatchID
+			}
+
+			first := ulid.MustParse(add())
+			pointer := bc.KeyGenerator().BatchPointer(ctx, fnID)
+			if !tc.pending {
+				// Run the first batch as the schedule job does, which moves the
+				// pointer to a new, empty batch.
+				_, err = mgr.StartExecution(ctx, item.AccountID, fnID, first, pointer)
+				require.NoError(t, err)
+				_, err = mgr.DeleteKeys(ctx, item.AccountID, fnID, first)
+				require.NoError(t, err)
+			}
+			producer.mu.Lock()
+			producer.items = nil
+			producer.mu.Unlock()
+
+			second := ulid.MustParse(add())
+			if tc.pending {
+				require.Equal(t, first, second)
+			} else {
+				require.NotEqual(t, first, second)
+				require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(ctx, fnID, second)),
+					"empty batch got metadata; keys: %v", r.Keys())
+			}
+
+			producer.mu.Lock()
+			defer producer.mu.Unlock()
+			if !tc.wantSchedule {
+				require.Empty(t, producer.items)
+				return
+			}
+			require.Len(t, producer.items, 1)
+			payload, ok := producer.items[0].item.Payload.(ScheduleBatchPayload)
+			require.True(t, ok)
+			require.Equal(t, second, payload.BatchID)
+		})
+	}
+}

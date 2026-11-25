@@ -490,8 +490,11 @@ type QueueOptions struct {
 
 	lifecycles QueueLifecycleListeners
 
-	AllowKeyQueues                  AllowKeyQueues
-	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
+	AllowKeyQueues                    AllowKeyQueues
+	AllowKeyQueueRefill               AllowKeyQueueRefill
+	AllowKeyQueueCapacityLeaseRepair  AllowKeyQueueCapacityLeaseRepair
+	keyQueueCapacityLeaseRepairBudget *KeyQueueCapacityLeaseRepairBudget
+	PartitionConstraintConfigGetter   PartitionConstraintConfigGetter
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -654,6 +657,30 @@ func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AllowKeyQueues = kq
 	}
+}
+
+// AllowKeyQueueRefill controls backlog admission independently of key-queue routing,
+// ready-item execution, and backlog normalization. Returning false pauses all
+// refills for the function, including subsequent steps of existing runs.
+type AllowKeyQueueRefill func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
+
+func WithAllowKeyQueueRefill(allow AllowKeyQueueRefill) QueueOpt {
+	return func(q *QueueOptions) {
+		q.AllowKeyQueueRefill = allow
+	}
+}
+
+// AllowKeyQueueCapacityLeaseRepair gates automatic repair independently of key
+// queue routing and refill. It defaults off so item-leasing processes can deploy
+// generation fencing before any scanner starts repairing legacy items.
+type AllowKeyQueueCapacityLeaseRepair func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
+
+func WithAllowKeyQueueCapacityLeaseRepair(allow AllowKeyQueueCapacityLeaseRepair) QueueOpt {
+	return func(q *QueueOptions) { q.AllowKeyQueueCapacityLeaseRepair = allow }
+}
+
+func WithKeyQueueCapacityLeaseRepairBudget(budget *KeyQueueCapacityLeaseRepairBudget) QueueOpt {
+	return func(q *QueueOptions) { q.keyQueueCapacityLeaseRepairBudget = budget }
 }
 
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
@@ -997,6 +1024,9 @@ func NewQueueOptions(
 		},
 		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
+		},
+		AllowKeyQueueRefill: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
+			return true
 		},
 		QueueItemEarliestPeekTimeEnabled: func(ctx context.Context, shardName string, acctID, envID, fnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
 			return QueueItemEarliestPeekTimeConfig{}

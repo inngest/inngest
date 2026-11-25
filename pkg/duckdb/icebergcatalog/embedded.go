@@ -62,6 +62,12 @@ type Config struct {
 	// Retention configures snapshot expiry + metadata file cleanup, see
 	// Retention. The zero value is on w/ the defaults.
 	Retention Retention
+	// Credentials, when non-nil, vends storage creds to clients (see
+	// CredentialVendor), IE so a duckdb reader can reach an S3 warehouse
+	// w/o its own S3 secret.
+	Credentials CredentialVendor
+	// ReadOnly serves only reads, see Options.ReadOnly.
+	ReadOnly bool
 }
 
 // Embedded is a running catalog bound to 127.0.0.1.
@@ -138,11 +144,13 @@ func Open(ctx context.Context, cfg Config) (*Embedded, error) {
 		return nil, fmt.Errorf("icebergcatalog: listening: %w", err)
 	}
 	srv := New(cat, Options{
-		Warehouse: warehouse,
-		Token:     token,
-		Logger:    cfg.Logger,
-		Retention: cfg.Retention,
-		CatalogDB: &CatalogDB{DB: db, Dialect: dialect, Name: CatalogName, Properties: props},
+		Warehouse:   warehouse,
+		Token:       token,
+		Logger:      cfg.Logger,
+		Retention:   cfg.Retention,
+		CatalogDB:   &CatalogDB{DB: db, Dialect: dialect, Name: CatalogName, Properties: props},
+		Credentials: cfg.Credentials,
+		ReadOnly:    cfg.ReadOnly,
 	})
 	done := make(chan error, 1)
 	go func() { done <- srv.Start(srvCtx, l) }()

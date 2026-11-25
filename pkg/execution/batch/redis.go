@@ -575,6 +575,7 @@ type BulkAppendResult struct {
 	NextBatchID    string `json:"nextBatchID,omitempty"`   // If overflow, the new batch ID
 	OverflowCount  int    `json:"overflowCount,omitempty"` // Number of events in overflow batch
 	CommittedBytes int64  `json:"committedBytes"`          // Serialized bytes committed to batch lists
+	BatchSize      int    `json:"batchSize"`               // Number of events in BatchID after the append
 }
 
 // BulkAppend appends multiple items to a batch atomically. If the batch becomes full,

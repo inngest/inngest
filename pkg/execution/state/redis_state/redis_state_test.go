@@ -23,6 +23,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSavePauseWithPastDeadline(t *testing.T) {
+	_, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	store := NewPauseStore(NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey, WithPauseEventBodyExpiry()))
+	ctx := t.Context()
+	event := "test/expired"
+	p := state.Pause{
+		ID: uuid.New(), WorkspaceID: uuid.New(), Event: &event,
+		Identifier: state.PauseIdentifier{RunID: ulid.Make()},
+		Expires:    state.Time(time.Now().Add(-24 * time.Hour)),
+	}
+
+	_, err := store.SavePause(ctx, p)
+	require.NoError(t, err)
+	_, err = store.PauseByID(ctx, p.ID, p.WorkspaceID)
+	require.ErrorIs(t, err, state.ErrPauseNotFound)
+	count, err := store.PauseLen(ctx, p.WorkspaceID, event)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
+
 func TestPauseEventBodyExpiry(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {

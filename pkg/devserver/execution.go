@@ -269,6 +269,13 @@ func newExecutor(p executorParams) (execution.Executor, error) {
 		executor.WithRateLimiter(p.RateLimiter),
 		executor.WithLogger(p.Log),
 		executor.WithFunctionLoader(p.CQRS.(state.FunctionLoader)),
+		executor.WithAppNameLoader(func(ctx context.Context, appID uuid.UUID) (string, error) {
+			app, err := p.CQRS.GetAppByID(ctx, appID)
+			if err != nil {
+				return "", err
+			}
+			return app.Name, nil
+		}),
 		executor.WithRealtimePublisher(p.Broadcaster),
 		executor.WithSigningKeyLoader(func(ctx context.Context, envID uuid.UUID) ([]byte, error) {
 			// for httpv2, ensuring we sign sync and async requests using the new driver.

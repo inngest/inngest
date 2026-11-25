@@ -798,15 +798,63 @@ func (a *adapter) adaptStarExpression(n *peg.Node) Expr {
 			s.Exclude = append(s.Exclude, p[len(p)-1])
 		}
 	}
-	// Not modeled on StarExpr; silently dropping them would change which
-	// columns (or column names) the query returns.
 	if r, ok := present(seq.Children[3]); ok {
-		a.unsupported(r, "* REPLACE (...)")
+		// ReplaceList <- 'REPLACE' ReplaceEntries
+		s.Replace = a.adaptReplaceEntries(body(r).Children[1])
 	}
 	if r, ok := present(seq.Children[4]); ok {
-		a.unsupported(r, "* RENAME (...)")
+		// RenameList <- 'RENAME' RenameEntries
+		s.Rename = a.adaptRenameEntries(body(r).Children[1])
 	}
 	return s
+}
+
+func (a *adapter) adaptReplaceEntries(n *peg.Node) []*SelectItem {
+	// ReplaceEntries <- ReplaceEntrySingle / ReplaceEntryList
+	alt := choice(body(n))
+	if alt.Name == "ReplaceEntrySingle" {
+		return []*SelectItem{a.adaptReplaceEntry(body(alt))} // <- ReplaceEntry
+	}
+	// ReplaceEntryList <- Parens(List(ReplaceEntry)), unwrapped like
+	// ExcludeNameList.
+	listSeq := body(body(body(alt)).Children[1])
+	entries := []*SelectItem{a.adaptReplaceEntry(listSeq.Children[0])}
+	for _, tail := range listSeq.Children[1].Children {
+		entries = append(entries, a.adaptReplaceEntry(body(tail).Children[1]))
+	}
+	return entries
+}
+
+func (a *adapter) adaptReplaceEntry(n *peg.Node) *SelectItem {
+	// ReplaceEntry <- Expression 'AS' ColumnReference
+	seq := body(n)
+	name := ""
+	if id, ok := a.adaptColumnReference(seq.Children[2]).(*Ident); ok && len(id.Parts) > 0 {
+		name = id.Parts[len(id.Parts)-1]
+	}
+	return &SelectItem{baseExpr: a.at(n), Expr: a.adaptExpression(seq.Children[0]), Alias: name}
+}
+
+func (a *adapter) adaptRenameEntries(n *peg.Node) []StarRename {
+	// RenameEntries <- RenameEntryList / SingleRenameEntry
+	alt := choice(body(n))
+	if alt.Name == "SingleRenameEntry" {
+		return []StarRename{a.adaptRenameEntry(body(alt))} // <- RenameEntry
+	}
+	// RenameEntryList <- Parens(List(RenameEntry)), unwrapped like
+	// ExcludeNameList.
+	listSeq := body(body(body(alt)).Children[1])
+	entries := []StarRename{a.adaptRenameEntry(listSeq.Children[0])}
+	for _, tail := range listSeq.Children[1].Children {
+		entries = append(entries, a.adaptRenameEntry(body(tail).Children[1]))
+	}
+	return entries
+}
+
+func (a *adapter) adaptRenameEntry(n *peg.Node) StarRename {
+	// RenameEntry <- ExcludeName 'AS' Identifier
+	seq := body(n)
+	return StarRename{From: a.adaptExcludeName(seq.Children[0]), To: literalText(seq.Children[2])}
 }
 
 func (a *adapter) adaptExcludeNames(n *peg.Node) [][]string {

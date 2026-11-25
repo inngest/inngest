@@ -1077,9 +1077,10 @@ type IcebergOptions struct {
 	// Token is a static bearer token. Empty attaches w/
 	// AUTHORIZATION_TYPE 'none'.
 	Token string
-	// DataPath is the warehouse's local directory when it's on local disk,
-	// which the sandbox has to allow (see sandboxStmts). Empty for a
-	// remote warehouse.
+	// DataPath is the warehouse's local directory, or its object store
+	// prefix (`s3://bucket/prefix`), which the sandbox has to allow (see
+	// sandboxStmts). A remote warehouse also needs creds for it, IE vended
+	// by the catalog.
 	DataPath string
 }
 

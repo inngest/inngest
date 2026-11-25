@@ -48,14 +48,19 @@ SELECT * REPLACE (event_data::JSON AS event_data, event_meta::JSON AS event_meta
 CREATE OR REPLACE MACRO inngest_local.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 
--- inngest_local.run_metadata_rollup is one row per (run_id, span_id) with the
--- latest emission of each kind as user_metadata/internal_metadata (kind ->
--- values). Every metadata write is a full replace of its kind, so there's no
+-- inngest_local.run_metadata_rollup is one row per (run_id, span_id, scope)
+-- with the latest emission of each kind as user_metadata/internal_metadata
+-- (kind -> values). scope is part of the key because a span can carry more
+-- than one: step and step_attempt metadata both land on the finalized step
+-- span, and a consumer joins on one scope (IE insights_steps on 'step').
+-- step_attempt is legacy and read as step (see enums.MetadataScopeStepAttempt),
+-- which the executor still writes its own extra metadata (IE inngest.ai) as. Every metadata write is a full replace of its kind, so there's no
 -- merging: an older emission's keys don't survive a newer one, and a null
 -- value is kept as null rather than deleting its key the way
 -- json_merge_patch (RFC 7386) would. kind is stored without its
 -- userland/inngest prefix, so is_user is part of the collapse key or a user
--- "foo" and an internal "foo" would clobber each other. Ties on created_at
+-- "foo" and an internal "foo" would clobber each other (and scope is too,
+-- so the same kind on two scopes of one span stays apart). Ties on created_at
 -- fall back to the values text so the winner is deterministic;
 -- pkg/duckdb/query's GetSpansByRunID collapses with the same ordering.
 --
@@ -63,11 +68,15 @@ SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 -- so a federated executor can roll up lake + buffer emissions together: a
 -- span's latest emission of a kind may be on either side.
 CREATE OR REPLACE MACRO inngest_local.run_metadata_rollup(p_metadata := 'inngest.run_metadata') AS TABLE
-WITH latest AS (
-  SELECT *
+WITH emissions AS (
+  SELECT * REPLACE (CASE scope WHEN 'step_attempt' THEN 'step' ELSE scope END AS scope)
   FROM query_table(p_metadata)
+),
+latest AS (
+  SELECT *
+  FROM emissions
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY account_id, env_id, run_id, span_id, is_user, kind
+    PARTITION BY account_id, env_id, run_id, span_id, scope, is_user, kind
     ORDER BY created_at DESC, values DESC NULLS LAST
   ) = 1
 )
@@ -77,7 +86,7 @@ SELECT
   run_id,
   max(run_queued_at) as run_queued_at,
   span_id,
-  max(scope) as scope,
+  scope,
   max(step_id) as step_id,
   max(step_index) as step_index,
   max(step_attempt) as step_attempt,
@@ -86,7 +95,7 @@ SELECT
   COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (is_user))), json_object()) as user_metadata,
   COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values::JSON} ORDER BY kind) FILTER (NOT is_user))), json_object()) as internal_metadata,
 FROM latest
-GROUP BY account_id, env_id, run_id, span_id
+GROUP BY account_id, env_id, run_id, span_id, scope
 ;
 
 -- Every insights_* logical table is a parameterized table macro, not a
@@ -226,8 +235,17 @@ SELECT
   rts.error as error,
   rts.input as input,
   rts.attributes,
-  rts.attributes->>'$."_inngest.step.userland.id"' AS step_id,
-  TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER) AS step_index,
+  -- A resumed wait/invoke span only carries the hashed step id (the pause
+  -- doesn't know the userland one), so it takes its userland id/index from
+  -- the run's other spans of that hashed id (its pause_started span).
+  COALESCE(
+    rts.attributes->>'$."_inngest.step.userland.id"',
+    CASE WHEN rts.attributes->>'$."_inngest.step.id"' IS NOT NULL THEN max(rts.attributes->>'$."_inngest.step.userland.id"') OVER hashed_step END
+  ) AS step_id,
+  COALESCE(
+    TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER),
+    CASE WHEN rts.attributes->>'$."_inngest.step.id"' IS NOT NULL THEN max(TRY_CAST(rts.attributes->>'$."_inngest.step.userland.index"' AS INTEGER)) OVER hashed_step END
+  ) AS step_index,
   TRY_CAST(rts.attributes->>'$."_inngest.step.attempt"' AS INTEGER) AS step_attempt,
   TRY_CAST(rts.attributes->>'$."_inngest.step.max_attempts"' AS INTEGER) AS step_max_attempts,
   rts.attributes->>'$."_inngest.step.type"' AS step_type,
@@ -237,7 +255,8 @@ SELECT
 FROM query_table(p_spans) rts
 LEFT JOIN inngest_local.run_metadata_rollup(p_metadata := p_metadata) rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'step'
 WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
-  AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned');
+  AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned')
+WINDOW hashed_step AS (PARTITION BY rts.run_id, rts.attributes->>'$."_inngest.step.id"');
 
 CREATE OR REPLACE MACRO inngest_local.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
@@ -245,12 +264,16 @@ FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans,
 
 -- inngest_local.insights_steps(p_account_id, p_env_id) collapses
 -- insights_step_attempts to the latest attempt per (run_id, step_id) --
--- highest step_attempt, tie-broken by start_time -- mirroring the
+-- highest step_attempt, tie-broken by start_time then end_time (a resumed
+-- pause span starts when its pause_started span does) -- mirroring the
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
--- Logical tables and views table).
+-- Logical tables and views table). A step span w/o a userland step id
+-- (IE the executor.step.planned markers) isn't a step: they'd all collapse
+-- into one extra NULL step_id row per run.
 CREATE OR REPLACE MACRO inngest_local.insights_steps(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata') AS TABLE
 SELECT * REPLACE (output::JSON AS output, error::JSON AS error, input::JSON AS input, attributes::JSON AS attributes)
 FROM inngest_local.step_attempt_rows(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
+WHERE step_id IS NOT NULL
 QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
+  PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC, end_time DESC NULLS LAST
 ) = 1;

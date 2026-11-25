@@ -5,7 +5,9 @@ Re-enqueus a queue item within its queue, removing any lease.
 Output:
   0: Successfully re-enqueued item
   1: Queue item not found
-  2: Successfully re-queued to backlog -- TODO: this should be a temporary status
+  2: Expired-capacity repair precondition failed
+  3: Observed lease no longer matches
+  4: Partition lease no longer owned
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
@@ -47,6 +49,11 @@ local requeueToBacklog				= tonumber(ARGV[8])
 local shadowPartitionItem     = ARGV[9]
 local backlogID               = ARGV[10]
 local backlogItem             = ARGV[11]
+local expectedLeaseID         = ARGV[12]
+local expectedPartitionLease  = ARGV[13]
+local expectedGeneration      = tonumber(ARGV[14])
+local expectedCapacityLease   = ARGV[15]
+local expectedRefilledFrom    = ARGV[16]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -54,10 +61,70 @@ local backlogItem             = ARGV[11]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
+-- $include(decode_ulid_time.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
     return 1
+end
+
+-- A scavenger snapshot must not clear a lease acquired after it was read.
+if expectedLeaseID ~= nil and expectedLeaseID ~= "" then
+  local currentLeaseID = item.leaseID
+  if currentLeaseID == nil or currentLeaseID == cjson.null then
+    currentLeaseID = "00000000000000000000000000"
+  end
+  if currentLeaseID ~= expectedLeaseID then
+    return 3
+  end
+end
+
+if expectedPartitionLease ~= nil and expectedPartitionLease ~= "" then
+    -- Go resolves the account/env/function flag again before this call. Once
+    -- disabled, leave ready work for ordinary admission/emergency draining.
+    if requeueToBacklog ~= 1 then
+        return 2
+    end
+
+    -- A stalled scanner may resume after its partition lease was replaced or
+    -- expired. Stop that scanner rather than mutate another owner's items.
+    local partition = get_partition_item(keyPartitionMap, partitionID)
+    if partition == nil or partition.leaseID ~= expectedPartitionLease then
+        return 4
+    end
+    if decode_ulid_time(expectedPartitionLease) <= nowMS then
+        return 4
+    end
+
+    -- Requeue/normalization/refill may supersede the peeked snapshot. Check
+    -- generation (including legacy zero) and provenance before using its data
+    -- to route the item back to a backlog.
+    if (item.genID or 0) ~= expectedGeneration then
+        return 2
+    end
+    if item.rf == nil or item.rf == cjson.null or item.rf == "" or item.rf ~= expectedRefilledFrom then
+        return 2
+    end
+
+    -- Only repair due ready work. Leasing normally removes ready membership;
+    -- also check the live item lease so a stale ready pointer cannot let this
+    -- mutation erase another processor's ownership.
+    if redis.call("ZSCORE", keyReadyQueue, queueID) == false or item.at > nowMS then
+        return 2
+    end
+    if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS then
+        return 2
+    end
+
+    -- Capacity may be refreshed without changing generation. Require the exact
+    -- expired reservation observed by the scanner. As in Acquire, an expiry
+    -- equal to nowMS is still counted as active.
+    if item.cl == nil or item.cl == cjson.null then
+        return 2
+    end
+    if item.cl.l ~= expectedCapacityLease or decode_ulid_time(item.cl.l) >= nowMS then
+        return 2
+    end
 end
 
 -- Update the queue item with a nil lease, at, atMS, etc.

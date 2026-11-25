@@ -184,14 +184,34 @@ func extractBinary(archive []byte) ([]byte, error) {
 
 // writeBinaryAtomically writes data to path with executable permissions via
 // a temp file + rename, so a concurrent reader (or a crash mid-write) never
-// observes a partially-written binary at the final path.
-func writeBinaryAtomically(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o755); err != nil {
+// observes a partially-written binary at the final path. The temp file is
+// unique per call: two processes installing at once (they share a state
+// dir) each rename their own complete file into place, rather than writing
+// over each other's.
+func writeBinaryAtomically(path string, data []byte) (err error) {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("duckdb: creating temporary binary: %w", err)
+	}
+	tmp := f.Name()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmp)
+		}
+	}()
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("duckdb: writing temporary binary: %w", err)
+	}
+	// CreateTemp makes it 0600.
+	if err := f.Chmod(0o755); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("duckdb: writing temporary binary: %w", err)
+	}
+	if err := f.Close(); err != nil {
 		return fmt.Errorf("duckdb: writing temporary binary: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
 		return fmt.Errorf("duckdb: installing binary at %q: %w", path, err)
 	}
 	return nil

@@ -29,6 +29,9 @@ func (q *queueProcessor) addContinue(ctx context.Context, p *QueuePartition, ctr
 
 	q.continuesLock.Lock()
 	defer q.continuesLock.Unlock()
+	if q.capacityLeaseRepairRetryAt(p.ID).After(q.Clock().Now()) {
+		return
+	}
 
 	// If this is the first continuation, check if we're on a cooldown, or if we're
 	// beyond capacity.

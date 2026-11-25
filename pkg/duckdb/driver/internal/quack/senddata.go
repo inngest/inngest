@@ -125,7 +125,7 @@ func decodeSendDataResponseBody(r *reader) error {
 
 // streamNotActiveMessage is the ErrorResponse text the server sends for
 // a SEND_DATA_REQUEST whose stream_id names no currently-open stream.
-// sendDataSendBatch retries on this while the companion PrepareRequest is
+// sendWhenActive retries on this while the companion PrepareRequest is
 // still reaching BIND.
 const streamNotActiveMessage = "No active data stream"
 
@@ -133,12 +133,12 @@ func isStreamNotActiveErr(err error) bool {
 	return errors.Is(err, result.ErrStatementFailed) && strings.Contains(err.Error(), streamNotActiveMessage)
 }
 
-// sendDataStreamReadyTimeout bounds how long sendDataSendBatch retries
-// a "no active stream" rejection before giving up.
-const sendDataStreamReadyTimeout = 5 * time.Second
+// sendDataStatementEndGrace bounds how long sendDataDrive waits for a
+// statement whose send was rejected to end on its own before cancelling it.
+const sendDataStatementEndGrace = time.Second
 
-// sendDataStreamReadyMinBackoff/MaxBackoff bound sendDataSendBatch's
-// retry backoff.
+// sendDataStreamReadyMinBackoff/MaxBackoff bound sendWhenActive's retry
+// backoff.
 const (
 	sendDataStreamReadyMinBackoff = 2 * time.Millisecond
 	sendDataStreamReadyMaxBackoff = 100 * time.Millisecond
@@ -183,90 +183,85 @@ func (s *Session) Append(ctx context.Context, schema, table string, columns []Co
 
 // sendDataDrive runs sql (which must reference
 // scan_data_from_quack_client(streamID, ...) somewhere in its FROM/USING
-// clause) as a PrepareRequest on its own goroutine — blocked server-side
-// until data arrives — while pushing every row in rows as the one batch that
-// PrepareRequest is waiting on, tagged with streamID, followed by a terminal
+// clause) as a PrepareRequest on its own goroutine, blocked server-side
+// until data arrives, while pushing every row in rows as the one batch that
+// PrepareRequest is waiting on, tagged w/ streamID, followed by a terminal
 // message. It then joins the PrepareRequest goroutine and returns its
-// result. Shared by Append (a plain INSERT) and Merge (a
-// MERGE INTO, merge.go) — the two differ only in what sql says to do
-// with the streamed rows once scan_data_from_quack_client yields them.
+// result. Shared by Append (a plain INSERT) and Merge (a MERGE INTO,
+// merge.go), which differ only in what sql does w/ the streamed rows.
+//
+// It never returns w/ the statement still running: a send that fails
+// cancels the statement and waits for it, which marks s Abandoned (see
+// watchForCancel) so its owner doesn't run the next statement on top of
+// this one.
 func (s *Session) sendDataDrive(ctx context.Context, sql, streamID string, columns []ColumnKind, rows [][]any) error {
 	blob, chunkCount, err := rowsToChunks(columns, rows)
 	if err != nil {
 		return err
 	}
 
-	prepareDone := make(chan error, 1)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	done := make(chan struct{})
+	var prepErr error
 	go func() {
-		_, _, err := s.Exec(ctx, sql)
-		prepareDone <- err
+		defer close(done)
+		_, _, prepErr = s.Exec(ctx, sql)
 	}()
 
-	const batchIndex = uint64(1)
-	if err := s.sendDataSendBatch(ctx, streamID, batchIndex, chunkCount, blob, prepareDone); err != nil {
-		return err
+	batchIndex, totalBatches := uint64(1), uint64(1)
+	sendErr := s.sendWhenActive(ctx, done, func() []byte {
+		return encodeSendDataRequest(s.connectionID, streamID, chunkCount, &batchIndex, nil, blob)
+	})
+	if sendErr == nil {
+		// The stream is open by now, so this only sees errStatementEnded
+		// if the statement failed (or was superseded) in between.
+		sendErr = s.sendWhenActive(ctx, done, func() []byte {
+			return encodeSendDataRequest(s.connectionID, streamID, 0, nil, &totalBatches, nil)
+		})
 	}
-	if err := s.sendDataSendTerminal(ctx, streamID, batchIndex); err != nil {
-		return err
+	if sendErr == nil {
+		<-done
+		return prepErr
 	}
 
-	return <-prepareDone
-}
-
-// sendDataSendBatch sends the one dense batch this appender needs, retrying
-// while the server reports no active stream yet (opened once the
-// PrepareRequest goroutine's BIND phase runs). If prepareDone reports before
-// the stream ever opens (the INSERT was rejected), that error is surfaced
-// directly instead of retrying against a stream that will never exist.
-func (s *Session) sendDataSendBatch(ctx context.Context, streamID string, batchIndex, chunkCount uint64, blob []byte, prepareDone <-chan error) error {
-	deadline := time.Now().Add(sendDataStreamReadyTimeout)
-	backoff := sendDataStreamReadyMinBackoff
-	for {
-		payload := encodeSendDataRequest(s.connectionID, streamID, chunkCount, &batchIndex, nil, blob)
-		err := s.sendDataRequest(ctx, payload)
-		if err == nil {
-			return nil
+	if errors.Is(sendErr, errStatementEnded) {
+		// The statement ended w/o taking the rows. Its own error says why
+		// (e.g. the INSERT was rejected at bind).
+		if prepErr != nil {
+			return fmt.Errorf("duckdb: quack appender: prepare ended before the stream took its data: %w", prepErr)
 		}
-		if !isStreamNotActiveErr(err) {
-			return err
-		}
+		return errors.New("duckdb: quack appender: prepare completed without the stream ever accepting data")
+	}
 
+	if errors.Is(sendErr, result.ErrStatementFailed) {
+		// A statement-level rejection of the send is usually the statement's
+		// own error (IE the INSERT failed on the rows), and its PrepareRequest
+		// is answering w/ the same error. Cancelling now would abandon a
+		// statement that already ended, so let it finish first.
 		select {
-		case prepErr := <-prepareDone:
-			if prepErr != nil {
-				return fmt.Errorf("duckdb: quack appender: prepare ended before the stream ever opened: %w", prepErr)
-			}
-			return fmt.Errorf("duckdb: quack appender: prepare completed without the stream ever accepting data")
-		default:
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("duckdb: quack appender: stream %q never became active: %w", streamID, err)
-		}
-
-		select {
+		case <-done:
 		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-		}
-		backoff *= 2
-		if backoff > sendDataStreamReadyMaxBackoff {
-			backoff = sendDataStreamReadyMaxBackoff
+		case <-time.After(sendDataStatementEndGrace):
 		}
 	}
-}
-
-// sendDataSendTerminal closes streamID against totalBatches: a SEND_DATA
-// with no chunks closes the stream against the batch count, so a lost batch
-// fails the statement. No retry here, since sendDataSendBatch having
-// succeeded means the stream is known to be open.
-func (s *Session) sendDataSendTerminal(ctx context.Context, streamID string, totalBatches uint64) error {
-	payload := encodeSendDataRequest(s.connectionID, streamID, 0, nil, &totalBatches, nil)
-	return s.sendDataRequest(ctx, payload)
+	// The statement may still be waiting on its stream. Exec returns as
+	// soon as its ctx ends (the cancel itself runs in the background), so
+	// this wait can't hang on the server. Once done is closed this is a no-op.
+	cancel()
+	<-done
+	if errors.Is(prepErr, result.ErrStatementFailed) {
+		// The statement failed on its own first, and the send only failed
+		// because of that.
+		return fmt.Errorf("%w (sending its data: %v)", prepErr, sendErr)
+	}
+	return sendErr
 }
 
 // sendDataRequest POSTs one already-encoded SEND_DATA_REQUEST and maps its
 // response the same way exec/query map a PrepareRequest's: a statement-level
-// rejection (including "no active stream", which sendDataSendBatch handles
+// rejection (including "no active stream", which sendWhenActive handles
 // specially) wraps result.ErrStatementFailed; anything else unexpected is a
 // transport-level error.
 func (s *Session) sendDataRequest(ctx context.Context, payload []byte) error {

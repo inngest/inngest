@@ -76,6 +76,9 @@ type fastPath struct {
 	// beforeSwap, when non-nil, runs right before the CAS (tests use it to
 	// commit underneath an in-flight commit).
 	beforeSwap func()
+	// afterSwap, when non-nil, replaces the CAS's error (tests use it to
+	// lose a committed swap's response).
+	afterSwap func(error) error
 }
 
 func newFastPath(c *CatalogDB) *fastPath {
@@ -260,9 +263,18 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 		f.beforeSwap()
 	}
 	err = f.swap(ctx, ident, base.loc, loc)
+	if f.afterSwap != nil {
+		err = f.afterSwap(err)
+	}
 	if err != nil {
-		// Nothing points at it. Best effort, same as the sql catalog.
-		_ = wfs.Remove(loc)
+		// Only when the swap matched no row does nothing point at it (best
+		// effort, same as the sql catalog). Any other error is ambiguous,
+		// IE the UPDATE committed and its response was lost, and removing
+		// the file then would leave the table pointing at nothing. An
+		// orphaned metadata.json is harmless.
+		if errors.Is(err, errNotCurrent) {
+			_ = wfs.Remove(loc)
+		}
 		return nil, "", err
 	}
 	return md, loc, nil

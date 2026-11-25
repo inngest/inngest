@@ -74,6 +74,14 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 	}, nil
 }
 
+func (s *Service) GetAccountUsage(ctx context.Context, req *apiv2.GetAccountUsageRequest) (*apiv2.GetAccountUsageResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetAccountUsage_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no account usage was fetched.")
+	}
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
+		"Account usage is only available in Inngest Cloud. Run: inngest api --prod get-account-usage")
+}
+
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
 	// Extract environment from X-Inngest-Env header
 	envName := s.base.GetInngestEnvHeader(ctx)
