@@ -45,6 +45,9 @@ func TestDeployApp(t *testing.T) {
 		rejected string
 		// deploy is the GetDeploy response, with the deploy ID as {id}.
 		deploy string
+		// access is the GetComputeAccess response.  without it the API has
+		// no such route, as before the check existed.
+		access string
 		// wantCalls is the API calls in order.  the API names deploys d1,
 		// d2, and so on.
 		wantCalls []string
@@ -68,6 +71,24 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 				"Deploy d1 is ready.  Artifact digest abc",
 				"inngest/deploy.sync_failed",
 			},
+		},
+		{
+			name:       "account can deploy",
+			toml:       "[apps.inngest]\nconnect = {}",
+			access:     `{"data":{"allowed":true}}`,
+			wantDocker: []string{"-t", "<ref>", "-f", "./Dockerfile", "."},
+			wantBuilt:  []string{"inngest"},
+			wantConfig: map[string]string{"inngest": `{"connect":{}}`},
+			deploy:     ready,
+			wantCalls:  []string{"access", "create inngest", "upload d1", "commit inngest d1", "get d1"},
+		},
+		{
+			// outside a terminal, deploy prints the link instead of waiting.
+			name:      "account must be verified first",
+			toml:      "[apps.inngest]\nconnect = {}",
+			access:    `{"data":{"allowed":false,"code":"verification_required","message":"This account must be verified before it can use compute or sandboxes. Verify at https://app.inngest.com/verify","verifyUrl":"https://app.inngest.com/verify"}}`,
+			wantCalls: []string{"access"},
+			err:       "verification_required: This account must be verified before it can use compute or sandboxes. Verify at https://app.inngest.com/verify",
 		},
 		{
 			name:       "connect",
@@ -185,6 +206,13 @@ dockerfile = "./cmd/all-in-one/Dockerfile"`,
 				calls = append(calls, call)
 			}
 			mux := http.NewServeMux()
+			if tc.access != "" {
+				mux.HandleFunc("GET /v2/compute/access", func(w http.ResponseWriter, r *http.Request) {
+					record("access")
+					require.Equal(t, "Bearer access-token", r.Header.Get("Authorization"))
+					_, _ = w.Write([]byte(tc.access))
+				})
+			}
 			mux.HandleFunc("POST /v2/deploys/{name}", func(w http.ResponseWriter, r *http.Request) {
 				name := r.PathValue("name")
 				record("create " + name)
