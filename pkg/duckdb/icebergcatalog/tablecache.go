@@ -1,10 +1,12 @@
 package icebergcatalog
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"sync"
 
+	icebergio "github.com/apache/iceberg-go/io"
 	"github.com/apache/iceberg-go/table"
 )
 
@@ -29,6 +31,10 @@ type cachedTable struct {
 	loc  string
 	md   table.Metadata
 	body json.RawMessage
+	// fsF is the loaded table's FS factory (bound to the catalog's trusted
+	// properties), kept so remote metadata cleanup works even w/o CatalogDB
+	// or StorageProperties.
+	fsF func(context.Context) (icebergio.IO, error)
 }
 
 func tableKey(ident table.Identifier) string { return strings.Join(ident, "\x00") }
@@ -46,16 +52,32 @@ func (c *tableCache) get(ident table.Identifier) (cachedTable, bool) {
 // body returns md's JSON encoding, reusing the cached one when loc is the
 // cached location and caching it otherwise.
 func (c *tableCache) body(ident table.Identifier, loc string, md table.Metadata) (json.RawMessage, error) {
+	return c.bodyFS(ident, loc, md, nil)
+}
+
+func (c *tableCache) bodyFS(ident table.Identifier, loc string, md table.Metadata, fsF func(context.Context) (icebergio.IO, error)) (json.RawMessage, error) {
 	if t, ok := c.get(ident); ok && t.loc == loc {
+		if t.fsF == nil && fsF != nil {
+			c.mu.Lock()
+			if cur, exists := c.m[tableKey(ident)]; exists && cur.loc == loc && cur.fsF == nil {
+				cur.fsF = fsF
+				c.m[tableKey(ident)] = cur
+			}
+			c.mu.Unlock()
+		}
 		return t.body, nil
 	}
-	return c.put(ident, loc, md)
+	return c.putFS(ident, loc, md, fsF)
 }
 
 // put encodes md and caches it as ident's latest version, refusing to
 // regress an existing entry for the same table UUID to an older metadata
 // version and bounding total cache size.
 func (c *tableCache) put(ident table.Identifier, loc string, md table.Metadata) (json.RawMessage, error) {
+	return c.putFS(ident, loc, md, nil)
+}
+
+func (c *tableCache) putFS(ident table.Identifier, loc string, md table.Metadata, fsF func(context.Context) (icebergio.IO, error)) (json.RawMessage, error) {
 	body, err := json.Marshal(md)
 	if err != nil {
 		return nil, err
@@ -68,6 +90,9 @@ func (c *tableCache) put(ident table.Identifier, loc string, md table.Metadata) 
 	}
 	if existing, ok := c.m[key]; ok {
 		if existing.md != nil && md != nil && existing.md.TableUUID() == md.TableUUID() {
+			if fsF == nil {
+				fsF = existing.fsF
+			}
 			oldV := parseMetadataVersion(existing.loc)
 			newV := parseMetadataVersion(loc)
 			if oldV >= 0 && newV >= 0 && newV < oldV {
@@ -86,7 +111,7 @@ func (c *tableCache) put(ident table.Identifier, loc string, md table.Metadata) 
 			}
 		}
 	}
-	c.m[key] = cachedTable{loc: loc, md: md, body: body}
+	c.m[key] = cachedTable{loc: loc, md: md, body: body, fsF: fsF}
 	return body, nil
 }
 

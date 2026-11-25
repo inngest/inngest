@@ -84,6 +84,11 @@ type Options struct {
 	// was created on. It turns on the load/commit fast path (see
 	// fastPath), which skips re-reading metadata.json on every request.
 	CatalogDB *CatalogDB
+	// StorageProperties are trusted catalog-level FileIO properties (e.g.
+	// `s3.endpoint`, `s3.region`, `s3.access-key-id`) for remote metadata
+	// cleanup and table purge when CatalogDB is nil. When unset, CatalogDB's
+	// Properties or the loaded table's FS(ctx) is used instead.
+	StorageProperties iceberg.Properties
 	// Credentials, when non-nil, vends storage credentials to clients that
 	// ask for them (see CredentialVendor). W/o it, clients need their own.
 	Credentials CredentialVendor
@@ -117,15 +122,20 @@ func New(cat Catalog, opts Options) *Server {
 	return s
 }
 
-func (s *Server) getFileIO(ctx context.Context, loc string) (icebergio.IO, error) {
-	if s.fast != nil {
+func (s *Server) getFileIO(ctx context.Context, loc string, tableFS func(context.Context) (icebergio.IO, error)) (icebergio.IO, error) {
+	if len(s.opts.StorageProperties) > 0 {
+		return s.io.load(ctx, s.opts.StorageProperties, loc)
+	}
+	if s.fast != nil && (len(s.fast.props) > 0 || s.fast.io.loadFS != nil) {
 		return s.fast.io.load(ctx, s.fast.props, loc)
 	}
-	var props iceberg.Properties
-	if s.opts.CatalogDB != nil {
-		props = s.opts.CatalogDB.Properties
+	if s.opts.CatalogDB != nil && len(s.opts.CatalogDB.Properties) > 0 {
+		return s.io.load(ctx, s.opts.CatalogDB.Properties, loc)
 	}
-	return s.io.load(ctx, props, loc)
+	if tableFS != nil && s.io.loadFS == nil {
+		return tableFS(ctx)
+	}
+	return s.io.load(ctx, nil, loc)
 }
 
 // endpoints is advertised in GET /v1/config so clients know what we support.
@@ -629,7 +639,7 @@ func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
-	body, err := s.tables.body(ident, tbl.MetadataLocation(), tbl.Metadata())
+	body, err := s.tables.bodyFS(ident, tbl.MetadataLocation(), tbl.Metadata(), tbl.FS)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -703,6 +713,7 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		current  table.Metadata
 		cached   cachedTable
 		verified bool
+		tableFS  func(context.Context) (icebergio.IO, error)
 	)
 	fromCache := false
 	if s.fast != nil {
@@ -713,12 +724,15 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	}
 	if fromCache {
 		current = cached.md
+		tableFS = cached.fsF
 	}
 	if !fromCache || !requirementsHold(req.Requirements, current) {
 		verified = false
 		current = nil
+		tableFS = nil
 		if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
 			current = tbl.Metadata()
+			tableFS = tbl.FS
 		} else if !errors.Is(err, catalog.ErrNoSuchTable) {
 			writeCatalogError(w, err)
 			return
@@ -757,8 +771,8 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
-	s.deleteOldMetadata(ctx, current, md, loc)
-	body, err := s.tables.put(ident, loc, md)
+	s.deleteOldMetadata(ctx, ident, current, md, loc, tableFS)
+	body, err := s.tables.putFS(ident, loc, md, tableFS)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -814,7 +828,7 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 				s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
 			}
 		} else {
-			s.purgeRemoteTable(ctx, ident, loc, tbl.MetadataLocation(), tbl.Metadata())
+			s.purgeRemoteTable(ctx, ident, loc, tbl.MetadataLocation(), tbl.Metadata(), tbl.FS)
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -824,8 +838,8 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 // (e.g. s3://) via FileIO. It prefers RemoveAllIO, then ListableIO +
 // BulkRemovableIO/WriteFileIO.Remove, and falls back to removing known
 // metadata/manifest files under loc via WriteFileIO.Remove.
-func (s *Server) purgeRemoteTable(ctx context.Context, ident table.Identifier, loc, metaLoc string, md table.Metadata) {
-	fsys, err := s.getFileIO(ctx, loc)
+func (s *Server) purgeRemoteTable(ctx context.Context, ident table.Identifier, loc, metaLoc string, md table.Metadata, tableFS func(context.Context) (icebergio.IO, error)) {
+	fsys, err := s.getFileIO(ctx, loc, tableFS)
 	if err != nil {
 		if s.opts.Logger != nil {
 			s.opts.Logger.Warn("dropped iceberg table but failed to load FileIO for purge", "table", strings.Join(ident, "."), "location", loc, "error", err)

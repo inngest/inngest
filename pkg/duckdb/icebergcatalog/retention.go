@@ -189,7 +189,7 @@ func (s *Server) retain(base, md table.Metadata, client table.Updates, req *comm
 // through the log, so a file that fell out of it is unreachable anyways.
 // Only files directly under the table's metadata dir named like the catalog
 // names them are touched (both local and remote warehouses via WriteFileIO).
-func (s *Server) deleteOldMetadata(ctx context.Context, prev, next table.Metadata, nextLoc string) {
+func (s *Server) deleteOldMetadata(ctx context.Context, ident table.Identifier, prev, next table.Metadata, nextLoc string, tableFS func(context.Context) (icebergio.IO, error)) {
 	if s.opts.Retention.KeepOldMetadata || prev == nil {
 		return
 	}
@@ -256,7 +256,14 @@ func (s *Server) deleteOldMetadata(ctx context.Context, prev, next table.Metadat
 	if len(toDelete) == 0 {
 		return
 	}
-	fsys, err := s.getFileIO(ctx, toDelete[0])
+	if tableFS == nil && len(s.opts.StorageProperties) == 0 && s.fast == nil &&
+		(s.opts.CatalogDB == nil || len(s.opts.CatalogDB.Properties) == 0) &&
+		s.io.loadFS == nil && s.cat != nil && len(ident) > 0 {
+		if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
+			tableFS = tbl.FS
+		}
+	}
+	fsys, err := s.getFileIO(ctx, toDelete[0], tableFS)
 	if err != nil {
 		if s.opts.Logger != nil {
 			s.opts.Logger.Warn("failed to load FileIO for old iceberg metadata cleanup", "location", dir, "error", err)
