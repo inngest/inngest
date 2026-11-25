@@ -80,7 +80,7 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 		signalCorrId = *p.SignalID
 	}
 
-	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
+	extendedExpiry := p.Expires.Time().Add(10 * time.Minute).Unix()
 
 	createdAt := p.CreatedAt
 	if createdAt.IsZero() {
@@ -130,7 +130,7 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 		signalCorrId,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
-		int(extendedExpiry),
+		extendedExpiry,
 		nowUnixSeconds,
 		replaceSignalOnConflict,
 		expireEventBodies,
