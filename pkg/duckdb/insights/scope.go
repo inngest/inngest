@@ -439,6 +439,13 @@ func parseExcludeName(star *parser.StarExpr, i int) (x excludeName, display stri
 	if star.ExcludeParts != nil {
 		parts = star.ExcludeParts[i]
 	}
+	return parseStarColumnName(parts)
+}
+
+// parseStarColumnName parses a star modifier's dotted column name (an
+// EXCLUDE or RENAME entry), "col" or "t.col", also returning it as written
+// for error messages. ok is false for anything past "t.col".
+func parseStarColumnName(parts []string) (x excludeName, display string, ok bool) {
 	display = strings.Join(parts, ".")
 	switch len(parts) {
 	case 1:

@@ -49,6 +49,8 @@ local shadowPartitionItem     = ARGV[11]
 local backlogItem             = ARGV[12]
 local backlogID               = ARGV[13]
 local normalizeFromBacklogID  = ARGV[14]
+local singletonMigration      = ARGV[15] == "1"
+local snapshotGeneration      = tonumber(ARGV[16])
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -57,9 +59,29 @@ local normalizeFromBacklogID  = ARGV[14]
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
 -- $include(update_backlog_pointer.lua)
+-- $include(decode_ulid_time.lua)
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
 local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
+
+-- A normalizer may hold a snapshot read before a worker or migration claimed or
+-- removed the item. Check current storage inside this transaction before replacing
+-- it; normalization must never recreate a deleted or already-refilled source copy.
+if is_normalize then
+  local stored = redis.call("HGET", queueKey, queueID)
+  if not stored or not redis.call("ZSCORE", keyNormalizeFromBacklogSet, queueID) then
+    return -1
+  end
+  local current = cjson.decode(stored)
+  if current.leaseID ~= nil and current.leaseID ~= cjson.null and decode_ulid_time(current.leaseID) > nowMS then
+    return -2
+  end
+  -- A refill/worker retry may have restored the same backlog membership after
+  -- the snapshot was read. Never roll its attempt, generation or schedule back.
+  if snapshotGeneration == nil or (tonumber(current.genID) or 0) ~= snapshotGeneration then
+    return -1
+  end
+end
 
 -- Check idempotency exists
 if redis.call("EXISTS", idempotencyKey) ~= 0 and not is_normalize then
@@ -72,7 +94,6 @@ if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
 end
 
 -- Migration may join the same run's existing ownership, never another run's.
-local singletonMigration = ARGV[15] == "1"
 -- Check if the item is a singleton and if an existing item already exists
 if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
   local holder = redis.call("GET", singletonKey)

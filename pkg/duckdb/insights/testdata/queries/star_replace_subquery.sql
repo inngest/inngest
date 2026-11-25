@@ -1,0 +1,1 @@
+SELECT * REPLACE ((SELECT max(r2.status) FROM runs r2) AS status) FROM runs

@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  gci:
+    sections:
+      - "standard"
+      - "default"
+      - "prefix(github.com/goccy/go-yaml)"
+      - "blank"
+      - "dot"
+  gofmt:
+    simplify: true
+  govet:
+    disable:
+      - tests
+  misspell:
+    locale: US
+  perfsprint:
+    int-conversion: false
+    err-error: false
+    errorf: true
+    sprintf1: false
+    strconcat: false
+  staticcheck:
+    checks: ["all", "-ST1000", "-ST1005"]
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gci
+    - gofmt
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - perfsprint
+    - staticcheck
+    - typecheck
+    - unused
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - staticcheck

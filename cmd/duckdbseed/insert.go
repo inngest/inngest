@@ -161,7 +161,8 @@ type InsertOptions struct {
 	BatchSize int
 	// Parallelism is how many writer sets run, each w/ one writer (its own
 	// quack connection + appender) per table. Clamped to >= 1. Values > 1
-	// mean concurrent commits to the same table.
+	// mean concurrent Iceberg commits to the same table, which conflict and
+	// retry.
 	Parallelism int
 	// OnProgress, if non-nil, is called once each batch is flushed to every
 	// table, w/ that batch's own 1-based index and the total batch count
@@ -430,7 +431,8 @@ type tableWork struct {
 // opts.Parallelism writers per table, each its own quack connection and
 // appender. A dispatcher hands each batch to every table's queue, so the
 // tables flush in parallel and a slow table (spans) only holds back its own
-// writers until its queue fills.
+// writers until its queue fills. Iceberg commits to different tables don't
+// conflict, so w/ Parallelism 1 nothing ever retries.
 //
 // A batch is reported to opts.OnProgress once its last table has flushed.
 func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work <-chan indexedBatch, opts InsertOptions, total, totalBatches int) (Summary, Timings, error) {
@@ -488,7 +490,7 @@ func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work
 					return fmt.Errorf("duckdbseed: opening %s connection: %w", table.name, err)
 				}
 				defer conn.Close()
-				appender, err := duckdbdriver.NewQuackAppenderFromConn(gctx, conn, duckdbdriver.DuckLakeAlias, "main", table.name, table.columns)
+				appender, err := duckdbdriver.NewQuackAppenderFromConn(gctx, conn, duckdbdriver.LakeAlias, "main", table.name, table.columns)
 				if err != nil {
 					return fmt.Errorf("duckdbseed: creating %s appender: %w", table.name, err)
 				}
@@ -535,23 +537,21 @@ func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work
 	return summary, timings, err
 }
 
-// sortRuns, sortSpans, and sortEvents sort a batch's rows in place to match
-// each table's declared SORTED BY key exactly
-// (pkg/db/duckdb/migrations/000001_baseline.sql) — GenerateRuns produces
-// rows in arbitrary RNG order, so without this, writes would land out of
-// the order DuckLake expects for zonemap pruning. Each key is built as a
-// single sortable string — year and month zero-padded, timestamps as
-// zero-padded UnixNano — so a plain lexicographic string comparison
-// reproduces the exact multi-column ORDER BY the schema declares, including
-// that tenant/natural-key columns outrank the trailing timestamp column(s)
-// within the same year/month.
+// sortRuns, sortSpans, sortEvents and sortMetadata sort a batch's rows in
+// place by partition month, then tenant + natural key, then timestamp(s).
+// The lake tables don't declare a sort order (appends land unsorted), and
+// GenerateRuns produces rows in arbitrary RNG order, so this just makes a
+// seeded lake's files look like sorted (compacted) ones for min/max
+// pruning. Each key is a single sortable string (year and month
+// zero-padded, timestamps as zero-padded UnixNano), so a plain
+// lexicographic comparison gives the multi-column order.
 
 func sortRuns(rows []RunRow) {
 	sort.Slice(rows, func(i, j int) bool { return runSortKey(rows[i]) < runSortKey(rows[j]) })
 }
 
-// runSortKey mirrors inngest.runs' SORTED BY (year(queued_at),
-// month(queued_at), account_id, env_id, run_id, queued_at).
+// runSortKey is (year(queued_at), month(queued_at), account_id, env_id,
+// run_id, queued_at).
 func runSortKey(r RunRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d",
 		r.QueuedAt.Year(), r.QueuedAt.Month(), r.AccountID, r.EnvID, r.RunID, r.QueuedAt.UnixNano())
@@ -561,9 +561,8 @@ func sortSpans(rows []SpanRow) {
 	sort.Slice(rows, func(i, j int) bool { return spanSortKey(rows[i]) < spanSortKey(rows[j]) })
 }
 
-// spanSortKey mirrors inngest.run_trace_spans' SORTED BY
-// (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id,
-// start_time, end_time).
+// spanSortKey is (year(run_queued_at), month(run_queued_at), account_id,
+// env_id, run_id, start_time, end_time).
 func spanSortKey(s SpanRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d-%020d",
 		s.RunQueuedAt.Year(), s.RunQueuedAt.Month(), s.AccountID, s.EnvID, s.RunID,
@@ -574,8 +573,8 @@ func sortEvents(rows []EventRow) {
 	sort.Slice(rows, func(i, j int) bool { return eventSortKey(rows[i]) < eventSortKey(rows[j]) })
 }
 
-// eventSortKey mirrors inngest.events' SORTED BY (year(received_at),
-// month(received_at), account_id, env_id, internal_id, received_at).
+// eventSortKey is (year(received_at), month(received_at), account_id,
+// env_id, internal_id, received_at).
 func eventSortKey(e EventRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d",
 		e.ReceivedAt.Year(), e.ReceivedAt.Month(), e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt.UnixNano())
@@ -585,11 +584,10 @@ func sortMetadata(rows []MetadataRow) {
 	sort.Slice(rows, func(i, j int) bool { return metadataSortKey(rows[i]) < metadataSortKey(rows[j]) })
 }
 
-// metadataSortKey mirrors inngest.run_metadata's SORTED BY
-// (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id,
-// scope, step_id, step_index, step_attempt, span_id, kind). step_index/
-// step_attempt sort as -1 when NULL (a run-scoped row) — only meant to keep
-// output deterministic, not to reproduce DuckDB's own NULL-ordering rules.
+// metadataSortKey is (year(run_queued_at), month(run_queued_at),
+// account_id, env_id, run_id, scope, step_id, step_index, step_attempt,
+// span_id, kind). step_index/step_attempt sort as -1 when NULL (a
+// run-scoped row), only to keep output deterministic.
 func metadataSortKey(m MetadataRow) string {
 	var stepID string
 	if m.StepID != nil {

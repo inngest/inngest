@@ -29,7 +29,7 @@ func requireQuackExtension(t *testing.T) {
 	}
 }
 
-// newTestDB opens a fresh DuckDB subprocess (DuckLake attached, schema
+// newTestDB opens a fresh DuckDB subprocess (Iceberg lake attached, schema
 // migrated, quack enabled with parallelism connections) rooted at a temp
 // directory, and returns both the connector (needed for additional
 // concurrent connections — see InsertGeneratedRuns) and the *sql.DB (for
@@ -40,12 +40,9 @@ func newTestDB(t *testing.T, parallelism int) (*driver.Connector, *sql.DB) {
 	requireQuackExtension(t)
 	dir := t.TempDir()
 
-	connector, db, err := openDuckDB(t.Context(), dir, parallelism)
+	connector, db, closeDB, err := openDuckDB(t.Context(), dir, parallelism)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = db.Close()
-		_ = connector.Close()
-	})
+	t.Cleanup(closeDB)
 	return connector, db
 }
 
@@ -53,7 +50,7 @@ func newTestDB(t *testing.T, parallelism int) (*driver.Connector, *sql.DB) {
 // equivalence assertions between two independently-populated databases.
 func runIDsInDB(t *testing.T, db *sql.DB) []string {
 	t.Helper()
-	rows, err := db.QueryContext(context.Background(), "SELECT run_id FROM "+driver.DuckLakeAlias+".runs ORDER BY run_id;")
+	rows, err := db.QueryContext(context.Background(), "SELECT run_id FROM "+driver.LakeAlias+".runs ORDER BY run_id;")
 	require.NoError(t, err)
 	defer rows.Close()
 

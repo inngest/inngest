@@ -239,3 +239,33 @@ func TestExecuteJSONDotNumeric(t *testing.T) {
 		require.InDelta(t, 101.0, rows[0][1], 1e-9)
 	})
 }
+
+// TestExecuteStarModifiers runs a star w/ EXCEPT, REPLACE and RENAME end to
+// end: DuckDB (and the rendered-SQL guard) accept what Transpile renders,
+// and the result's columns are the renamed, replaced ones.
+func TestExecuteStarModifiers(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	accountID, envID := uuid.New(), uuid.New()
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+		 VALUES (?, ?, 'internal-0', now(), 'api', 'evt-0', 'App/X', '{}', '1', now(), '{}');`,
+		accountID.String(), envID.String(),
+	)
+	require.NoError(t, err)
+
+	tr, err := insights.Transpile(
+		"SELECT * EXCEPT (data, meta, ts, received_at) REPLACE (lower(name) AS name) RENAME (id AS event_id) FROM events ORDER BY event_id",
+		accountID, envID)
+	require.NoError(t, err)
+	res, err := insights.Execute(ctx, db, tr)
+	require.NoError(t, err)
+	var names []string
+	for _, c := range res.Columns {
+		names = append(names, c.Name)
+	}
+	require.Equal(t, []string{"event_id", "name", "v"}, names)
+	require.Len(t, res.Rows, 1)
+	require.Equal(t, []any{"evt-0", "app/x", "1"}, res.Rows[0])
+}

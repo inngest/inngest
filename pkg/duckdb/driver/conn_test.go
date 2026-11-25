@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,4 +63,14 @@ func TestConnQueryContextColumnsMatchQueryOrder(t *testing.T) {
 	rows, err := c.QueryContext(t.Context(), "SELECT zebra, apple FROM t;", nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"zebra", "apple"}, rows.Columns())
+}
+
+// TestConnCheckNamedValueULID: a ULID binds as its text form and is accepted
+// as is, not handed on to database/sql's default converter (which would
+// take ULID's own Value(), 16 raw bytes, if this ever stopped rewriting it).
+func TestConnCheckNamedValueULID(t *testing.T) {
+	id := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	nv := &driver.NamedValue{Ordinal: 1, Value: id}
+	require.NoError(t, (&conn{}).CheckNamedValue(nv))
+	require.Equal(t, id.String(), nv.Value)
 }

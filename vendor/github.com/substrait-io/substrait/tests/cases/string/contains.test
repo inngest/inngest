@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples contains as prefix
+contains('abcdefg'::str, 'abc'::str) = true::bool
+contains('abcdefg'::str, 'CdE'::str) = false::bool
+contains('abcdefg'::str, 'CdE'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool
+contains('abcdefg'::str, 'cde'::str) = true::bool
+contains('abcdefg'::str, 'fg'::str) = true::bool
+contains('abcdefg'::str, 'aef'::str) = false::bool
+
+# multi_byte_characters: multi byte characters exists in the string
+contains('😊a😊b😊😊'::str, 'a😊b'::str) = true::bool
+contains('😊a😊b😊😊'::str, 'A😊B'::str) = false::bool
+contains('😊a😊b😊😊'::str, 'A😊B'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool
+contains('😊a😊b😊😊'::str, 'a😊c'::str) = false::bool

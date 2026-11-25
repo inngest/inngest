@@ -1,0 +1,20 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+substring('abcdefg'::str, 1::i32, 5::i32) = 'abcde'::str
+substring('abcdefg'::str, 1::i32, 5::i32) = 'abcde'::str
+
+# start_greater_than_length: Example where start argument greater than the length of the string
+substring('abcdefg'::str, 10::i32, 2::i32) = ''::str
+substring('abcdefg'::str, 10::i32, 2::i32) = ''::str
+
+# multi_byte_characters: Example where multi byte characters exist in the string
+substring('😊a😊b😊😊'::str, 1::i32, 3::i32) = '😊a😊'::str
+substring('😊a😊b😊😊'::str, 1::i32, 3::i32) = '😊a😊'::str
+
+# negative_start: Example where start argument is a negative integer
+substring('abcdefg'::str, -1::i32, 2::i32) [negative_start:WRAP_FROM_END] = 'g'::str
+substring('abcdefg'::str, -2::i32, 1::i32) [negative_start:WRAP_FROM_END] = 'f'::str
+substring('abcdefg'::str, -1::i32, 2::i32) [negative_start:LEFT_OF_BEGINNING] = ''::str
+substring('abcdefg'::str, -1::i32, 3::i32) [negative_start:LEFT_OF_BEGINNING] = 'a'::str

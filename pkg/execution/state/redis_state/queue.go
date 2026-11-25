@@ -172,6 +172,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		i.Data.JobID = &i.ID
 	}
 
+	// Compare normalization against the original snapshot, before promoting a
+	// legacy generation-zero item to generation one for its next dispatch.
+	normalizationGeneration := i.GenerationID
+
 	// Start GenerationID at 1 so the very first dispatch carries a non-zero
 	// value to the SDK. The validator treats 0 as "no value sent"
 	if i.GenerationID == 0 {
@@ -274,6 +278,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 		opts.NormalizeFromBacklogID,
 		opts.SingletonMigrationKey != "",
+		normalizationGeneration,
 	})
 	if err != nil {
 		return i, err
@@ -298,6 +303,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
 	switch status {
+	case -1:
+		return i, osqueue.ErrQueueItemNotFound
+	case -2:
+		return i, osqueue.ErrQueueItemAlreadyLeased
 	case 0:
 		return i, nil
 	case 1:

@@ -247,3 +247,20 @@ func TestV1FromMetadata_NilSemaphores(t *testing.T) {
 	v1 := V1FromMetadata(md)
 	assert.Nil(t, v1.Semaphores)
 }
+
+func TestConfigAppNameRoundTrip(t *testing.T) {
+	for _, name := range []string{"my-app", ""} {
+		cfg := InitConfig(&Config{FunctionVersion: 1})
+		if name != "" {
+			cfg.SetAppName(name)
+		}
+		cfg.SetFunctionSlug("my-app-fn")
+
+		pbCfg, err := ConfigToProto(*cfg)
+		require.NoError(t, err)
+		roundTripped, err := ConfigFromProto(pbCfg)
+		require.NoError(t, err)
+		assert.Equal(t, name, roundTripped.AppName())
+		assert.Equal(t, "my-app-fn", roundTripped.FunctionSlug())
+	}
+}

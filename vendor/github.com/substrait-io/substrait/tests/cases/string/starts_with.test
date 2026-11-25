@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+starts_with('abcd'::str, 'a'::str) = true::bool
+starts_with('abcd'::str, 'z'::str) = false::bool
+starts_with('abcd'::str, 'AB'::str) = false::bool
+
+# case_insenstivity: multi byte character comparison with case insensitivity
+starts_with('abcd'::str, 'AB'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool
+
+# multi_byte_characters: multi byte character comparison
+starts_with('😊a😊b😊😊'::str, '😊a'::str) = true::bool
+
+# multi_byte_characters case insensitivity: multi byte character comparison with case insensitivity
+starts_with('😊a😊b😊😊'::str, '😊A'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool

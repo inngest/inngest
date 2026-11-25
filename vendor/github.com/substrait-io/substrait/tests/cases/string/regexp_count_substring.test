@@ -1,0 +1,50 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+regexp_count_substring('foobarboopzoo'::str, 'o{1,}'::str, 1::i64) = 3::i64
+regexp_count_substring('foobarboopzoo'::str, 'o{1}'::str, 1::i64) = 6::i64
+regexp_count_substring('abcabcacb'::str, '[bc]'::str, 1::i64) = 6::i64
+regexp_count_substring('abcdefc'::str, '(.*)c'::str, 1::i64) = 1::i64
+regexp_count_substring('abcdefc'::str, '(.*)c?'::str, 1::i64) = 2::i64
+regexp_count_substring('foobarboopzoo'::str, 'o{1,}'::str) = 3::i64
+regexp_count_substring('foobarboopzoo'::str, 'o{1}'::str) = 6::i64
+regexp_count_substring('abcabcacb'::str, '[bc]'::str) = 6::i64
+regexp_count_substring('abcdefc'::str, '(.*)c'::str) = 1::i64
+regexp_count_substring('abcdefc'::str, '(.*)c?'::str) = 2::i64
+
+# null_input: Examples with null as input
+regexp_count_substring('Hello'::str, null::str?, 1::i64) = null::i64?
+regexp_count_substring(null::str?, ' '::str, 1::i64) = null::i64?
+regexp_count_substring('Hello'::str, null::str?) = null::i64?
+regexp_count_substring(null::str?, ' '::str) = null::i64?
+
+# metacharacters: Examples with metacharacters
+regexp_count_substring('abc1abc'::str, '\d'::str, 1::i64) = 1::i64
+regexp_count_substring('abc1abc'::str, '\D'::str, 1::i64) = 6::i64
+regexp_count_substring('abc def ghi'::str, '\s'::str, 1::i64) = 2::i64
+regexp_count_substring('abc def ghi'::str, '\S'::str, 1::i64) = 9::i64
+regexp_count_substring('abc def ghi'::str, '\w'::str, 1::i64) = 9::i64
+regexp_count_substring('abc def ghi,'::str, '\W'::str, 1::i64) = 3::i64
+regexp_count_substring('abc1abc'::str, '\d'::str) = 1::i64
+regexp_count_substring('abc1abc'::str, '\D'::str) = 6::i64
+regexp_count_substring('abc def ghi'::str, '\s'::str) = 2::i64
+regexp_count_substring('abc def ghi'::str, '\S'::str) = 9::i64
+regexp_count_substring('abc def ghi'::str, '\w'::str) = 9::i64
+regexp_count_substring('abc def ghi,'::str, '\W'::str) = 3::i64
+
+# lookahead: Examples with lookahead
+regexp_count_substring('100 dollars 100 dollars'::str, '\d+(?= dollars)'::str, 1::i64) [lookaround:TRUE] = 2::i64
+regexp_count_substring('100 dollars 100 dollars'::str, '\d+(?= dollars)'::str) [lookaround:TRUE] = 2::i64
+
+# negative_lookahead: Examples with negative lookahead
+regexp_count_substring('100 pesos, 99 pesos, 98 pesos'::str, '\d+(?!\d| dollars)'::str, 1::i64) [lookaround:TRUE] = 3::i64
+regexp_count_substring('100 pesos, 99 pesos, 98 pesos'::str, '\d+(?!\d| dollars)'::str) [lookaround:TRUE] = 3::i64
+
+# lookbehind: Examples with lookbehind
+regexp_count_substring('USD100'::str, '(?<=USD)\d{3}'::str, 1::i64) [lookaround:TRUE] = 1::i64
+regexp_count_substring('USD100'::str, '(?<=USD)\d{3}'::str) [lookaround:TRUE] = 1::i64
+
+# negative_lookbehind: Examples with negative lookbehind
+regexp_count_substring('JPY100JPY100'::str, '\d{3}(?<!USD\d{3})'::str, 1::i64) [lookaround:TRUE] = 2::i64
+regexp_count_substring('JPY100JPY100'::str, '\d{3}(?<!USD\d{3})'::str) [lookaround:TRUE] = 2::i64

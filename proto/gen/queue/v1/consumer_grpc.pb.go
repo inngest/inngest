@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ConsumerService_Dequeue_FullMethodName = "/queue.v1.ConsumerService/Dequeue"
+	ConsumerService_Dequeue_FullMethodName          = "/queue.v1.ConsumerService/Dequeue"
+	ConsumerService_DequeueWithLease_FullMethodName = "/queue.v1.ConsumerService/DequeueWithLease"
 )
 
 // ConsumerServiceClient is the client API for ConsumerService service.
@@ -27,6 +28,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConsumerServiceClient interface {
 	Dequeue(ctx context.Context, in *DequeueRequest, opts ...grpc.CallOption) (*DequeueResponse, error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	DequeueWithLease(ctx context.Context, in *DequeueWithLeaseRequest, opts ...grpc.CallOption) (*DequeueWithLeaseResponse, error)
 }
 
 type consumerServiceClient struct {
@@ -47,11 +50,23 @@ func (c *consumerServiceClient) Dequeue(ctx context.Context, in *DequeueRequest,
 	return out, nil
 }
 
+func (c *consumerServiceClient) DequeueWithLease(ctx context.Context, in *DequeueWithLeaseRequest, opts ...grpc.CallOption) (*DequeueWithLeaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DequeueWithLeaseResponse)
+	err := c.cc.Invoke(ctx, ConsumerService_DequeueWithLease_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConsumerServiceServer is the server API for ConsumerService service.
 // All implementations must embed UnimplementedConsumerServiceServer
 // for forward compatibility.
 type ConsumerServiceServer interface {
 	Dequeue(context.Context, *DequeueRequest) (*DequeueResponse, error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	DequeueWithLease(context.Context, *DequeueWithLeaseRequest) (*DequeueWithLeaseResponse, error)
 	mustEmbedUnimplementedConsumerServiceServer()
 }
 
@@ -64,6 +79,9 @@ type UnimplementedConsumerServiceServer struct{}
 
 func (UnimplementedConsumerServiceServer) Dequeue(context.Context, *DequeueRequest) (*DequeueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Dequeue not implemented")
+}
+func (UnimplementedConsumerServiceServer) DequeueWithLease(context.Context, *DequeueWithLeaseRequest) (*DequeueWithLeaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DequeueWithLease not implemented")
 }
 func (UnimplementedConsumerServiceServer) mustEmbedUnimplementedConsumerServiceServer() {}
 func (UnimplementedConsumerServiceServer) testEmbeddedByValue()                         {}
@@ -104,6 +122,24 @@ func _ConsumerService_Dequeue_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConsumerService_DequeueWithLease_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DequeueWithLeaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsumerServiceServer).DequeueWithLease(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsumerService_DequeueWithLease_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsumerServiceServer).DequeueWithLease(ctx, req.(*DequeueWithLeaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConsumerService_ServiceDesc is the grpc.ServiceDesc for ConsumerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +150,10 @@ var ConsumerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Dequeue",
 			Handler:    _ConsumerService_Dequeue_Handler,
+		},
+		{
+			MethodName: "DequeueWithLease",
+			Handler:    _ConsumerService_DequeueWithLease_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

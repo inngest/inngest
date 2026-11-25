@@ -1,0 +1,28 @@
+%YAML 1.2
+---
+urn: extension:io.substrait:functions_set
+scalar_functions:
+  -
+    name: "index_in"
+    description: >
+      Checks the membership of a value in a list of values
+
+      Returns the first 0-based index value of some input `needle` if `needle` is equal to
+      any element in `haystack`.  Returns `NULL` if not found.
+
+      If `needle` is `NULL`, returns `NULL`.
+
+      If `needle` is `NaN`:
+        - Returns 0-based index of `NaN` in `input` (default)
+        - Returns `NULL` (if `NAN_IS_NOT_NAN` is specified)
+    impls:
+      - args:
+          - name: needle
+            value: any1
+          - name: haystack
+            value: list<any1>
+        options:
+          nan_equality:
+            values: [ NAN_IS_NAN, NAN_IS_NOT_NAN ]
+        nullability: DECLARED_OUTPUT
+        return: i64?

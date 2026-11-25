@@ -1,0 +1,13 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding.yaml'
+
+# basic: Basic examples without any special cases
+round(2::i8, 2::i32) = 2::i8?
+round(2.75::fp32, 1::i32) = 2.8::fp32?
+round(2.0000007152457373046875::fp64, 10::i32) = 2.0000007152::fp64?
+round(2.0000007152457373046875::fp64, 10::i32) = 2.0000007152::fp64?
+
+# negative_rounding: Examples with negative rounding
+round(2::i8, -2::i32) = 0::i8?
+round(123::i8, -2::i32) = 100::i8?
+round(8793::i16, -2::i32) = 8800::i16?

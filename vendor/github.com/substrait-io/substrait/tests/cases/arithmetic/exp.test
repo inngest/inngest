@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+exp(100::i64) = 2.6881171418161356e+43::fp64
+exp(0.25::fp32) = 1.2840254166877414::fp32
+exp(0.693::fp64) = 1.9997056605411638::fp64
+exp(2.0000007152557373046875::fp64) = 7.3890613839973085::fp64
+exp(0.0::fp64) = 1.0::fp64
+exp(null::fp64?) = null::fp64?
+exp(1000::i64) = inf::fp64

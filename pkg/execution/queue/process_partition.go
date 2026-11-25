@@ -35,6 +35,10 @@ func partitionRequeueExtensionWithJitter() time.Duration {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
+	if continuationCount > 0 && q.capacityLeaseRepairRetryAt(p.ID).After(q.Clock().Now()) {
+		q.removeContinue(ctx, p, false)
+		return nil
+	}
 	l := logger.StdlibLogger(ctx)
 	shard := q.Shard()
 
@@ -189,6 +193,16 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	if err != nil {
 		span.RecordError(err)
 		return err
+	}
+
+	queue, capacityRepair, err := q.requeueExpiredCapacityLeases(ctx, p, queue)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	if !capacityRepair.retryAt.IsZero() {
+		q.repairRetry.Store(p.ID, capacityRepair.retryAt)
+		q.removeContinue(ctx, p, false)
 	}
 
 	l.Optional(p.AccountID, "queue").Debug(
@@ -394,8 +408,16 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// time with jitter. This is why we have to lease items above, else this may
 	// return an item that is about to be leased and processed by the worker.
 	requeueExtension := partitionRequeueExtensionWithJitter()
+	forceRepairRequeue := capacityRepair.attempts > 0 || !capacityRepair.retryAt.IsZero()
+	if !capacityRepair.retryAt.IsZero() {
+		requeueExtension = max(0, capacityRepair.retryAt.Sub(q.Clock().Now()))
+	} else if capacityRepair.attempts > 0 {
+		// Continue bounded repair promptly, including when reservation owners
+		// were beyond this peek. The shard still garbage-collects empty queues.
+		requeueExtension = 0
+	}
 	_, err = DurationWithTags(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
-		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), false)
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), forceRepairRequeue)
 		return nil, err
 	}, map[string]any{"no_peek": noPeek})
 	if err == ErrPartitionGarbageCollected {

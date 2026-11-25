@@ -6,27 +6,28 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/karlseguin/ccache/v3"
-	// "golang.org/x/sync/singleflight"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
 	defaultRefreshInterval = 5 * time.Second
-	defaultCacheTTL        = 5 * time.Second
+	defaultCacheTTL        = 30 * time.Second
 	defaultLookupTimeout   = 5 * time.Second
+
+	// maxStale is how long an expired entry is still used when a fresh lookup
+	// fails, so a DNS blip doesn't fail requests to hosts we just reached.
+	maxStale = 5 * time.Minute
 
 	happyEyeballsDelay = 100 * time.Millisecond
 
 	// default dialer to use if not provided
 	defaultDialer = &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
-
-	// lookupGroup merges lookup calls together for lookups for the same host. The
-	// lookupGroup key is is the LookupIPAddr.host argument.
-	// lookupGroup singleflight.Group
 
 	ErrNoIPsAvailable = fmt.Errorf("no ips available for domain")
 )
@@ -37,6 +38,9 @@ type DNSResolver interface {
 	Lookup(ctx context.Context, host string) ([]net.IP, error)
 	Dialer() Dialer
 	DialerWithNAT64Fallback() Dialer
+	// DialIPs dials port on the given addresses without another lookup, so a
+	// caller that validated the addresses connects to exactly those.
+	DialIPs(ctx context.Context, network, port string, ips []net.IP, allowNAT64Fallback bool) (net.Conn, error)
 }
 
 type (
@@ -50,6 +54,7 @@ func New(opts ...ResolverOpts) *resolver {
 		refreshInterval: defaultRefreshInterval,
 		dialer:          defaultDialer.DialContext,
 		cacheTTL:        defaultCacheTTL,
+		lookupIPAddr:    net.DefaultResolver.LookupIPAddr,
 	}
 
 	for _, apply := range opts {
@@ -108,6 +113,12 @@ type resolver struct {
 	// dialer is the function used to establish the connection
 	dialer Dialer
 
+	// lookupIPAddr resolves a host. tests replace it.
+	lookupIPAddr func(ctx context.Context, host string) ([]net.IPAddr, error)
+
+	// lookupGroup merges concurrent lookups for the same host into one.
+	lookupGroup singleflight.Group
+
 	// l is an optional logger
 	l logger.Logger
 }
@@ -135,14 +146,18 @@ func (r *resolver) dialerWithNAT64Fallback(allowNAT64Fallback bool) Dialer {
 			return nil, err
 		}
 
-		// XXX: When IPv6 and IPv4 are both specified, prefer IPv4.  This allows us to
-		// prefer egress without NAT64 hops, which on some clouds is required.
-		//
-		// We also implement our own "happy eyes" dial mechanism which allows us
-		// to dial both and eject after some delay.
-		six, four := sixfour(ips)
-		return r.dialParallelWithNAT64Fallback(ctx, network, port, four, six, allowNAT64Fallback)
+		return r.DialIPs(ctx, network, port, ips, allowNAT64Fallback)
 	}
+}
+
+func (r *resolver) DialIPs(ctx context.Context, network, port string, ips []net.IP, allowNAT64Fallback bool) (net.Conn, error) {
+	// XXX: When IPv6 and IPv4 are both specified, prefer IPv4.  This allows us to
+	// prefer egress without NAT64 hops, which on some clouds is required.
+	//
+	// We also implement our own "happy eyes" dial mechanism which allows us
+	// to dial both and eject after some delay.
+	six, four := sixfour(ips)
+	return r.dialParallelWithNAT64Fallback(ctx, network, port, four, six, allowNAT64Fallback)
 }
 
 type dialResult struct {
@@ -325,33 +340,81 @@ func nat64Addresses(ips []net.IP) []net.IP {
 func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 	key := fmt.Sprintf("h:%s", host)
 
-	// should this utilize singleflight to reduce map lookups?
-	item, err := r.cache.Fetch(key, r.cacheTTL, func() (cacheType, error) {
-		// should this provide resolver override?
-		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	item := r.cache.Get(key)
+	if item != nil && !item.Expired() {
+		return item.Value(), nil
+	}
+
+	// the shared lookup serves every waiting caller, so it gets its own
+	// bounded context instead of the first caller's; each caller stops
+	// waiting when its own context ends.
+	ch := r.lookupGroup.DoChan(key, func() (any, error) {
+		// another caller may have cached an answer since our miss above.
+		if fresh := r.cache.Get(key); fresh != nil && !fresh.Expired() {
+			return fresh.Value(), nil
+		}
+
+		lctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.lookupTimeout)
+		defer cancel()
+
+		ips, err := r.resolve(lctx, host)
 		if err != nil {
 			return nil, err
 		}
-
-		ips := make([]net.IP, len(addrs))
-		for i, addr := range addrs {
-			ips[i] = addr.IP
-		}
-
-		if len(ips) == 0 {
-			return nil, ErrNoIPsAvailable
-		}
-
+		r.cache.Set(key, ips, r.cacheTTL)
 		return ips, nil
 	})
+
+	var v any
+	var err error
+	select {
+	case res := <-ch:
+		v, err = res.Val, res.Err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	if err != nil {
+		if item != nil && time.Since(item.Expires()) < maxStale {
+			return item.Value(), nil
+		}
 		if r.l != nil {
 			r.l.Error("error fetching ips from cache", "host", host)
 		}
 		return nil, err
 	}
 
-	return item.Value(), nil
+	return v.(cacheType), nil
+}
+
+// resolve looks a dotted host up as an absolute name first.  pods default to
+// ndots:5, so without the trailing dot "api.example.com" is first tried with
+// every search domain (A and AAAA each) before the real name.  names that only
+// resolve through the search list still work via the fallback.
+func (r *resolver) resolve(ctx context.Context, host string) (cacheType, error) {
+	if strings.Contains(host, ".") && !strings.HasSuffix(host, ".") && net.ParseIP(host) == nil {
+		ips, err := r.lookupIPs(ctx, host+".")
+		var dnsErr *net.DNSError
+		if err == nil || !errors.As(err, &dnsErr) || !dnsErr.IsNotFound {
+			return ips, err
+		}
+	}
+	return r.lookupIPs(ctx, host)
+}
+
+func (r *resolver) lookupIPs(ctx context.Context, host string) (cacheType, error) {
+	addrs, err := r.lookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, ErrNoIPsAvailable
+	}
+
+	ips := make(cacheType, len(addrs))
+	for i, addr := range addrs {
+		ips[i] = addr.IP
+	}
+	return ips, nil
 }
 
 // sixfour returns the ips split by ipv6 and ipv4

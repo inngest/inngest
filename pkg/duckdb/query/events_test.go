@@ -25,8 +25,8 @@ func TestGetEventsByInternalIDs(t *testing.T) {
 		name string
 	}{{id1, "test/one"}, {id2, "test/two"}} {
 		_, err := db.ExecContext(ctx,
-			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{"k":"v"}'::JSON, '1', ?);`,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{"k":"v"}'::JSON, '1', ?, '{}'::JSON);`,
 			accountID.String(), envID.String(), e.id.String(), time.Now().UTC(), e.id.String(), e.name, time.Now().UTC(),
 		)
 		require.NoError(t, err)
@@ -62,8 +62,8 @@ func TestGetEventsByInternalIDsErrorsWhenEventDataIsNotAnObject(t *testing.T) {
 	accountID, envID := uuid.New(), uuid.New()
 	id := ulid.MustNew(ulid.Now(), rand.Reader)
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-		 VALUES (?, ?, ?, ?, 'test', ?, 'test/event', '[1,2,3]'::JSON, '1', ?);`,
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+		 VALUES (?, ?, ?, ?, 'test', ?, 'test/event', '[1,2,3]'::JSON, '1', ?, '{}'::JSON);`,
 		accountID.String(), envID.String(), id.String(), time.Now().UTC(), id.String(), time.Now().UTC(),
 	)
 	require.NoError(t, err)
@@ -93,8 +93,8 @@ func TestGetEventsFiltersByNameAndExcludesInternalByDefault(t *testing.T) {
 
 	seed := func(name string, ts time.Time) {
 		_, err := db.ExecContext(ctx,
-			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, '1', ?);`,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, '1', ?, '{}'::JSON);`,
 			accountID.String(), envID.String(), ulid.MustNew(ulid.Timestamp(ts), rand.Reader).String(), ts, ulid.MustNew(ulid.Timestamp(ts), rand.Reader).String(), name, ts,
 		)
 		require.NoError(t, err)
@@ -137,8 +137,8 @@ func TestGetEventsCountMatchesGetEventsFilterAndIgnoresCursor(t *testing.T) {
 	seed := func(acct uuid.UUID, name string, ts time.Time) ulid.ULID {
 		id := ulid.MustNew(ulid.Timestamp(ts), rand.Reader)
 		_, err := db.ExecContext(ctx,
-			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, '1', ?);`,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, '{}'::JSON, '1', ?, '{}'::JSON);`,
 			acct.String(), envID.String(), id.String(), ts, id.String(), name, ts,
 		)
 		require.NoError(t, err)

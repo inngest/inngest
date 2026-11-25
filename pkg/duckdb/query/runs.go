@@ -151,7 +151,7 @@ const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
 // column could order them; COALESCE picks the furthest lifecycle state each
 // row's own columns encode. Timestamps are ms precision so rows can still
 // tie (a Queued and a Running row in the same ms), so the rest of the order
-// prefers the furthest-along row, matching the inngest.insights_runs macro
+// prefers the furthest-along row, matching the inngest_local.insights_runs macro
 // and dashboards.latestRunOrder.
 func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	where := []string{
@@ -257,7 +257,7 @@ func encodeRunsCursor(run *cqrs.TraceRun, orderCol string) (string, error) {
 func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s.runs WHERE run_id = ? ORDER BY %s LIMIT 1;",
-		runColumns, driver.DuckLakeAlias, latestRunOrder,
+		runColumns, driver.LakeAlias, latestRunOrder,
 	)
 	rows, err := m.db.QueryContext(ctx, query, id.RunID.String())
 	if err != nil {
@@ -286,7 +286,7 @@ func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.UL
 			PARTITION BY run_id ORDER BY %s
 		 ) = 1
 		 ORDER BY queued_at ASC;`,
-		runColumns, driver.DuckLakeAlias, latestRunOrder,
+		runColumns, driver.LakeAlias, latestRunOrder,
 	)
 
 	rows, err := m.db.QueryContext(ctx, query, triggerID.String())
@@ -465,7 +465,7 @@ func (m *Manager) getTraceRunsBatch(ctx context.Context, opt cqrs.GetTraceRunOpt
 	}
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s.runs WHERE %s QUALIFY %s ORDER BY %s %s, run_id ASC",
-		cols, driver.DuckLakeAlias, rq.preWhere, qualify, orderCol, orderDir,
+		cols, driver.LakeAlias, rq.preWhere, qualify, orderCol, orderDir,
 	)
 	args := append(append([]any{}, rq.preArgs...), qualifyArgs...)
 	if limit > 0 {
@@ -585,7 +585,7 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	// and the outer query only aggregates its already-filtered output.
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) AS c FROM (SELECT run_id FROM %s.runs WHERE %s QUALIFY %s);",
-		driver.DuckLakeAlias, rq.preWhere, rq.qualify,
+		driver.LakeAlias, rq.preWhere, rq.qualify,
 	)
 	n, err := scanCount(m.db.QueryRowContext(ctx, query, args...))
 	if err != nil {
@@ -599,7 +599,7 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 func (m *Manager) countTraceRunsInGo(ctx context.Context, rq runsQuery, args []any) (int, error) {
 	query := fmt.Sprintf(
 		"SELECT inputs, output, error FROM %s.runs WHERE %s QUALIFY %s;",
-		driver.DuckLakeAlias, rq.preWhere, rq.qualify,
+		driver.LakeAlias, rq.preWhere, rq.qualify,
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {

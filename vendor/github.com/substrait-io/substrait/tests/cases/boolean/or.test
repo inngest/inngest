@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_boolean.yaml'
+
+# basic: Basic examples without any special cases
+or(true::bool, true::bool) = true::bool
+or(true::bool, false::bool) = true::bool
+or(false::bool, false::bool) = false::bool
+
+# null_input: Examples with null as input
+or(true::bool, null::bool?) = true::bool?
+or(null::bool?, true::bool) = true::bool?
+or(false::bool, null::bool?) = null::bool?
+or(null::bool?, false::bool) = null::bool?
+or(null::bool?, null::bool?) = null::bool?

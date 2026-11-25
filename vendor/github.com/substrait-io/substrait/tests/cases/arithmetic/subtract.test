@@ -1,0 +1,21 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+subtract(120::i8, 5::i8) = 115::i8
+subtract(-100::i16, 100::i16) = -200::i16
+subtract(-30000::i32, 30000::i32) = -60000::i32
+subtract(-2000000000::i64, 2000000000::i64) = -4000000000::i64
+
+# overflow: Examples demonstrating overflow behavior
+subtract(-120::i8, 10::i8) [overflow:ERROR] = <!ERROR>
+subtract(-30000::i16, 30000::i16) [overflow:ERROR] = <!ERROR>
+subtract(-2000000000::i32, 2000000000::i32) [overflow:ERROR] = <!ERROR>
+subtract(-9223372036854775808::i64, 1::i64) [overflow:ERROR] = <!ERROR>
+subtract(-120::i8, 10::i8) [overflow:SATURATE] = -128::i8
+subtract(120::i8, -10::i8) [overflow:SATURATE] = 127::i8
+subtract(-120::i8, 10::i8) [overflow:SILENT] = <!UNDEFINED>
+
+# floating_exception: Examples demonstrating exceptional floating point cases
+subtract(-1.5e+308::fp64, 1.5e+308::fp64) = -inf::fp64
+subtract(1.5e+308::fp64, -1.5e+308::fp64) = inf::fp64

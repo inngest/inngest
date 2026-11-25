@@ -149,7 +149,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	}
 
 	// Only stream the delta columns the query reads.
-	used, err := deltaColumnsUsed(ctx, conn, q, needed)
+	used, err := deltaColumnsUsed(q, needed)
 	if err != nil {
 		return fail(err)
 	}
@@ -261,7 +261,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		return stmt, args, nil
 	}
 	for _, t := range needed {
-		v, err := rawView(t, q.Lake, q.RunsCollapsed)
+		v, err := rawView(t, q.RunsCollapsed)
 		if err != nil {
 			return nil, nil, err
 		}
