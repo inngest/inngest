@@ -1186,7 +1186,10 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 // and server.
 func TestQueueProxyVariadicOptionCompatibilityGuard(t *testing.T) {
 	coverage := fieldCoverage{covered: []string{"CapacityLeased", "MatchItemLease"}}
-	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), coverage)
+	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), fieldCoverage{
+		covered: coverage.covered,
+		ignored: map[string]string{"ExpiredCapacityLeasePartition": "direct Redis scanner guard; queue-proxy rejects this option rather than dropping its conditions"},
+	})
 	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), coverage)
 	for _, msg := range []proto.Message{&pb.RequeueRequest{}, &pb.DequeueRequest{}} {
 		field := msg.ProtoReflect().Descriptor().Fields().ByName("match_item_lease")
