@@ -13,8 +13,8 @@ import (
 // STRUCT/MAP/VARIANT) report JSON: they're nested data a client renders the
 // same way as any other JSON value. Every semi-structured column in this
 // schema (attributes/output/input/event_data/etc.) is JSON text in the lake
-// (migrations/000001_baseline.sql) that the raw_*/insights_* macros cast to
-// JSON, so it reports JSON here.
+// (migrations/000001_baseline.sql) that the views.sql macros cast to JSON,
+// so it reports JSON here.
 type ColumnType int
 
 const (

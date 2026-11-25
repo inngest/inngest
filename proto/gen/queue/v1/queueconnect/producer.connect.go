@@ -37,6 +37,9 @@ const (
 	ProducerServiceEnqueueProcedure = "/queue.v1.ProducerService/Enqueue"
 	// ProducerServiceRequeueProcedure is the fully-qualified name of the ProducerService's Requeue RPC.
 	ProducerServiceRequeueProcedure = "/queue.v1.ProducerService/Requeue"
+	// ProducerServiceRequeueWithLeaseProcedure is the fully-qualified name of the ProducerService's
+	// RequeueWithLease RPC.
+	ProducerServiceRequeueWithLeaseProcedure = "/queue.v1.ProducerService/RequeueWithLease"
 	// ProducerServiceRequeueByJobIDProcedure is the fully-qualified name of the ProducerService's
 	// RequeueByJobID RPC.
 	ProducerServiceRequeueByJobIDProcedure = "/queue.v1.ProducerService/RequeueByJobID"
@@ -46,6 +49,8 @@ const (
 type ProducerServiceClient interface {
 	Enqueue(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
 	Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	RequeueWithLease(context.Context, *connect.Request[v1.RequeueWithLeaseRequest]) (*connect.Response[v1.RequeueWithLeaseResponse], error)
 	RequeueByJobID(context.Context, *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error)
 }
 
@@ -72,6 +77,12 @@ func NewProducerServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(producerServiceMethods.ByName("Requeue")),
 			connect.WithClientOptions(opts...),
 		),
+		requeueWithLease: connect.NewClient[v1.RequeueWithLeaseRequest, v1.RequeueWithLeaseResponse](
+			httpClient,
+			baseURL+ProducerServiceRequeueWithLeaseProcedure,
+			connect.WithSchema(producerServiceMethods.ByName("RequeueWithLease")),
+			connect.WithClientOptions(opts...),
+		),
 		requeueByJobID: connect.NewClient[v1.RequeueByJobIDRequest, v1.RequeueByJobIDResponse](
 			httpClient,
 			baseURL+ProducerServiceRequeueByJobIDProcedure,
@@ -83,9 +94,10 @@ func NewProducerServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // producerServiceClient implements ProducerServiceClient.
 type producerServiceClient struct {
-	enqueue        *connect.Client[v1.EnqueueRequest, v1.EnqueueResponse]
-	requeue        *connect.Client[v1.RequeueRequest, v1.RequeueResponse]
-	requeueByJobID *connect.Client[v1.RequeueByJobIDRequest, v1.RequeueByJobIDResponse]
+	enqueue          *connect.Client[v1.EnqueueRequest, v1.EnqueueResponse]
+	requeue          *connect.Client[v1.RequeueRequest, v1.RequeueResponse]
+	requeueWithLease *connect.Client[v1.RequeueWithLeaseRequest, v1.RequeueWithLeaseResponse]
+	requeueByJobID   *connect.Client[v1.RequeueByJobIDRequest, v1.RequeueByJobIDResponse]
 }
 
 // Enqueue calls queue.v1.ProducerService.Enqueue.
@@ -98,6 +110,11 @@ func (c *producerServiceClient) Requeue(ctx context.Context, req *connect.Reques
 	return c.requeue.CallUnary(ctx, req)
 }
 
+// RequeueWithLease calls queue.v1.ProducerService.RequeueWithLease.
+func (c *producerServiceClient) RequeueWithLease(ctx context.Context, req *connect.Request[v1.RequeueWithLeaseRequest]) (*connect.Response[v1.RequeueWithLeaseResponse], error) {
+	return c.requeueWithLease.CallUnary(ctx, req)
+}
+
 // RequeueByJobID calls queue.v1.ProducerService.RequeueByJobID.
 func (c *producerServiceClient) RequeueByJobID(ctx context.Context, req *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error) {
 	return c.requeueByJobID.CallUnary(ctx, req)
@@ -107,6 +124,8 @@ func (c *producerServiceClient) RequeueByJobID(ctx context.Context, req *connect
 type ProducerServiceHandler interface {
 	Enqueue(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
 	Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	RequeueWithLease(context.Context, *connect.Request[v1.RequeueWithLeaseRequest]) (*connect.Response[v1.RequeueWithLeaseResponse], error)
 	RequeueByJobID(context.Context, *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error)
 }
 
@@ -129,6 +148,12 @@ func NewProducerServiceHandler(svc ProducerServiceHandler, opts ...connect.Handl
 		connect.WithSchema(producerServiceMethods.ByName("Requeue")),
 		connect.WithHandlerOptions(opts...),
 	)
+	producerServiceRequeueWithLeaseHandler := connect.NewUnaryHandler(
+		ProducerServiceRequeueWithLeaseProcedure,
+		svc.RequeueWithLease,
+		connect.WithSchema(producerServiceMethods.ByName("RequeueWithLease")),
+		connect.WithHandlerOptions(opts...),
+	)
 	producerServiceRequeueByJobIDHandler := connect.NewUnaryHandler(
 		ProducerServiceRequeueByJobIDProcedure,
 		svc.RequeueByJobID,
@@ -141,6 +166,8 @@ func NewProducerServiceHandler(svc ProducerServiceHandler, opts ...connect.Handl
 			producerServiceEnqueueHandler.ServeHTTP(w, r)
 		case ProducerServiceRequeueProcedure:
 			producerServiceRequeueHandler.ServeHTTP(w, r)
+		case ProducerServiceRequeueWithLeaseProcedure:
+			producerServiceRequeueWithLeaseHandler.ServeHTTP(w, r)
 		case ProducerServiceRequeueByJobIDProcedure:
 			producerServiceRequeueByJobIDHandler.ServeHTTP(w, r)
 		default:
@@ -158,6 +185,10 @@ func (UnimplementedProducerServiceHandler) Enqueue(context.Context, *connect.Req
 
 func (UnimplementedProducerServiceHandler) Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ProducerService.Requeue is not implemented"))
+}
+
+func (UnimplementedProducerServiceHandler) RequeueWithLease(context.Context, *connect.Request[v1.RequeueWithLeaseRequest]) (*connect.Response[v1.RequeueWithLeaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ProducerService.RequeueWithLease is not implemented"))
 }
 
 func (UnimplementedProducerServiceHandler) RequeueByJobID(context.Context, *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error) {

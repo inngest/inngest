@@ -366,7 +366,7 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 				event := "test/event"
 				invokeCorrelationID := ""
 				signalCorrelationID := ""
-				extendedExpiry := "3600"
+				extendedExpiry := fmt.Sprintf("%d", time.Now().Add(time.Hour).Unix())
 				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
 				canReplaceSignal := "0"
 
@@ -409,7 +409,8 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 				pauseID := "pause-2"
 				event := "test/event"
 				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
-				args := []string{pauseData, pauseID, event, "", "", "3600", nowUnixSeconds, "0"}
+				extendedExpiry := fmt.Sprintf("%d", time.Now().Add(time.Hour).Unix())
+				args := []string{pauseData, pauseID, event, "", "", extendedExpiry, nowUnixSeconds, "0"}
 
 				// First save should succeed
 				result1, err := runSavePause(t, rc, keys, args)
@@ -440,7 +441,8 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 				event := ""
 				invokeCorrelationID := "invoke-correlation-123"
 				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
-				args := []string{pauseData, pauseID, event, invokeCorrelationID, "", "3600", nowUnixSeconds, "0"}
+				extendedExpiry := fmt.Sprintf("%d", time.Now().Add(time.Hour).Unix())
+				args := []string{pauseData, pauseID, event, invokeCorrelationID, "", extendedExpiry, nowUnixSeconds, "0"}
 
 				result, err := runSavePause(t, rc, keys, args)
 				require.NoError(t, err)
@@ -469,7 +471,8 @@ func TestSavePauseLuaCompatibility(t *testing.T) {
 				pauseID := "pause-4"
 				signalCorrelationID := "signal-correlation-456"
 				nowUnixSeconds := fmt.Sprintf("%d", time.Now().Unix())
-				args := []string{pauseData, pauseID, "", "", signalCorrelationID, "3600", nowUnixSeconds, "0"}
+				extendedExpiry := fmt.Sprintf("%d", time.Now().Add(time.Hour).Unix())
+				args := []string{pauseData, pauseID, "", "", signalCorrelationID, extendedExpiry, nowUnixSeconds, "0"}
 
 				result, err := runSavePause(t, rc, keys, args)
 				require.NoError(t, err)

@@ -30,11 +30,11 @@ const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_ti
 //
 // Metadata (inngest.run_metadata) is aggregated in SQL rather than a
 // second round trip: the latest_metadata CTE LEFT JOINs it and collapses
-// multiple emissions of the same (span_id, is_user, kind) to the latest by
+// multiple emissions of the same (span_id, scope, is_user, kind) (w/ step_attempt read as step) to the latest by
 // created_at via QUALIFY, then the outer query GROUPs BY every span column
 // and aggregates metadata into one LIST(STRUCT(...)) column per span. The
 // ordering (values text breaks created_at ties) matches
-// inngest.run_metadata_rollup's so both pick the same row.
+// inngest_local.run_metadata_rollup's so both pick the same row.
 func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	query := fmt.Sprintf(
 		`WITH latest_metadata AS (
@@ -45,7 +45,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		    AND m.run_id = s.run_id AND m.span_id = s.span_id
 		   WHERE s.run_id = ?
 		   QUALIFY m.kind IS NULL OR ROW_NUMBER() OVER (
-		     PARTITION BY m.span_id, m.is_user, m.kind
+		     PARTITION BY m.span_id, CASE m.scope WHEN 'step_attempt' THEN 'step' ELSE m.scope END, m.is_user, m.kind
 		     ORDER BY m.created_at DESC, m.values DESC NULLS LAST
 		   ) = 1
 		 )
@@ -56,7 +56,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		 FROM latest_metadata
 		 GROUP BY %s
 		 ORDER BY start_time ASC;`,
-		spanColumnsPrefixed, driver.DuckLakeAlias, driver.DuckLakeAlias,
+		spanColumnsPrefixed, driver.LakeAlias, driver.LakeAlias,
 		spanColumns, spanColumns,
 	)
 	rows, err := m.db.QueryContext(ctx, query, runID.String())
@@ -180,7 +180,7 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 
 	query := fmt.Sprintf(
 		"SELECT output, error, input FROM %s.run_trace_spans WHERE run_id = ? AND span_id IN (%s);",
-		driver.DuckLakeAlias, strings.Join(placeholders, ", "),
+		driver.LakeAlias, strings.Join(placeholders, ", "),
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {

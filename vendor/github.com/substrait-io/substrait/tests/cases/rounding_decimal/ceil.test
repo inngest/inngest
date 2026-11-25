@@ -1,0 +1,7 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding_decimal.yaml'
+
+# basic: Basic examples without any special cases
+ceil(2.25::dec<3,2>) = 3::dec<2,0>
+ceil(-65.5::dec<3,1>) = -65::dec<3,0>
+ceil(9.9::dec<2,1>) = 10::dec<2,0>

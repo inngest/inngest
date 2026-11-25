@@ -1,0 +1,3 @@
+proto/buf.lock linguist-generated=true
+tests/coverage/antlr_parser/** linguist-generated=true
+tests/type/antlr_parser/** linguist-generated=true

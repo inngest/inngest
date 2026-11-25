@@ -1,0 +1,1 @@
+SELECT r.* RENAME (r.run_id AS id, status AS "run status") FROM runs r

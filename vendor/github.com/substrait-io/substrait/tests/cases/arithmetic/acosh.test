@@ -1,0 +1,12 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+acosh(1.0::fp64) = 0.0::fp64
+acosh(10.0005::fp64) = 2.9932730967481995::fp64
+acosh(null::fp64?) = null::fp64?
+
+# On_domain_error: Examples demonstrating On_domain_error behavior
+acosh(0.01::fp32) [on_domain_error:ERROR] = <!ERROR>
+acosh(0.5::fp64) [on_domain_error:NAN] = nan::fp64
+acosh(0.5::fp32) [on_domain_error:NONE] = null::fp32?

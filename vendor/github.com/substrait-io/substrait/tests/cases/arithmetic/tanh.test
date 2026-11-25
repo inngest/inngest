@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+tanh(0.0::fp32) = 0.0::fp32
+tanh(1.0::fp64) = 0.7615941559557649::fp64
+tanh(7.0000009::fp64) = 0.9999983369469382::fp64
+tanh(-7.0000009::fp64) = -0.9999983369469382::fp64
+tanh(null::fp64?) = null::fp64?

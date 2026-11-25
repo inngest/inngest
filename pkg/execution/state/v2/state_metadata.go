@@ -20,6 +20,7 @@ import (
 const (
 	cronScheduleKey   = "__cron"
 	fnslugKey         = "__fnslug"
+	appNameKey        = "__appname"
 	traceLinkKey      = "__tracelink"
 	debounceKey       = "__debounce"
 	evtmapKey         = "__evtmap"
@@ -275,6 +276,33 @@ func (c *Config) FunctionSlug() string {
 	if v, ok := c.Context[fnslugKey]; ok {
 		if slug, ok := v.(string); ok {
 			return slug
+		}
+	}
+
+	return ""
+}
+
+func (c *Config) SetAppName(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[appNameKey] = name
+}
+
+// AppName retrieves the stored app name if available. Runs scheduled before
+// it was stored have none.
+func (c *Config) AppName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return ""
+	}
+
+	if v, ok := c.Context[appNameKey]; ok {
+		if name, ok := v.(string); ok {
+			return name
 		}
 	}
 

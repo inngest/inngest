@@ -4,6 +4,14 @@ import (
 	"context"
 )
 
+func IncrQueueCapacityLeaseRepairCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName: opts.PkgName, MetricName: "queue_capacity_lease_repair_total",
+		Description: "Capacity lease repair attempts and deferred partition scans",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionLeasedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

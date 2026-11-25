@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
@@ -16,21 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestDB opens a real duckdb subprocess over quack with DuckLake attached
+// newTestDB opens a real duckdb subprocess over quack with an Iceberg lake attached
 // and the POC schema migrated.
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	binPath := driver.RequireDuckDBBinary(t)
-	dir := t.TempDir()
 	addr := driver.EphemeralQuackAddr
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    icebergtest.Start(t),
+		QuackAddr:  &addr,
 	})
 	if err != nil {
 		t.Skipf("duckdb with quack unavailable: %v", err)

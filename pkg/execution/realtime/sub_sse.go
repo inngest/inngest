@@ -20,6 +20,7 @@ func NewSSESubscription(
 		id:    uuid.New(),
 		w:     w,
 		ready: make(chan struct{}),
+		done:  make(chan struct{}),
 	}
 }
 
@@ -29,6 +30,11 @@ func NewSSESubscription(
 // proper HTTP status codes.  It also unblocks any pending writes (e.g.
 // keepalives) that were waiting for headers to be committed.
 func (s *subSSE) WriteHeaders() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
 	sseHeaders(s.w)
 	s.w.WriteHeader(http.StatusOK)
 	if f, ok := s.w.(http.Flusher); ok {
@@ -48,6 +54,7 @@ func sseHeaders(w http.ResponseWriter) {
 type subSSE struct {
 	id     uuid.UUID
 	w      http.ResponseWriter
+	done   chan struct{} // Closed to wake the HTTP handler on server-side disconnection.
 	ready  chan struct{} // Closed by WriteHeaders; write blocks until headers are committed or the sub is closed.
 	mu     sync.Mutex    // Protects concurrent writes to http.ResponseWriter
 	closed bool          // Set when the handler is returning; prevents writes after the response is finalized
@@ -109,37 +116,21 @@ func (s *subSSE) WriteChunk(c Chunk) error {
 	return s.writeSSE(byt)
 }
 
-// Close marks the subscription as closed and forcefully terminates the
-// underlying connection by hijacking it from the HTTP server.  This is
-// needed during broadcaster shutdown to unblock handler goroutines that
-// are waiting in a select.
+// Close wakes the HTTP handler so it can terminate the response, including
+// HTTP/2 streams whose ResponseWriter cannot be hijacked.
 func (s *subSSE) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	if !s.closed {
 		s.closed = true
-		// Unblock any writes waiting on ready so they can see
-		// closed==true and return immediately.
 		select {
 		case <-s.ready:
-			// Already closed by WriteHeaders.
 		default:
 			close(s.ready)
 		}
+		close(s.done)
 	}
-
-	hj, ok := s.w.(http.Hijacker)
-	if !ok {
-		return nil
-	}
-	conn, bufrw, err := hj.Hijack()
-	if err != nil {
-		// Already closed or finalized by the HTTP server — not an error.
-		return nil
-	}
-	_ = bufrw.Flush()
-	return conn.Close()
+	return nil
 }
 
 // writeSSE formats the data as a proper SSE event and writes it

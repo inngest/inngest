@@ -1,0 +1,9 @@
+repos:
+  - repo: https://github.com/golangci/golangci-lint/
+    rev: v1.52.2
+    hooks:
+      - id: golangci-lint
+        args:
+          - --fix
+          - --issues-exit-code=1
+          - --config=.golangci.yml

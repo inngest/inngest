@@ -2,7 +2,6 @@ package driver
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -24,26 +23,22 @@ func TestQuackMergeAppenderMergesRowsIntoRealTable(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".merge_t (k VARCHAR, v VARCHAR);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".merge_t (k VARCHAR, v VARCHAR);")
 	require.NoError(t, err)
-	_, err = db.ExecContext(t.Context(), "INSERT INTO "+DuckLakeAlias+".merge_t VALUES ('a', 'unchanged'), ('b', 'stale');")
+	_, err = db.ExecContext(t.Context(), "INSERT INTO "+LakeAlias+".merge_t VALUES ('a', 'unchanged'), ('b', 'stale');")
 	require.NoError(t, err)
 
-	appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", "merge_t",
+	appender, err := NewQuackMergeAppender(t.Context(), db, LakeAlias, "main", "merge_t",
 		QuackMergeConfig{
 			On:        "t.k = s.k",
 			UpdateSet: "v = s.v",
@@ -58,7 +53,7 @@ func TestQuackMergeAppenderMergesRowsIntoRealTable(t *testing.T) {
 	require.NoError(t, appender.AppendRow("c", "inserted"))
 	require.NoError(t, appender.Close(t.Context()))
 
-	rows, err := db.QueryContext(t.Context(), "SELECT k, v FROM "+DuckLakeAlias+".merge_t ORDER BY k;")
+	rows, err := db.QueryContext(t.Context(), "SELECT k, v FROM "+LakeAlias+".merge_t ORDER BY k;")
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -85,24 +80,20 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".many_rows_merge_t (k VARCHAR, v VARCHAR);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".many_rows_merge_t (k VARCHAR, v VARCHAR);")
 	require.NoError(t, err)
 
-	appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", "many_rows_merge_t",
+	appender, err := NewQuackMergeAppender(t.Context(), db, LakeAlias, "main", "many_rows_merge_t",
 		QuackMergeConfig{On: "t.k = s.k", UpdateSet: "v = s.v"},
 		[]QuackMergeColumn{
 			{Name: "k", Kind: QuackColumnVarchar},
@@ -116,13 +107,13 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	}
 	require.NoError(t, appender.Close(t.Context()))
 
-	row := db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+DuckLakeAlias+".many_rows_merge_t;")
+	row := db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+LakeAlias+".many_rows_merge_t;")
 	var gotCount int
 	require.NoError(t, row.Scan(&gotCount))
 	require.Equal(t, wantRows, gotCount)
 
 	last := db.QueryRowContext(t.Context(),
-		"SELECT v FROM "+DuckLakeAlias+".many_rows_merge_t WHERE k = 'row-"+fmt.Sprint(wantRows-1)+"';")
+		"SELECT v FROM "+LakeAlias+".many_rows_merge_t WHERE k = 'row-"+fmt.Sprint(wantRows-1)+"';")
 	var gotV string
 	require.NoError(t, last.Scan(&gotV))
 	require.Equal(t, fmt.Sprintf("v-%d", wantRows-1), gotV)
@@ -138,26 +129,22 @@ func TestQuackMergeAppenderOmitsUpdateWhenUpdateSetEmpty(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".insert_only_merge_t (k VARCHAR, v VARCHAR);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".insert_only_merge_t (k VARCHAR, v VARCHAR);")
 	require.NoError(t, err)
-	_, err = db.ExecContext(t.Context(), "INSERT INTO "+DuckLakeAlias+".insert_only_merge_t VALUES ('a', 'original');")
+	_, err = db.ExecContext(t.Context(), "INSERT INTO "+LakeAlias+".insert_only_merge_t VALUES ('a', 'original');")
 	require.NoError(t, err)
 
-	appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", "insert_only_merge_t",
+	appender, err := NewQuackMergeAppender(t.Context(), db, LakeAlias, "main", "insert_only_merge_t",
 		QuackMergeConfig{On: "t.k = s.k"}, // UpdateSet deliberately left empty
 		[]QuackMergeColumn{
 			{Name: "k", Kind: QuackColumnVarchar},
@@ -169,7 +156,7 @@ func TestQuackMergeAppenderOmitsUpdateWhenUpdateSetEmpty(t *testing.T) {
 	require.NoError(t, appender.AppendRow("b", "inserted"))
 	require.NoError(t, appender.Close(t.Context()))
 
-	rows, err := db.QueryContext(t.Context(), "SELECT k, v FROM "+DuckLakeAlias+".insert_only_merge_t ORDER BY k;")
+	rows, err := db.QueryContext(t.Context(), "SELECT k, v FROM "+LakeAlias+".insert_only_merge_t ORDER BY k;")
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -198,26 +185,22 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".dedup_merge_t (k VARCHAR, seq VARCHAR, v VARCHAR);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".dedup_merge_t (k VARCHAR, seq VARCHAR, v VARCHAR);")
 	require.NoError(t, err)
-	_, err = db.ExecContext(t.Context(), "INSERT INTO "+DuckLakeAlias+".dedup_merge_t VALUES ('existing', '000', 'stale');")
+	_, err = db.ExecContext(t.Context(), "INSERT INTO "+LakeAlias+".dedup_merge_t VALUES ('existing', '000', 'stale');")
 	require.NoError(t, err)
 
-	appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", "dedup_merge_t",
+	appender, err := NewQuackMergeAppender(t.Context(), db, LakeAlias, "main", "dedup_merge_t",
 		QuackMergeConfig{
 			On:           "t.k = s.k",
 			UpdateSet:    "seq = s.seq, v = s.v",
@@ -242,7 +225,7 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 	require.NoError(t, appender.AppendRow("new", "005", "new-last"))
 	require.NoError(t, appender.Close(t.Context()))
 
-	rows, err := db.QueryContext(t.Context(), "SELECT k, seq, v FROM "+DuckLakeAlias+".dedup_merge_t ORDER BY k;")
+	rows, err := db.QueryContext(t.Context(), "SELECT k, seq, v FROM "+LakeAlias+".dedup_merge_t ORDER BY k;")
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -266,14 +249,13 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 // quack.Session is extracted), so many concurrent, short-lived appenders
 // sharing a small connection pool never have one appender's in-flight
 // stream superseded by another's PrepareRequest landing on the same
-// connection mid-flight. Each worker merges into its own table since DuckLake
-// conflicts concurrent MERGEs into one table (see QuackMergeAppender's doc
-// comment).
+// connection mid-flight. Each worker merges into its own table since the
+// lake's optimistic commits conflict concurrent MERGEs into one table (see
+// QuackMergeAppender's doc comment).
 func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	const quackConns = 4
 	const workers = 20
@@ -282,10 +264,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    testIceberg(t),
 		QuackAddr:  &addr,
 		QuackConns: quackConns,
 	})
@@ -294,7 +273,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 
 	table := func(worker int) string { return fmt.Sprintf("concurrent_pooled_merge_t%d", worker) }
 	for w := range workers {
-		_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+"."+table(w)+" (k VARCHAR, v VARCHAR);")
+		_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+"."+table(w)+" (k VARCHAR, v VARCHAR);")
 		require.NoError(t, err)
 	}
 
@@ -305,7 +284,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 		go func(worker int) {
 			defer wg.Done()
 			for a := range appendersPerWorker {
-				appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", table(worker),
+				appender, err := NewQuackMergeAppender(t.Context(), db, LakeAlias, "main", table(worker),
 					QuackMergeConfig{On: "t.k = s.k", UpdateSet: "v = s.v"},
 					[]QuackMergeColumn{
 						{Name: "k", Kind: QuackColumnVarchar},
@@ -337,7 +316,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	const wantRows = workers * appendersPerWorker * rowsPerAppender
 	union := make([]string, workers)
 	for w := range workers {
-		union[w] = "SELECT k FROM " + DuckLakeAlias + "." + table(w)
+		union[w] = "SELECT k FROM " + LakeAlias + "." + table(w)
 	}
 	all := "(" + strings.Join(union, " UNION ALL ") + ")"
 	var count, distinct int

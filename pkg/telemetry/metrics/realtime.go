@@ -164,3 +164,23 @@ func HistogramRealtimeSubscriptionTopicsCount(ctx context.Context, val int64, op
 		Boundaries:  peekSizeBoundaries,
 	})
 }
+
+func IncrRealtimeSubscriptionRecoveryTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "realtime_subscription_recovery_total",
+		Description: "Realtime Redis subscription recovery attempts and outcomes",
+		Tags:        opts.Tags,
+	})
+}
+
+func HistogramRealtimeSubscriptionRecoveryDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "realtime_subscription_recovery_duration_ms",
+		Description: "Time until Redis confirms a recovered realtime subscription",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}

@@ -1,0 +1,1 @@
+SELECT * REPLACE (nonexistent_evil_column AS status) FROM runs

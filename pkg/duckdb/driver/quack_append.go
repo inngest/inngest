@@ -30,7 +30,7 @@ const (
 // NewQuackAppender's doc comment for why concurrent *appenders*, each on its
 // own instance, are fine).
 type QuackAppender struct {
-	session *quack.Session
+	session quackAppenderSession
 	schema  string
 	table   string
 	columns []QuackColumnKind
@@ -68,11 +68,11 @@ type QuackAppender struct {
 // The wire protocol has no catalog field: it resolves schema.table against
 // the target connection's own default catalog, which is per-connection, not
 // shared with the bootstrapping CLI session. So when catalog is non-empty,
-// NewQuackAppender issues "USE <catalog>;" once on the resolved session
+// NewQuackAppender issues "USE <catalog>.<schema>;" once on the resolved session
 // before returning. This is a real, global mutation of that session's
-// default catalog for every later statement — safe here only because every
-// other caller already fully qualifies table names with DuckLakeAlias (see
-// cmd/duckdbseed/insert.go).
+// default catalog (and schema) for every later statement — safe here only
+// because every other caller already fully qualifies table names with
+// LakeAlias (see cmd/duckdbseed/insert.go).
 func NewQuackAppender(ctx context.Context, db *sql.DB, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
 	sqlConn, err := db.Conn(ctx)
 	if err != nil {
@@ -107,28 +107,59 @@ func NewQuackAppenderFromConn(ctx context.Context, driverConn driver.Conn, catal
 // NewQuackAppenderFromConn share: resolve driverConn to its underlying
 // quack.Session, optionally switch catalog, construct the QuackAppender.
 func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
-	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, "quack appender")
+	sess, err := newQuackAppenderSession(ctx, driverConn, catalog, schema, "quack appender")
 	if err != nil {
 		return nil, err
 	}
 	return &QuackAppender{session: sess, schema: schema, table: table, columns: columns}, nil
 }
 
-// resolveQuackSessionForAppender resolves driverConn to its underlying
-// quack.Session and, if catalog is non-empty, switches that session's default
-// catalog — the logic every *Appender constructor (QuackAppender,
-// QuackMergeAppender) shares. errPrefix names the caller in error messages
-// (e.g. "quack appender", "quack merge appender").
-//
-// The wire protocol has no catalog field: it resolves schema.table against
-// the target connection's own default catalog, which is per-connection, not
-// shared with the bootstrapping CLI session. So when catalog is non-empty,
-// this issues "USE <catalog>;" once on the resolved session before
-// returning. This is a real, global mutation of that session's default
-// catalog for every later statement — safe here only because every other
-// caller already fully qualifies table names with DuckLakeAlias (see
-// cmd/duckdbseed/insert.go).
-func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog, errPrefix string) (*quack.Session, error) {
+// quackAppenderSession is the quack session an appender flushes on. It's
+// resolved from driverConn again on every Flush: a Flush whose ctx ends
+// mid-statement abandons its session (see quack.Session.Abandoned), which is
+// then disconnected server-side, and a subprocess restart replaces the
+// session outright, so either way a cached one would fail every later Flush.
+type quackAppenderSession struct {
+	driverConn any
+	catalog    string
+	schema     string
+	errPrefix  string
+
+	sess *quack.Session
+}
+
+func newQuackAppenderSession(ctx context.Context, driverConn any, catalog, schema, errPrefix string) (quackAppenderSession, error) {
+	s := quackAppenderSession{driverConn: driverConn, catalog: catalog, schema: schema, errPrefix: errPrefix}
+	_, err := s.current(ctx)
+	return s, err
+}
+
+// current returns the session to flush on, selecting the appender's catalog
+// on it again only when it isn't the one the last call returned. The
+// appender owns driverConn until Close (see NewQuackAppender), so nothing
+// else uses (or USEs) its session in between. A bare *quack.Session
+// connection has nothing to re-handshake with, so once abandoned this keeps
+// failing w/ resolveQuackSession's "abandoned" error.
+func (s *quackAppenderSession) current(ctx context.Context) (*quack.Session, error) {
+	sess, err := resolveQuackSession(ctx, s.driverConn, s.errPrefix)
+	if err != nil {
+		return nil, err
+	}
+	if sess == s.sess {
+		return sess, nil
+	}
+	if err := selectQuackAppenderCatalog(ctx, sess, s.catalog, s.schema, s.errPrefix); err != nil {
+		return nil, err
+	}
+	s.sess = sess
+	return sess, nil
+}
+
+// resolveQuackSession resolves driverConn to its current underlying
+// quack.Session, replacing an abandoned one where the transport can. errPrefix
+// names the caller in error messages (e.g. "quack appender", "quack merge
+// appender").
+func resolveQuackSession(ctx context.Context, driverConn any, errPrefix string) (*quack.Session, error) {
 	c, ok := driverConn.(*conn)
 	if !ok {
 		return nil, fmt.Errorf("duckdb: %s: unexpected driver connection type %T", errPrefix, driverConn)
@@ -139,36 +170,46 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 	// > 1 is a *pooledQuackConn. Either way the appender drives the current
 	// *quack.Session directly, so a crash mid-append surfaces as a plain
 	// error rather than a transparent retry.
-	var sess *quack.Session
 	switch s := c.sess.(type) {
 	case *quack.Session:
 		if s.Abandoned() {
 			return nil, fmt.Errorf("duckdb: %s: quack session was abandoned mid-statement", errPrefix)
 		}
-		sess = s
+		return s, nil
 	case *pooledQuackConn:
-		var err error
-		sess, err = s.currentSession(ctx)
-		if err != nil {
-			return nil, err
-		}
+		return s.currentSession(ctx)
 	case *process:
-		var err error
-		sess, err = s.currentQuackSession(ctx)
-		if err != nil {
-			return nil, err
-		}
+		return s.currentQuackSession(ctx)
 	default:
 		return nil, fmt.Errorf("duckdb: %s: unexpected transport %T", errPrefix, c.sess)
 	}
+}
 
-	if catalog != "" {
-		if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", quack.Identifier(catalog))); err != nil {
-			return nil, fmt.Errorf("duckdb: %s: switching to catalog %q: %w", errPrefix, catalog, err)
-		}
+// selectQuackAppenderCatalog switches sess's default catalog when catalog is
+// non-empty.
+//
+// The wire protocol has no catalog field: it resolves schema.table against
+// the target connection's own default catalog, which is per-connection, not
+// shared with the bootstrapping CLI session. So this issues
+// "USE <catalog>.<schema>;" on the session. This is a real, global mutation
+// of that session's default catalog for every later statement (see
+// NewQuackAppender's NOTE).
+func selectQuackAppenderCatalog(ctx context.Context, sess *quack.Session, catalog, schema, errPrefix string) error {
+	if catalog == "" {
+		return nil
 	}
-
-	return sess, nil
+	// USE catalog.schema rather than just the catalog: on an Iceberg
+	// catalog (no default schema of its own) a bare `USE "inngest"`
+	// leaves 2-part `inngest.<table>` names on the session binding as
+	// schema "inngest" and failing.
+	target := quack.Identifier(catalog)
+	if schema != "" {
+		target += "." + quack.Identifier(schema)
+	}
+	if _, _, err := sess.Exec(ctx, fmt.Sprintf("USE %s;", target)); err != nil {
+		return fmt.Errorf("duckdb: %s: switching to catalog %q: %w", errPrefix, catalog, err)
+	}
+	return nil
 }
 
 // AppendRow buffers one row. len(vals) must equal len(columns) from
@@ -183,12 +224,20 @@ func (a *QuackAppender) AppendRow(vals ...any) error {
 }
 
 // Flush sends every buffered row as one SEND_DATA_REQUEST batch and clears
-// the buffer. A no-op if nothing is buffered.
+// the buffer. A no-op if nothing is buffered. The rows stay buffered when it
+// fails, so calling Flush again re-sends them (on a new session, if this
+// one's ctx ended mid-statement). NOTE: a Flush that failed w/ its ctx's
+// error may still have inserted its rows, since the cancel races the
+// INSERT's commit.
 func (a *QuackAppender) Flush(ctx context.Context) error {
 	if len(a.rows) == 0 {
 		return nil
 	}
-	if err := a.session.Append(ctx, a.schema, a.table, a.columns, a.rows); err != nil {
+	sess, err := a.session.current(ctx)
+	if err != nil {
+		return err
+	}
+	if err := sess.Append(ctx, a.schema, a.table, a.columns, a.rows); err != nil {
 		return err
 	}
 	a.rows = a.rows[:0]

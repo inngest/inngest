@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProducerService_Enqueue_FullMethodName        = "/queue.v1.ProducerService/Enqueue"
-	ProducerService_Requeue_FullMethodName        = "/queue.v1.ProducerService/Requeue"
-	ProducerService_RequeueByJobID_FullMethodName = "/queue.v1.ProducerService/RequeueByJobID"
+	ProducerService_Enqueue_FullMethodName          = "/queue.v1.ProducerService/Enqueue"
+	ProducerService_Requeue_FullMethodName          = "/queue.v1.ProducerService/Requeue"
+	ProducerService_RequeueWithLease_FullMethodName = "/queue.v1.ProducerService/RequeueWithLease"
+	ProducerService_RequeueByJobID_FullMethodName   = "/queue.v1.ProducerService/RequeueByJobID"
 )
 
 // ProducerServiceClient is the client API for ProducerService service.
@@ -30,6 +31,8 @@ const (
 type ProducerServiceClient interface {
 	Enqueue(ctx context.Context, in *EnqueueRequest, opts ...grpc.CallOption) (*EnqueueResponse, error)
 	Requeue(ctx context.Context, in *RequeueRequest, opts ...grpc.CallOption) (*RequeueResponse, error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	RequeueWithLease(ctx context.Context, in *RequeueWithLeaseRequest, opts ...grpc.CallOption) (*RequeueWithLeaseResponse, error)
 	RequeueByJobID(ctx context.Context, in *RequeueByJobIDRequest, opts ...grpc.CallOption) (*RequeueByJobIDResponse, error)
 }
 
@@ -61,6 +64,16 @@ func (c *producerServiceClient) Requeue(ctx context.Context, in *RequeueRequest,
 	return out, nil
 }
 
+func (c *producerServiceClient) RequeueWithLease(ctx context.Context, in *RequeueWithLeaseRequest, opts ...grpc.CallOption) (*RequeueWithLeaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequeueWithLeaseResponse)
+	err := c.cc.Invoke(ctx, ProducerService_RequeueWithLease_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *producerServiceClient) RequeueByJobID(ctx context.Context, in *RequeueByJobIDRequest, opts ...grpc.CallOption) (*RequeueByJobIDResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RequeueByJobIDResponse)
@@ -77,6 +90,8 @@ func (c *producerServiceClient) RequeueByJobID(ctx context.Context, in *RequeueB
 type ProducerServiceServer interface {
 	Enqueue(context.Context, *EnqueueRequest) (*EnqueueResponse, error)
 	Requeue(context.Context, *RequeueRequest) (*RequeueResponse, error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	RequeueWithLease(context.Context, *RequeueWithLeaseRequest) (*RequeueWithLeaseResponse, error)
 	RequeueByJobID(context.Context, *RequeueByJobIDRequest) (*RequeueByJobIDResponse, error)
 	mustEmbedUnimplementedProducerServiceServer()
 }
@@ -93,6 +108,9 @@ func (UnimplementedProducerServiceServer) Enqueue(context.Context, *EnqueueReque
 }
 func (UnimplementedProducerServiceServer) Requeue(context.Context, *RequeueRequest) (*RequeueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Requeue not implemented")
+}
+func (UnimplementedProducerServiceServer) RequeueWithLease(context.Context, *RequeueWithLeaseRequest) (*RequeueWithLeaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequeueWithLease not implemented")
 }
 func (UnimplementedProducerServiceServer) RequeueByJobID(context.Context, *RequeueByJobIDRequest) (*RequeueByJobIDResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RequeueByJobID not implemented")
@@ -154,6 +172,24 @@ func _ProducerService_Requeue_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProducerService_RequeueWithLease_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequeueWithLeaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProducerServiceServer).RequeueWithLease(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProducerService_RequeueWithLease_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProducerServiceServer).RequeueWithLease(ctx, req.(*RequeueWithLeaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProducerService_RequeueByJobID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequeueByJobIDRequest)
 	if err := dec(in); err != nil {
@@ -186,6 +222,10 @@ var ProducerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Requeue",
 			Handler:    _ProducerService_Requeue_Handler,
+		},
+		{
+			MethodName: "RequeueWithLease",
+			Handler:    _ProducerService_RequeueWithLease_Handler,
 		},
 		{
 			MethodName: "RequeueByJobID",

@@ -1,0 +1,53 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+((1.0, 2.0, 3.0, 4.0, 5.0)) std_dev(SAMPLE::enum, col0::fp32) = 1.5811388::fp32?
+((1.0, 2.0, 3.0, 4.0, 5.0)) std_dev(SAMPLE::enum, col0::fp64) = 1.5811388300841898::fp64?
+((1.0, 2.0, 3.0, 4.0, 5.0)) std_dev(POPULATION::enum, col0::fp32) = 1.4142135::fp32?
+((1.0, 2.0, 3.0, 4.0, 5.0)) std_dev(POPULATION::enum, col0::fp64) = 1.4142135623730951::fp64?
+
+# uniform_values: Standard deviation of uniform values
+((5.0, 5.0, 5.0, 5.0)) std_dev(SAMPLE::enum, col0::fp32) = 0.0::fp32?
+((5.0, 5.0, 5.0, 5.0)) std_dev(POPULATION::enum, col0::fp64) = 0.0::fp64?
+
+# single_value: Standard deviation with single value
+((42.0)) std_dev(SAMPLE::enum, col0::fp32) = Null::fp32?
+((42.0)) std_dev(POPULATION::enum, col0::fp64) = 0.0::fp64?
+
+# negative_values: Standard deviation with negative values
+((-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)) std_dev(SAMPLE::enum, col0::fp32) = 3.8944404::fp32?
+((-5.0, -3.0, -1.0, 1.0, 3.0, 5.0)) std_dev(SAMPLE::enum, col0::fp64) = 3.8944404818493075::fp64?
+((-10.0, -5.0, 0.0, 5.0, 10.0)) std_dev(POPULATION::enum, col0::fp32) = 7.0710678::fp32?
+((-10.0, -5.0, 0.0, 5.0, 10.0)) std_dev(POPULATION::enum, col0::fp64) = 7.0710678118654755::fp64?
+
+# decimal_precision: Standard deviation with decimal values
+((1.5, 2.5, 3.5, 4.5, 5.5)) std_dev(SAMPLE::enum, col0::fp32) = 1.5811388::fp32?
+((1.5, 2.5, 3.5, 4.5, 5.5)) std_dev(SAMPLE::enum, col0::fp64) = 1.5811388300841898::fp64?
+((0.1, 0.2, 0.3, 0.4, 0.5)) std_dev(POPULATION::enum, col0::fp64) = 0.14142135623730953::fp64?
+
+# large_values: Standard deviation with large values
+((1000.0, 2000.0, 3000.0, 4000.0, 5000.0)) std_dev(SAMPLE::enum, col0::fp32) = 1581.1388::fp32?
+((1000.0, 2000.0, 3000.0, 4000.0, 5000.0)) std_dev(SAMPLE::enum, col0::fp64) = 1581.1388300841898::fp64?
+
+# small_values: Standard deviation with small values
+((0.001, 0.002, 0.003, 0.004, 0.005)) std_dev(SAMPLE::enum, col0::fp64) = 0.0015811388300841896::fp64?
+((0.001, 0.002, 0.003, 0.004, 0.005)) std_dev(POPULATION::enum, col0::fp64) = 0.0014142135623730951::fp64?
+
+# null_handling: Examples with null as input or output
+((Null, Null, Null)) std_dev(SAMPLE::enum, col0::fp32?) = Null::fp32?
+(()) std_dev(SAMPLE::enum, col0::fp32) = Null::fp32?
+((1.0, Null, 3.0, Null, 5.0)) std_dev(SAMPLE::enum, col0::fp32?) = 2.0::fp32?
+((1.0, Null, 3.0, Null, 5.0)) std_dev(POPULATION::enum, col0::fp64?) = 1.632993161855452::fp64?
+
+# rounding: Examples with different rounding modes
+((1.1, 2.2, 3.3, 4.4, 5.5)) std_dev(SAMPLE::enum, col0::fp32) [rounding:TIE_TO_EVEN] = 1.7406897::fp32?
+((1.1, 2.2, 3.3, 4.4, 5.5)) std_dev(SAMPLE::enum, col0::fp64) [rounding:TRUNCATE] = 1.7406897166664838::fp64?
+
+# two_values: Standard deviation with two values
+((10.0, 20.0)) std_dev(SAMPLE::enum, col0::fp32) = 7.071068::fp32?
+((10.0, 20.0)) std_dev(POPULATION::enum, col0::fp64) = 5.0::fp64?
+
+# mixed_range: Standard deviation with mixed range values
+((0.0, 100.0, 50.0, 25.0, 75.0)) std_dev(SAMPLE::enum, col0::fp32) = 41.010193::fp32?
+((0.0, 100.0, 50.0, 25.0, 75.0)) std_dev(POPULATION::enum, col0::fp64) = 36.66060555964672::fp64?

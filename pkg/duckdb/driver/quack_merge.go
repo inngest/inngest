@@ -25,25 +25,17 @@ type QuackMergeColumn = quack.MergeColumn
 // comments for why concurrent *appenders*, each on its own instance, are
 // fine).
 //
-// On a DuckLake target, a Flush conflicts with any other transaction that
-// inserted into the same table since its snapshot, even when their keys are
-// disjoint and nothing matched. DuckLake (ducklake ddb4e23e, first shipped in
-// DuckDB v2.0.0) marks the whole table delete-attempted for any MERGE w/ a
-// WHEN NOT MATCHED INSERT action, and its commit-time conflict check is per
-// table, not per key, and runs against everything committed to the catalog
-// -- so it spans clients, not just this driver's pooled conns. Concurrent
-// merges into one table (from any mix of processes/clients sharing the
-// catalog), or a merge racing any plain INSERT/QuackAppender into it, fail
-// for whichever commits second w/ "Transaction conflict - attempting to
-// delete from table ... but another transaction has inserted into it".
-// DuckLake doesn't retry this (ducklake_max_retry_count only covers snapshot
-// races), so multi-client upserts into a lake table need a single writer
-// or retries on this error. The MERGE is a single auto-committed statement
-// and the rows stay buffered when Flush fails, so calling Flush again re-runs
-// it (Close doesn't, it releases the pooled conn even if its final Flush
-// fails).
+// On an Iceberg target a Flush is one optimistic commit, so it fails w/ a
+// 409 (CommitFailedException) when another writer committed to the same
+// table first, unless the table's `commit.retry.*` properties let duckdb
+// retry it. Multi-writer upserts into one lake table need a single writer,
+// those properties, or retries on this error. The MERGE is a single
+// auto-committed statement and the rows stay buffered when Flush fails, so
+// calling Flush again re-runs it, on a new session if the failed Flush's ctx
+// ended mid-statement (Close doesn't, it releases the pooled conn even if
+// its final Flush fails).
 type QuackMergeAppender struct {
-	session *quack.Session
+	session quackAppenderSession
 	schema  string
 	table   string
 	cfg     QuackMergeConfig
@@ -88,7 +80,7 @@ func NewQuackMergeAppenderFromConn(ctx context.Context, driverConn driver.Conn, 
 }
 
 func newQuackMergeAppenderFromDriverConn(ctx context.Context, driverConn any, catalog, schema, table string, cfg QuackMergeConfig, columns []QuackMergeColumn) (*QuackMergeAppender, error) {
-	sess, err := resolveQuackSessionForAppender(ctx, driverConn, catalog, "quack merge appender")
+	sess, err := newQuackAppenderSession(ctx, driverConn, catalog, schema, "quack merge appender")
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +104,11 @@ func (a *QuackMergeAppender) Flush(ctx context.Context) error {
 	if len(a.rows) == 0 {
 		return nil
 	}
-	if err := a.session.Merge(ctx, a.schema, a.table, a.cfg, a.columns, a.rows); err != nil {
+	sess, err := a.session.current(ctx)
+	if err != nil {
+		return err
+	}
+	if err := sess.Merge(ctx, a.schema, a.table, a.cfg, a.columns, a.rows); err != nil {
 		return err
 	}
 	a.rows = a.rows[:0]

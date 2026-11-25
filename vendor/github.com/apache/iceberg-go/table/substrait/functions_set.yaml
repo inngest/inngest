@@ -1,0 +1,37 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+%YAML 1.2
+---
+urn: extension:apache.iceberg:functions_set
+scalar_functions:
+  -
+    name: "is_in"
+    description: >
+      Checks membership of a value in a list of values
+
+      Returns true or false if `needle` is found in `haystack`.
+    impls:
+      - args:
+        - name: needle
+          value: any1
+        - name: haystack
+          value: list<any1>
+        options:
+          nan_equality:
+            values: [ NAN_IS_NAN, NAN_IS_NOT_NAN ]
+        return: "boolean"

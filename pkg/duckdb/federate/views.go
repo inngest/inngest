@@ -35,7 +35,7 @@ func DeltaColumns(t Table) []Column {
 
 // SourceName is the CTE a federated physical table is read through: its
 // lake rows ∪ its delta rows, uncollapsed. Callers pass it to a macro that
-// takes a physical source (inngest.raw_runs, inngest.insights_runs, ...).
+// takes a physical source (inngest_local.raw_runs, insights_runs, ...).
 func SourceName(t Table) string { return GeneratedPrefix + "fed_" + Physical[t].Name }
 
 // GeneratedPrefix prefixes every CTE name the executor generates, so they
@@ -44,8 +44,10 @@ func SourceName(t Table) string { return GeneratedPrefix + "fed_" + Physical[t].
 // can't use.
 const GeneratedPrefix = "__inngest_"
 
-// LakeSource is the lake half of the union: a DuckLake catalog alias,
-// optionally pinned to a snapshot so one query reads one lake version.
+// LakeSource is the lake half of the union: the lake's catalog alias,
+// optionally pinned to an Iceberg snapshot id so one query reads one lake
+// version. It only qualifies tables: the macros over them (raw_runs) live in
+// schema.MacroSchema, outside the lake.
 type LakeSource struct {
 	Catalog  string
 	Snapshot *int64
@@ -137,7 +139,7 @@ func deltaBoundColumns(t Table, allTenants bool) []string {
 // which is free, STRUCT lists), so the union is the physical table's own
 // shape and any macro over the table reads it unchanged. JSON text stays
 // VARCHAR here so filters and extractions read it w/o a JSON cast (a
-// validating parse per row); the lake's macros cast it to JSON only
+// validating parse per row); the views.sql macros cast it to JSON only
 // where they return it.
 func sourceCTE(t Table, spec sourceSpec) (*parser.CTE, error) {
 	phys, ok := Physical[t]
@@ -193,17 +195,17 @@ func deltaSelect(c schema.Column) *parser.SelectItem {
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
-// inngest.raw_runs over their federated source (unless runsCollapsed, see
+// inngest_local.raw_runs over their federated source (unless runsCollapsed, see
 // Query.RunsCollapsed); spans, events and metadata are the source itself
 // (each row is its own emission / event).
-func rawView(t Table, lake LakeSource, runsCollapsed bool) (*parser.CTE, error) {
+func rawView(t Table, runsCollapsed bool) (*parser.CTE, error) {
 	switch t {
 	case TableRuns:
 		if runsCollapsed {
 			return cte(string(t), selectStar(tableRef(SourceName(t)))), nil
 		}
 		return cte(string(t), selectStar(&parser.TableFunctionRef{
-			Name: []string{lake.Catalog, "raw_runs"},
+			Name: []string{schema.MacroSchema, "raw_runs"},
 			Args: []parser.Expr{&parser.NamedArg{Name: "p_runs", Value: strLit(SourceName(t))}},
 		})), nil
 	case TableSpans, TableEvents, TableMetadata:

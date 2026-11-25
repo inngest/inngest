@@ -60,6 +60,7 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 		require.Contains(t, names, name)
 	}
 	require.Contains(t, names, "list_functions")
+	require.Contains(t, names, "get_account_usage")
 	require.Contains(t, names, "invoke_function")
 	require.Contains(t, names, "create_replay")
 	require.Contains(t, names, "pause_function")

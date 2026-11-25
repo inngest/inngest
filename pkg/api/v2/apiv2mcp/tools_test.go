@@ -12,6 +12,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetAccountUsageTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "GetAccountUsage")
+	tool := Tool(endpoint)
+	require.Equal(t, "get_account_usage", tool.Name)
+	require.True(t, tool.Annotations.ReadOnlyHint)
+	require.True(t, tool.Annotations.IdempotentHint)
+	require.False(t, *tool.Annotations.DestructiveHint)
+	require.Empty(t, InputSchema(endpoint)["required"])
+
+	req, err := Request(t.Context(), endpoint, nil, Options{BasePath: "/v2", EnvHeader: "X-Inngest-Env"})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodGet, req.Method)
+	require.Equal(t, "/v2/account/usage", req.URL.Path)
+	require.Empty(t, req.Header.Get("X-Inngest-Env"))
+	require.Empty(t, req.URL.RawQuery)
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	require.Empty(t, body)
+}
+
 func TestRequest(t *testing.T) {
 	endpoint := endpointByMethod(t, "InvokeFunction")
 	req, err := Request(context.Background(), endpoint, map[string]any{

@@ -280,3 +280,50 @@ func TestPinnedChecksumsCoverEveryKnownAsset(t *testing.T) {
 		}
 	}
 }
+
+// TestWriteBinaryAtomicallyConcurrentWriters: two processes installing the
+// binary at once (e.g. two dev servers sharing a state dir on first start)
+// must each succeed and leave a complete binary, w/ no temp files behind.
+func TestWriteBinaryAtomicallyConcurrentWriters(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "duckdb")
+	data := bytes.Repeat([]byte("duckdb-binary-"), 1<<19) // ~7MB, so writes overlap
+
+	const writers = 8
+	errs := make(chan error, writers)
+	start := make(chan struct{})
+	for range writers {
+		go func() {
+			<-start
+			errs <- writeBinaryAtomically(path, data)
+		}()
+	}
+	close(start)
+	for range writers {
+		if err := <-errs; err != nil {
+			t.Errorf("writeBinaryAtomically: %v", err)
+		}
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Fatalf("installed binary is corrupt: %d bytes, want %d", len(got), len(data))
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o755 {
+		t.Fatalf("installed binary mode = %v, want 0755", info.Mode().Perm())
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("leftover files beside the binary: %v", entries)
+	}
+}
