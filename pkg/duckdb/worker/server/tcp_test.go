@@ -2,12 +2,15 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/duckdb/worker"
+	"github.com/inngest/inngest/pkg/duckdb/worker/libduckdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -153,4 +156,47 @@ func TestServerDistinctSessionIDPrefixes(t *testing.T) {
 	require.Equal(t, "s-"+srv1.instanceID+"-1", id1)
 	require.Equal(t, "s-"+srv2.instanceID+"-1", id2)
 	require.NotEqual(t, id1, id2)
+}
+
+type fakeSessionConn struct {
+	closed      atomic.Bool
+	interrupted atomic.Bool
+}
+
+func (f *fakeSessionConn) Close() error {
+	f.closed.Store(true)
+	return nil
+}
+
+func (f *fakeSessionConn) Interrupt() {
+	f.interrupted.Store(true)
+}
+
+func (f *fakeSessionConn) Exec(string) error {
+	return errors.New("not implemented")
+}
+
+func (f *fakeSessionConn) Query(string) (*libduckdb.Result, error) {
+	return nil, errors.New("not implemented")
+}
+
+func TestOpenSessionCleansUpOnReplyWriteFailure(t *testing.T) {
+	srv := New(nil, "v-test-open-fail")
+	fakeConn := &fakeSessionConn{}
+	srv.connect = func() (sessionConn, error) {
+		return fakeConn, nil
+	}
+
+	serverConn, clientConn := net.Pipe()
+	require.NoError(t, clientConn.Close())
+	t.Cleanup(func() { _ = serverConn.Close() })
+
+	keepOpen := srv.dispatch(serverConn, &worker.Request{Op: worker.OpOpenSession})
+	require.False(t, keepOpen)
+	require.True(t, fakeConn.closed.Load(), "expected DuckDB session conn to be closed after reply write failure")
+
+	srv.mu.RLock()
+	remaining := len(srv.sessions)
+	srv.mu.RUnlock()
+	require.Zero(t, remaining, "expected failed session to be removed from server sessions map")
 }

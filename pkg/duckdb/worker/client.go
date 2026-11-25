@@ -243,14 +243,22 @@ func (c *Client) roundTrip(ctx context.Context, req Request) (Response, error) {
 	}
 	defer conn.Close()
 
-	if deadline, ok := ctx.Deadline(); ok {
-		_ = conn.SetDeadline(deadline)
-	}
+	stop := context.AfterFunc(ctx, func() {
+		_ = conn.Close()
+	})
+	defer stop()
+
 	if err := WriteFrame(conn, req); err != nil {
+		if ctx.Err() != nil {
+			return Response{}, ctx.Err()
+		}
 		return Response{}, err
 	}
 	var resp Response
 	if err := ReadFrame(conn, &resp); err != nil {
+		if ctx.Err() != nil {
+			return Response{}, ctx.Err()
+		}
 		return Response{}, err
 	}
 	if resp.Kind == KindError {

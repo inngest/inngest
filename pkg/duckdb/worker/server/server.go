@@ -137,9 +137,16 @@ func startHealthServer(addr string, srv *Server) (func() error, error) {
 	}, nil
 }
 
+type sessionConn interface {
+	Close() error
+	Interrupt()
+	Exec(sql string) error
+	Query(sql string) (*libduckdb.Result, error)
+}
+
 type session struct {
 	id   string
-	conn *libduckdb.Conn
+	conn sessionConn
 
 	mu          sync.Mutex
 	active      bool
@@ -175,6 +182,7 @@ func (sess *session) interrupt(reqID uint64) {
 // concurrent per-session libduckdb connections.
 type Server struct {
 	db         *libduckdb.DB
+	connect    func() (sessionConn, error)
 	version    string
 	authToken  string
 	instanceID string
@@ -200,7 +208,10 @@ func New(db *libduckdb.DB, version string) *Server {
 	var buf [8]byte
 	_, _ = rand.Read(buf[:])
 	return &Server{
-		db:         db,
+		db: db,
+		connect: func() (sessionConn, error) {
+			return db.Connect()
+		},
 		version:    version,
 		instanceID: hex.EncodeToString(buf[:]),
 		sessions:   make(map[string]*session),
@@ -437,7 +448,7 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 		return true
 
 	case worker.OpOpenSession:
-		conn, err := s.db.Connect()
+		conn, err := s.connect()
 		if err != nil {
 			_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindError, Error: err.Error()})
 			return true
@@ -452,7 +463,19 @@ func (s *Server) dispatch(c net.Conn, req *worker.Request) bool {
 		}
 		s.sessions[id] = &session{id: id, conn: conn}
 		s.mu.Unlock()
-		_ = worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, SessionID: id})
+		if err := worker.WriteFrame(c, worker.Response{Kind: worker.KindOK, SessionID: id}); err != nil {
+			s.mu.Lock()
+			sess, ok := s.sessions[id]
+			if ok {
+				delete(s.sessions, id)
+			}
+			s.mu.Unlock()
+			if ok {
+				sess.conn.Interrupt()
+				_ = sess.conn.Close()
+			}
+			return false
+		}
 		return true
 
 	case worker.OpCloseSession:
