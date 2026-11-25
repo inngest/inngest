@@ -637,3 +637,54 @@ func TestGenerationZeroFenceWithRepairDisabled(t *testing.T) {
 	_, err = f.shard.Lease(t.Context(), *items[0], queue.QueueLeaseDuration, f.clock.Now())
 	require.NoError(t, err, "a current post-requeue snapshot must still lease")
 }
+
+func TestExpiredCapacityRepairPreservesItemLeaseGuard(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		storedLease  bool
+		observeLease bool
+		wantErr      error
+	}{
+		{name: "unleased item"},
+		{name: "matching expired item lease", storedLease: true, observeLease: true},
+		{name: "item lease changed since snapshot", storedLease: true, wantErr: queue.ErrQueueItemLeaseMismatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newCapacityRecoveryFixture(t, 25)
+			f.enqueue(1)
+			f.refill()
+			f.advance(31 * time.Second)
+			items, err := f.shard.Peek(t.Context(), f.partition(), f.clock.Now(), 1)
+			require.NoError(t, err)
+			require.Len(t, items, 1)
+			snapshot := *items[0]
+			if tc.storedLease {
+				current := snapshot
+				lease := ulid.MustNew(ulid.Timestamp(f.clock.Now().Add(-time.Second)), nil)
+				current.LeaseID = &lease
+				f.store(current)
+				if tc.observeLease {
+					snapshot = current
+				}
+			}
+			p := f.partition()
+			p.LeaseID, err = f.shard.PartitionLease(t.Context(), p, queue.PartitionLeaseDuration)
+			require.NoError(t, err)
+			before, err := f.shard.LoadQueueItem(t.Context(), snapshot.ID)
+			require.NoError(t, err)
+			err = f.shard.Requeue(t.Context(), snapshot, f.clock.Now(), queue.RequeueMatchItemLease(), queue.RequeueIfExpiredCapacityLease(*p.LeaseID))
+			require.ErrorIs(t, err, tc.wantErr)
+			after, err := f.shard.LoadQueueItem(t.Context(), snapshot.ID)
+			require.NoError(t, err)
+			if tc.wantErr != nil {
+				require.Equal(t, *before, *after, "item-lease mismatch must not mutate the stored item")
+				require.Equal(t, 1, f.ready())
+				require.Zero(t, f.backlogSize())
+			} else {
+				require.Zero(t, f.ready())
+				require.EqualValues(t, 1, f.backlogSize())
+				require.Equal(t, before.GenerationID+1, after.GenerationID)
+			}
+		})
+	}
+}
