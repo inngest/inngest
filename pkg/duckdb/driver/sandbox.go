@@ -19,15 +19,29 @@ func withRestrictExternalAccess(restrict bool) processOption {
 // initSessionLocked: once enable_external_access is off, INSTALL/LOAD, a new
 // ATTACH, and changing extension/home directories all fail, so every other
 // bootstrap phase has to be done by then.
-func (p *process) bootstrapSandboxLocked(ctx context.Context) error {
+func (p *process) bootstrapSandboxLocked(ctx context.Context, alreadySandboxed *bool) error {
 	if !p.restrictExternalAccess {
+		return nil
+	}
+	if alreadySandboxed != nil && *alreadySandboxed {
 		return nil
 	}
 	stmts, err := sandboxStmts(p.iceberg)
 	if err != nil {
 		return err
 	}
-	return p.bootstrapExecLocked(ctx, "sandbox", stmts)
+	err = p.bootstrapExecLocked(ctx, "sandbox", stmts)
+	if err != nil && p.workerSocket != "" {
+		// Another client on the shared external worker may have turned off
+		// enable_external_access concurrently, which blocks SET allowed_directories.
+		if disabled, checkErr := p.externalAccessDisabledLocked(ctx); checkErr == nil && disabled {
+			if alreadySandboxed != nil {
+				*alreadySandboxed = true
+			}
+			return nil
+		}
+	}
+	return err
 }
 
 // sandboxStmts builds the statements that turn off DuckDB's external access

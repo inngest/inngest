@@ -278,11 +278,21 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.bootstrapStateDirLocked(ctx); err != nil {
+	sharedWorker := p.workerSocket != ""
+	alreadySandboxed := false
+	if sharedWorker && (p.stateDir != "" || p.iceberg != nil || p.restrictExternalAccess) {
+		var err error
+		alreadySandboxed, err = p.externalAccessDisabledLocked(ctx)
+		if err != nil {
+			return fmt.Errorf("duckdb: checking worker external access state: %w", p.redactor.redactErr(err))
+		}
+	}
+
+	if err := p.bootstrapStateDirLocked(ctx, &alreadySandboxed); err != nil {
 		return err
 	}
 
-	if err := p.bootstrapIcebergLocked(ctx); err != nil {
+	if err := p.bootstrapIcebergLocked(ctx, &alreadySandboxed); err != nil {
 		return err
 	}
 
@@ -291,7 +301,7 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	}
 
 	// Last: it forbids the INSTALL/LOAD/ATTACH the phases above rely on.
-	if err := p.bootstrapSandboxLocked(ctx); err != nil {
+	if err := p.bootstrapSandboxLocked(ctx, &alreadySandboxed); err != nil {
 		return err
 	}
 
@@ -308,6 +318,41 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	p.quackGen++
 	p.workerEP.Store(&workerEndpoint{client: p.client, gen: p.quackGen})
 	return nil
+}
+
+// externalAccessDisabledLocked reports whether the connected worker already
+// has enable_external_access turned off (e.g. a shared external sidecar that
+// was previously sandboxed by an earlier connection).
+func (p *process) externalAccessDisabledLocked(ctx context.Context) (bool, error) {
+	_, rows, err := p.sess.Exec(ctx, "SELECT current_setting('enable_external_access') AS v;")
+	if err != nil {
+		return false, err
+	}
+	if len(rows) == 0 {
+		return false, nil
+	}
+	switch v := rows[0].Get("v").(type) {
+	case bool:
+		return !v, nil
+	case string:
+		return strings.EqualFold(v, "false"), nil
+	default:
+		return false, nil
+	}
+}
+
+// lakeAttachedLocked reports whether LakeAlias is already attached on the
+// connected worker.
+func (p *process) lakeAttachedLocked(ctx context.Context) (bool, error) {
+	aliasLit, err := encodeLiteral(LakeAlias)
+	if err != nil {
+		return false, err
+	}
+	_, rows, err := p.sess.Exec(ctx, fmt.Sprintf("SELECT 1 AS attached FROM duckdb_databases() WHERE database_name = %s;", aliasLit))
+	if err != nil {
+		return false, err
+	}
+	return len(rows) > 0, nil
 }
 
 type bootstrapConnector struct {
@@ -405,8 +450,11 @@ func (p *process) bootstrapTimeZoneLocked(ctx context.Context) error {
 	return p.bootstrapExecLocked(ctx, "time zone", []string{"SET GLOBAL TimeZone = 'UTC';"})
 }
 
-func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
+func (p *process) bootstrapStateDirLocked(ctx context.Context, alreadySandboxed *bool) error {
 	if p.stateDir == "" {
+		return nil
+	}
+	if alreadySandboxed != nil && *alreadySandboxed {
 		return nil
 	}
 	homeDir := filepath.Join(p.stateDir, "duckdb")
@@ -437,10 +485,21 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 		fmt.Sprintf("SET extension_directories=[%s];", extLiteral),
 		fmt.Sprintf("SET temp_directory=%s;", tmpLiteral),
 	}
-	return p.bootstrapExecLocked(ctx, "state dir", stmts)
+	err = p.bootstrapExecLocked(ctx, "state dir", stmts)
+	if err != nil && p.workerSocket != "" {
+		// Another client on the shared external worker may have finished
+		// sandboxing it concurrently, which blocks changing these directories.
+		if disabled, checkErr := p.externalAccessDisabledLocked(ctx); checkErr == nil && disabled {
+			if alreadySandboxed != nil {
+				*alreadySandboxed = true
+			}
+			return nil
+		}
+	}
+	return err
 }
 
-func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
+func (p *process) bootstrapIcebergLocked(ctx context.Context, alreadySandboxed *bool) error {
 	if p.iceberg == nil {
 		return nil
 	}
@@ -449,17 +508,48 @@ func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if sharedWorker && alreadySandboxed != nil && *alreadySandboxed {
+		return p.verifySandboxedIcebergLocked(ctx)
+	}
 	err = p.bootstrapExecLocked(ctx, "Iceberg", stmts)
 	if err != nil && sharedWorker {
+		// If another client sandboxed the shared worker while we were
+		// bootstrapping, INSTALL/LOAD/ATTACH will fail. Reuse the worker's
+		// completed Iceberg setup instead of retrying blocked statements.
+		if disabled, checkErr := p.externalAccessDisabledLocked(ctx); checkErr == nil && disabled {
+			if alreadySandboxed != nil {
+				*alreadySandboxed = true
+			}
+			return p.verifySandboxedIcebergLocked(ctx)
+		}
 		// On a shared external worker we never DETACH LakeAlias (another
 		// client may be reading concurrently). If ATTACH with DEFAULT_SCHEMA
 		// failed because LakeNamespace doesn't exist yet on a fresh catalog,
 		// create the namespace via the Iceberg REST API and retry once.
 		if nsErr := ensureIcebergNamespace(ctx, *p.iceberg); nsErr == nil {
 			err = p.bootstrapExecLocked(ctx, "Iceberg", stmts)
+			if err != nil {
+				if disabled, checkErr := p.externalAccessDisabledLocked(ctx); checkErr == nil && disabled {
+					if alreadySandboxed != nil {
+						*alreadySandboxed = true
+					}
+					return p.verifySandboxedIcebergLocked(ctx)
+				}
+			}
 		}
 	}
 	return err
+}
+
+func (p *process) verifySandboxedIcebergLocked(ctx context.Context) error {
+	attached, err := p.lakeAttachedLocked(ctx)
+	if err != nil {
+		return fmt.Errorf("duckdb: checking Iceberg catalog %q on sandboxed worker: %w", LakeAlias, p.redactor.redactErr(err))
+	}
+	if !attached {
+		return fmt.Errorf("duckdb: Iceberg bootstrap failed: external access is already disabled on shared worker and catalog %q is not attached", LakeAlias)
+	}
+	return nil
 }
 
 // ensureIcebergNamespace creates LakeNamespace on the Iceberg REST catalog via
