@@ -451,3 +451,54 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
+
+func TestQueueDequeueMatchItemLease(t *testing.T) {
+	for _, backlog := range []bool{false, true} {
+		for _, state := range []string{"owned", "replaced", "cleared", "expired", "zero", "nil", "missing"} {
+			t.Run(fmt.Sprintf("backlog=%t/%s", backlog, state), func(t *testing.T) {
+				r, rc := initRedis(t)
+				t.Cleanup(rc.Close)
+				clock := clockwork.NewFakeClock()
+				_, shard := newQueue(t, rc, osqueue.WithClock(clock), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return backlog }))
+				ctx := t.Context()
+				fnID, wsID, accountID := uuid.New(), uuid.New(), uuid.New()
+				item := osqueue.QueueItem{ID: "owned-dequeue", FunctionID: fnID, WorkspaceID: wsID, Data: osqueue.Item{Kind: osqueue.KindSleep}}
+				item.Data.Identifier.AccountID, item.Data.Identifier.WorkspaceID, item.Data.Identifier.WorkflowID = accountID, wsID, fnID
+				item.Data.Identifier.RunID = ulid.Make()
+				item, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Hour), osqueue.EnqueueOpts{PassthroughJobId: true})
+				require.NoError(t, err)
+				lease, err := shard.Lease(ctx, item, time.Minute, clock.Now())
+				require.NoError(t, err)
+				item.LeaseID = lease
+				switch state {
+				case "replaced":
+					item.LeaseID = new(ulid.Make())
+				case "cleared":
+					require.NoError(t, shard.Requeue(ctx, item, clock.Now().Add(time.Hour)))
+				case "expired":
+					clock.Advance(2 * time.Minute)
+				case "zero":
+					item.LeaseID = new(ulid.ULID{})
+				case "nil":
+					item.LeaseID = nil
+				case "missing":
+					require.NoError(t, shard.Dequeue(ctx, item))
+				}
+				before := r.Dump()
+				err = shard.Dequeue(ctx, item, osqueue.DequeueMatchItemLease())
+				switch state {
+				case "owned":
+					require.NoError(t, err)
+					_, err := shard.LoadQueueItem(ctx, item.ID)
+					require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+				case "missing":
+					require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+					require.Equal(t, before, r.Dump())
+				default:
+					require.ErrorIs(t, err, osqueue.ErrQueueItemLeaseMismatch)
+					require.Equal(t, before, r.Dump(), "ownership loss must leave payload, indexes and locks unchanged")
+				}
+			})
+		}
+	}
+}

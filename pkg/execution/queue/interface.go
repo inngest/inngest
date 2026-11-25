@@ -20,6 +20,8 @@ type DequeueOptions struct {
 	// that wake parked partitions on capacity release should wait for
 	// CapacityReleaseNotifier.CapacityReleased instead of waking at dequeue.
 	CapacityLeased bool
+	// MatchItemLease requires the stored lease to match the item's live lease.
+	MatchItemLease bool
 }
 
 // DequeueCapacityLeased marks the dequeued item as holding a capacity lease
@@ -28,15 +30,30 @@ func DequeueCapacityLeased() DequeueOptionFn {
 	return func(o *DequeueOptions) { o.CapacityLeased = true }
 }
 
+// DequeueMatchItemLease checks the item's live lease atomically with deletion.
+// A missing, replaced or expired lease leaves the item intact.
+func DequeueMatchItemLease() DequeueOptionFn {
+	return func(o *DequeueOptions) { o.MatchItemLease = true }
+}
+
 type RequeueOptions struct {
 	// CapacityLeased has the same meaning as DequeueOptions.CapacityLeased.
 	CapacityLeased bool
+	// MatchItemLease requires the stored lease to match the item's lease.
+	// A nil item lease requires no stored lease; expired matching leases are allowed.
+	MatchItemLease bool
 }
 
 // RequeueCapacityLeased marks the requeued item as holding a capacity lease
 // that will be released after the requeue completes.
 func RequeueCapacityLeased() RequeueOptionFn {
 	return func(o *RequeueOptions) { o.CapacityLeased = true }
+}
+
+// RequeueMatchItemLease checks the item's observed lease atomically before
+// requeueing. Expired leases are allowed; a nil item lease requires no stored lease.
+func RequeueMatchItemLease() RequeueOptionFn {
+	return func(o *RequeueOptions) { o.MatchItemLease = true }
 }
 
 type RequeueOptionFn func(o *RequeueOptions)
