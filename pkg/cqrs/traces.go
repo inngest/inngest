@@ -479,7 +479,7 @@ type GetTraceRunOpt struct {
 	Cursor        string
 	Items         uint
 	IncludeOutput bool
-	// IncludeSkipped exposes skipped runs for replay selection; ordinary run lists omit them.
+	// IncludeSkipped exposes skipped runs for point, event, and replay reads; ordinary run lists omit them.
 	IncludeSkipped bool
 	// Whether the run list should use the tracing preview stores
 	Preview bool
@@ -522,6 +522,7 @@ type GetTraceRunFilter struct {
 	FunctionID   []uuid.UUID
 	AppName      []string
 	FunctionSlug []string
+	RunID        []ulid.ULID
 	EventID      []ulid.ULID
 	TimeField    enums.TraceRunTime
 	From         time.Time

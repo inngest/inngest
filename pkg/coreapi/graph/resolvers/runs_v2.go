@@ -420,9 +420,10 @@ func toRunsQueryOpt(
 			CEL:         cel,
 			IsDeferred:  filter.IsDeferred,
 		},
-		Order:   orderBy,
-		Cursor:  cursor,
-		Items:   uint(items),
-		Preview: true,
+		Order:         orderBy,
+		Cursor:        cursor,
+		Items:         uint(items),
+		Preview:       true,
+		IncludeOutput: true,
 	}
 }
