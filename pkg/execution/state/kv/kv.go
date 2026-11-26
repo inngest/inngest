@@ -48,6 +48,11 @@ type Store interface {
 	// Delete removes one key.  without WithExpected, a missing key is not an
 	// error.
 	Delete(context.Context, Key, ...Option) error
+	// Extend moves the key's expiry to d from now when that is later than
+	// the expiry the key has.  the value and the version do not change, so
+	// it cannot conflict with a compare and set.  a key without an expiry
+	// keeps none.  a missing key returns ErrNotFound and is not created.
+	Extend(context.Context, Key, time.Duration) error
 }
 
 // Entry represents one value in a KV store.

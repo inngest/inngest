@@ -119,6 +119,25 @@ func TestAsRetryAt(t *testing.T) {
 	require.Nil(t, AsRetryAtError(fmt.Errorf("no")))
 }
 
+func TestAlwaysRetryErrorUnwrap(t *testing.T) {
+	cause := fmt.Errorf("cause")
+	now := time.Now()
+
+	err := AlwaysRetryError(fmt.Errorf("wrap: %w", cause))
+	require.ErrorIs(t, err, cause)
+	require.True(t, IsAlwaysRetryable(err))
+
+	// the error that always retries is found first, so the attempt count
+	// and a wrapped error that never retries do not stop the retry.
+	require.True(t, ShouldRetry(AlwaysRetryError(NeverRetryError(cause)), 10, 5))
+	require.False(t, ShouldRetry(NeverRetryError(AlwaysRetryError(cause)), 0, 5))
+
+	at := AsRetryAtError(RetryAtError(AlwaysRetryError(cause), &now))
+	require.NotNil(t, at)
+	require.ErrorIs(t, at, cause)
+	require.NotNil(t, AsRetryAtError(AlwaysRetryError(RetryAtError(cause, &now))))
+}
+
 func TestPartitionPeekLimit(t *testing.T) {
 	for _, tt := range []struct {
 		name  string

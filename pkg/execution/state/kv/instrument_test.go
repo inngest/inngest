@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/domain"
@@ -19,6 +20,9 @@ type fakeStore struct {
 	delErr   error
 	setOpts  Options
 	delOpts  Options
+
+	extendErr error
+	extendTTL time.Duration
 }
 
 func (f *fakeStore) Get(ctx context.Context, k Key) (Entry, error) {
@@ -42,6 +46,11 @@ func (f *fakeStore) Set(ctx context.Context, e Entry, opts ...Option) (Entry, er
 func (f *fakeStore) Delete(ctx context.Context, k Key, opts ...Option) error {
 	f.delOpts = ApplyOptions(opts...)
 	return f.delErr
+}
+
+func (f *fakeStore) Extend(ctx context.Context, k Key, d time.Duration) error {
+	f.extendTTL = d
+	return f.extendErr
 }
 
 type recorder struct {
@@ -188,6 +197,45 @@ func TestInstrumentDelete(t *testing.T) {
 				Op:        OpDelete,
 				Result:    c.result,
 			}, op)
+		})
+	}
+}
+
+func TestInstrumentExtend(t *testing.T) {
+	ctx := context.Background()
+	key := testKey()
+
+	cases := []struct {
+		name   string
+		err    error
+		result Result
+	}{
+		{name: "ok", result: ResultOK},
+		{name: "not found", err: ErrNotFound, result: ResultNotFound},
+		{name: "error", err: errors.New("boom"), result: ResultError},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			inner := &fakeStore{extendErr: c.err}
+			rec := &recorder{}
+			s := Instrument(inner, rec)
+
+			err := s.Extend(ctx, key, time.Minute)
+			if c.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, c.err)
+			}
+			require.Equal(t, time.Minute, inner.extendTTL)
+
+			op := rec.last(t)
+			require.Equal(t, Operation{
+				Tenant:    key.Tenant,
+				Namespace: key.Namespace,
+				Op:        OpExtend,
+				Result:    c.result,
+			}, op)
+			require.Len(t, rec.ops, 1)
 		})
 	}
 }

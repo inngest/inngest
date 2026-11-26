@@ -257,6 +257,9 @@ func (p *runProvider) Rerun(ctx context.Context, runID ulid.ULID, opts apiv2.Rer
 	if err != nil {
 		return ulid.ULID{}, err
 	}
+	if fn.Loop != nil && opts.FromStep != nil {
+		return ulid.ULID{}, apiv2.ErrLoopRerunFromStep
+	}
 
 	evt, err := p.data.GetEventByInternalID(ctx, fnrun.EventID)
 	if err != nil {

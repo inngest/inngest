@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/domain"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/loops"
@@ -100,15 +101,20 @@ func (h *loopHarness) loopService(t *testing.T, fn inngest.Function) (*Service, 
 	return s, exec, pub
 }
 
-// timerItem enqueues one tick or wake item for the harness key and loads
-// it back the way the queue hands it to the service.
+// timerItem enqueues one tick or wake item for the record the harness key
+// has now and loads it back the way the queue hands it to the service.
 func (h *loopHarness) timerItem(t *testing.T, kind string, input string, inputID string) queue.Item {
 	t.Helper()
+	return h.timerItemOf(t, h.opener(t), kind, input, inputID)
+}
+
+// timerItemOf enqueues one tick or wake item that names the record
+// openedBy opened, and loads it back the way the queue hands it to the
+// service.
+func (h *loopHarness) timerItemOf(t *testing.T, openedBy domain.RunID, kind string, input string, inputID string) queue.Item {
+	t.Helper()
 	id := h.loopID("user-1")
-	jobID := "tick:" + id.InstanceID().String()
-	if input == loops.InputWake {
-		jobID = h.wakeJobID(inputID)
-	}
+	jobID := loopTimerJobID(id, openedBy, input, inputID)
 	md := sv2.Metadata{
 		ID: sv2.ID{
 			RunID:      ulid.Make(),
@@ -120,7 +126,7 @@ func (h *loopHarness) timerItem(t *testing.T, kind string, input string, inputID
 			},
 		},
 	}
-	item := loopTimerItem(md, id, jobID, kind, input, inputID)
+	item := loopTimerItem(md, id, openedBy, jobID, kind, input, inputID)
 	require.NoError(t, h.q.Enqueue(h.ctx, item, time.Now(), queue.EnqueueOpts{}))
 	loaded, err := h.shard.LoadQueueItem(h.ctx, queue.HashID(h.ctx, jobID))
 	require.NoError(t, err)
@@ -145,17 +151,41 @@ func (p loopInputProcessor) Run(ctx context.Context, f queue.RunFunc) error {
 	return nil
 }
 
+// loopInputFailingExecutor fails every schedule request with err.
+type loopInputFailingExecutor struct {
+	execution.Executor
+	err error
+}
+
+func (e loopInputFailingExecutor) Schedule(context.Context, execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	return nil, nil, e.err
+}
+
+// requireLoopTickRequeued checks that err makes the queue run item again
+// one tick interval after start, on any attempt, without a new attempt
+// counted.
+func requireLoopTickRequeued(t *testing.T, err error, item queue.Item, start time.Time, tick time.Duration) {
+	t.Helper()
+	require.True(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
+	require.True(t, queue.IsAlwaysRetryable(err))
+	at := queue.AsRetryAtError(err)
+	require.NotNil(t, at)
+	require.NotNil(t, at.NextRetryAt())
+	require.WithinDuration(t, start.Add(tick), *at.NextRetryAt(), 5*time.Second)
+}
+
 func TestHandleLoopInput(t *testing.T) {
 	t.Run("tick starts a run with the tick event", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.openAndCommit(t)
+		opener := h.opener(t)
 		s, exec, pub := h.loopService(t, h.req.Function)
 
 		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
 		payload := item.Payload.(queue.PayloadLoop)
 		require.Equal(t, "user-1", payload.Key)
 		require.Equal(t, loops.InputTick, payload.Kind)
-		require.NotEmpty(t, payload.Nonce)
+		require.Equal(t, opener, payload.OpenedBy)
 		require.NoError(t, s.handleLoopInput(h.ctx, item))
 
 		require.Len(t, exec.reqs, 1)
@@ -167,7 +197,10 @@ func TestHandleLoopInput(t *testing.T) {
 		require.Len(t, req.Events, 1)
 		evt := req.Events[0].GetEvent()
 		require.Equal(t, loops.EventTick, evt.Name)
-		require.Equal(t, map[string]any{"key": "user-1"}, evt.Data)
+		require.Equal(t, map[string]any{
+			"key":       "user-1",
+			"opened_by": opener.String(),
+		}, evt.Data)
 		require.NotEmpty(t, evt.ID)
 
 		require.NotNil(t, exec.mds[0])
@@ -198,8 +231,9 @@ func TestHandleLoopInput(t *testing.T) {
 		evt := exec.reqs[0].Events[0].GetEvent()
 		require.Equal(t, loops.EventWake, evt.Name)
 		require.Equal(t, map[string]any{
-			"key": "user-1",
-			"id":  "w1",
+			"key":       "user-1",
+			"id":        "w1",
+			"opened_by": h.opener(t).String(),
 		}, evt.Data)
 		require.NotNil(t, exec.mds[0])
 		_, err := h.e.smv2.LoadMetadata(h.ctx, exec.mds[0].ID)
@@ -210,13 +244,105 @@ func TestHandleLoopInput(t *testing.T) {
 		h := newLoopHarness(t)
 		s, exec, pub := h.loopService(t, h.req.Function)
 
-		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		item := h.timerItemOf(t, ulid.Make(), queue.KindLoopTick, loops.InputTick, "")
 		require.NoError(t, s.handleLoopInput(h.ctx, item))
 
 		require.Len(t, exec.reqs, 1)
 		require.Nil(t, exec.mds[0])
 		_, err := h.store.Load(h.ctx, h.loopID("user-1"))
 		require.ErrorIs(t, err, loops.ErrNotFound)
+		require.Equal(t, 0, pub.count())
+	})
+
+	// the key ends and a later trigger opens a new instance before the
+	// timers of the ended instance run.  the old items start no run and the
+	// new record does not change.  an item of the new instance with the
+	// same wake id is a second queue item and starts a run.
+	for _, tt := range []struct {
+		name    string
+		kind    string
+		input   string
+		inputID string
+	}{
+		{
+			name:  "tick of an ended instance does not reach a reopened instance",
+			kind:  queue.KindLoopTick,
+			input: loops.InputTick,
+		},
+		{
+			name:    "wake of an ended instance does not reach a reopened instance",
+			kind:    queue.KindLoopWake,
+			input:   loops.InputWake,
+			inputID: "w1",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newLoopHarness(t)
+			h.openAndCommit(t)
+			s, exec, pub := h.loopService(t, h.req.Function)
+
+			old := h.timerItem(t, tt.kind, tt.input, tt.inputID)
+			snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+			require.NoError(t, err)
+			require.NoError(t, h.store.End(h.ctx, snap))
+			reopener := ulid.Make()
+			_, err = h.store.Open(h.ctx, h.loopID("user-1"), reopener)
+			require.NoError(t, err)
+
+			require.NoError(t, s.handleLoopInput(h.ctx, old))
+			require.Len(t, exec.reqs, 1)
+			require.Nil(t, exec.mds[0])
+			require.Equal(t, 0, pub.count())
+			fresh, err := h.store.Load(h.ctx, h.loopID("user-1"))
+			require.NoError(t, err)
+			require.Equal(t, reopener, fresh.OpenedBy)
+			require.Equal(t, int64(0), fresh.Counter)
+
+			// the queue rejects a second item with the job id of a pending
+			// one, so this enqueue shows the two instances have two items.
+			item := h.timerItem(t, tt.kind, tt.input, tt.inputID)
+			require.NotEqual(t, *old.JobID, *item.JobID)
+			require.NoError(t, s.handleLoopInput(h.ctx, item))
+			require.Len(t, exec.reqs, 2)
+			require.NotNil(t, exec.mds[1])
+			evts, err := h.e.smv2.LoadEvents(h.ctx, exec.mds[1].ID)
+			require.NoError(t, err)
+			in, err := loopInput(h.ctx, h.req.Function, evts)
+			require.NoError(t, err)
+			require.Equal(t, loops.Input{
+				Kind:     tt.input,
+				Key:      "user-1",
+				ID:       tt.inputID,
+				OpenedBy: reopener,
+			}, in)
+			require.Eventually(t, func() bool { return pub.count() == 1 }, 2*time.Second, 10*time.Millisecond)
+		})
+	}
+
+	t.Run("an item without an opener schedules nothing", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		s, exec, pub := h.loopService(t, h.req.Function)
+
+		// the item is decoded from JSON whose payload has no opened_by
+		// field.
+		item := queue.Item{}
+		require.NoError(t, json.Unmarshal([]byte(`{"kind":"loop-wake","payload":{"key":"user-1","kind":"wake","id":"w1"}}`), &item))
+		require.Equal(t, queue.PayloadLoop{
+			Key:  "user-1",
+			Kind: loops.InputWake,
+			ID:   "w1",
+		}, item.Payload)
+		item.WorkspaceID = h.req.WorkspaceID
+		item.Identifier = state.Identifier{
+			AccountID:   h.req.AccountID,
+			WorkspaceID: h.req.WorkspaceID,
+			AppID:       h.req.AppID,
+			WorkflowID:  h.req.Function.ID,
+		}
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+		require.Len(t, exec.reqs, 1)
+		require.Nil(t, exec.mds[0])
 		require.Equal(t, 0, pub.count())
 	})
 
@@ -232,40 +358,49 @@ func TestHandleLoopInput(t *testing.T) {
 		require.Eventually(t, func() bool { return pub.count() == 1 }, 2*time.Second, 10*time.Millisecond)
 	})
 
-	t.Run("the same item twice starts one run", func(t *testing.T) {
-		h := newLoopHarness(t)
-		h.openAndCommit(t)
-		s, exec, pub := h.loopService(t, h.req.Function)
+	// the queue runs an item twice when a worker stops after the schedule
+	// and before the dequeue.  each run of the item starts its own loop run,
+	// so a tick is never dropped as a duplicate.
+	for _, tt := range []struct {
+		name    string
+		kind    string
+		input   string
+		inputID string
+	}{
+		{
+			name:  "the same tick item twice starts two runs",
+			kind:  queue.KindLoopTick,
+			input: loops.InputTick,
+		},
+		{
+			name:    "the same wake item twice starts two runs",
+			kind:    queue.KindLoopWake,
+			input:   loops.InputWake,
+			inputID: "w1",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newLoopHarness(t)
+			h.openAndCommit(t)
+			s, exec, pub := h.loopService(t, h.req.Function)
 
-		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
+			item := h.timerItem(t, tt.kind, tt.input, tt.inputID)
+			require.NoError(t, s.handleLoopInput(h.ctx, item))
+			require.NoError(t, s.handleLoopInput(h.ctx, item))
 
-		// a retry or a scavenge moves the item, so the rerun has a new time.
-		item.At = item.At.Add(time.Minute)
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
-
-		require.Len(t, exec.reqs, 2)
-		first := exec.reqs[0].Events[0].GetEvent()
-		second := exec.reqs[1].Events[0].GetEvent()
-		require.Equal(t, first.ID, second.ID)
-		require.Equal(t, exec.reqs[0].Events[0].GetInternalID(), exec.reqs[1].Events[0].GetInternalID())
-		require.NotNil(t, exec.reqs[0].IdempotencyKey)
-		require.Equal(t, first.ID, *exec.reqs[0].IdempotencyKey)
-		require.NotNil(t, exec.mds[0])
-		require.Nil(t, exec.mds[1])
-		require.Eventually(t, func() bool { return pub.count() == 2 }, 2*time.Second, 10*time.Millisecond)
-
-		// the same job enqueued by another run carries a new nonce and is
-		// a new run.
-		payload := item.Payload.(queue.PayloadLoop)
-		payload.Nonce = ulid.Make().String()
-		item.Payload = payload
-		require.NoError(t, s.handleLoopInput(h.ctx, item))
-		require.Len(t, exec.reqs, 3)
-		third := exec.reqs[2].Events[0].GetEvent()
-		require.NotEqual(t, first.ID, third.ID)
-		require.NotNil(t, exec.mds[2])
-	})
+			require.Len(t, exec.reqs, 2)
+			first := exec.reqs[0].Events[0]
+			second := exec.reqs[1].Events[0]
+			require.NotEqual(t, first.GetEvent().ID, second.GetEvent().ID)
+			require.NotEqual(t, first.GetInternalID(), second.GetInternalID())
+			require.Nil(t, exec.reqs[0].IdempotencyKey)
+			require.Nil(t, exec.reqs[1].IdempotencyKey)
+			require.NotNil(t, exec.mds[0])
+			require.NotNil(t, exec.mds[1])
+			require.NotEqual(t, exec.mds[0].ID.RunID, exec.mds[1].ID.RunID)
+			require.Eventually(t, func() bool { return pub.count() == 2 }, 2*time.Second, 10*time.Millisecond)
+		})
+	}
 
 	t.Run("the service run loop dispatches both kinds", func(t *testing.T) {
 		h := newLoopHarness(t)
@@ -284,6 +419,118 @@ func TestHandleLoopInput(t *testing.T) {
 		require.Equal(t, loops.EventWake, exec.reqs[1].Events[0].GetEvent().Name)
 		require.NotNil(t, exec.mds[0])
 		require.NotNil(t, exec.mds[1])
+	})
+
+	// the account is over its execution cap, so every schedule is skipped
+	// and no run exists to enqueue the next tick.
+	t.Run("a skipped tick runs again one tick interval later", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, pub := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		item.Attempt = item.GetMaxAttempts() - 1
+		start := time.Now()
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, ErrFunctionSkipped)
+		requireLoopTickRequeued(t, err, item, start, 30*time.Second)
+
+		require.Len(t, exec.reqs, 1)
+		require.Nil(t, exec.mds[0])
+		require.Equal(t, 0, pub.count())
+	})
+
+	t.Run("a skipped wake is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+		require.Len(t, exec.reqs, 1)
+		require.Nil(t, exec.mds[0])
+	})
+
+	t.Run("a skipped tick of a function without a tick is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, _, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+	})
+
+	// the ended instance is found before the skip, so the item is dropped
+	// and does not run again while the skip lasts.
+	t.Run("a skipped tick of an ended instance is dropped", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.setTick(t, 30*time.Second)
+		h.e.accountExecutionCap = capDecision(ExecutionCapLimitDecision{
+			Exceeded: true,
+			Enforce:  true,
+		})
+		s, exec, _ := h.loopService(t, h.req.Function)
+
+		item := h.timerItemOf(t, ulid.Make(), queue.KindLoopTick, loops.InputTick, "")
+		require.NoError(t, s.handleLoopInput(h.ctx, item))
+		require.Len(t, exec.reqs, 1)
+	})
+
+	t.Run("a tick that fails to schedule uses its attempts and then runs again one tick interval later", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		s, _, _ := h.loopService(t, h.req.Function)
+		cause := errors.New("schedule failed")
+		s.exec = loopInputFailingExecutor{
+			Executor: h.e,
+			err:      cause,
+		}
+
+		item := h.timerItem(t, queue.KindLoopTick, loops.InputTick, "")
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		require.False(t, queue.IsAlwaysRetryable(err))
+		require.Nil(t, queue.AsRetryAtError(err))
+		require.True(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
+
+		item.Attempt = item.GetMaxAttempts() - 1
+		start := time.Now()
+		err = s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		requireLoopTickRequeued(t, err, item, start, 30*time.Second)
+	})
+
+	t.Run("a wake that fails to schedule on its last attempt is not run again", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.openAndCommit(t)
+		h.setTick(t, 30*time.Second)
+		s, _, _ := h.loopService(t, h.req.Function)
+		cause := errors.New("schedule failed")
+		s.exec = loopInputFailingExecutor{
+			Executor: h.e,
+			err:      cause,
+		}
+
+		item := h.timerItem(t, queue.KindLoopWake, loops.InputWake, "w1")
+		item.Attempt = item.GetMaxAttempts() - 1
+		err := s.handleLoopInput(h.ctx, item)
+		require.ErrorIs(t, err, cause)
+		require.False(t, queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()))
 	})
 
 	t.Run("function that is no longer a loop drops the item", func(t *testing.T) {

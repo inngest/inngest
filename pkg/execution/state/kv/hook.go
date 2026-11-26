@@ -14,6 +14,7 @@ const (
 	OpGet    Op = "get"
 	OpSet    Op = "set"
 	OpDelete Op = "delete"
+	OpExtend Op = "extend"
 )
 
 // Result names how one kv call ended.

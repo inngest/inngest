@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/loops"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/kv"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -122,7 +124,8 @@ func loopReturnOp(t *testing.T, ret state.LoopReturn) *state.GeneratorOpcode {
 }
 
 // runLoop schedules one input and drives its start item through Execute.
-// a nil input schedules the trigger, which opens the instance.
+// a nil input schedules the trigger, and the first request of its run
+// opens the instance.
 func (h *loopHarness) runLoop(t *testing.T, d *loopReturnDriver, input *event.Event) (sv2.ID, *state.DriverResponse, error) {
 	t.Helper()
 	h.e.driverv1 = map[string]driver.DriverV1{
@@ -204,19 +207,40 @@ func (h *loopHarness) finishedResult(t *testing.T) string {
 	}
 }
 
-func (h *loopHarness) wakeJobID(wakeID string) string {
-	return fmt.Sprintf("wake:%s:%s", h.loopID("user-1").InstanceID(), wakeID)
+// loopTTL returns the time left on the kv entry of the loop record.  the
+// expiry is not in the snapshot, so a test reads it from the harness redis.
+func (h *loopHarness) loopTTL(t *testing.T) time.Duration {
+	t.Helper()
+	id := h.loopID("user-1")
+	iid := id.InstanceID()
+	key := kv.Key{
+		Tenant:    id.Tenant,
+		Namespace: loops.Namespace,
+		Key:       hex.EncodeToString(iid[:]),
+	}.String()
+	require.True(t, h.mr.Exists(key))
+	return h.mr.TTL(key)
 }
 
+// loadTimer loads the tick item or the wake item of the harness key that
+// names the record openedBy opened.  kind is loops.InputTick or
+// loops.InputWake.
+func (h *loopHarness) loadTimer(t *testing.T, kind string, openedBy domain.RunID, wakeID string) (*queue.QueueItem, error) {
+	t.Helper()
+	jobID := loopTimerJobID(h.loopID("user-1"), openedBy, kind, wakeID)
+	return h.shard.LoadQueueItem(h.ctx, queue.HashID(h.ctx, jobID))
+}
+
+// loadWake loads the wake item of the record the harness key has now.
 func (h *loopHarness) loadWake(t *testing.T, wakeID string) (*queue.QueueItem, error) {
 	t.Helper()
-	return h.shard.LoadQueueItem(h.ctx, queue.HashID(h.ctx, h.wakeJobID(wakeID)))
+	return h.loadTimer(t, loops.InputWake, h.opener(t), wakeID)
 }
 
+// loadTick loads the tick item of the record the harness key has now.
 func (h *loopHarness) loadTick(t *testing.T) (*queue.QueueItem, error) {
 	t.Helper()
-	jobID := "tick:" + h.loopID("user-1").InstanceID().String()
-	return h.shard.LoadQueueItem(h.ctx, queue.HashID(h.ctx, jobID))
+	return h.loadTimer(t, loops.InputTick, h.opener(t), "")
 }
 
 // setTick gives the harness function a tick and reloads it.
@@ -262,7 +286,7 @@ func TestLoopReturnCommit(t *testing.T) {
 	require.NotNil(t, snap.LastRunID)
 	require.Equal(t, id.RunID, *snap.LastRunID)
 	// the harness function has no idle_ttl, so the commit uses the default.
-	require.WithinDuration(t, time.Now().Add(consts.DefaultLoopIdleTTL), snap.ExpiresAt, 10*time.Second)
+	require.InDelta(t, consts.DefaultLoopIdleTTL, h.loopTTL(t), float64(10*time.Second))
 
 	h.requireRunGone(t, id)
 	require.JSONEq(t, `{"n":1}`, h.finishedResult(t))
@@ -277,7 +301,7 @@ func TestLoopReturnCommit(t *testing.T) {
 			}),
 		},
 	}
-	id, resp, err = h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+	id, resp, err = h.runLoop(t, d, h.tick(t))
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 	require.Equal(t, int64(1), d.seen.Version)
@@ -313,9 +337,7 @@ func TestLoopReturnIdleTTL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 
-	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-	require.NoError(t, err)
-	require.WithinDuration(t, time.Now().Add(time.Hour), snap.ExpiresAt, 10*time.Second)
+	require.InDelta(t, time.Hour, h.loopTTL(t), float64(10*time.Second))
 }
 
 func TestLoopReturnWakeIdleTTL(t *testing.T) {
@@ -362,9 +384,7 @@ func TestLoopReturnWakeIdleTTL(t *testing.T) {
 		require.NoError(t, err)
 		requireWithin(t, time.Now().Add(time.Hour), item.AtMS, 5*time.Second)
 
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.WithinDuration(t, time.Now().Add(2*time.Hour), snap.ExpiresAt, 10*time.Second)
+		require.InDelta(t, 2*time.Hour, h.loopTTL(t), float64(10*time.Second))
 	})
 
 	t.Run("short wake expires one idle ttl after the commit", func(t *testing.T) {
@@ -373,9 +393,7 @@ func TestLoopReturnWakeIdleTTL(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
 
-		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
-		require.NoError(t, err)
-		require.WithinDuration(t, time.Now().Add(3*time.Hour), snap.ExpiresAt, 10*time.Second)
+		require.InDelta(t, 3*time.Hour, h.loopTTL(t), float64(10*time.Second))
 	})
 }
 
@@ -402,6 +420,7 @@ func TestLoopReturnVersionMismatch(t *testing.T) {
 func TestLoopReturnEnd(t *testing.T) {
 	h := newLoopHarness(t)
 	h.openAndCommit(t)
+	opener := h.opener(t)
 
 	d := &loopReturnDriver{
 		ops: []*state.GeneratorOpcode{
@@ -416,7 +435,7 @@ func TestLoopReturnEnd(t *testing.T) {
 			}),
 		},
 	}
-	id, resp, err := h.runLoop(t, d, new(loops.NewWakeEvent("user-1", "w0")))
+	id, resp, err := h.runLoop(t, d, h.wake(t, "w0"))
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 	require.Equal(t, "user-1", d.seen.Key)
@@ -430,7 +449,7 @@ func TestLoopReturnEnd(t *testing.T) {
 	h.requireRunGone(t, id)
 	require.JSONEq(t, `{"done":true}`, h.finishedResult(t))
 
-	_, err = h.loadWake(t, "w1")
+	_, err = h.loadTimer(t, loops.InputWake, opener, "w1")
 	require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 }
 
@@ -459,10 +478,10 @@ func TestLoopReturnWake(t *testing.T) {
 	requireWithin(t, time.Now().Add(30*time.Second), item.AtMS, 5*time.Second)
 	require.Equal(t, queue.KindLoopWake, item.Data.Kind)
 	require.Equal(t, queue.PayloadLoop{
-		Key:   "user-1",
-		Kind:  loops.InputWake,
-		ID:    "w1",
-		Nonce: id.RunID.String(),
+		Key:      "user-1",
+		Kind:     loops.InputWake,
+		ID:       "w1",
+		OpenedBy: id.RunID,
 	}, item.Data.Payload)
 	require.Equal(t, id.FunctionID, item.Data.Identifier.WorkflowID)
 	require.Equal(t, id.Tenant.AccountID, item.Data.Identifier.AccountID)
@@ -485,7 +504,7 @@ func TestLoopReturnWake(t *testing.T) {
 			}),
 		},
 	}
-	_, resp, err = h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+	_, resp, err = h.runLoop(t, d, h.tick(t))
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 
@@ -507,7 +526,7 @@ func TestLoopReturnWake(t *testing.T) {
 			}),
 		},
 	}
-	_, resp, err = h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+	_, resp, err = h.runLoop(t, d, h.tick(t))
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 	other, err := h.loadWake(t, "w2")
@@ -583,6 +602,7 @@ func TestLoopReturnRetryAfterEnd(t *testing.T) {
 	h := newLoopHarness(t)
 	h.setTick(t, time.Minute)
 	h.openAndCommit(t)
+	opener := h.opener(t)
 	cs := &crashingStore{
 		Store:    h.store,
 		endFails: 1,
@@ -598,7 +618,7 @@ func TestLoopReturnRetryAfterEnd(t *testing.T) {
 			}),
 		},
 	}
-	id, _, err := h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+	id, _, err := h.runLoop(t, d, h.tick(t))
 	require.ErrorIs(t, err, errStoreCrashed)
 	require.Equal(t, 1, d.calls)
 	_, err = h.store.Load(h.ctx, h.loopID("user-1"))
@@ -615,7 +635,7 @@ func TestLoopReturnRetryAfterEnd(t *testing.T) {
 
 	// the retry replays the saved return and never reaches the driver.
 	// the attempt counter is not read.  the fresh instance is left alone
-	// and no tick is enqueued.
+	// and no tick is enqueued for the ended instance or the fresh one.
 	resp, err := h.retry(t, id, 0)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -626,6 +646,8 @@ func TestLoopReturnRetryAfterEnd(t *testing.T) {
 	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
 	require.NoError(t, err)
 	require.Equal(t, int64(0), snap.Counter)
+	_, err = h.loadTimer(t, loops.InputTick, opener, "")
+	require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	_, err = h.loadTick(t)
 	require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 }
@@ -650,7 +672,7 @@ func TestLoopReturnRetryBeforeEnd(t *testing.T) {
 				}),
 			},
 		}
-		id, _, err := h.runLoop(t, d, new(loops.NewTickEvent("user-1")))
+		id, _, err := h.runLoop(t, d, h.tick(t))
 		require.ErrorIs(t, err, errStoreCrashed)
 		require.Equal(t, 1, d.calls)
 		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
@@ -779,7 +801,7 @@ func TestLoopReturnTickAfterEnd(t *testing.T) {
 	h.e.driverv1 = map[string]driver.DriverV1{
 		d.Name(): d,
 	}
-	req, id := h.request(new(loops.NewTickEvent("user-1")))
+	req, id := h.request(h.tick(t))
 	_, _, err := h.e.Schedule(h.ctx, req)
 	require.NoError(t, err)
 	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
@@ -835,12 +857,153 @@ func TestLoopReturnWakeIDReused(t *testing.T) {
 			}),
 		},
 	}
-	_, resp, err = h.runLoop(t, d, new(loops.NewWakeEvent("user-1", "w1")))
+	_, resp, err = h.runLoop(t, d, h.wake(t, "w1"))
 	require.NoError(t, err)
 	require.Nil(t, resp.Err)
 	again, err := h.loadWake(t, "w1")
 	require.NoError(t, err)
 	requireWithin(t, time.Now().Add(5*time.Minute), again.AtMS, 5*time.Second)
+}
+
+// TestLoopReturnReopened ends an instance that has a pending tick and a
+// pending wake, and then opens the key again with a new trigger.  an end
+// does not delete the timers of the instance.  the new instance gets its
+// own tick item and its own wake item for the same wake id, and the items
+// of the ended instance start no run on it.
+func TestLoopReturnReopened(t *testing.T) {
+	h := newLoopHarness(t)
+	h.setTick(t, time.Minute)
+	wakeIn := func(after string, end bool) *loopReturnDriver {
+		ret := state.LoopReturn{
+			State: json.RawMessage(`{"n":1}`),
+			End:   end,
+		}
+		if after != "" {
+			ret.Wake = &state.LoopWake{
+				ID:    "w1",
+				After: after,
+			}
+		}
+		return &loopReturnDriver{
+			echo: true,
+			ops: []*state.GeneratorOpcode{
+				loopReturnOp(t, ret),
+			},
+		}
+	}
+
+	// the first instance commits with a tick and a wake pending.
+	first, resp, err := h.runLoop(t, wakeIn("30s", false), nil)
+	require.NoError(t, err)
+	require.Nil(t, resp.Err)
+	require.Equal(t, first.RunID, h.opener(t))
+	oldTick, err := h.loadTick(t)
+	require.NoError(t, err)
+	oldWake, err := h.loadWake(t, "w1")
+	require.NoError(t, err)
+	// a run of the old tick is scheduled while its instance is open.
+	late, lateID := h.request(h.tick(t))
+	_, _, err = h.e.Schedule(h.ctx, late)
+	require.NoError(t, err)
+
+	// a tick run ends the instance.  both timers stay in the queue.
+	_, resp, err = h.runLoop(t, wakeIn("", true), h.tick(t))
+	require.NoError(t, err)
+	require.Nil(t, resp.Err)
+	_, err = h.store.Load(h.ctx, h.loopID("user-1"))
+	require.ErrorIs(t, err, loops.ErrNotFound)
+	_, err = h.loadTimer(t, loops.InputTick, first.RunID, "")
+	require.NoError(t, err)
+	_, err = h.loadTimer(t, loops.InputWake, first.RunID, "w1")
+	require.NoError(t, err)
+
+	// a new trigger opens the key again and asks for the same wake id.
+	second, resp, err := h.runLoop(t, wakeIn("5m", false), nil)
+	require.NoError(t, err)
+	require.Nil(t, resp.Err)
+	require.NotEqual(t, first.RunID, second.RunID)
+	require.Equal(t, second.RunID, h.opener(t))
+
+	// the new instance has its own tick.  the old tick did not stop it.
+	newTick, err := h.loadTick(t)
+	require.NoError(t, err)
+	require.NotEqual(t, oldTick.ID, newTick.ID)
+	require.Equal(t, queue.PayloadLoop{
+		Key:      "user-1",
+		Kind:     loops.InputTick,
+		OpenedBy: second.RunID,
+	}, newTick.Data.Payload)
+
+	// the new wake is a second item.  the old item is not moved and still
+	// names the ended instance.
+	newWake, err := h.loadWake(t, "w1")
+	require.NoError(t, err)
+	require.NotEqual(t, oldWake.ID, newWake.ID)
+	requireWithin(t, time.Now().Add(5*time.Minute), newWake.AtMS, 5*time.Second)
+	require.Equal(t, queue.PayloadLoop{
+		Key:      "user-1",
+		Kind:     loops.InputWake,
+		ID:       "w1",
+		OpenedBy: second.RunID,
+	}, newWake.Data.Payload)
+	same, err := h.loadTimer(t, loops.InputWake, first.RunID, "w1")
+	require.NoError(t, err)
+	require.Equal(t, oldWake.AtMS, same.AtMS)
+	require.Equal(t, queue.PayloadLoop{
+		Key:      "user-1",
+		Kind:     loops.InputWake,
+		ID:       "w1",
+		OpenedBy: first.RunID,
+	}, same.Data.Payload)
+
+	// the old wake and the old tick start no run on the new instance.
+	for _, evt := range []event.Event{
+		loops.NewWakeEvent("user-1", "w1", first.RunID),
+		loops.NewTickEvent("user-1", first.RunID),
+	} {
+		req, id := h.request(&evt)
+		_, _, err = h.e.Schedule(h.ctx, req)
+		require.ErrorIs(t, err, ErrLoopEnded)
+		h.requireRunGone(t, id)
+	}
+
+	// the run of the old tick that was scheduled before the end is
+	// cancelled without a request.  it enqueues no tick for the new
+	// instance, whose own tick stays at its time.
+	d := wakeIn("", false)
+	h.e.driverv1 = map[string]driver.DriverV1{
+		d.Name(): d,
+	}
+	resp, err = h.execute(t, lateID)
+	require.ErrorIs(t, err, state.ErrFunctionCancelled)
+	require.Nil(t, resp)
+	require.Equal(t, 0, d.calls)
+	h.requireRunGone(t, lateID)
+	kept, err := h.loadTick(t)
+	require.NoError(t, err)
+	require.Equal(t, newTick.ID, kept.ID)
+	require.Equal(t, newTick.AtMS, kept.AtMS)
+	snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+	require.NoError(t, err)
+	require.Equal(t, second.RunID, snap.OpenedBy)
+	require.Equal(t, int64(1), snap.Counter)
+	require.Equal(t, second.RunID, *snap.LastRunID)
+
+	// the wake of the new instance is delivered with the same wake id.
+	d = wakeIn("", false)
+	_, resp, err = h.runLoop(t, d, h.wake(t, "w1"))
+	require.NoError(t, err)
+	require.Nil(t, resp.Err)
+	require.Equal(t, 1, d.calls)
+	require.Equal(t, driver.SDKLoopInput{
+		Kind: loops.InputWake,
+		ID:   "w1",
+	}, d.seen.Input)
+	require.Equal(t, int64(1), d.seen.Version)
+	snap, err = h.store.Load(h.ctx, h.loopID("user-1"))
+	require.NoError(t, err)
+	require.Equal(t, second.RunID, snap.OpenedBy)
+	require.Equal(t, int64(2), snap.Counter)
 }
 
 func TestValidateLoopResponseStepOps(t *testing.T) {
@@ -898,15 +1061,15 @@ func TestLoopReturnTick(t *testing.T) {
 		requireWithin(t, time.Now().Add(time.Minute), item.AtMS, 5*time.Second)
 		require.Equal(t, queue.KindLoopTick, item.Data.Kind)
 		require.Equal(t, queue.PayloadLoop{
-			Key:   "user-1",
-			Kind:  loops.InputTick,
-			Nonce: id.RunID.String(),
+			Key:      "user-1",
+			Kind:     loops.InputTick,
+			OpenedBy: id.RunID,
 		}, item.Data.Payload)
 		require.Equal(t, h.req.Function.ID, item.Data.Identifier.WorkflowID)
 		require.Equal(t, ulid.ULID{}, item.Data.Identifier.RunID)
 
-		// a pending tick is kept by the next return, with its nonce.
-		_, resp, err = h.runLoop(t, ret(), new(loops.NewTickEvent("user-1")))
+		// a pending tick is kept by the next return, at its first time.
+		_, resp, err = h.runLoop(t, ret(), h.tick(t))
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
 		same, err := h.loadTick(t)
@@ -936,10 +1099,10 @@ func TestLoopReturnTick(t *testing.T) {
 				}),
 			},
 		}
-		_, resp, err := h.runLoop(t, d, nil)
+		id, resp, err := h.runLoop(t, d, nil)
 		require.NoError(t, err)
 		require.Nil(t, resp.Err)
-		_, err = h.loadTick(t)
+		_, err = h.loadTimer(t, loops.InputTick, id.RunID, "")
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	})
 
@@ -959,9 +1122,7 @@ func TestLoopReturnTick(t *testing.T) {
 	t.Run("a cancelled run still ticks", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.setTick(t, time.Minute)
-		req, id := h.request(nil)
-		_, _, err := h.e.Schedule(h.ctx, req)
-		require.NoError(t, err)
+		_, id := h.open(t)
 
 		require.NoError(t, h.e.Cancel(h.ctx, id, execution.CancelRequest{}))
 		h.requireRunGone(t, id)
@@ -969,14 +1130,70 @@ func TestLoopReturnTick(t *testing.T) {
 		item, err := h.loadTick(t)
 		require.NoError(t, err)
 		requireWithin(t, time.Now().Add(time.Minute), item.AtMS, 5*time.Second)
+		require.Equal(t, queue.PayloadLoop{
+			Key:      "user-1",
+			Kind:     loops.InputTick,
+			OpenedBy: id.RunID,
+		}, item.Data.Payload)
 	})
 
-	t.Run("a run that fails permanently still ticks", func(t *testing.T) {
+	t.Run("a cancelled run without a record enqueues no tick", func(t *testing.T) {
 		h := newLoopHarness(t)
 		h.setTick(t, time.Minute)
 		req, id := h.request(nil)
 		_, _, err := h.e.Schedule(h.ctx, req)
 		require.NoError(t, err)
+
+		require.NoError(t, h.e.Cancel(h.ctx, id, execution.CancelRequest{}))
+		h.requireRunGone(t, id)
+		for _, opener := range []domain.RunID{
+			id.RunID,
+			{},
+		} {
+			_, err = h.loadTimer(t, loops.InputTick, opener, "")
+			require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+		}
+	})
+
+	t.Run("a cancelled tick run of an ended instance enqueues no tick for a reopened instance", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.setTick(t, time.Minute)
+		h.openAndCommit(t)
+		opener := h.opener(t)
+		d := ret()
+		h.e.driverv1 = map[string]driver.DriverV1{
+			d.Name(): d,
+		}
+		req, id := h.request(h.tick(t))
+		_, _, err := h.e.Schedule(h.ctx, req)
+		require.NoError(t, err)
+
+		// the instance ends and a later trigger opens the key again before
+		// the tick run starts.
+		snap, err := h.store.Load(h.ctx, h.loopID("user-1"))
+		require.NoError(t, err)
+		require.NoError(t, h.store.End(h.ctx, snap))
+		reopener := ulid.Make()
+		_, err = h.store.Open(h.ctx, h.loopID("user-1"), reopener)
+		require.NoError(t, err)
+
+		_, err = h.execute(t, id)
+		require.ErrorIs(t, err, state.ErrFunctionCancelled)
+		require.Equal(t, 0, d.calls)
+		h.requireRunGone(t, id)
+		for _, openedBy := range []domain.RunID{
+			opener,
+			reopener,
+		} {
+			_, err = h.loadTimer(t, loops.InputTick, openedBy, "")
+			require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+		}
+	})
+
+	t.Run("a run that fails permanently still ticks", func(t *testing.T) {
+		h := newLoopHarness(t)
+		h.setTick(t, time.Minute)
+		_, id := h.open(t)
 		scope := queue.Scope{
 			AccountID:  id.Tenant.AccountID,
 			EnvID:      id.Tenant.EnvID,

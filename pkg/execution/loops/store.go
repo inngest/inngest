@@ -34,23 +34,31 @@ type Store interface {
 	// the stored counter.  ErrConflict means the record moved.  ErrNotFound
 	// means the record is already gone.
 	End(context.Context, Snapshot) error
+	// Touch moves the instance's expiry to expiresAt when that is later
+	// than the expiry it has.  the record and the counter do not change, so
+	// a touch cannot make a commit fail.  ErrNotFound means the record is
+	// gone, and a touch does not create it.
+	Touch(ctx context.Context, id ID, expiresAt time.Time) error
 }
 
 // openAttempts bounds the create then read loop in Open.  each extra pass
 // covers an End that ran between the two calls.
 const openAttempts = 3
 
-// record is the value stored in the kv entry.
+// record is the value stored in the kv entry.  the expiry is not in it.
+// the expiry is the ttl of the kv entry, which a Touch moves without a
+// write to the record.
 type record struct {
 	OpenedBy  domain.RunID    `json:"o"`
 	LastRunID *domain.RunID   `json:"r,omitempty"`
-	ExpiresAt time.Time       `json:"e,omitzero"`
+	UpdatedAt time.Time       `json:"u"`
 	State     json.RawMessage `json:"s"`
 }
 
 // store keeps one kv entry per instance.  the kv version is the lock.  Open
 // writes the entry at kv version 1, which is Counter 0, and every Commit
-// adds one to both, so Counter is always the kv version minus one.
+// adds one to both, so Counter is always the kv version minus one.  a Touch
+// moves the expiry of the entry and writes nothing.
 type store struct {
 	kv kv.Store
 }
@@ -65,7 +73,7 @@ func (s *store) Open(ctx context.Context, id ID, runID domain.RunID) (Snapshot, 
 	for range openAttempts {
 		rec := record{
 			OpenedBy:  runID,
-			ExpiresAt: time.Now().Add(OpenTTL),
+			UpdatedAt: time.Now().UTC(),
 			State:     json.RawMessage("null"),
 		}
 		e, err := s.write(ctx, key, rec, kv.WithExpected(0), kv.WithTTL(OpenTTL))
@@ -108,7 +116,7 @@ func (s *store) Commit(ctx context.Context, c Commit) (Snapshot, error) {
 	rec := record{
 		OpenedBy:  c.OpenedBy,
 		LastRunID: &runID,
-		ExpiresAt: c.ExpiresAt,
+		UpdatedAt: time.Now().UTC(),
 		State:     c.State,
 	}
 
@@ -171,9 +179,22 @@ func (s *store) End(ctx context.Context, snap Snapshot) error {
 	if !errors.Is(err, kv.ErrConflict) {
 		return err
 	}
-	// a missing key is at kv version 0, so the delete reports a conflict
-	// for it as well.  a read tells the two apart.
-	_, err = s.Load(ctx, snap.ID)
+	return s.conflictOrGone(ctx, snap.ID)
+}
+
+func (s *store) Touch(ctx context.Context, id ID, expiresAt time.Time) error {
+	err := s.kv.Extend(ctx, id.kvKey(), ttlUntil(expiresAt))
+	if errors.Is(err, kv.ErrNotFound) {
+		return ErrNotFound
+	}
+	return err
+}
+
+// conflictOrGone returns ErrNotFound when the record is gone and
+// ErrConflict when it is there.  a missing key is at kv version 0, so a
+// compare and set reports a conflict for it as well.
+func (s *store) conflictOrGone(ctx context.Context, id ID) error {
+	_, err := s.Load(ctx, id)
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return ErrNotFound
@@ -183,11 +204,10 @@ func (s *store) End(ctx context.Context, snap Snapshot) error {
 	return ErrConflict
 }
 
-// write encodes rec and stores it under key.  times are stored in utc
-// with no monotonic reading, so a snapshot read back equals the one the
-// writer returned.
+// write encodes rec and stores it under key.  the caller sets UpdatedAt in
+// utc, which has no monotonic reading, so a snapshot read back equals the
+// one the writer returned.
 func (s *store) write(ctx context.Context, key kv.Key, rec record, opts ...kv.Option) (kv.Entry, error) {
-	rec.ExpiresAt = rec.ExpiresAt.UTC()
 	val, err := json.Marshal(rec)
 	if err != nil {
 		return kv.Entry{}, fmt.Errorf("loop: encoding record: %w", err)
@@ -215,7 +235,7 @@ func toSnapshot(id ID, e kv.Entry, rec record) (Snapshot, error) {
 		State:     state,
 		LastRunID: rec.LastRunID,
 		Counter:   e.Version - 1,
-		ExpiresAt: rec.ExpiresAt.UTC(),
+		UpdatedAt: rec.UpdatedAt.UTC(),
 	}, nil
 }
 

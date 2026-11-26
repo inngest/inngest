@@ -38,23 +38,30 @@ func setLoopSemaphoreKey(sems []constraintapi.Semaphore, fn inngest.Function, ke
 	return ErrNoLoopSemaphore
 }
 
-// openLoop makes sure the loop instance exists before the run is created.
-// a trigger opens the instance.  any other input loads it, and a missing
-// instance returns ErrLoopEnded so the input is dropped.
-func (e *executor) openLoop(ctx context.Context, req execution.ScheduleRequest, in loops.Input, runID domain.RunID) error {
-	id := loops.NewID(domain.NewTenant(req.AccountID, req.WorkspaceID), req.Function.ID, in.Key)
+// checkLoopInstance drops a tick or a wake whose instance is gone, before
+// the run is created.  it returns ErrLoopEnded for one.  a tick or a wake
+// names its record by OpenedBy.  a record with a different OpenedBy is a new
+// instance of the same key, and the input is dropped the same way.  without
+// that check a timer of an ended instance starts a run on the new one.  a
+// trigger is not checked and writes nothing here.  the first request of its
+// run opens the instance in loopRequest, so only the run that has the key
+// creates a record.  a record created here would be found by a run of the
+// same key that is already in progress and whose own record expired, and
+// that run would commit over it.
+func (e *executor) checkLoopInstance(ctx context.Context, req execution.ScheduleRequest, in loops.Input) error {
 	if in.Kind == loops.InputEvent {
-		if _, err := e.loops.Open(ctx, id, runID); err != nil {
-			return fmt.Errorf("error opening loop instance: %w", err)
-		}
 		return nil
 	}
-	_, err := e.loops.Load(ctx, id)
+	id := loops.NewID(domain.NewTenant(req.AccountID, req.WorkspaceID), req.Function.ID, in.Key)
+	snap, err := e.loops.Load(ctx, id)
 	switch {
 	case errors.Is(err, loops.ErrNotFound):
 		return ErrLoopEnded
 	case err != nil:
 		return fmt.Errorf("error loading loop instance: %w", err)
+	}
+	if snap.OpenedBy != in.OpenedBy {
+		return ErrLoopEnded
 	}
 	return nil
 }
@@ -83,13 +90,26 @@ func loopInput(ctx context.Context, fn inngest.Function, events []json.RawMessag
 // its LoopReturn under loops.ReturnStepID first, and a run whose stack
 // names that step is replayed the same way.  run hands the replay to the
 // normal handler, which commits nothing new and finishes the run with the
-// stored state.  a trigger whose instance is gone opens a fresh one, since
-// the instance ended after the trigger was scheduled.  a tick or a wake
-// whose instance is gone returns ErrLoopEnded, and run finishes the run as
-// cancelled without a request.
+// stored state.  a trigger whose instance is missing opens one.  that is
+// the first run of a key, or a run whose instance ended or expired while it
+// was queued.  a tick or a wake whose instance is gone returns
+// ErrLoopEnded, and run finishes the run as cancelled without a request.
+// both apply only to a run with no saved steps.  a run with saved steps
+// whose instance is gone fails without retry, since its steps ran against
+// state that no longer exists.  a tick or a wake names its record by
+// OpenedBy.  a record with a different OpenedBy is a new instance of the
+// same key, and the instance of the input counts as gone.
 //
-// the record's OpenedBy and a replayed saved return are kept on i for the
-// handler, and i.loopReplay is set for a replay.
+// every request moves the expiry to now plus the idle TTL plus
+// consts.MaxFunctionTimeout, unless the record already expires later.  the
+// touch does not move the counter.  one SDK request runs for at most
+// consts.MaxFunctionTimeout, so the record does not expire while a request
+// is in progress, and a full idle TTL is left when the request returns.  a
+// gap between two requests of one run that is shorter than the idle TTL
+// then does not expire the record.  a commit sets the expiry again, so the
+// extra time only stays on a record whose run did not commit.
+//
+// what the handler of the response needs is set on i.loop.
 func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDKLoopRequest, *state.DriverResponse, error) {
 	md, fn := i.md, i.f
 	if fn.Loop == nil {
@@ -113,8 +133,10 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 		if st == nil {
 			st = json.RawMessage("null")
 		}
-		i.loopReplay = true
-		i.loopOpenedBy = snap.OpenedBy
+		i.loop = loopRequestInfo{
+			replay:   true,
+			openedBy: snap.OpenedBy,
+		}
 		return nil, loopReplay(fn, state.LoopReturn{
 			State:   st,
 			Version: snap.Counter - 1,
@@ -128,11 +150,19 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 		if err != nil {
 			return nil, nil, err
 		}
-		i.loopReplay = true
-		i.loopSaved = &saved
+		i.loop = loopRequestInfo{
+			replay: true,
+			saved:  &saved,
+		}
 		return nil, loopReplay(fn, saved.Return), nil
 	}
+	if found && in.Kind != loops.InputEvent && snap.OpenedBy != in.OpenedBy {
+		found = false
+	}
 	if !found {
+		if len(md.Stack) > 0 {
+			return nil, nil, queue.NeverRetryError(fmt.Errorf("loop instance for key %q expired or was removed while run %s was running", in.Key, md.ID.RunID))
+		}
 		if in.Kind != loops.InputEvent {
 			return nil, nil, fmt.Errorf("%w: run %s", ErrLoopEnded, md.ID.RunID)
 		}
@@ -141,7 +171,12 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 			return nil, nil, fmt.Errorf("error opening loop instance: %w", err)
 		}
 	}
-	i.loopOpenedBy = snap.OpenedBy
+	if err := e.loops.Touch(ctx, id, e.now().Add(loopIdleTTL(fn)+consts.MaxFunctionTimeout)); err != nil {
+		return nil, nil, fmt.Errorf("error moving loop instance expiry: %w", err)
+	}
+	i.loop = loopRequestInfo{
+		openedBy: snap.OpenedBy,
+	}
 	return &driver.SDKLoopRequest{
 		State:   snap.State,
 		Version: snap.Counter,
@@ -151,6 +186,22 @@ func (e *executor) loopRequest(ctx context.Context, i *runInstance) (*driver.SDK
 			ID:   in.ID,
 		},
 	}, nil, nil
+}
+
+// loopRequestInfo is what loopRequest found for one request of a loop run.
+// loopRequest sets it on the run instance, and handleGeneratorLoopReturn
+// reads it when it applies the return of the same request.
+type loopRequestInfo struct {
+	// replay is set when the response was built from the loop store or
+	// from the saved loop return in place of an SDK request.  the handler
+	// then enqueues no timer and saves nothing.
+	replay bool
+	// openedBy is the OpenedBy of the loop record the request was built
+	// from.  the handler writes it back on commit and saves it with an
+	// end.  it is zero for a replay of a saved return.
+	openedBy domain.RunID
+	// saved is the saved return a replayed end was built from.
+	saved *savedLoopReturn
 }
 
 // savedLoopReturn is the value a run saves under loops.ReturnStepID before
@@ -307,6 +358,8 @@ func (e *executor) runFunction(ctx context.Context, runCtx execution.RunContext)
 // then deletes the instance in one compare and swap on the echoed version
 // and skips the commit.  an instance that is already gone counts as ended.
 // any other return enqueues the wake and the tick first and commits second.
+// both timers name the record by its OpenedBy.  an end does not delete the
+// timers of the instance, and the timer handler drops them when they run.
 // a timer that lands without its commit is harmless, since the timer
 // handler drops an input for an instance that is gone, and the SDK handler
 // receives a wake id its state does not know and ignores it.  an error
@@ -332,16 +385,14 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	if err != nil {
 		return queue.NeverRetryError(fmt.Errorf("loop run %s: %w", md.ID.RunID, err))
 	}
-	var (
-		replay   bool
-		openedBy domain.RunID
-		saved    *savedLoopReturn
-	)
+	// a RunContext that is not the executor's own run instance has no
+	// request info.  the return is then handled as a first return, and the
+	// opener is read from the record below.
+	var info loopRequestInfo
 	if i, ok := runCtx.(*runInstance); ok {
-		replay = i.loopReplay
-		openedBy = i.loopOpenedBy
-		saved = i.loopSaved
+		info = i.loop
 	}
+	replay, openedBy, saved := info.replay, info.openedBy, info.saved
 
 	ret, err := gen.LoopReturn()
 	if err != nil {
@@ -353,13 +404,7 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	if len(ret.State) > consts.MaxLoopStateSize {
 		return loopInvalid(fmt.Sprintf("loop state is %d bytes, the limit is %d bytes", len(ret.State), consts.MaxLoopStateSize))
 	}
-	// a config that did not go through sync, such as a test fixture, has no
-	// TTL.  without the default every wake is rejected and every commit
-	// expires the instance at once.
-	ttl := fn.Loop.IdleTTL
-	if ttl <= 0 {
-		ttl = consts.DefaultLoopIdleTTL
-	}
+	ttl := loopIdleTTL(fn)
 	var after time.Duration
 	if ret.Wake != nil && !ret.End {
 		if ret.Wake.ID == "" {
@@ -382,6 +427,12 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 
 	id := loops.NewID(domain.NewTenant(md.ID.Tenant.AccountID, md.ID.Tenant.EnvID), md.ID.FunctionID, in.Key)
 	output := ret.State
+	if !replay {
+		openedBy, err = e.loopOpenedBy(ctx, id, openedBy)
+		if err != nil {
+			return err
+		}
+	}
 	if ret.End {
 		if replay {
 			if saved != nil {
@@ -390,10 +441,6 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 				}
 			}
 		} else {
-			openedBy, err = e.loopOpenedBy(ctx, id, openedBy)
-			if err != nil {
-				return err
-			}
 			if err := e.saveLoopReturn(ctx, md.ID, savedLoopReturn{
 				Return:   *ret,
 				OpenedBy: openedBy,
@@ -415,12 +462,12 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 		}
 	} else {
 		if ret.Wake != nil && !replay {
-			if err := e.enqueueLoopWake(ctx, *md, id, ret.Wake.ID, after); err != nil {
+			if err := e.enqueueLoopWake(ctx, *md, id, openedBy, ret.Wake.ID, after); err != nil {
 				return fmt.Errorf("error enqueueing loop wake: %w", err)
 			}
 		}
 		if !replay {
-			if err := e.enqueueLoopTick(ctx, *md, fn, id); err != nil {
+			if err := e.enqueueLoopTick(ctx, *md, fn, id, openedBy); err != nil {
 				return fmt.Errorf("error enqueueing loop tick: %w", err)
 			}
 		}
@@ -467,11 +514,23 @@ func (e *executor) handleGeneratorLoopReturn(ctx context.Context, runCtx executi
 	return e.handleGeneratorFunctionFinished(ctx, runCtx, done, edge)
 }
 
-// loopOpenedBy returns the opener of the record an end is for.  a known
+// loopIdleTTL returns the function's idle TTL, or the default when it has
+// none.  a config that did not go through sync, such as a test fixture, has
+// no TTL.  without the default every wake is rejected and every commit
+// expires the instance at once.
+func loopIdleTTL(fn inngest.Function) time.Duration {
+	if fn.Loop.IdleTTL <= 0 {
+		return consts.DefaultLoopIdleTTL
+	}
+	return fn.Loop.IdleTTL
+}
+
+// loopOpenedBy returns the opener of the record a return is for.  a known
 // opener is returned as is.  a zero one, from a RunContext that is not the
-// executor's own run instance, is read from the record, so the saved
-// return names the record and a replayed end can delete it.  a record
-// that is gone gives zero.
+// executor's own run instance, is read from the record.  the saved return
+// then names the record, so a replayed end can delete it, and the timers
+// name the record, so they are not dropped when they run.  a record that
+// is gone gives zero.
 func (e *executor) loopOpenedBy(ctx context.Context, id loops.ID, openedBy domain.RunID) (domain.RunID, error) {
 	if openedBy != (domain.RunID{}) {
 		return openedBy, nil
@@ -481,7 +540,7 @@ func (e *executor) loopOpenedBy(ctx context.Context, id loops.ID, openedBy domai
 	case errors.Is(err, loops.ErrNotFound):
 		return domain.RunID{}, nil
 	case err != nil:
-		return domain.RunID{}, fmt.Errorf("error loading loop instance to end it: %w", err)
+		return domain.RunID{}, fmt.Errorf("error loading loop instance for its opener: %w", err)
 	}
 	return snap.OpenedBy, nil
 }
@@ -539,22 +598,23 @@ func (e *executor) endLoopAgain(ctx context.Context, id loops.ID, saved savedLoo
 }
 
 // enqueueLoopWake puts one KindLoopWake item on the function's partition at
-// now plus after.  the job id is wake:<instance>:<wake id>, so a later return
-// with the same wake id moves that item instead of adding one.  the item has
-// no run id, no semaphore, no concurrency key, and no idempotency period, so
-// a wake id can be used again once its item ran.  an item that is leased
-// right now is left alone, since that wake is already being turned into an
-// input.  the requeue happens before the commit, so a commit conflict after
-// it leaves the moved item at its new time.  the wake then runs at the time
-// the losing run asked for, and the SDK sees a wake id its state may not
-// know.
-func (e *executor) enqueueLoopWake(ctx context.Context, md sv2.Metadata, id loops.ID, wakeID string, after time.Duration) error {
+// now plus after.  the job id is wake:<instance>:<opener>:<wake id>, so a
+// later return with the same wake id moves that item instead of adding one.
+// a new instance of the same key has another opener, so its wake does not
+// move the item of an ended instance.  the item has no run id, no
+// semaphore, no concurrency key, and no idempotency period, so a wake id
+// can be used again once its item ran.  an item that is leased right now is
+// left alone, since that wake is already being turned into an input.  the
+// requeue happens before the commit, so a commit conflict after it leaves
+// the moved item at its new time.  the wake then runs at the time the
+// losing run asked for, and the SDK sees a wake id its state may not know.
+func (e *executor) enqueueLoopWake(ctx context.Context, md sv2.Metadata, id loops.ID, openedBy domain.RunID, wakeID string, after time.Duration) error {
 	if e.shards == nil {
 		return fmt.Errorf("executor has no shard registry")
 	}
-	jobID := loopTimerJobID(id, loops.InputWake, wakeID)
+	jobID := loopTimerJobID(id, openedBy, loops.InputWake, wakeID)
 	at := e.now().Add(after)
-	item := loopTimerItem(md, id, jobID, queue.KindLoopWake, loops.InputWake, wakeID)
+	item := loopTimerItem(md, id, openedBy, jobID, queue.KindLoopWake, loops.InputWake, wakeID)
 	noIdempotency := time.Duration(0)
 	opts := queue.EnqueueOpts{
 		IdempotencyPeriod: &noIdempotency,
@@ -588,16 +648,17 @@ func (e *executor) enqueueLoopWake(ctx context.Context, md sv2.Metadata, id loop
 }
 
 // enqueueLoopTick puts one KindLoopTick item on the function's partition at
-// now plus the function's tick.  the job id is tick:<instance>, so a
-// pending tick is kept and a second one is not added.  a function without
-// a tick enqueues nothing.
-func (e *executor) enqueueLoopTick(ctx context.Context, md sv2.Metadata, fn inngest.Function, id loops.ID) error {
+// now plus the function's tick.  the job id is tick:<instance>:<opener>, so
+// a pending tick is kept and a second one is not added.  a pending tick of
+// an ended instance has another opener and does not stop the tick of a new
+// instance of the same key.  a function without a tick enqueues nothing.
+func (e *executor) enqueueLoopTick(ctx context.Context, md sv2.Metadata, fn inngest.Function, id loops.ID, openedBy domain.RunID) error {
 	if fn.Loop == nil || fn.Loop.Tick <= 0 {
 		return nil
 	}
-	jobID := loopTimerJobID(id, loops.InputTick, "")
+	jobID := loopTimerJobID(id, openedBy, loops.InputTick, "")
 	at := e.now().Add(fn.Loop.Tick)
-	item := loopTimerItem(md, id, jobID, queue.KindLoopTick, loops.InputTick, "")
+	item := loopTimerItem(md, id, openedBy, jobID, queue.KindLoopTick, loops.InputTick, "")
 	noIdempotency := time.Duration(0)
 	err := e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{
 		IdempotencyPeriod: &noIdempotency,
@@ -610,9 +671,12 @@ func (e *executor) enqueueLoopTick(ctx context.Context, md sv2.Metadata, fn inng
 
 // loopTickOnFinalize enqueues the tick for a loop run that finishes as
 // failed or cancelled, so the instance keeps going.  a completed run
-// enqueued its tick in the LoopReturn handler.  the function is loaded
-// here, since the run holds nothing about the loop beyond its semaphore.
-// the run is already final, so an error is logged and not returned.
+// enqueued its tick in the LoopReturn handler.  the function and the loop
+// record are loaded here, since the run stores nothing about the loop beyond
+// its semaphore.  the tick names the record by its OpenedBy.  a record that
+// is gone gets no tick, and a tick or a wake run of an ended instance
+// enqueues no tick for a new instance of the same key.  the run is already
+// final, so an error is logged and not returned.
 func (e *executor) loopTickOnFinalize(ctx context.Context, md sv2.Metadata, status enums.StepStatus, events []json.RawMessage) {
 	if status != enums.StepStatusFailed && status != enums.StepStatusCancelled {
 		return
@@ -646,7 +710,21 @@ func (e *executor) loopTickOnFinalize(ctx context.Context, md sv2.Metadata, stat
 		return
 	}
 	id := loops.NewID(domain.NewTenant(md.ID.Tenant.AccountID, md.ID.Tenant.EnvID), md.ID.FunctionID, in.Key)
-	if err := e.enqueueLoopTick(ctx, md, fn, id); err != nil {
+	snap, err := e.loops.Load(ctx, id)
+	switch {
+	case errors.Is(err, loops.ErrNotFound):
+		return
+	case err != nil:
+		e.log.Error("error loading loop instance to tick a finished run",
+			"error", err,
+			"run_id", md.ID.RunID,
+		)
+		return
+	}
+	if in.Kind != loops.InputEvent && snap.OpenedBy != in.OpenedBy {
+		return
+	}
+	if err := e.enqueueLoopTick(ctx, md, fn, id, snap.OpenedBy); err != nil {
 		e.log.Error("error enqueueing loop tick after a finished run",
 			"error", err,
 			"run_id", md.ID.RunID,
@@ -655,21 +733,23 @@ func (e *executor) loopTickOnFinalize(ctx context.Context, md sv2.Metadata, stat
 }
 
 // loopTimerJobID returns the queue job id of the tick item or the wake
-// item of an instance.  the service builds the same id to name the event
-// that a run of the item starts.
-func loopTimerJobID(id loops.ID, kind string, wakeID string) string {
+// item of an instance.  the instance id is the same for every record of
+// one key, so the id also has the OpenedBy of the record.  without it the
+// timers of an ended instance and of a new instance of the same key are
+// one queue item.
+func loopTimerJobID(id loops.ID, openedBy domain.RunID, kind string, wakeID string) string {
 	if kind == loops.InputWake {
-		return fmt.Sprintf("wake:%s:%s", id.InstanceID(), wakeID)
+		return fmt.Sprintf("wake:%s:%s:%s", id.InstanceID(), openedBy, wakeID)
 	}
-	return fmt.Sprintf("tick:%s", id.InstanceID())
+	return fmt.Sprintf("tick:%s:%s", id.InstanceID(), openedBy)
 }
 
 // loopTimerItem builds the queue item for a tick or a wake.  the item has
 // the function, account, env, and app ids and no run id, no semaphore, and
 // no concurrency key.  the run is created when the item is handled.  the
-// payload nonce is the enqueuing run id.  a pending tick that is kept and
-// a wake that is moved keep their nonce.
-func loopTimerItem(md sv2.Metadata, id loops.ID, jobID string, kind string, input string, inputID string) queue.Item {
+// payload has the OpenedBy of the record, which the handler compares with
+// the record in the store.
+func loopTimerItem(md sv2.Metadata, id loops.ID, openedBy domain.RunID, jobID string, kind string, input string, inputID string) queue.Item {
 	maxAttempts := consts.MaxRetries + 1
 	return queue.Item{
 		JobID:       &jobID,
@@ -684,10 +764,10 @@ func loopTimerItem(md sv2.Metadata, id loops.ID, jobID string, kind string, inpu
 		Attempt:     0,
 		MaxAttempts: &maxAttempts,
 		Payload: queue.PayloadLoop{
-			Key:   id.Key,
-			Kind:  input,
-			ID:    inputID,
-			Nonce: md.ID.RunID.String(),
+			Key:      id.Key,
+			Kind:     input,
+			ID:       inputID,
+			OpenedBy: openedBy,
 		},
 	}
 }

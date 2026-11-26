@@ -7,6 +7,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/inngest/inngest/pkg/execution/state/kv"
@@ -45,6 +46,20 @@ if ARGV[1] ~= '' and tonumber(ARGV[1]) ~= cur then
 	return -1
 end
 redis.call('DEL', KEYS[1])
+return 0
+`)
+
+// extendScript moves the expiry later and never earlier.  ARGV[1] is the
+// new ttl in milliseconds.  PTTL returns -2 for a missing key and -1 for a
+// key without an expiry.  it returns 0, or -1 when the key is missing.
+var extendScript = rueidis.NewLuaScript(`
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl == -2 then
+	return -1
+end
+if ttl >= 0 and tonumber(ARGV[1]) > ttl then
+	redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
 return 0
 `)
 
@@ -127,6 +142,24 @@ func (s *Store) Delete(ctx context.Context, k kv.Key, opts ...kv.Option) error {
 	}
 	if v < 0 {
 		return kv.ErrConflict
+	}
+	return nil
+}
+
+// Extend moves the expiry of one key to d from now when that is later than
+// the expiry the key has.  the hash fields are not written, so the version
+// stays the same.
+func (s *Store) Extend(ctx context.Context, k kv.Key, d time.Duration) error {
+	if err := k.Validate(); err != nil {
+		return err
+	}
+	args := []string{strconv.FormatInt(d.Milliseconds(), 10)}
+	v, err := extendScript.Exec(ctx, s.rc, []string{s.redisKey(k)}, args).AsInt64()
+	if err != nil {
+		return err
+	}
+	if v < 0 {
+		return kv.ErrNotFound
 	}
 	return nil
 }

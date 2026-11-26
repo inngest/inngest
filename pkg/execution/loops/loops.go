@@ -4,10 +4,8 @@
 package loops
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -52,7 +50,8 @@ const (
 )
 
 // internal event names that start a tick run and a wake run.  the event
-// data containsd the loop key, and for a wake the wake id.
+// data contains the loop key and the opener of the loop record, and for a
+// wake the wake id.
 const (
 	EventTick = "inngest/loop.tick"
 	EventWake = "inngest/loop.wake"
@@ -65,69 +64,50 @@ type Input struct {
 	Kind string
 	Key  LoopKey
 	ID   string
+	// OpenedBy is the OpenedBy of the record a tick or a wake was enqueued
+	// for.  the executor drops the input when the record in the store has
+	// another opener.  without it a timer of an ended instance is delivered
+	// to a new instance of the same key.  it is zero for a trigger.
+	OpenedBy domain.RunID
 }
 
-// NewTickEvent returns the event that starts a tick run for key, with a
-// random event id.
-func NewTickEvent(key LoopKey) event.Event {
-	return NewTickEventWithID(key, ulid.MustNew(ulid.Now(), rand.Reader))
-}
-
-// NewTickEventWithID returns the event that starts a tick run for key with
-// the event id.  the timestamp is now, the time the input is handled.
-func NewTickEventWithID(key LoopKey, id ulid.ULID) event.Event {
-	return newLoopEvent(EventTick, id, map[string]any{
-		"key": key,
+// NewTickEvent returns the event that starts a tick run for key.  openedBy
+// is the OpenedBy of the record the tick was enqueued for.  the event id is
+// random and the timestamp is now, the time the input is handled.
+func NewTickEvent(key LoopKey, openedBy domain.RunID) event.Event {
+	return newLoopEvent(EventTick, map[string]any{
+		"key":       key,
+		"opened_by": openedBy.String(),
 	})
 }
 
 // NewWakeEvent returns the event that starts a wake run for key with the
-// wake id, with a random event id.
-func NewWakeEvent(key LoopKey, wakeID string) event.Event {
-	return NewWakeEventWithID(key, wakeID, ulid.MustNew(ulid.Now(), rand.Reader))
-}
-
-// NewWakeEventWithID returns the event that starts a wake run for key with
-// the wake id and the event id.  the timestamp is now, the time the input
-// is handled.
-func NewWakeEventWithID(key LoopKey, wakeID string, id ulid.ULID) event.Event {
-	return newLoopEvent(EventWake, id, map[string]any{
-		"key": key,
-		"id":  wakeID,
+// wake id.  openedBy is the OpenedBy of the record the wake was enqueued
+// for.  the event id is random and the timestamp is now, the time the
+// input is handled.
+func NewWakeEvent(key LoopKey, wakeID string, openedBy domain.RunID) event.Event {
+	return newLoopEvent(EventWake, map[string]any{
+		"key":       key,
+		"id":        wakeID,
+		"opened_by": openedBy.String(),
 	})
 }
 
-func newLoopEvent(name string, id ulid.ULID, data map[string]any) event.Event {
+func newLoopEvent(name string, data map[string]any) event.Event {
 	return event.Event{
-		ID:        id.String(),
+		ID:        ulid.MustNew(ulid.Now(), rand.Reader).String(),
 		Name:      name,
 		Data:      data,
 		Timestamp: time.Now().UnixMilli(),
 	}
 }
 
-// TimerEventID returns the event id for one tick or wake item.  the id is
-// derived from the item's job id and its nonce, the run id that enqueued
-// it, so every run of the same item builds the same id and the schedule
-// idempotency key drops all but the first.  the item's scheduled time is
-// not part of it, since a retry and a scavenge move the item.  the time
-// part of the id is the nonce's time, or zero when the nonce is not a
-// ulid.  that is the enqueuing run's time, not the time the timer fired,
-// so the id sorts by enqueue time.  the event timestamp is the firing
-// time, set when the item is handled.
-func TimerEventID(jobID string, nonce string) ulid.ULID {
-	var ms uint64
-	if id, err := ulid.Parse(nonce); err == nil {
-		ms = id.Time()
-	}
-	sum := sha256.Sum256([]byte(jobID + ":" + nonce))
-	return ulid.MustNew(ms, bytes.NewReader(sum[:]))
-}
-
 // InputFromEvent derives the input from the event map of a run's first
-// event.  a tick event and a wake event carry the key and the wake id in
-// their data.  any other event is a trigger, and the key comes from the
-// loop key expression.
+// event.  a tick event and a wake event carry the key, the opener, and the
+// wake id in their data.  any other event is a trigger, and the key comes
+// from the loop key expression.  a tick or a wake event with no valid
+// opener gives a zero OpenedBy.  every record has the id of the run that
+// opened it, so that input matches no record and the executor drops it.
 func InputFromEvent(ctx context.Context, loop inngest.Loop, evt map[string]any) (Input, error) {
 	name, _ := evt["name"].(string)
 	switch name {
@@ -151,6 +131,11 @@ func InputFromEvent(ctx context.Context, loop inngest.Loop, evt map[string]any) 
 	in := Input{
 		Kind: InputTick,
 		Key:  key,
+	}
+	if s, _ := data["opened_by"].(string); s != "" {
+		if openedBy, err := ulid.Parse(s); err == nil {
+			in.OpenedBy = openedBy
+		}
 	}
 	if name == EventWake {
 		in.Kind = InputWake
@@ -237,18 +222,22 @@ type Snapshot struct {
 	ID ID
 	// OpenedBy is the run that created the record.  an end that is replayed
 	// after a crash compares it with the value it saved, so a record that a
-	// later trigger created is left alone.
+	// later trigger created is left alone.  a tick item and a wake item have
+	// it too, so a timer of an ended instance is not delivered to a record
+	// that a later trigger created.
 	OpenedBy domain.RunID
 	// State is the marshalled state for the loop.  the state is one kv
 	// entry.  it is nil until the first commit.
 	State     json.RawMessage
 	LastRunID *domain.RunID
 	// Counter is the number of commits so far.  it also acts as a lock for
-	// each update.  a record that Open created and no run has committed is
+	// each commit.  a record that Open created and no run has committed is
 	// at 0.
 	Counter int64
-	// ExpiresAt is when the store drops the instance.  zero means never.
-	ExpiresAt time.Time
+	// UpdatedAt is when the last Open or Commit wrote the record.  a Touch
+	// does not write the record and does not change it.  the snapshot does
+	// not contain the expiry, which only the store knows.
+	UpdatedAt time.Time
 }
 
 // Commit represents a commit to the loops state, which happens at the end of a function

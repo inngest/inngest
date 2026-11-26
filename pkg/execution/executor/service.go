@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/domain"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -1161,12 +1160,20 @@ func (s *Service) handleCron(ctx context.Context, item queue.Item) error {
 }
 
 // handleLoopInput starts one run for a tick or a wake item.  the run's
-// first event is the tick or wake event, which carries the key and the wake
-// id, so the executor derives the input from it like any other run.  the
-// event is published to the event stream the way a cron event is, so the
-// dashboard shows it as the run's trigger.  an ended instance, a skipped
-// function, a missing function, and a function that is no longer a loop
-// all drop the item.
+// first event is the tick or wake event, which carries the key, the opener
+// of the loop record, and the wake id, so the executor derives the input
+// from it like any other run.  the event is published to the event stream
+// the way a cron event is, so the dashboard shows it as the run's trigger.
+// an ended instance, a missing function, and a function that is no longer a
+// loop all drop the item.  an item whose opener is not the opener of the
+// record in the store counts as one for an ended instance.  a skipped wake
+// is dropped.  a tick that is skipped, or that fails on its last attempt,
+// runs again one tick interval later.
+//
+// the event id is random, so a second run of the same item starts a second
+// run of the loop.  the queue runs an item twice when a worker stops after
+// the schedule and before the dequeue.  the handler then gets the same tick
+// or the same wake id twice.
 func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "loop", "item_kind", item.Kind, "fn_id", item.Identifier.WorkflowID)
 
@@ -1196,30 +1203,23 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	// the event id comes from the item's job id and nonce, so a second run
-	// of the same item builds the same id and the schedule idempotency key
-	// drops it.
-	loopID := loops.NewID(domain.NewTenant(item.Identifier.AccountID, item.Identifier.WorkspaceID), item.Identifier.WorkflowID, payload.Key)
-	evtID := loops.TimerEventID(loopTimerJobID(loopID, payload.Kind, payload.ID), payload.Nonce)
 	var evt event.Event
 	switch payload.Kind {
 	case loops.InputTick:
-		evt = loops.NewTickEventWithID(payload.Key, evtID)
+		evt = loops.NewTickEvent(payload.Key, payload.OpenedBy)
 	case loops.InputWake:
-		evt = loops.NewWakeEventWithID(payload.Key, payload.ID, evtID)
+		evt = loops.NewWakeEvent(payload.Key, payload.ID, payload.OpenedBy)
 	default:
 		return queue.NeverRetryError(fmt.Errorf("unexpected loop input kind %q", payload.Kind))
 	}
-	tracked := event.NewBaseTrackedEventWithID(evt, evtID)
-	idempotencyKey := evtID.String()
+	tracked := event.NewBaseTrackedEvent(evt, nil)
 
 	_, _, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
-		AccountID:      item.Identifier.AccountID,
-		WorkspaceID:    item.Identifier.WorkspaceID,
-		AppID:          item.Identifier.AppID,
-		Function:       *conf,
-		Events:         []event.TrackedEvent{tracked},
-		IdempotencyKey: &idempotencyKey,
+		AccountID:   item.Identifier.AccountID,
+		WorkspaceID: item.Identifier.WorkspaceID,
+		AppID:       item.Identifier.AppID,
+		Function:    *conf,
+		Events:      []event.TrackedEvent{tracked},
 	})
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
@@ -1231,23 +1231,27 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 	})
 
 	switch {
-	case err == nil, errors.Is(err, ErrFunctionSkippedIdempotency), errors.Is(err, state.ErrIdentifierExists):
-		// the run exists, from this call or from an earlier run of the
-		// same item.
+	case err == nil:
 	case errors.Is(err, ErrLoopEnded):
 		l.Debug("dropping loop input, instance ended", "key", payload.Key)
 		return nil
 	case errors.Is(err, ErrFunctionSkipped):
+		if payload.Kind == loops.InputTick && conf.Loop.Tick > 0 {
+			return requeueLoopTick(err, conf.Loop.Tick)
+		}
 		return nil
 	default:
-		return fmt.Errorf("error scheduling loop run: %w", err)
+		err = fmt.Errorf("error scheduling loop run: %w", err)
+		if payload.Kind == loops.InputTick && conf.Loop.Tick > 0 && !queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
+			return requeueLoopTick(err, conf.Loop.Tick)
+		}
+		return err
 	}
 
 	// publish the event to pubsub, as the cron handler does.  the publish
 	// runs after the handler returns and uses a context the queue cannot
-	// cancel.  the event is published once the run exists, and again on a
-	// rerun of the item, so a crash before the publish still leaves the
-	// event recorded.  a dropped input publishes nothing.
+	// cancel.  the event is published once the run exists.  a dropped input
+	// publishes nothing.
 	if s.publisher != nil {
 		go func(ctx context.Context) {
 			byt, err := json.Marshal(tracked)
@@ -1269,6 +1273,16 @@ func (s *Service) handleLoopInput(ctx context.Context, item queue.Item) error {
 		}(context.WithoutCancel(ctx))
 	}
 	return nil
+}
+
+// requeueLoopTick returns the error that makes the queue run the same tick
+// item again one tick interval from now.  the attempt count of the item does
+// not go up.  only a run that finishes enqueues the next tick, so without it
+// a tick that started no run is the last tick of the instance until another
+// input arrives.
+func requeueLoopTick(cause error, tick time.Duration) error {
+	at := time.Now().Add(tick)
+	return queue.RetryAtError(queue.AlwaysRetryError(cause), &at)
 }
 
 func (s *Service) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
