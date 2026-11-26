@@ -45,13 +45,15 @@ type Store interface {
 // covers an End that ran between the two calls.
 const openAttempts = 3
 
-// record is the value stored in the kv entry.  the expiry is not in it.
-// the expiry is the ttl of the kv entry, which a Touch moves without a
-// write to the record.
+// record is the value stored in the kv entry.  ExpiresAt is the expiry that
+// the last Open or Commit set.  a Touch moves the ttl of the kv entry
+// without a write to the record, so the entry can expire later than
+// ExpiresAt.
 type record struct {
 	OpenedBy  domain.RunID    `json:"o"`
 	LastRunID *domain.RunID   `json:"r,omitempty"`
 	UpdatedAt time.Time       `json:"u"`
+	ExpiresAt time.Time       `json:"e,omitzero"`
 	State     json.RawMessage `json:"s"`
 }
 
@@ -71,9 +73,11 @@ func (s *store) Open(ctx context.Context, id ID, runID domain.RunID) (Snapshot, 
 	key := id.kvKey()
 	var lastErr error
 	for range openAttempts {
+		now := time.Now().UTC()
 		rec := record{
 			OpenedBy:  runID,
-			UpdatedAt: time.Now().UTC(),
+			UpdatedAt: now,
+			ExpiresAt: now.Add(OpenTTL),
 			State:     json.RawMessage("null"),
 		}
 		e, err := s.write(ctx, key, rec, kv.WithExpected(0), kv.WithTTL(OpenTTL))
@@ -117,6 +121,7 @@ func (s *store) Commit(ctx context.Context, c Commit) (Snapshot, error) {
 		OpenedBy:  c.OpenedBy,
 		LastRunID: &runID,
 		UpdatedAt: time.Now().UTC(),
+		ExpiresAt: c.ExpiresAt.UTC(),
 		State:     c.State,
 	}
 
@@ -204,9 +209,9 @@ func (s *store) conflictOrGone(ctx context.Context, id ID) error {
 	return ErrConflict
 }
 
-// write encodes rec and stores it under key.  the caller sets UpdatedAt in
-// utc, which has no monotonic reading, so a snapshot read back equals the
-// one the writer returned.
+// write encodes rec and stores it under key.  the caller sets UpdatedAt and
+// ExpiresAt in utc, which has no monotonic reading, so a snapshot read back
+// equals the one the writer returned.
 func (s *store) write(ctx context.Context, key kv.Key, rec record, opts ...kv.Option) (kv.Entry, error) {
 	val, err := json.Marshal(rec)
 	if err != nil {
@@ -236,6 +241,7 @@ func toSnapshot(id ID, e kv.Entry, rec record) (Snapshot, error) {
 		LastRunID: rec.LastRunID,
 		Counter:   e.Version - 1,
 		UpdatedAt: rec.UpdatedAt.UTC(),
+		ExpiresAt: rec.ExpiresAt.UTC(),
 	}, nil
 }
 

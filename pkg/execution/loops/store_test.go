@@ -426,6 +426,67 @@ func TestTouchOpened(t *testing.T) {
 	require.Equal(t, snap, loaded)
 }
 
+func TestExpiresAt(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newStore(t)
+	id := testID()
+
+	snap, err := s.Open(ctx, id, ulid.Make())
+	require.NoError(t, err)
+	require.WithinDuration(t, time.Now().Add(OpenTTL), snap.ExpiresAt, time.Minute)
+	loaded, err := s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, snap, loaded)
+
+	// a commit stores the commit's expiry.
+	expires := time.Now().Add(time.Hour)
+	c1, err := s.Commit(ctx, Commit{
+		ID:        id,
+		RunID:     ulid.Make(),
+		Counter:   snap.Counter,
+		State:     json.RawMessage(`{"n":1}`),
+		ExpiresAt: expires,
+	})
+	require.NoError(t, err)
+	require.True(t, expires.Equal(c1.ExpiresAt))
+	loaded, err = s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, c1, loaded)
+
+	// a touch moves the kv expiry and leaves the stored expiry as it is.
+	require.NoError(t, s.Touch(ctx, id, time.Now().Add(2*time.Hour)))
+	loaded, err = s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, c1, loaded)
+
+	// a commit with no expiry stores zero.
+	c2, err := s.Commit(ctx, Commit{
+		ID:      id,
+		RunID:   ulid.Make(),
+		Counter: c1.Counter,
+	})
+	require.NoError(t, err)
+	require.True(t, c2.ExpiresAt.IsZero())
+	loaded, err = s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, c2, loaded)
+
+	// an expiry in another location is stored in utc.
+	local := time.Now().In(time.FixedZone("x", 3*60*60)).Add(time.Hour)
+	c3, err := s.Commit(ctx, Commit{
+		ID:        id,
+		RunID:     ulid.Make(),
+		Counter:   c2.Counter,
+		ExpiresAt: local,
+	})
+	require.NoError(t, err)
+	require.True(t, local.Equal(c3.ExpiresAt))
+	require.Equal(t, time.UTC, c3.ExpiresAt.Location())
+	loaded, err = s.Load(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, c3, loaded)
+}
+
 func TestKVIsolation(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newStore(t)

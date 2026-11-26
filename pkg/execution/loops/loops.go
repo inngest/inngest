@@ -235,9 +235,12 @@ type Snapshot struct {
 	// at 0.
 	Counter int64
 	// UpdatedAt is when the last Open or Commit wrote the record.  a Touch
-	// does not write the record and does not change it.  the snapshot does
-	// not contain the expiry, which only the store knows.
+	// does not write the record and does not change it.
 	UpdatedAt time.Time
+	// ExpiresAt is the expiry that the last Open or Commit set.  zero means
+	// no expiry.  a Touch can move the real expiry of the record later and
+	// does not change this value.
+	ExpiresAt time.Time
 }
 
 // Commit represents a commit to the loops state, which happens at the end of a function

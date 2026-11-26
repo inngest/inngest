@@ -51,6 +51,14 @@ const (
 	// a larger state fails the run without retry and commits nothing.
 	MaxLoopStateSize = 512 * 1024
 
+	// MaxLoopInboxEvents is the most unread events one loop inbox can
+	// contain.  an event that arrives for a full inbox is dropped.
+	MaxLoopInboxEvents = 50
+
+	// MaxLoopInboxSize is the most bytes of unread events one loop inbox can
+	// contain.  an event that takes the inbox past it is dropped.
+	MaxLoopInboxSize = 4 * 1024 * 1024
+
 	// MinLoopIdleTTL is the shortest idle_ttl a loop can sync with.
 	MinLoopIdleTTL = 5 * time.Minute
 

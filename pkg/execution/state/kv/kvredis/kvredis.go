@@ -1,6 +1,7 @@
-// Package kvredis stores KV entries as redis hashes.  each key is one hash
-// with a version field and a data field, so a compare and set reads and
-// writes one key inside one script.
+// Package kvredis stores KV entries and lists as redis hashes.  each entry
+// is one hash with a version field and a data field, so a compare and set
+// reads and writes one key inside one script.  each list is one hash with
+// one field per item, and list.go describes its fields.
 package kvredis
 
 import (

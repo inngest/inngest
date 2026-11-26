@@ -64,18 +64,25 @@ type Entry struct {
 	Version int64
 }
 
-// Options controls settings for Set or Delete.  stores read it through
-// ApplyOptions.
+// Options controls settings for a write to a Store or a ListStore.  stores
+// read it through ApplyOptions.
 type Options struct {
 	// Expected is the version the key must have for the write to happen.
-	// zero means the key must not exist.  nil means no check.
+	// zero means the key must not exist.  nil means no check.  a ListStore
+	// ignores it.
 	Expected *int64
 	// TTL is how long the key lives after the write.  zero means no expiry.
 	// Delete ignores it.
 	TTL time.Duration
+	// MaxItems is the most items a list can contain.  zero means no limit.
+	// only Push reads it.
+	MaxItems int
+	// MaxBytes is the most bytes of item values a list can contain.  zero
+	// means no limit.  only Push reads it.
+	MaxBytes int64
 }
 
-// Option changes one setting on a Set or Delete.
+// Option changes one setting on a write to a Store or a ListStore.
 type Option func(*Options)
 
 // WithExpected makes the write a compare and set.  the write happens only
@@ -91,6 +98,22 @@ func WithExpected(v int64) Option {
 func WithTTL(d time.Duration) Option {
 	return func(o *Options) {
 		o.TTL = d
+	}
+}
+
+// WithMaxItems makes a Push return ErrFull when the list already contains n
+// items.
+func WithMaxItems(n int) Option {
+	return func(o *Options) {
+		o.MaxItems = n
+	}
+}
+
+// WithMaxBytes makes a Push return ErrFull when the item would take the
+// values in the list past n bytes.
+func WithMaxBytes(n int64) Option {
+	return func(o *Options) {
+		o.MaxBytes = n
 	}
 }
 

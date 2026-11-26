@@ -121,4 +121,20 @@ func TestApplyOptions(t *testing.T) {
 
 	o = ApplyOptions(WithExpected(3), WithExpected(7))
 	require.Equal(t, int64(7), *o.Expected)
+
+	o = ApplyOptions()
+	require.Zero(t, o.MaxItems)
+	require.Zero(t, o.MaxBytes)
+	o = ApplyOptions(WithMaxItems(5), WithMaxBytes(1024))
+	require.Equal(t, 5, o.MaxItems)
+	require.Equal(t, int64(1024), o.MaxBytes)
+}
+
+func TestValidateItemID(t *testing.T) {
+	for _, id := range []string{"a", "item-1", "A_b-9", strings.Repeat("x", MaxPartLen)} {
+		require.NoError(t, ValidateItemID(id), id)
+	}
+	for _, id := range []string{"", "a/b", "a:b", "#seq", "a b", "ü", strings.Repeat("x", MaxPartLen+1)} {
+		require.ErrorIs(t, ValidateItemID(id), ErrInvalidItemID, id)
+	}
 }

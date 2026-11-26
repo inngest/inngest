@@ -15,6 +15,11 @@ const (
 	OpSet    Op = "set"
 	OpDelete Op = "delete"
 	OpExtend Op = "extend"
+
+	OpPush   Op = "push"
+	OpPeek   Op = "peek"
+	OpRemove Op = "remove"
+	OpClear  Op = "clear"
 )
 
 // Result names how one kv call ended.
@@ -24,7 +29,12 @@ const (
 	ResultOK       Result = "ok"
 	ResultNotFound Result = "not_found"
 	ResultConflict Result = "conflict"
-	ResultError    Result = "error"
+	// ResultFull means a Push found the list full and wrote nothing.
+	ResultFull Result = "full"
+	// ResultDuplicate means a Push found an item with the same ID in the
+	// list and wrote nothing.
+	ResultDuplicate Result = "duplicate"
+	ResultError     Result = "error"
 )
 
 // Operation describes one completed kv call.
@@ -33,8 +43,9 @@ type Operation struct {
 	Namespace string
 	Op        Op
 	Result    Result
-	// Bytes is the value length read by a successful Get or written by a
-	// successful Set.  it is zero for every other call.
+	// Bytes is the value length read by a successful Get or Peek, or written
+	// by a successful Set or by a Push that added its item.  it is zero for
+	// every other call.
 	Bytes int64
 }
 
@@ -61,6 +72,8 @@ func resultOf(err error) Result {
 		return ResultNotFound
 	case errors.Is(err, ErrConflict):
 		return ResultConflict
+	case errors.Is(err, ErrFull):
+		return ResultFull
 	default:
 		return ResultError
 	}

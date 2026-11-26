@@ -270,6 +270,7 @@ func TestResultOf(t *testing.T) {
 	require.Equal(t, ResultOK, resultOf(nil))
 	require.Equal(t, ResultNotFound, resultOf(ErrNotFound))
 	require.Equal(t, ResultConflict, resultOf(ErrConflict))
+	require.Equal(t, ResultFull, resultOf(ErrFull))
 	require.Equal(t, ResultError, resultOf(ErrInvalidNamespace))
 	require.Equal(t, ResultError, resultOf(errors.New("x")))
 }
