@@ -1073,6 +1073,10 @@ func (q *queueProcessor) configureScannerRoles(scanner QueueScanner) error {
 	if !ok {
 		return nil
 	}
+	if q.roleLeaseLock != nil {
+		q.roleLeaseLock.Lock()
+		defer q.roleLeaseLock.Unlock()
+	}
 	provided := filterQueueRoles(q.QueueOptions, provider.QueueScannerRoles())
 	existing := make(map[string]struct{}, len(q.roles)+len(provided))
 	for _, role := range q.roles {
