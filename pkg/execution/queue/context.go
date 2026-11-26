@@ -9,6 +9,7 @@ var (
 	startedAtKey                           = startedAtCtxKey{}
 	sojournKey                             = sojournCtxKey{}
 	latencyKey                             = latencyCtxKey{}
+	startLatencyKey                        = startLatencyCtxKey{}
 	archivedWorkspaceAppSemaphoreBypassKey = archivedWorkspaceAppSemaphoreBypassCtxKey{}
 )
 
@@ -24,6 +25,10 @@ type latencyCtxKey struct{}
 // available via context.
 type sojournCtxKey struct{}
 
+// startLatencyCtxKey is a context key which records how long the queue item
+// waited between being due and starting, available via context.
+type startLatencyCtxKey struct{}
+
 type archivedWorkspaceAppSemaphoreBypassCtxKey struct{}
 
 func GetItemStart(ctx context.Context) (time.Time, bool) {
@@ -38,6 +43,21 @@ func GetItemSystemLatency(ctx context.Context) (time.Duration, bool) {
 
 func GetItemConcurrencyLatency(ctx context.Context) (time.Duration, bool) {
 	t, ok := ctx.Value(sojournKey).(time.Duration)
+	return t, ok
+}
+
+// WithItemStartLatency records how long the queue item waited between being due
+// and starting, so that consumers can report it via GetItemStartLatency.
+func WithItemStartLatency(ctx context.Context, latency time.Duration) context.Context {
+	return context.WithValue(ctx, startLatencyKey, latency)
+}
+
+// GetItemStartLatency returns the time between the queue item being due and
+// starting, as computed by QueueItem.StartLatency.  This includes waits for
+// concurrency, throttle or backlog capacity, but not intentional delays such
+// as sleeps, debounces or retry backoff.
+func GetItemStartLatency(ctx context.Context) (time.Duration, bool) {
+	t, ok := ctx.Value(startLatencyKey).(time.Duration)
 	return t, ok
 }
 
