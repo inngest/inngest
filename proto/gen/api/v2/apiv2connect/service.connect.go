@@ -166,6 +166,10 @@ const (
 	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2ResumeFunctionProcedure is the fully-qualified name of the V2's ResumeFunction RPC.
 	V2ResumeFunctionProcedure = "/api.v2.V2/ResumeFunction"
+	// V2ArchiveFunctionProcedure is the fully-qualified name of the V2's ArchiveFunction RPC.
+	V2ArchiveFunctionProcedure = "/api.v2.V2/ArchiveFunction"
+	// V2UnarchiveFunctionProcedure is the fully-qualified name of the V2's UnarchiveFunction RPC.
+	V2UnarchiveFunctionProcedure = "/api.v2.V2/UnarchiveFunction"
 	// V2PauseFunctionsProcedure is the fully-qualified name of the V2's PauseFunctions RPC.
 	V2PauseFunctionsProcedure = "/api.v2.V2/PauseFunctions"
 	// V2ResumeFunctionsProcedure is the fully-qualified name of the V2's ResumeFunctions RPC.
@@ -271,6 +275,8 @@ type V2Client interface {
 	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	ArchiveFunction(context.Context, *connect.Request[v2.ArchiveFunctionRequest]) (*connect.Response[v2.ArchiveFunctionResponse], error)
+	UnarchiveFunction(context.Context, *connect.Request[v2.UnarchiveFunctionRequest]) (*connect.Response[v2.UnarchiveFunctionResponse], error)
 	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
 	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
@@ -679,6 +685,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ResumeFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		archiveFunction: connect.NewClient[v2.ArchiveFunctionRequest, v2.ArchiveFunctionResponse](
+			httpClient,
+			baseURL+V2ArchiveFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("ArchiveFunction")),
+			connect.WithClientOptions(opts...),
+		),
+		unarchiveFunction: connect.NewClient[v2.UnarchiveFunctionRequest, v2.UnarchiveFunctionResponse](
+			httpClient,
+			baseURL+V2UnarchiveFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("UnarchiveFunction")),
+			connect.WithClientOptions(opts...),
+		),
 		pauseFunctions: connect.NewClient[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse](
 			httpClient,
 			baseURL+V2PauseFunctionsProcedure,
@@ -849,6 +867,8 @@ type v2Client struct {
 	createCancellation         *connect.Client[v2.CreateCancellationRequest, v2.CreateCancellationResponse]
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	resumeFunction             *connect.Client[v2.ResumeFunctionRequest, v2.ResumeFunctionResponse]
+	archiveFunction            *connect.Client[v2.ArchiveFunctionRequest, v2.ArchiveFunctionResponse]
+	unarchiveFunction          *connect.Client[v2.UnarchiveFunctionRequest, v2.UnarchiveFunctionResponse]
 	pauseFunctions             *connect.Client[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse]
 	resumeFunctions            *connect.Client[v2.ResumeFunctionsRequest, v2.ResumeFunctionsResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
@@ -1183,6 +1203,16 @@ func (c *v2Client) ResumeFunction(ctx context.Context, req *connect.Request[v2.R
 	return c.resumeFunction.CallUnary(ctx, req)
 }
 
+// ArchiveFunction calls api.v2.V2.ArchiveFunction.
+func (c *v2Client) ArchiveFunction(ctx context.Context, req *connect.Request[v2.ArchiveFunctionRequest]) (*connect.Response[v2.ArchiveFunctionResponse], error) {
+	return c.archiveFunction.CallUnary(ctx, req)
+}
+
+// UnarchiveFunction calls api.v2.V2.UnarchiveFunction.
+func (c *v2Client) UnarchiveFunction(ctx context.Context, req *connect.Request[v2.UnarchiveFunctionRequest]) (*connect.Response[v2.UnarchiveFunctionResponse], error) {
+	return c.unarchiveFunction.CallUnary(ctx, req)
+}
+
 // PauseFunctions calls api.v2.V2.PauseFunctions.
 func (c *v2Client) PauseFunctions(ctx context.Context, req *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {
 	return c.pauseFunctions.CallUnary(ctx, req)
@@ -1336,6 +1366,8 @@ type V2Handler interface {
 	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	ArchiveFunction(context.Context, *connect.Request[v2.ArchiveFunctionRequest]) (*connect.Response[v2.ArchiveFunctionResponse], error)
+	UnarchiveFunction(context.Context, *connect.Request[v2.UnarchiveFunctionRequest]) (*connect.Response[v2.UnarchiveFunctionResponse], error)
 	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
 	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
@@ -1740,6 +1772,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ResumeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ArchiveFunctionHandler := connect.NewUnaryHandler(
+		V2ArchiveFunctionProcedure,
+		svc.ArchiveFunction,
+		connect.WithSchema(v2Methods.ByName("ArchiveFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2UnarchiveFunctionHandler := connect.NewUnaryHandler(
+		V2UnarchiveFunctionProcedure,
+		svc.UnarchiveFunction,
+		connect.WithSchema(v2Methods.ByName("UnarchiveFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2PauseFunctionsHandler := connect.NewUnaryHandler(
 		V2PauseFunctionsProcedure,
 		svc.PauseFunctions,
@@ -1970,6 +2014,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2ResumeFunctionProcedure:
 			v2ResumeFunctionHandler.ServeHTTP(w, r)
+		case V2ArchiveFunctionProcedure:
+			v2ArchiveFunctionHandler.ServeHTTP(w, r)
+		case V2UnarchiveFunctionProcedure:
+			v2UnarchiveFunctionHandler.ServeHTTP(w, r)
 		case V2PauseFunctionsProcedure:
 			v2PauseFunctionsHandler.ServeHTTP(w, r)
 		case V2ResumeFunctionsProcedure:
@@ -2263,6 +2311,14 @@ func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) ArchiveFunction(context.Context, *connect.Request[v2.ArchiveFunctionRequest]) (*connect.Response[v2.ArchiveFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ArchiveFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) UnarchiveFunction(context.Context, *connect.Request[v2.UnarchiveFunctionRequest]) (*connect.Response[v2.UnarchiveFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.UnarchiveFunction is not implemented"))
 }
 
 func (UnimplementedV2Handler) PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {

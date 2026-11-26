@@ -83,6 +83,8 @@ const (
 	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
+	V2_ArchiveFunction_FullMethodName            = "/api.v2.V2/ArchiveFunction"
+	V2_UnarchiveFunction_FullMethodName          = "/api.v2.V2/UnarchiveFunction"
 	V2_PauseFunctions_FullMethodName             = "/api.v2.V2/PauseFunctions"
 	V2_ResumeFunctions_FullMethodName            = "/api.v2.V2/ResumeFunctions"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
@@ -172,6 +174,8 @@ type V2Client interface {
 	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
+	ArchiveFunction(ctx context.Context, in *ArchiveFunctionRequest, opts ...grpc.CallOption) (*ArchiveFunctionResponse, error)
+	UnarchiveFunction(ctx context.Context, in *UnarchiveFunctionRequest, opts ...grpc.CallOption) (*UnarchiveFunctionResponse, error)
 	PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error)
 	ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
@@ -856,6 +860,26 @@ func (c *v2Client) ResumeFunction(ctx context.Context, in *ResumeFunctionRequest
 	return out, nil
 }
 
+func (c *v2Client) ArchiveFunction(ctx context.Context, in *ArchiveFunctionRequest, opts ...grpc.CallOption) (*ArchiveFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_ArchiveFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) UnarchiveFunction(ctx context.Context, in *UnarchiveFunctionRequest, opts ...grpc.CallOption) (*UnarchiveFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnarchiveFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_UnarchiveFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PauseFunctionsResponse)
@@ -1096,6 +1120,8 @@ type V2Server interface {
 	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
+	ArchiveFunction(context.Context, *ArchiveFunctionRequest) (*ArchiveFunctionResponse, error)
+	UnarchiveFunction(context.Context, *UnarchiveFunctionRequest) (*UnarchiveFunctionResponse, error)
 	PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error)
 	ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
@@ -1311,6 +1337,12 @@ func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionReques
 }
 func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeFunction not implemented")
+}
+func (UnimplementedV2Server) ArchiveFunction(context.Context, *ArchiveFunctionRequest) (*ArchiveFunctionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ArchiveFunction not implemented")
+}
+func (UnimplementedV2Server) UnarchiveFunction(context.Context, *UnarchiveFunctionRequest) (*UnarchiveFunctionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnarchiveFunction not implemented")
 }
 func (UnimplementedV2Server) PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PauseFunctions not implemented")
@@ -2497,6 +2529,42 @@ func _V2_ResumeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ArchiveFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ArchiveFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ArchiveFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ArchiveFunction(ctx, req.(*ArchiveFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_UnarchiveFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnarchiveFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).UnarchiveFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_UnarchiveFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).UnarchiveFunction(ctx, req.(*UnarchiveFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_PauseFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PauseFunctionsRequest)
 	if err := dec(in); err != nil {
@@ -3049,6 +3117,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumeFunction",
 			Handler:    _V2_ResumeFunction_Handler,
+		},
+		{
+			MethodName: "ArchiveFunction",
+			Handler:    _V2_ArchiveFunction_Handler,
+		},
+		{
+			MethodName: "UnarchiveFunction",
+			Handler:    _V2_UnarchiveFunction_Handler,
 		},
 		{
 			MethodName: "PauseFunctions",

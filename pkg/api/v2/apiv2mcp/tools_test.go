@@ -71,15 +71,16 @@ func TestWebhookRequestsUseCanonicalPath(t *testing.T) {
 	}
 }
 
-func TestFunctionPauseResumeRequest(t *testing.T) {
-	for _, action := range []struct{ method, name string }{{"PauseFunction", "pause"}, {"ResumeFunction", "resume"}} {
+func TestFunctionStateActionRequest(t *testing.T) {
+	for _, action := range []struct{ method, name string }{{"PauseFunction", "pause"}, {"ResumeFunction", "resume"}, {"ArchiveFunction", "archive"}, {"UnarchiveFunction", "unarchive"}} {
 		t.Run(action.name, func(t *testing.T) {
 			endpoint := endpointByMethod(t, action.method)
 			req, err := Request(t.Context(), endpoint, map[string]any{
-				"appId": "my app", "functionId": "hello/world",
-			}, Options{})
+				"appId": "my app", "functionId": "hello/world", "env": "branch-a",
+			}, Options{EnvHeader: "X-Inngest-Env"})
 			require.NoError(t, err)
 			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "branch-a", req.Header.Get("X-Inngest-Env"))
 			require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/"+action.name, req.URL.EscapedPath())
 			body, err := io.ReadAll(req.Body)
 			require.NoError(t, err)
@@ -90,6 +91,8 @@ func TestFunctionPauseResumeRequest(t *testing.T) {
 			require.Len(t, schema["properties"], 3)
 			tool := Tool(endpoint)
 			require.Equal(t, action.name+"_function", tool.Name)
+			require.NotNil(t, tool.Annotations.DestructiveHint)
+			require.True(t, *tool.Annotations.DestructiveHint)
 			require.True(t, tool.Annotations.IdempotentHint)
 			require.False(t, tool.Annotations.ReadOnlyHint)
 		})

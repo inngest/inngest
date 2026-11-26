@@ -2294,6 +2294,242 @@ service V2 {
     };
   }
 
+  rpc ArchiveFunction(ArchiveFunctionRequest) returns (ArchiveFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/archive"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:archive"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Archive a function"
+      description: "Archives a function. Idempotent: archiving an archived function returns 200 and changes nothing. Archived functions stop receiving new runs from events and crons. In-flight runs are not cancelled. Pause state is kept. Syncing an app that still includes the function unarchives it. Send no request body. The dev server returns 501."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Environment name or ID"
+          type: STRING
+          required: false
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Function archived"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ArchiveFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Permission denied"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Function not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unable to archive function"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Function archive is not implemented"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
+  rpc UnarchiveFunction(UnarchiveFunctionRequest) returns (UnarchiveFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/unarchive"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:unarchive"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Unarchive a function"
+      description: "Unarchives a function and redeploys its latest synced config. Idempotent: unarchiving a function that is not archived returns 200 with isArchived: false and changes nothing. A paused function stays paused. Unarchiving a function the app no longer defines redeploys its last synced config until the next sync archives it again. Send no request body. The dev server returns 501."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      parameters: {
+        headers: {
+          name: "X-Inngest-Env"
+          description: "Environment name or ID"
+          type: STRING
+          required: false
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Function unarchived"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2UnarchiveFunctionResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Permission denied"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Function not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unable to unarchive function"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Function unarchive is not implemented"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc PauseFunctions(PauseFunctionsRequest) returns (PauseFunctionsResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/pause"
@@ -5030,6 +5266,26 @@ message ResumeFunctionRequest {
 }
 
 message ResumeFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ArchiveFunctionRequest {
+  string app_id = 1;
+  string function_id = 2;
+}
+
+message ArchiveFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message UnarchiveFunctionRequest {
+  string app_id = 1;
+  string function_id = 2;
+}
+
+message UnarchiveFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
 }

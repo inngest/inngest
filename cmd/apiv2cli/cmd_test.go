@@ -423,15 +423,17 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
 }
 
-func TestCommandPausesAndResumesFunction(t *testing.T) {
+func TestCommandFunctionStateActions(t *testing.T) {
 	for _, action := range []struct{ name, response string }{
 		{"pause", `{"data":{"id":"fn","isPaused":true}}`},
 		{"resume", `{"data":{"id":"fn","isPaused":false}}`},
+		{"archive", `{"data":{"id":"fn","isArchived":true}}`},
+		{"unarchive", `{"data":{"id":"fn","isArchived":false}}`},
 	} {
 		t.Run(action.name, func(t *testing.T) {
-			var method, path, body string
+			var method, path, body, env string
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				method, path = r.Method, r.URL.Path
+				method, path, env = r.Method, r.URL.Path, r.Header.Get("X-Inngest-Env")
 				data, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
 				body = string(data)
@@ -442,11 +444,12 @@ func TestCommandPausesAndResumesFunction(t *testing.T) {
 			cmd := Command()
 			var out bytes.Buffer
 			cmd.Writer = &out
-			err := cmd.Run(t.Context(), []string{"api", action.name + "-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-function", "--api-host", srv.URL, "--env", "branch-a", "--app-id", "app", "--function-id", "fn"})
 			require.NoError(t, err)
 			require.Equal(t, http.MethodPost, method)
 			require.Equal(t, "/api/v2/apps/app/functions/fn/"+action.name, path)
 			require.Empty(t, body)
+			require.Equal(t, "branch-a", env)
 			require.JSONEq(t, action.response, out.String())
 		})
 	}
