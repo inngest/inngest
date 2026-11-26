@@ -28,11 +28,23 @@ export type RunDeferredFromSummary = {
   } | null;
 };
 
+export type RunInvokedFromSummary = {
+  runID: string;
+  function: { name: string; slug: string } | null;
+  run: {
+    id: string;
+    status: string;
+  } | null;
+};
+
 export type GetRunLinkageData = {
   defers: RunDeferSummary[];
   siblingDefers: RunDeferSummary[];
   // A batched child can descend from several parents, so this is a list.
   deferredFrom: RunDeferredFromSummary[];
+  // The run that started this run with step.invoke. Optional because not
+  // every data source exposes it yet.
+  invokedFrom?: RunInvokedFromSummary | null;
 };
 
 export type GetRunLinkageResult = {

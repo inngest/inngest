@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -160,6 +161,81 @@ func (r *runDeferredFromResolver) Run(ctx context.Context, df *models.RunDeferre
 			"failed to get run",
 			"error", err,
 			"run_id", df.RunID,
+		)
+		return nil, errors.New("failed to get run")
+	}
+	return models.MakeFunctionRunV2(run)
+}
+
+// InvokedFrom returns the run that started this run with step.invoke. The
+// link comes from the invocation event that triggered this run: its
+// correlation ID starts with the invoking run's ID and its metadata holds the
+// invoking function's ID. Runs that were not started by step.invoke, including
+// runs invoked through the API, have no invoking run and resolve to null.
+func (r *functionRunV2Resolver) InvokedFrom(ctx context.Context, fn *models.FunctionRunV2) (*models.RunInvokedFrom, error) {
+	// An invoked run has exactly one trigger: its invocation event.
+	if len(fn.TriggerIDs) != 1 {
+		return nil, nil
+	}
+
+	events, err := r.Data.GetEventsByInternalIDs(ctx, fn.TriggerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving trigger event: %w", err)
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+
+	evt := events[0].GetEvent()
+	if !evt.IsInvokeEvent() {
+		return nil, nil
+	}
+
+	// Malformed metadata leaves nothing to link to; it must not fail the
+	// rest of the run's linkage.
+	md, err := evt.InngestMetadata()
+	if err != nil {
+		return nil, nil
+	}
+	parentRunID := md.RunID()
+	if parentRunID == nil {
+		return nil, nil
+	}
+
+	// The function ID is informational: an unparseable ID only hides the
+	// invoking function, not the link to the invoking run.
+	fnID, _ := uuid.Parse(md.SourceFnID)
+
+	return &models.RunInvokedFrom{
+		RunID:      *parentRunID,
+		FunctionID: fnID,
+	}, nil
+}
+
+func (r *runInvokedFromResolver) Function(ctx context.Context, inv *models.RunInvokedFrom) (*models.Function, error) {
+	if inv.FunctionID == uuid.Nil {
+		return nil, nil
+	}
+	fun, err := r.Data.GetFunctionByInternalUUID(ctx, inv.FunctionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving invoking function: %w", err)
+	}
+	return models.MakeFunction(fun)
+}
+
+func (r *runInvokedFromResolver) Run(ctx context.Context, inv *models.RunInvokedFrom) (*models.FunctionRunV2, error) {
+	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: inv.RunID})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		logger.StdlibLogger(ctx).Error(
+			"failed to get run",
+			"error", err,
+			"run_id", inv.RunID,
 		)
 		return nil, errors.New("failed to get run")
 	}

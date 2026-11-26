@@ -269,7 +269,9 @@ func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
 		}
-		return nil, fmt.Errorf("run not found: %s", id.RunID)
+		// Wrap sql.ErrNoRows so callers can detect a missing run the same
+		// way they do against the SQLite reader.
+		return nil, fmt.Errorf("run not found: %s: %w", id.RunID, sql.ErrNoRows)
 	}
 	return scanTraceRun(rows)
 }
