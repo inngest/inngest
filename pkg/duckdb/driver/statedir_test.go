@@ -54,6 +54,12 @@ func TestConnectIsolatesExtensionsUnderStateDir(t *testing.T) {
 	t.Cleanup(func() { _ = c.Close() })
 
 	require.DirExists(t, filepath.Join(stateDir, "duckdb", "extensions"))
+	require.DirExists(t, filepath.Join(stateDir, "tmp"))
+
+	_, rows, err := c.proc.Exec(t.Context(), "SELECT current_setting('temp_directory') AS d;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, filepath.Join(stateDir, "tmp"), rows[0].Get("d"))
 }
 
 // TestConnectWithoutStateDirDoesNotCreateOne is the regression guard: leaving

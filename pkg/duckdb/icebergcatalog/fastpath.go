@@ -241,11 +241,12 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 	if err != nil {
 		return nil, "", err
 	}
+	// Never merge table-level md.Properties() into FileIO config: a client
+	// must not be able to override s3.endpoint/credentials/HTTP settings.
 	ioProps := maps.Clone(f.props)
 	if ioProps == nil {
 		ioProps = iceberg.Properties{}
 	}
-	maps.Copy(ioProps, md.Properties())
 	fsys, err := icebergio.LoadFS(ctx, ioProps, loc)
 	if err != nil {
 		return nil, "", err

@@ -216,118 +216,146 @@ func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
 	require.Equal(t, n, count, "every row buffered before stop() must be flushed, not dropped")
 }
 
-// disabledDriver is a database/sql driver whose every statement fails with
-// duckdbdriver.ErrDisabled — exactly what the real driver returns once the
-// subprocess has died and its one restart attempt has failed. It counts
-// attempts so a test can prove the batcher stops trying.
-type disabledDriver struct{ attempts atomic.Int64 }
+// cooldownDriver is a database/sql driver whose ExecContext returns
+// duckdbdriver.ErrDisabled while disabled is true, and succeeds once cleared.
+type cooldownDriver struct {
+	disabled  atomic.Bool
+	attempts  atomic.Int64
+	succeeded atomic.Int64
+}
 
-func (d *disabledDriver) Open(string) (driver.Conn, error) { return &disabledConn{drv: d}, nil }
+func (d *cooldownDriver) Open(string) (driver.Conn, error) { return &cooldownConn{drv: d}, nil }
 
-type disabledConn struct{ drv *disabledDriver }
+type cooldownConn struct{ drv *cooldownDriver }
 
-func (c *disabledConn) Prepare(string) (driver.Stmt, error) {
+func (c *cooldownConn) Prepare(string) (driver.Stmt, error) {
 	return nil, errors.New("not supported")
 }
-func (c *disabledConn) Close() error              { return nil }
-func (c *disabledConn) Begin() (driver.Tx, error) { return nil, errors.New("not supported") }
-func (c *disabledConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+func (c *cooldownConn) Close() error              { return nil }
+func (c *cooldownConn) Begin() (driver.Tx, error) { return nil, errors.New("not supported") }
+func (c *cooldownConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
 	c.drv.attempts.Add(1)
-	return nil, duckdbdriver.ErrDisabled
+	if c.drv.disabled.Load() {
+		return nil, duckdbdriver.ErrDisabled
+	}
+	c.drv.succeeded.Add(1)
+	return driver.RowsAffected(1), nil
 }
 
-// TestBatcherStopsFlushingOnceDriverDisabled covers Fix 5: before it, the
-// driver's terminal "disabled" state was unobservable to the batcher, so the
-// batchers kept draining channels, building INSERTs, calling ExecContext and
-// logging a Warn on every single flush, forever. The spec wants dual-write
-// disabled for the process lifetime with the warning logged once.
-func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
-	drv := &disabledDriver{}
-	name := fmt.Sprintf("duckdb-disabled-test-%d", time.Now().UnixNano())
+// TestBatcherResumesAfterDriverCooldown verifies that driver.ErrDisabled
+// (temporary restart cooldown) drops the failed batch, counts it, and keeps
+// the batcher running so dual-write automatically resumes once DuckDB recovers.
+func TestBatcherResumesAfterDriverCooldown(t *testing.T) {
+	drv := &cooldownDriver{}
+	drv.disabled.Store(true)
+	name := fmt.Sprintf("duckdb-cooldown-test-%d", time.Now().UnixNano())
 	sql.Register(name, drv)
 
 	db, err := sql.Open(name, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
+	ctx, logs := logCtx(t)
+	var dropped atomic.Int64
 	ch := make(chan Event, 100)
-	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
+	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{
+		maxSize:       1,
+		flushInterval: 10 * time.Millisecond,
+		dropped:       &dropped,
+	})
 
 	done := make(chan struct{})
 	go func() {
-		b.run(context.Background())
+		b.run(ctx)
 		close(done)
 	}()
-	t.Cleanup(b.stop)
+	t.Cleanup(func() {
+		b.stop()
+		<-done
+	})
 
 	ch <- testEvent("1", "a")
 
-	// The batcher must exit of its own accord once it observes ErrDisabled,
-	// rather than spinning on a subprocess that will never come back.
+	require.Eventually(t, func() bool {
+		return drv.attempts.Load() >= 1 && dropped.Load() == 1 &&
+			strings.Contains(logs.String(), "dualwrite: duckdb temporarily unavailable in restart cooldown")
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Batcher must still be running (not permanently exited).
 	select {
 	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("batcher kept running after the driver reported ErrDisabled")
+		t.Fatal("batcher exited permanently on temporary ErrDisabled")
+	default:
 	}
 
-	require.Equal(t, int64(1), drv.attempts.Load(),
-		"exactly one flush attempt should have been made before giving up")
-	require.True(t, b.opts.disabled.disabled())
-
-	// Further rows are simply never flushed: no more ExecContext calls.
+	// Simulate driver recovery after cooldown: subsequent batches flush.
+	drv.disabled.Store(false)
 	ch <- testEvent("2", "b")
-	time.Sleep(100 * time.Millisecond)
-	require.Equal(t, int64(1), drv.attempts.Load())
+
+	require.Eventually(t, func() bool {
+		return drv.succeeded.Load() == 1
+	}, 2*time.Second, 10*time.Millisecond)
+	require.Equal(t, int64(1), dropped.Load(), "recovered batch must not be counted as dropped")
 }
 
-// TestDisabledStateSharedAcrossBatchersLogsOnce proves the shared
-// disabledState NewListener hands to every table's batcher makes the terminal
-// state stop the whole dual-write path — one batcher observing ErrDisabled
-// stops the others too — and that the warning is emitted once rather than
-// once per table.
-func TestDisabledStateSharedAcrossBatchersLogsOnce(t *testing.T) {
-	shared := &disabledState{}
+// TestDisabledStateSharedAcrossBatchersRateLimitsWarnings proves the shared
+// disabledState rate-limits cooldown warnings across all tables while keeping
+// every batcher running.
+func TestDisabledStateSharedAcrossBatchersRateLimitsWarnings(t *testing.T) {
+	shared := &disabledState{warnInterval: time.Hour}
 
-	drv := &disabledDriver{}
+	drv := &cooldownDriver{}
+	drv.disabled.Store(true)
 	name := fmt.Sprintf("duckdb-disabled-shared-test-%d", time.Now().UnixNano())
 	sql.Register(name, drv)
 	db, err := sql.Open(name, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	// Only this batcher ever gets a row, so only it can discover the
-	// terminal state.
-	discoverer := make(chan Event, 10)
-	bystander := make(chan RunMetadata, 10)
+	ctx, logs := logCtx(t)
+	ch1 := make(chan Event, 10)
+	ch2 := make(chan RunMetadata, 10)
 
 	ins := NewDuckDBInserter(db)
-	b1 := newBatcher("events", discoverer, ins.InsertEvents, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
-	b2 := newBatcher("run_metadata", bystander, ins.InsertRunMetadata, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b1 := newBatcher("events", ch1, ins.InsertEvents, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b2 := newBatcher("run_metadata", ch2, ins.InsertRunMetadata, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
 
 	done1, done2 := make(chan struct{}), make(chan struct{})
-	go func() { b1.run(context.Background()); close(done1) }()
-	go func() { b2.run(context.Background()); close(done2) }()
-	t.Cleanup(func() { b1.stop(); b2.stop() })
+	go func() { b1.run(ctx); close(done1) }()
+	go func() { b2.run(ctx); close(done2) }()
+	t.Cleanup(func() {
+		b1.stop()
+		b2.stop()
+		<-done1
+		<-done2
+	})
 
-	discoverer <- testEvent("1", "a")
-
-	for _, done := range []chan struct{}{done1, done2} {
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			t.Fatal("a batcher kept running after the shared disabled state was set")
-		}
+	ch1 <- testEvent("1", "a")
+	ch1 <- testEvent("2", "b")
+	ch2 <- RunMetadata{
+		AccountID: batchTestAccountID.String(),
+		EnvID:     batchTestEnvID.String(),
+		RunID:     ulid.Make().String(),
+		Kind:      "test",
+		Values:    json.RawMessage(`{}`),
+		CreatedAt: time.Now().UTC(),
 	}
 
-	// The bystander never even attempted a flush, so the driver saw exactly
-	// the discoverer's single attempt.
-	require.Equal(t, int64(1), drv.attempts.Load())
+	require.Eventually(t, func() bool {
+		return drv.attempts.Load() >= 3
+	}, 2*time.Second, 10*time.Millisecond)
 
-	// sync.Once is what bounds the warning to one emission; calling disable
-	// again must not re-log.
-	logged := 0
-	shared.once.Do(func() { logged++ })
-	require.Equal(t, 0, logged, "the warning must already have been logged exactly once")
+	// Both batchers must still be alive, and only one warning should be logged.
+	select {
+	case <-done1:
+		t.Fatal("b1 exited permanently on temporary ErrDisabled")
+	case <-done2:
+		t.Fatal("b2 exited permanently on temporary ErrDisabled")
+	default:
+	}
+
+	require.Equal(t, 1, strings.Count(logs.String(), "dualwrite: duckdb temporarily unavailable in restart cooldown"),
+		"cooldown warnings must be rate-limited across batchers")
 }
 
 // syncBuffer is a goroutine-safe log sink for asserting on batcher logs.
@@ -665,4 +693,61 @@ func TestBatcherKeepsResumeInterruptedAgain(t *testing.T) {
 		require.True(t, succeeded.Load(), "run %d: the uncommitted part was dropped", i)
 		require.Equal(t, []string{"b"}, got, "run %d", i)
 	}
+}
+
+// When a resumed batch succeeds and only newer items in buf fail with
+// ErrDisabled, dropped must only count the failed items, not the already-flushed
+// resumed batch.
+func TestBatcherDroppedCountExcludesResumedBatch(t *testing.T) {
+	var calls atomic.Int64
+	var dropped atomic.Int64
+	firstFailed := make(chan struct{})
+
+	flush := func(_ context.Context, items []Event) error {
+		switch calls.Add(1) {
+		case 1:
+			// Initial flush of 2 items hits a retryable conflict and enters backoff.
+			close(firstFailed)
+			return errConflict
+		case 2:
+			// Final flush retries the resumed 2 items and succeeds.
+			require.Len(t, items, 2)
+			return nil
+		case 3:
+			// Final flush attempts the 1 newly drained item and hits ErrDisabled.
+			require.Len(t, items, 1)
+			return duckdbdriver.ErrDisabled
+		default:
+			t.Fatalf("unexpected flush call %d", calls.Load())
+			return nil
+		}
+	}
+
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, flush, batcherOpts{
+		maxSize:        2,
+		flushInterval:  time.Hour,
+		retryBaseDelay: time.Hour,
+		retryMaxDelay:  time.Hour,
+		dropped:        &dropped,
+	})
+	done := make(chan struct{})
+	go func() { b.run(t.Context()); close(done) }()
+
+	ch <- testEvent("1", "a")
+	ch <- testEvent("2", "b")
+	<-firstFailed
+
+	// Queue one more event while the batcher is in backoff, then stop so
+	// drainRemaining appends it to buf before the final flush.
+	ch <- testEvent("3", "c")
+	b.stop()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batcher did not exit after stop")
+	}
+	require.Equal(t, int64(3), calls.Load())
+	require.Equal(t, int64(1), dropped.Load(), "only the failed newer item should be counted as dropped")
 }

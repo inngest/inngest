@@ -238,7 +238,10 @@ func keyList(q AggregateQuery) []*parser.SelectItem {
 		expr := colRef(k.Column)
 		if k.Bucket > 0 {
 			width := &parser.IntervalExpr{Value: numLit(int64(k.Bucket / time.Second)), Unit: "SECOND"}
-			expr = cast(call("time_bucket", width, expr), "TIMESTAMPTZ")
+			// Pin an explicit UTC origin so non-UTC DuckDB session timezones
+			// cannot misalign buckets with ClickHouse.
+			origin := timeLit(time.Unix(0, 0).UTC())
+			expr = cast(call("time_bucket", width, expr, origin), "TIMESTAMPTZ")
 		}
 		out[i] = item(expr, k.As)
 	}
