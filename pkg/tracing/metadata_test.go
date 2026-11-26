@@ -241,14 +241,19 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
+	statev2.InitConfig(&stateMd.Config)
+	stateMd.Config.SetAppName("my-app")
+	stateMd.Config.SetFunctionSlug("my-app-fn")
 
 	hashedStepID := "hashed-step-1"
 	userlandStepID := "my-step"
 	stepAttempt := 2
+	stepType := enums.StepTypeGroupExperiment
 	withStepIdentity := func(cfg *MetadataSpanConfig) {
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &userlandStepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, &stepAttempt)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepType, &stepType)
 	}
 
 	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
@@ -265,10 +270,13 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 
 	got := rec.entries[0]
 	require.Equal(t, runID, got.RunID)
+	require.Equal(t, "my-app", got.AppName)
+	require.Equal(t, "my-app-fn", got.FunctionSlug)
 	require.Equal(t, userlandStepID, got.StepID)
 	require.Equal(t, hashedStepID, got.StepHashedID)
 	require.NotNil(t, got.StepAttempt)
 	require.Equal(t, stepAttempt, *got.StepAttempt)
+	require.Equal(t, enums.StepTypeGroupExperiment.String(), got.StepType)
 	require.Nil(t, got.StepIndex)
 }
 
@@ -282,6 +290,9 @@ func TestCreateMetadataSpanFromValues_StepIDFallsBackToHashedID(t *testing.T) {
 
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
+	statev2.InitConfig(&stateMd.Config)
+	stateMd.Config.SetAppName("my-app")
+	stateMd.Config.SetFunctionSlug("my-app-fn")
 
 	hashedStepID := "hashed-step-1"
 	withHashedOnly := func(cfg *MetadataSpanConfig) {
@@ -311,6 +322,9 @@ func TestCreateMetadataSpanFromValues_StepIdentityEmptyWithoutEitherAttr(t *test
 
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
+	statev2.InitConfig(&stateMd.Config)
+	stateMd.Config.SetAppName("my-app")
+	stateMd.Config.SetFunctionSlug("my-app-fn")
 
 	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
 	_, err := CreateMetadataSpanFromValues(
@@ -323,6 +337,7 @@ func TestCreateMetadataSpanFromValues_StepIdentityEmptyWithoutEitherAttr(t *test
 	require.Len(t, rec.entries, 1)
 	require.Empty(t, rec.entries[0].StepID)
 	require.Empty(t, rec.entries[0].StepHashedID)
+	require.Empty(t, rec.entries[0].StepType)
 }
 
 // TestCreateMetadataSpanFromValues_NotifiesSyncListenersFromAttrsWhenStateMetadataNil
@@ -335,13 +350,16 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersFromAttrsWhenStateMet
 	rec := &recordingMetadataListener{}
 
 	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	appName, fnSlug := "my-app", "my-app-fn"
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	addTenantIDs := func(cfg *MetadataSpanConfig) {
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, &accountID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, &envID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &appID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.AppName, &appName)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &functionID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionSlug, &fnSlug)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &runID)
 	}
 
@@ -358,6 +376,8 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersFromAttrsWhenStateMet
 	require.Len(t, rec.entries, 1)
 	require.Equal(t, runID, rec.entries[0].RunID)
 	require.Equal(t, accountID, rec.entries[0].AccountID)
+	require.Equal(t, appName, rec.entries[0].AppName)
+	require.Equal(t, fnSlug, rec.entries[0].FunctionSlug)
 }
 
 // TestCreateMetadataSpanFromValues_SkipsSyncListenersWithNoRunID proves a

@@ -218,7 +218,9 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 		entry.AccountID = stateMetadata.ID.Tenant.AccountID
 		entry.EnvID = stateMetadata.ID.Tenant.EnvID
 		entry.AppID = stateMetadata.ID.Tenant.AppID
+		entry.AppName = stateMetadata.Config.AppName()
 		entry.FunctionID = stateMetadata.ID.FunctionID
+		entry.FunctionSlug = stateMetadata.Config.FunctionSlug()
 		entry.RunID = stateMetadata.ID.RunID
 	} else {
 		if v, ok := meta.GetAttr(attrs, meta.Attrs.AccountID); ok && v != nil {
@@ -230,8 +232,14 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 		if v, ok := meta.GetAttr(attrs, meta.Attrs.AppID); ok && v != nil {
 			entry.AppID = *v
 		}
+		if v, ok := meta.GetAttr(attrs, meta.Attrs.AppName); ok && v != nil {
+			entry.AppName = *v
+		}
 		if v, ok := meta.GetAttr(attrs, meta.Attrs.FunctionID); ok && v != nil {
 			entry.FunctionID = *v
+		}
+		if v, ok := meta.GetAttr(attrs, meta.Attrs.FunctionSlug); ok && v != nil {
+			entry.FunctionSlug = *v
 		}
 		v, ok := meta.GetAttr(attrs, meta.Attrs.RunID)
 		if !ok || v == nil || *v == (ulid.ULID{}) {
@@ -268,6 +276,9 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 	}
 	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepAttempt); ok && v != nil {
 		entry.StepAttempt = v
+	}
+	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepType); ok && v != nil {
+		entry.StepType = v.String()
 	}
 
 	return entry, true

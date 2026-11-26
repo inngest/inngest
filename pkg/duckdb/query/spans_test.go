@@ -26,18 +26,14 @@ func seedSpanRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID
 	require.NoError(t, err)
 }
 
-// seedMetadataRow inserts one inngest.run_metadata row -- note app_id/
-// functionID are accepted for call-site parity with seedSpanRow but unused:
-// that table has no app_id/function_id columns at all (see the "TODO:
-// decide whether we can add app/function ids here" comment in
-// pkg/db/duckdb/migrations/000001_baseline.sql).
-func seedMetadataRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, _, _ uuid.UUID, runID ulid.ULID, spanID, scope, kind string, isUser bool, values string, createdAt time.Time) {
+// seedMetadataRow inserts one inngest.run_metadata row.
+func seedMetadataRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runID ulid.ULID, spanID, scope, kind string, isUser bool, values string, createdAt time.Time) {
 	t.Helper()
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.run_metadata
-		 (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-		accountID.String(), envID.String(), runID.String(), createdAt,
+		 (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, 'test-app', ?, 'test-fn', ?, ?, ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID.String(), createdAt, appID.String(), functionID.String(),
 		spanID, scope, kind, isUser, json.RawMessage(values), createdAt,
 	)
 	require.NoError(t, err)

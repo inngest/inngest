@@ -6585,6 +6585,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepAttempt)
 			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandID)
 			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandIndex)
+			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepType)
 		},
 	}
 

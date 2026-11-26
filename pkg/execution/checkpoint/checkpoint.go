@@ -951,6 +951,7 @@ func (c checkpointer) processMetadata(
 				meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepAttempt)
 				meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandID)
 				meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandIndex)
+				meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepType)
 			},
 		)
 		if err != nil {

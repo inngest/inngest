@@ -93,9 +93,9 @@ func insertMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, run
 	t.Helper()
 	_, err := db.ExecContext(t.Context(),
 		`INSERT INTO inngest.run_metadata
-		   (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, 'run', ?, ?, ?, ?);`,
-		accountID.String(), envID.String(), runID, createdAt, spanID, kind, isUser, json.RawMessage(values), createdAt,
+		   (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, 'test-app', ?, 'test-fn', ?, 'run', ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, createdAt, uuid.NewString(), uuid.NewString(), spanID, kind, isUser, json.RawMessage(values), createdAt,
 	)
 	require.NoError(t, err)
 }
@@ -329,9 +329,9 @@ func insertScopedMetadataRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUI
 	t.Helper()
 	_, err := db.ExecContext(t.Context(),
 		`INSERT INTO inngest.run_metadata
-		   (account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, true, ?, ?);`,
-		accountID.String(), envID.String(), runID, createdAt, spanID, scope, kind, json.RawMessage(values), createdAt,
+		   (account_id, env_id, app_id, function_id, app_name, function_slug, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, true, ?, ?);`,
+		accountID.String(), envID.String(), uuid.Nil.String(), uuid.Nil.String(), runID, createdAt, spanID, scope, kind, json.RawMessage(values), createdAt,
 	)
 	require.NoError(t, err)
 }

@@ -266,8 +266,10 @@ func (c *Config) SetFunctionSlug(slug string) {
 
 // FunctionSlug retrieves the stored function slug if available
 func (c *Config) FunctionSlug() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	if c.mu != nil {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+	}
 
 	if c.Context == nil {
 		return ""
@@ -293,8 +295,10 @@ func (c *Config) SetAppName(name string) {
 // AppName retrieves the stored app name if available. Runs scheduled before
 // it was stored have none.
 func (c *Config) AppName() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	if c.mu != nil {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+	}
 
 	if c.Context == nil {
 		return ""
