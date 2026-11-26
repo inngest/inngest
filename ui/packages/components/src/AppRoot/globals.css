@@ -68,6 +68,18 @@
   color: rgb(var(--color-foreground-base));
 }
 
+/* The email verification code field is the one Clerk input whose caret is
+   the only insertion-point indicator: the digits render in segmented boxes
+   over the field, so no text cursor shows inside a box the way it does in
+   the regular form fields. No rule here or in the Clerk appearance config
+   sets that caret's colour, so it falls back to Clerk's own default theme
+   instead of the design tokens above — on the dark auth surfaces that
+   leaves the focused field with no visible caret. Pin it to the same
+   foreground token the field's text uses. */
+.cl-otpCodeFieldInput {
+  caret-color: rgb(var(--color-foreground-base));
+}
+
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
