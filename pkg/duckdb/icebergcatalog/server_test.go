@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,5 +133,59 @@ func TestRequestLogUsesRoute(t *testing.T) {
 		if strings.Contains(out, leak) {
 			t.Fatalf("log has %q from the request: %q", leak, out)
 		}
+	}
+}
+
+func TestReadJSONMaxBytes(t *testing.T) {
+	big := strings.NewReader(`{"namespace":["` + strings.Repeat("a", maxRequestBodyBytes+1) + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/namespaces", big)
+	rec := httptest.NewRecorder()
+	var dst createNamespaceRequest
+	if readJSON(rec, req, &dst) {
+		t.Fatal("expected readJSON to reject oversized body")
+	}
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDropTablePurgeSkipsLocationUsedByOtherTableProps(t *testing.T) {
+	ts := newTestServer(t)
+
+	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {
+		t.Fatalf("create ns: %d %v", status, body)
+	}
+	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
+
+	// Create table A and get its location.
+	status, bodyA := do(t, ts, "POST", "/v1/namespaces/app/tables", `{"name":"a","schema":`+schema+`}`)
+	if status != 200 {
+		t.Fatalf("create table a: %d %v", status, bodyA)
+	}
+	locA := bodyA["metadata"].(map[string]any)["location"].(string)
+
+	// Create table B whose write.data.path points inside table A's directory.
+	sharedDataDir := filepath.Join(locA, "shared-data")
+	sharedDataJSON, _ := json.Marshal(sharedDataDir)
+	status, bodyB := do(t, ts, "POST", "/v1/namespaces/app/tables",
+		`{"name":"b","schema":`+schema+`,"properties":{"write.data.path":`+string(sharedDataJSON)+`}}`)
+	if status != 200 {
+		t.Fatalf("create table b: %d %v", status, bodyB)
+	}
+
+	if err := os.MkdirAll(sharedDataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(sharedDataDir, "data.parquet")
+	if err := os.WriteFile(marker, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Purge table A: locationInUse must see table B's write.data.path and skip deleting locA.
+	if status, body := do(t, ts, "DELETE", "/v1/namespaces/app/tables/a?purgeRequested=true", ""); status != 204 {
+		t.Fatalf("drop table a: %d %v", status, body)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("expected table B's data file under table A's location to survive purge: %v", err)
 	}
 }

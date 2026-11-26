@@ -448,37 +448,40 @@ func (c *locationChecker) checkUnder(p string, roots []string) error {
 	return fmt.Errorf("%w: %q is outside the table location", errBadRequest, p)
 }
 
-// purgeLocation is the local directory a purge may delete for a table w/
-// metadata md: its location, if that's strictly inside a local warehouse
-// (never the warehouse itself). It's empty for a remote warehouse, which
-// purge doesn't delete from (yet).
-func (s *Server) purgeLocation(md table.Metadata) (string, error) {
+// purgeLocation is the directory/prefix a purge may delete for a table w/
+// metadata md: its location, if that's strictly inside the warehouse (never
+// the warehouse itself). local reports whether the warehouse is on local
+// disk vs a remote store (e.g. s3://).
+func (s *Server) purgeLocation(md table.Metadata) (loc string, local bool, err error) {
 	if err := s.checkMetadata(md, nil); err != nil {
-		return "", err
+		return "", false, err
 	}
 	wh, err := url.Parse(s.opts.Warehouse)
 	if err != nil {
-		return "", err
+		return "", false, err
+	}
+	loc, err = s.checkLocation(md.Location())
+	if err != nil {
+		return "", false, err
 	}
 	if !isLocal(wh) {
-		return "", nil
-	}
-	loc, err := s.checkLocation(md.Location())
-	if err != nil {
-		return "", err
+		return loc, false, nil
 	}
 	root := filepath.Clean(localPath(s.opts.Warehouse, wh))
 	if loc == root || !underRoot(loc, root, string(filepath.Separator)) {
-		return "", fmt.Errorf("%w: refusing to purge %q", errBadRequest, loc)
+		return "", false, fmt.Errorf("%w: refusing to purge %q", errBadRequest, loc)
 	}
-	return loc, nil
+	return loc, true, nil
 }
 
 // locationInUse reports whether any table in the catalog has a location
-// equal to, inside or containing loc (a local path from purgeLocation). It
-// loads every table, which is fine for something as rare as a purge.
+// equal to, inside or containing loc (from purgeLocation). It loads every
+// table, which is fine for something as rare as a purge.
 func (s *Server) locationInUse(ctx context.Context, loc string) (bool, error) {
 	sep := string(filepath.Separator)
+	if strings.Contains(loc, "://") {
+		sep = "/"
+	}
 	// The sql catalog lists every namespace (nested ones included) for a
 	// nil parent.
 	nss, err := s.cat.ListNamespaces(ctx, nil)
@@ -494,13 +497,24 @@ func (s *Server) locationInUse(ctx context.Context, loc string) (bool, error) {
 			if err != nil {
 				return false, err
 			}
-			other, err := s.checkLocation(tbl.Metadata().Location())
-			if err != nil {
-				// Not under the warehouse, so it can't overlap loc.
-				continue
+			md := tbl.Metadata()
+			candidates := make([]string, 0, 1+len(locationProperties))
+			candidates = append(candidates, md.Location())
+			props := md.Properties()
+			for _, k := range locationProperties {
+				if v := props[k]; v != "" {
+					candidates = append(candidates, v)
+				}
 			}
-			if other == loc || underRoot(other, loc, sep) || underRoot(loc, other, sep) {
-				return true, nil
+			for _, raw := range candidates {
+				other, err := s.checkLocation(raw)
+				if err != nil {
+					// Not under the warehouse, so it can't overlap loc.
+					continue
+				}
+				if other == loc || underRoot(other, loc, sep) || underRoot(loc, other, sep) {
+					return true, nil
+				}
 			}
 		}
 	}

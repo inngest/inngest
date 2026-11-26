@@ -2,6 +2,8 @@ package icebergcatalog
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,4 +78,150 @@ func TestSTSVendor(t *testing.T) {
 		_, err := v.VendCredentials(t.Context(), []string{"t"}, loc)
 		require.Error(t, err, loc)
 	}
+}
+
+type blockingSTS struct {
+	calls   atomic.Int64
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingSTS) AssumeRole(ctx context.Context, _ *sts.AssumeRoleInput, _ ...func(*sts.Options)) (*sts.AssumeRoleOutput, error) {
+	if b.calls.Add(1) == 1 {
+		close(b.started)
+	}
+	select {
+	case <-b.release:
+		return &sts.AssumeRoleOutput{Credentials: &ststypes.Credentials{
+			AccessKeyId: aws.String("AK"), SecretAccessKey: aws.String("SK"), SessionToken: aws.String("TOK"),
+			Expiration: aws.Time(time.UnixMilli(1_800_000_000_000)),
+		}}, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestSTSVendorHardening(t *testing.T) {
+	t.Run("singleflight coalesces concurrent calls", func(t *testing.T) {
+		b := &blockingSTS{started: make(chan struct{}), release: make(chan struct{})}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: b, RoleARN: "arn:x", Now: func() time.Time { return now }}
+
+		const n = 8
+		var wg sync.WaitGroup
+		wg.Add(n)
+		for range n {
+			go func() {
+				defer wg.Done()
+				props, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+				require.NoError(t, err)
+				require.Equal(t, "AK", props["s3.access-key-id"])
+			}()
+		}
+		<-b.started
+		time.Sleep(10 * time.Millisecond)
+		close(b.release)
+		wg.Wait()
+		require.Equal(t, int64(1), b.calls.Load())
+	})
+
+	t.Run("returns cloned properties map", func(t *testing.T) {
+		f := &fakeSTS{}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: f, RoleARN: "arn:x", Now: func() time.Time { return now }}
+		p1, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+		require.NoError(t, err)
+		p1["s3.access-key-id"] = "MUTATED"
+
+		p2, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+		require.NoError(t, err)
+		require.Equal(t, "AK", p2["s3.access-key-id"])
+	})
+
+	t.Run("evicts expired entries on write", func(t *testing.T) {
+		f := &fakeSTS{}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: f, RoleARN: "arn:x", Now: func() time.Time { return now }}
+		_, err := v.VendCredentials(t.Context(), []string{"app", "a"}, "s3://bucket/wh/app.db/a")
+		require.NoError(t, err)
+		require.Len(t, v.cache, 1)
+
+		// Advance past half-life (1_750_000_000_000ms) and vend for another table.
+		now = time.UnixMilli(1_760_000_000_000)
+		_, err = v.VendCredentials(t.Context(), []string{"app", "b"}, "s3://bucket/wh/app.db/b")
+		require.NoError(t, err)
+		require.Len(t, v.cache, 1)
+		require.Contains(t, v.cache, "s3://bucket/wh/app.db/b")
+		require.NotContains(t, v.cache, "s3://bucket/wh/app.db/a")
+	})
+
+	t.Run("rejects invalid durations", func(t *testing.T) {
+		for _, d := range []time.Duration{-time.Second, 500 * time.Millisecond, 999 * time.Millisecond} {
+			f := &fakeSTS{}
+			v := &STSVendor{STS: f, RoleARN: "arn:x", Duration: d}
+			_, err := v.VendCredentials(t.Context(), []string{"app", "t"}, "s3://bucket/wh/app.db/t")
+			require.Error(t, err, "duration %v", d)
+			require.Equal(t, 0, f.calls)
+		}
+	})
+
+	t.Run("canceling first caller does not fail peer and caller cancel unblocks immediately", func(t *testing.T) {
+		b := &blockingSTS{started: make(chan struct{}), release: make(chan struct{})}
+		now := time.UnixMilli(1_700_000_000_000)
+		v := &STSVendor{STS: b, RoleARN: "arn:x", Now: func() time.Time { return now }}
+		loc := "s3://bucket/wh/app.db/t"
+
+		ctx1, cancel1 := context.WithCancel(t.Context())
+		err1Ch := make(chan error, 1)
+		go func() {
+			_, err := v.VendCredentials(ctx1, []string{"app", "t"}, loc)
+			err1Ch <- err
+		}()
+		<-b.started
+
+		// Caller 2 joins the same singleflight key; caller 3 joins and cancels itself.
+		res2Ch := make(chan error, 1)
+		go func() {
+			props, err := v.VendCredentials(t.Context(), []string{"app", "t"}, loc)
+			if err == nil && props["s3.access-key-id"] != "AK" {
+				t.Errorf("unexpected access key %q", props["s3.access-key-id"])
+			}
+			res2Ch <- err
+		}()
+
+		ctx3, cancel3 := context.WithCancel(t.Context())
+		err3Ch := make(chan error, 1)
+		go func() {
+			_, err := v.VendCredentials(ctx3, []string{"app", "t"}, loc)
+			err3Ch <- err
+		}()
+
+		time.Sleep(15 * time.Millisecond)
+
+		// Cancel caller 1 and caller 3: both must unblock immediately with context.Canceled.
+		cancel1()
+		cancel3()
+		select {
+		case err := <-err1Ch:
+			require.ErrorIs(t, err, context.Canceled)
+		case <-time.After(time.Second):
+			t.Fatal("caller 1 did not unblock on cancel")
+		}
+		select {
+		case err := <-err3Ch:
+			require.ErrorIs(t, err, context.Canceled)
+		case <-time.After(time.Second):
+			t.Fatal("caller 3 did not unblock on cancel")
+		}
+
+		// Now release STS: caller 2 must succeed even though caller 1 was canceled.
+		close(b.release)
+		select {
+		case err := <-res2Ch:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("caller 2 did not finish")
+		}
+		require.Equal(t, int64(1), b.calls.Load())
+	})
 }

@@ -73,12 +73,37 @@ type fastPath struct {
 	probed bool
 	v0     bool
 
+	// io loads a per-operation FileIO bound to the caller's context.
+	io ioLoader
+
 	// beforeSwap, when non-nil, runs right before the CAS (tests use it to
 	// commit underneath an in-flight commit).
 	beforeSwap func()
 	// afterSwap, when non-nil, replaces the CAS's error (tests use it to
 	// lose a committed swap's response).
 	afterSwap func(error) error
+}
+
+// ioLoader loads an icebergio.IO per operation using the caller's context so
+// S3/remote Create, Remove, and RemoveAll calls honor request cancellation and
+// deadlines (iceberg-go's blobfs binds the LoadFS ctx into those methods).
+type ioLoader struct {
+	loadFS func(ctx context.Context, props map[string]string, location string) (icebergio.IO, error)
+}
+
+func (l *ioLoader) load(ctx context.Context, props iceberg.Properties, loc string) (icebergio.IO, error) {
+	loader := l.loadFS
+	if loader == nil {
+		loader = icebergio.LoadFS
+	}
+	ioProps := maps.Clone(props)
+	if ioProps == nil {
+		ioProps = iceberg.Properties{}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return loader(ctx, ioProps, loc)
 }
 
 func newFastPath(c *CatalogDB) *fastPath {
@@ -226,7 +251,19 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 		return nil, "", err
 	}
 	if md.Equals(base.md) {
-		// Nothing changed, same as the sql catalog.
+		// Nothing changed, but still verify no concurrent writer moved
+		// metadata_location since our base check so we neither hide a
+		// conflict nor regress tableCache.
+		if f.beforeSwap != nil {
+			f.beforeSwap()
+		}
+		curLoc, ok, err := f.currentLocation(ctx, ident)
+		if err != nil {
+			return nil, "", err
+		}
+		if !ok || curLoc != base.loc {
+			return nil, "", errNotCurrent
+		}
 		return base.md, base.loc, nil
 	}
 	v := parseMetadataVersion(base.loc)
@@ -243,11 +280,7 @@ func (f *fastPath) commit(ctx context.Context, ident table.Identifier, base cach
 	}
 	// Never merge table-level md.Properties() into FileIO config: a client
 	// must not be able to override s3.endpoint/credentials/HTTP settings.
-	ioProps := maps.Clone(f.props)
-	if ioProps == nil {
-		ioProps = iceberg.Properties{}
-	}
-	fsys, err := icebergio.LoadFS(ctx, ioProps, loc)
+	fsys, err := f.io.load(ctx, f.props, loc)
 	if err != nil {
 		return nil, "", err
 	}

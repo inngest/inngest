@@ -18,6 +18,7 @@ import (
 
 	"github.com/apache/iceberg-go"
 	sqlcat "github.com/apache/iceberg-go/catalog/sql"
+	icebergio "github.com/apache/iceberg-go/io"
 	"github.com/apache/iceberg-go/table"
 )
 
@@ -414,4 +415,90 @@ func TestFastPathAmbiguousSwapKeepsMetadata(t *testing.T) {
 		t.Fatalf("load: %d %v", status, body)
 	}
 	ft.mustCommit(assertMain(2), snapshotUpdates(3, snapLoc(ft, 3)))
+}
+
+func TestFastPathNoOpCommitCASConflict(t *testing.T) {
+	ft := newFastTable(t, []string{"app"}, "")
+	ft.mustCommit("", `{"action":"set-properties","updates":{"k":"v"}}`)
+
+	// Another writer commits between cachedCurrent and the no-op commit check.
+	ft.srv.fast.beforeSwap = func() {
+		ft.srv.fast.beforeSwap = nil
+		ft.commitBehindBack("", `{"action":"set-properties","updates":{"other":"y"}}`)
+	}
+	// Setting k=v again produces md.Equals(base.md), so it hits the no-op path.
+	status, body := ft.commit("", `{"action":"set-properties","updates":{"k":"v"}}`)
+	if status != http.StatusConflict || body["error"].(map[string]any)["type"] != "CommitFailedException" {
+		t.Fatalf("expected 409 on raced no-op commit, got %d %v", status, body)
+	}
+}
+
+func TestFastPathLoadsFileIOPerOperation(t *testing.T) {
+	ft := newFastTable(t, []string{"app"}, "")
+	var loadCalls atomic.Int64
+	ft.srv.fast.io.loadFS = func(ctx context.Context, props map[string]string, loc string) (icebergio.IO, error) {
+		loadCalls.Add(1)
+		return icebergio.LoadFS(ctx, props, loc)
+	}
+	// First commit populates cache via sql catalog.
+	ft.mustCommit("", snapshotUpdates(1, snapLoc(ft, 1)))
+	// Each fast-path commit loads a fresh FileIO bound to its own request ctx.
+	ft.mustCommit(assertMain(1), snapshotUpdates(2, snapLoc(ft, 2)))
+	ft.mustCommit(assertMain(2), snapshotUpdates(3, snapLoc(ft, 3)))
+	ft.mustCommit(assertMain(3), snapshotUpdates(4, snapLoc(ft, 4)))
+	if got := loadCalls.Load(); got != 3 {
+		t.Fatalf("expected FileIO to be loaded per fast-path commit, got %d", got)
+	}
+}
+
+func TestIOLoaderHonorsCallerContextCancellation(t *testing.T) {
+	dir := t.TempDir()
+	type ctxKey struct{}
+	var loaderCtxErr error
+	var loaderCtxVal any
+	var loader ioLoader
+	loader.loadFS = func(ctx context.Context, props map[string]string, loc string) (icebergio.IO, error) {
+		loaderCtxErr = ctx.Err()
+		loaderCtxVal = ctx.Value(ctxKey{})
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return icebergio.LoadFS(ctx, props, loc)
+	}
+
+	canceledCtx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "aws-cfg"))
+	cancel()
+
+	_, err := loader.load(canceledCtx, iceberg.Properties{}, filepath.Join(dir, "a.json"))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled from canceled caller ctx, got %v", err)
+	}
+	if !errors.Is(loaderCtxErr, context.Canceled) {
+		t.Fatalf("expected loader to receive canceled context, got %v", loaderCtxErr)
+	}
+	if loaderCtxVal != "aws-cfg" {
+		t.Fatalf("expected loader to preserve caller context values, got %v", loaderCtxVal)
+	}
+
+	// A subsequent call with a live ctx succeeds cleanly.
+	liveCtx := context.WithValue(context.Background(), ctxKey{}, "aws-cfg")
+	fsys, err := loader.load(liveCtx, iceberg.Properties{}, filepath.Join(dir, "b.json"))
+	if err != nil {
+		t.Fatalf("ioLoader.load with live ctx failed: %v", err)
+	}
+	wfs, ok := fsys.(icebergio.WriteFileIO)
+	if !ok {
+		t.Fatalf("expected WriteFileIO, got %T", fsys)
+	}
+	target := filepath.Join(dir, "test.txt")
+	f, err := wfs.Create(target)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if _, err := f.Write([]byte("ok")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
 }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/apache/iceberg-go"
 	sqlcat "github.com/apache/iceberg-go/catalog/sql"
@@ -80,8 +81,10 @@ type Embedded struct {
 	// Warehouse is Config.Warehouse w/ local paths made absolute.
 	Warehouse string
 
-	cancel context.CancelFunc
-	done   <-chan error
+	cancel    context.CancelFunc
+	done      <-chan error
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // Open opens (and if needed initializes) the catalog's backing database and
@@ -164,8 +167,12 @@ func Open(ctx context.Context, cfg Config) (*Embedded, error) {
 	}, nil
 }
 
-// Close stops the server. The backing database is the caller's to close.
+// Close stops the server. Safe to call more than once. The backing
+// database is the caller's to close.
 func (e *Embedded) Close() error {
-	e.cancel()
-	return <-e.done
+	e.closeOnce.Do(func() {
+		e.cancel()
+		e.closeErr = <-e.done
+	})
+	return e.closeErr
 }

@@ -1,8 +1,12 @@
 package icebergcatalog
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
+	"iter"
+	"maps"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -12,7 +16,10 @@ import (
 	"time"
 
 	"github.com/apache/iceberg-go"
+	"github.com/apache/iceberg-go/catalog"
 	sqlcat "github.com/apache/iceberg-go/catalog/sql"
+	icebergio "github.com/apache/iceberg-go/io"
+	"github.com/apache/iceberg-go/table"
 )
 
 // retentionTable is a server w/ retention configured and one table app.t
@@ -222,13 +229,40 @@ func TestRetentionMaxSnapshots(t *testing.T) {
 		t.Fatalf("expected the newest 4 snapshots, got %v", got)
 	}
 
-	// The default is on.
+	// A burst of >100 commits inside DefaultMaxSnapshotAge is not expired by
+	// the default emergency cap (DefaultMaxSnapshots = 1000).
 	rt = newRetentionTable(t, Retention{MaxSnapshotAge: time.Hour}, "")
-	for i := 1; i <= DefaultMaxSnapshots+3; i++ {
+	for i := 1; i <= 120; i++ {
 		md = rt.commit(i)
 	}
-	if got := snapshotIDs(md); !slices.Equal(got, seq(4, DefaultMaxSnapshots+3)) {
-		t.Fatalf("expected the newest %d snapshots, got %v", DefaultMaxSnapshots, got)
+	if got := snapshotIDs(md); !slices.Equal(got, seq(1, 120)) {
+		t.Fatalf("expected all 120 young snapshots kept under default cap, got %d snapshots", len(got))
+	}
+
+	// The default emergency hard cap (DefaultMaxSnapshots) still bounds
+	// runaway bursts past 1000 snapshots.
+	base, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, "/wh/app.db/t", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	var ups table.Updates
+	for i := 1; i <= DefaultMaxSnapshots+3; i++ {
+		s := table.Snapshot{
+			SnapshotID:     int64(i),
+			SequenceNumber: int64(i),
+			TimestampMs:    now.Add(time.Duration(i) * time.Millisecond).UnixMilli(),
+			ManifestList:   fmt.Sprintf("/wh/app.db/t/metadata/snap-%d.avro", i),
+		}
+		ups = append(ups, table.NewAddSnapshotUpdate(&s))
+	}
+	bigMD, err := table.UpdateTableMetadata(base, ups, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired := expireSnapshots(bigMD, (Retention{}).policy(nil), now.Add(time.Second))
+	if !slices.Equal(expired, []int64{3, 2, 1}) && !slices.Equal(expired, []int64{1, 2, 3}) {
+		t.Fatalf("expected oldest 3 snapshots expired past DefaultMaxSnapshots (%d), got %v", DefaultMaxSnapshots, expired)
 	}
 }
 
@@ -322,4 +356,313 @@ func TestDeleteOldMetadata(t *testing.T) {
 	if got := metadataJSONs(t, rt.loc); len(got) != 6 {
 		t.Fatalf("expected every metadata file w/ delete-after-commit off, got %d", len(got))
 	}
+}
+
+type fakeRemoteWriteIO struct {
+	removed []string
+	files   []string
+}
+
+func (f *fakeRemoteWriteIO) Open(string) (icebergio.File, error)          { return nil, fs.ErrNotExist }
+func (f *fakeRemoteWriteIO) Create(string) (icebergio.FileWriter, error)  { return nil, fs.ErrPermission }
+func (f *fakeRemoteWriteIO) WriteFile(string, []byte) error               { return fs.ErrPermission }
+func (f *fakeRemoteWriteIO) Remove(name string) error                     { f.removed = append(f.removed, name); return nil }
+
+type fakeRemoteListableIO struct {
+	fakeRemoteWriteIO
+}
+
+func (f *fakeRemoteListableIO) WalkDir(_ string, fn fs.WalkDirFunc) error {
+	for _, p := range f.files {
+		if err := fn(p, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestDeleteOldMetadataRemote(t *testing.T) {
+	wh := "s3://bucket/wh"
+	loc := wh + "/app.db/t"
+	metaDir := loc + "/metadata"
+
+	fakeIO := &fakeRemoteWriteIO{}
+	srv := New(nil, Options{Warehouse: wh})
+	srv.io.loadFS = func(context.Context, map[string]string, string) (icebergio.IO, error) {
+		return fakeIO, nil
+	}
+
+	base, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, loc, iceberg.Properties{
+		"write.metadata.previous-versions-max": "1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v0 := metaDir + "/00000-00000000-0000-0000-0000-000000000000.metadata.json"
+	v1 := metaDir + "/00001-00000000-0000-0000-0000-000000000001.metadata.json"
+	v2 := metaDir + "/00002-00000000-0000-0000-0000-000000000002.metadata.json"
+
+	prev, err := table.UpdateTableMetadata(base, table.Updates{
+		table.NewSetPropertiesUpdate(iceberg.Properties{"k": "1"}),
+	}, v0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := table.UpdateTableMetadata(prev, table.Updates{
+		table.NewSetPropertiesUpdate(iceberg.Properties{"k": "2"}),
+	}, v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv.deleteOldMetadata(context.Background(), table.Identifier{"app", "t"}, prev, next, v2, nil)
+	if !slices.Equal(fakeIO.removed, []string{v0}) {
+		t.Fatalf("expected old remote metadata %s to be deleted, got %v", v0, fakeIO.removed)
+	}
+}
+
+func TestPurgeRemoteTable(t *testing.T) {
+	wh := "s3://bucket/wh"
+	loc := wh + "/app.db/t"
+
+	t.Run("listable", func(t *testing.T) {
+		fakeIO := &fakeRemoteListableIO{
+			fakeRemoteWriteIO: fakeRemoteWriteIO{
+				files: []string{
+					loc + "/metadata/00001.metadata.json",
+					loc + "/data/part-0.parquet",
+					wh + "/app.db/sibling/data/part-0.parquet",
+				},
+			},
+		}
+		srv := New(nil, Options{Warehouse: wh})
+		srv.io.loadFS = func(context.Context, map[string]string, string) (icebergio.IO, error) {
+			return fakeIO, nil
+		}
+		srv.purgeRemoteTable(context.Background(), table.Identifier{"app", "t"}, loc, loc+"/metadata/00001.metadata.json", nil, nil)
+		want := []string{loc + "/metadata/00001.metadata.json", loc + "/data/part-0.parquet"}
+		if !slices.Equal(fakeIO.removed, want) {
+			t.Fatalf("expected %v removed, got %v", want, fakeIO.removed)
+		}
+	})
+
+	t.Run("write-only fallback", func(t *testing.T) {
+		fakeIO := &fakeRemoteWriteIO{}
+		srv := New(nil, Options{Warehouse: wh})
+		srv.io.loadFS = func(context.Context, map[string]string, string) (icebergio.IO, error) {
+			return fakeIO, nil
+		}
+		base, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, loc, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v0 := loc + "/metadata/00000.metadata.json"
+		v1 := loc + "/metadata/00001.metadata.json"
+		md, err := table.UpdateTableMetadata(base, table.Updates{
+			table.NewSetPropertiesUpdate(iceberg.Properties{"k": "1"}),
+		}, v0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv.purgeRemoteTable(context.Background(), table.Identifier{"app", "t"}, loc, v1, md, nil)
+		want := []string{v1, v0}
+		if !slices.Equal(fakeIO.removed, want) {
+			t.Fatalf("expected %v removed, got %v", want, fakeIO.removed)
+		}
+	})
+}
+
+// fakeRemoteCatalog is a minimal in-memory Catalog for testing remote
+// cleanup/purge w/o CatalogDB, where the catalog itself carries the S3 FileIO
+// settings via tbl.FS(ctx).
+type fakeRemoteCatalog struct {
+	catalog.Catalog
+	tables  map[string]*table.Table
+	fsF     func(context.Context) (icebergio.IO, error)
+	dropped []string
+}
+
+func (f *fakeRemoteCatalog) ListNamespaces(context.Context, table.Identifier) ([]table.Identifier, error) {
+	return []table.Identifier{{"app"}}, nil
+}
+
+func (f *fakeRemoteCatalog) ListTables(_ context.Context, ns table.Identifier) iter.Seq2[table.Identifier, error] {
+	return func(yield func(table.Identifier, error) bool) {
+		for _, tbl := range f.tables {
+			if slices.Equal(catalog.NamespaceFromIdent(tbl.Identifier()), ns) {
+				if !yield(tbl.Identifier(), nil) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (f *fakeRemoteCatalog) LoadTable(_ context.Context, ident table.Identifier) (*table.Table, error) {
+	tbl, ok := f.tables[tableKey(ident)]
+	if !ok {
+		return nil, catalog.ErrNoSuchTable
+	}
+	return tbl, nil
+}
+
+func (f *fakeRemoteCatalog) CommitTable(_ context.Context, ident table.Identifier, reqs []table.Requirement, ups []table.Update) (table.Metadata, string, error) {
+	tbl, ok := f.tables[tableKey(ident)]
+	if !ok {
+		return nil, "", catalog.ErrNoSuchTable
+	}
+	for _, r := range reqs {
+		if err := r.Validate(tbl.Metadata()); err != nil {
+			return nil, "", err
+		}
+	}
+	next, err := table.UpdateTableMetadata(tbl.Metadata(), ups, tbl.MetadataLocation())
+	if err != nil {
+		return nil, "", err
+	}
+	v := parseMetadataVersion(tbl.MetadataLocation())
+	nextLoc := fmt.Sprintf("%s/metadata/%05d-00000000-0000-0000-0000-%012d.metadata.json", next.Location(), v+1, v+1)
+	f.tables[tableKey(ident)] = table.New(ident, next, nextLoc, f.fsF, nil)
+	return next, nextLoc, nil
+}
+
+func (f *fakeRemoteCatalog) DropTable(_ context.Context, ident table.Identifier) error {
+	key := tableKey(ident)
+	if _, ok := f.tables[key]; !ok {
+		return catalog.ErrNoSuchTable
+	}
+	delete(f.tables, key)
+	f.dropped = append(f.dropped, key)
+	return nil
+}
+
+func TestRemoteDeletionWithoutCatalogDB(t *testing.T) {
+	wh := "s3://bucket/wh"
+	loc := wh + "/app.db/t"
+	metaDir := loc + "/metadata"
+	ident := table.Identifier{"app", "t"}
+
+	t.Run("StorageProperties passed to LoadFS when CatalogDB is nil", func(t *testing.T) {
+		wantProps := iceberg.Properties{
+			"s3.endpoint":          "http://127.0.0.1:9000",
+			"s3.region":            "us-east-1",
+			"s3.access-key-id":     "minioadmin",
+			"s3.secret-access-key": "miniosecret",
+		}
+		fakeIO := &fakeRemoteListableIO{
+			fakeRemoteWriteIO: fakeRemoteWriteIO{
+				files: []string{
+					metaDir + "/00001-00000000-0000-0000-0000-000000000001.metadata.json",
+					loc + "/data/part-0.parquet",
+				},
+			},
+		}
+		var seenProps []map[string]string
+		srv := New(nil, Options{
+			Warehouse:         wh,
+			StorageProperties: wantProps,
+		})
+		srv.io.loadFS = func(_ context.Context, props map[string]string, _ string) (icebergio.IO, error) {
+			seenProps = append(seenProps, maps.Clone(props))
+			return fakeIO, nil
+		}
+
+		base, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, loc, iceberg.Properties{
+			"write.metadata.previous-versions-max": "1",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		v0 := metaDir + "/00000-00000000-0000-0000-0000-000000000000.metadata.json"
+		v1 := metaDir + "/00001-00000000-0000-0000-0000-000000000001.metadata.json"
+		v2 := metaDir + "/00002-00000000-0000-0000-0000-000000000002.metadata.json"
+		prev, err := table.UpdateTableMetadata(base, table.Updates{table.NewSetPropertiesUpdate(iceberg.Properties{"k": "1"})}, v0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		next, err := table.UpdateTableMetadata(prev, table.Updates{table.NewSetPropertiesUpdate(iceberg.Properties{"k": "2"})}, v1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		srv.deleteOldMetadata(context.Background(), ident, prev, next, v2, nil)
+		srv.purgeRemoteTable(context.Background(), ident, loc, v2, next, nil)
+
+		if len(seenProps) != 2 {
+			t.Fatalf("expected 2 LoadFS calls, got %d", len(seenProps))
+		}
+		for i, got := range seenProps {
+			if !maps.Equal(got, map[string]string(wantProps)) {
+				t.Fatalf("call %d: expected storage props %v, got %v", i, wantProps, got)
+			}
+		}
+	})
+
+	t.Run("dropTable purge and commitTable cleanup use loaded table FS without CatalogDB", func(t *testing.T) {
+		v0 := metaDir + "/00000-00000000-0000-0000-0000-000000000000.metadata.json"
+		v1 := metaDir + "/00001-00000000-0000-0000-0000-000000000001.metadata.json"
+		v2 := metaDir + "/00002-00000000-0000-0000-0000-000000000002.metadata.json"
+		dataFile := loc + "/data/part-0.parquet"
+
+		fakeIO := &fakeRemoteListableIO{
+			fakeRemoteWriteIO: fakeRemoteWriteIO{
+				files: []string{v2, dataFile},
+			},
+		}
+		fsCalls := 0
+		fsF := func(context.Context) (icebergio.IO, error) {
+			fsCalls++
+			return fakeIO, nil
+		}
+
+		base, err := table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, loc, iceberg.Properties{
+			"write.metadata.previous-versions-max": "1",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		md1, err := table.UpdateTableMetadata(base, table.Updates{
+			table.NewSetPropertiesUpdate(iceberg.Properties{"k": "1"}),
+		}, v0)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cat := &fakeRemoteCatalog{
+			tables: map[string]*table.Table{
+				tableKey(ident): table.New(ident, md1, v1, fsF, nil),
+			},
+			fsF: fsF,
+		}
+		// No CatalogDB and no StorageProperties: server must use tbl.FS(ctx).
+		srv := New(cat, Options{Warehouse: wh})
+		ts := httptest.NewServer(srv)
+		t.Cleanup(ts.Close)
+
+		// Load populates tableCache w/ tbl.FS; subsequent commit hits cache and
+		// trims v0 from the metadata log, deleting it via the cached tbl.FS.
+		if status, body := do(t, ts, "GET", "/v1/namespaces/app/tables/t", ""); status != 200 {
+			t.Fatalf("load table: %d %v", status, body)
+		}
+		if status, body := do(t, ts, "POST", "/v1/namespaces/app/tables/t",
+			`{"requirements":[],"updates":[{"action":"set-properties","updates":{"k":"2"}}]}`); status != 200 {
+			t.Fatalf("commit table: %d %v", status, body)
+		}
+		if !slices.Equal(fakeIO.removed, []string{v0}) {
+			t.Fatalf("expected commit cleanup to delete %s via tbl.FS, got %v", v0, fakeIO.removed)
+		}
+
+		// Drop w/ purgeRequested=true loads tbl before dropping and purges via tbl.FS.
+		fakeIO.removed = nil
+		if status, body := do(t, ts, "DELETE", "/v1/namespaces/app/tables/t?purgeRequested=true", ""); status != 204 {
+			t.Fatalf("drop table w/ purge: %d %v", status, body)
+		}
+		wantPurged := []string{v2, dataFile}
+		if !slices.Equal(fakeIO.removed, wantPurged) {
+			t.Fatalf("expected purge to delete %v via tbl.FS, got %v", wantPurged, fakeIO.removed)
+		}
+		if fsCalls != 2 {
+			t.Fatalf("expected 2 tbl.FS calls (commit cleanup + purge), got %d", fsCalls)
+		}
+	})
 }

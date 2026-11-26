@@ -193,3 +193,20 @@ func TestVendedCredentialsMetadataPath(t *testing.T) {
 		require.Equal(t, "app.t@"+loc, c)
 	}
 }
+
+func TestReadOnlyForcesReadOnlySTSVendor(t *testing.T) {
+	f := &fakeSTS{}
+	rwVendor := &STSVendor{STS: f, RoleARN: "arn:x", ReadOnly: false}
+	srv := New(nil, Options{Warehouse: "s3://bucket/wh", ReadOnly: true, Credentials: rwVendor})
+
+	// Caller's original vendor is untouched.
+	require.False(t, rwVendor.ReadOnly)
+
+	// Server's vendor must vend read-only session policies.
+	_, err := srv.opts.Credentials.VendCredentials(t.Context(), table.Identifier{"app", "t"}, "s3://bucket/wh/app.db/t")
+	require.NoError(t, err)
+	require.NotNil(t, f.in)
+	require.Contains(t, *f.in.Policy, `"s3:GetObject"`)
+	require.NotContains(t, *f.in.Policy, `"s3:PutObject"`)
+	require.NotContains(t, *f.in.Policy, `"s3:DeleteObject"`)
+}

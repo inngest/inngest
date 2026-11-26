@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -48,6 +49,7 @@ import (
 
 	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/catalog"
+	icebergio "github.com/apache/iceberg-go/io"
 	"github.com/apache/iceberg-go/table"
 )
 
@@ -82,6 +84,11 @@ type Options struct {
 	// was created on. It turns on the load/commit fast path (see
 	// fastPath), which skips re-reading metadata.json on every request.
 	CatalogDB *CatalogDB
+	// StorageProperties are trusted catalog-level FileIO properties (e.g.
+	// `s3.endpoint`, `s3.region`, `s3.access-key-id`) for remote metadata
+	// cleanup and table purge when CatalogDB is nil. When unset, CatalogDB's
+	// Properties or the loaded table's FS(ctx) is used instead.
+	StorageProperties iceberg.Properties
 	// Credentials, when non-nil, vends storage credentials to clients that
 	// ask for them (see CredentialVendor). W/o it, clients need their own.
 	Credentials CredentialVendor
@@ -99,15 +106,36 @@ type Server struct {
 	tables tableCache
 	// fast is nil w/o Options.CatalogDB.
 	fast *fastPath
+	// io loads per-operation FileIO instances when fast is nil (for remote GC/purge).
+	io ioLoader
 	// now is the clock snapshot ages are measured against (tests swap it).
 	now func() time.Time
 }
 
 // New returns a Server. The caller owns cat (and its *sql.DB).
 func New(cat Catalog, opts Options) *Server {
+	if opts.ReadOnly && opts.Credentials != nil {
+		opts.Credentials = readOnlyCredentials(opts.Credentials)
+	}
 	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux(), fast: newFastPath(opts.CatalogDB), now: time.Now}
 	s.routes()
 	return s
+}
+
+func (s *Server) getFileIO(ctx context.Context, loc string, tableFS func(context.Context) (icebergio.IO, error)) (icebergio.IO, error) {
+	if len(s.opts.StorageProperties) > 0 {
+		return s.io.load(ctx, s.opts.StorageProperties, loc)
+	}
+	if s.fast != nil && (len(s.fast.props) > 0 || s.fast.io.loadFS != nil) {
+		return s.fast.io.load(ctx, s.fast.props, loc)
+	}
+	if s.opts.CatalogDB != nil && len(s.opts.CatalogDB.Properties) > 0 {
+		return s.io.load(ctx, s.opts.CatalogDB.Properties, loc)
+	}
+	if tableFS != nil && s.io.loadFS == nil {
+		return tableFS(ctx)
+	}
+	return s.io.load(ctx, nil, loc)
 }
 
 // endpoints is advertised in GET /v1/config so clients know what we support.
@@ -611,7 +639,7 @@ func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
-	body, err := s.tables.body(ident, tbl.MetadataLocation(), tbl.Metadata())
+	body, err := s.tables.bodyFS(ident, tbl.MetadataLocation(), tbl.Metadata(), tbl.FS)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -685,6 +713,7 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		current  table.Metadata
 		cached   cachedTable
 		verified bool
+		tableFS  func(context.Context) (icebergio.IO, error)
 	)
 	fromCache := false
 	if s.fast != nil {
@@ -695,12 +724,15 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	}
 	if fromCache {
 		current = cached.md
+		tableFS = cached.fsF
 	}
 	if !fromCache || !requirementsHold(req.Requirements, current) {
 		verified = false
 		current = nil
+		tableFS = nil
 		if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
 			current = tbl.Metadata()
+			tableFS = tbl.FS
 		} else if !errors.Is(err, catalog.ErrNoSuchTable) {
 			writeCatalogError(w, err)
 			return
@@ -739,8 +771,8 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
-	s.deleteOldMetadata(current, md, loc)
-	body, err := s.tables.put(ident, loc, md)
+	s.deleteOldMetadata(ctx, ident, current, md, loc, tableFS)
+	body, err := s.tables.putFS(ident, loc, md, tableFS)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -771,7 +803,7 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
-	loc, err := s.purgeLocation(tbl.Metadata())
+	loc, local, err := s.purgeLocation(tbl.Metadata())
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -791,15 +823,96 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
-			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
+		if local {
+			if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
+				s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
+			}
+		} else {
+			s.purgeRemoteTable(ctx, ident, loc, tbl.MetadataLocation(), tbl.Metadata(), tbl.FS)
 		}
-	} else if s.opts.Logger != nil {
-		// TODO(maintenance): purge remote warehouses (list + delete under
-		// the table prefix).
-		s.opts.Logger.Warn("dropped iceberg table w/o purging files (remote warehouse)", "table", strings.Join(ident, "."))
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// purgeRemoteTable removes a dropped table's files from a remote warehouse
+// (e.g. s3://) via FileIO. It prefers RemoveAllIO, then ListableIO +
+// BulkRemovableIO/WriteFileIO.Remove, and falls back to removing known
+// metadata/manifest files under loc via WriteFileIO.Remove.
+func (s *Server) purgeRemoteTable(ctx context.Context, ident table.Identifier, loc, metaLoc string, md table.Metadata, tableFS func(context.Context) (icebergio.IO, error)) {
+	fsys, err := s.getFileIO(ctx, loc, tableFS)
+	if err != nil {
+		if s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to load FileIO for purge", "table", strings.Join(ident, "."), "location", loc, "error", err)
+		}
+		return
+	}
+	if rmAll, ok := fsys.(icebergio.RemoveAllIO); ok {
+		if err := rmAll.RemoveAll(loc); err != nil && !errors.Is(err, fs.ErrNotExist) && s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "location", loc, "error", err)
+		}
+		return
+	}
+	wfs, ok := fsys.(icebergio.WriteFileIO)
+	if !ok {
+		if s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table w/o purging files (FileIO does not support writing)", "table", strings.Join(ident, "."), "location", loc)
+		}
+		return
+	}
+
+	c := s.locations()
+	var paths []string
+	if listable, ok := fsys.(icebergio.ListableIO); ok {
+		walkErr := listable.WalkDir(loc, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d != nil && d.IsDir() {
+				return nil
+			}
+			if c.checkUnder(p, []string{loc}) == nil {
+				paths = append(paths, p)
+			}
+			return nil
+		})
+		if walkErr != nil && !errors.Is(walkErr, fs.ErrNotExist) && s.opts.Logger != nil {
+			s.opts.Logger.Warn("failed to list remote iceberg table files for purge", "table", strings.Join(ident, "."), "location", loc, "error", walkErr)
+		}
+	} else {
+		seen := map[string]bool{}
+		add := func(p string) {
+			if p == "" || seen[p] {
+				return
+			}
+			if clean, err := c.check(p); err == nil && c.checkUnder(clean, []string{loc}) == nil {
+				seen[p] = true
+				paths = append(paths, clean)
+			}
+		}
+		add(metaLoc)
+		if md != nil {
+			for e := range md.PreviousFiles() {
+				add(e.MetadataFile)
+			}
+			for _, p := range metadataPaths(md) {
+				add(p)
+			}
+		}
+	}
+	if len(paths) == 0 {
+		return
+	}
+	if brm, ok := fsys.(icebergio.BulkRemovableIO); ok {
+		if _, err := brm.DeleteFiles(ctx, paths); err != nil && s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to purge some remote files", "table", strings.Join(ident, "."), "location", loc, "error", err)
+		}
+		return
+	}
+	for _, p := range paths {
+		if err := wfs.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) && s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to purge remote file", "table", strings.Join(ident, "."), "path", p, "error", err)
+		}
+	}
 }
 
 func (s *Server) renameTable(w http.ResponseWriter, r *http.Request) {
@@ -895,8 +1008,16 @@ func hasAssertCreate(reqs table.Requirements) bool {
 	return false
 }
 
+const maxRequestBodyBytes = 32 << 20 // 32 MiB
+
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "RequestEntityTooLargeException", "request body too large")
+			return false
+		}
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed request: "+err.Error())
 		return false
 	}

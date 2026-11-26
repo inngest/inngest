@@ -77,6 +77,25 @@ func TestOpenSQLite(t *testing.T) {
 	}
 }
 
+func TestEmbeddedCloseIdempotent(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	e, err := Open(ctx, Config{
+		DB:        openSQLite(t, filepath.Join(dir, "catalog.db")),
+		Dialect:   SQLite,
+		Warehouse: filepath.Join(dir, "warehouse"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	if err := e.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+}
+
 // TestOpenRejectsURLCharsInLocalWarehouse checks a local warehouse w/ a
 // character that means something in a URL fails Open (and creates
 // nothing), rather than every table create failing later.
