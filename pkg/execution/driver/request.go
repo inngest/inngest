@@ -15,6 +15,8 @@ type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
 
+type sdkLoopCtxKey struct{}
+
 // DispatchRequestID is the single source of truth for the per-dispatch
 // GenerationID the executor stamps on outbound SDK requests.
 func DispatchRequestID(ts time.Time, jobID string, generationID int) ulid.ULID {
@@ -45,6 +47,19 @@ func JobIDFromContext(ctx context.Context) string {
 // executor that handles the inbox opcodes behind step.subscribe.
 const CapabilitySubscribe = "subscribe"
 
+// WithLoop stores the loop block for one SDK request.  MarshalV1 copies it
+// onto SDKRequest.Loop.
+func WithLoop(ctx context.Context, loop *SDKLoopRequest) context.Context {
+	return context.WithValue(ctx, sdkLoopCtxKey{}, loop)
+}
+
+// LoopFromContext returns the loop block for this SDK request.  it is nil
+// for a function without a loop.
+func LoopFromContext(ctx context.Context) *SDKLoopRequest {
+	loop, _ := ctx.Value(sdkLoopCtxKey{}).(*SDKLoopRequest)
+	return loop
+}
+
 type SDKRequest struct {
 	Event   map[string]any   `json:"event"`
 	Events  []map[string]any `json:"events"`
@@ -52,6 +67,10 @@ type SDKRequest struct {
 
 	// For the "defer" opcodes
 	Defers map[string]SDKDeferEntry `json:"defers"`
+
+	// Loop is set for loop functions only.  the SDK fails the run when a
+	// loop function gets a request without it.
+	Loop *SDKLoopRequest `json:"loop,omitempty"`
 
 	Context *SDKRequestContext `json:"ctx"`
 	// Version indicates the version used to manage the SDK request context.
@@ -74,6 +93,25 @@ type SDKDeferEntry struct {
 	// run. Aborting a deferred run simply will mean no run will ever exist
 	// (e.g. no run ID).
 	Abortable bool `json:"abortable"`
+}
+
+// SDKLoopRequest carries the committed loop state and the input that woke
+// the run.  it is resent on every re-entry of the run, like the step memo.
+type SDKLoopRequest struct {
+	// State is null until the first commit.
+	State   json.RawMessage `json:"state"`
+	Version int64           `json:"version"`
+	Key     string          `json:"key"`
+	Input   SDKLoopInput    `json:"input"`
+}
+
+// SDKLoopInput says why the run was invoked.  Kind is one of the loops
+// package input constants, "event", "subscription", "wake", or "tick".  ID
+// is the subscription id or the wake id for those two kinds and empty
+// otherwise.
+type SDKLoopInput struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
 }
 
 type SDKRequestContext struct {

@@ -40,6 +40,9 @@ const (
 	// OpcodeSubscribeClose closes an inbox: it deletes the pauses of the
 	// inbox's sources and ends the read waiting on it.
 	OpcodeSubscribeClose
+
+	// OpcodeLoopReturn is a RunComplete for a single loop iteration.
+	OpcodeLoopReturn
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
