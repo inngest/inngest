@@ -19,4 +19,6 @@ const (
 	KindCron            = "cron"              // handles the actual cron workloads
 	KindCronHealthCheck = "cron-health-check" // reconciles cron queues with fn configs from DB
 	KindLatencyTrack    = "ltc"               // latency tracking canary job
+	KindLoopWake        = "loop-wake"         // a loop wake timer.  the payload is PayloadLoop.
+	KindLoopTick        = "loop-tick"         // a loop tick timer.  the payload is PayloadLoop.
 )

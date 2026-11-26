@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"github.com/inngest/inngest/pkg/domain"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -25,6 +26,16 @@ type runInstance struct {
 	edge       inngest.Edge
 	resp       *state.DriverResponse
 	httpClient exechttp.RequestExecutor
+	// loopReplay is set when resp was built from the loop store or from
+	// the saved loop return in place of an SDK request.  the LoopReturn
+	// handler then enqueues no timer and saves nothing.
+	loopReplay bool
+	// loopOpenedBy is the OpenedBy of the loop record the request was
+	// built from.  the handler writes it back on commit and saves it with
+	// an end.
+	loopOpenedBy domain.RunID
+	// loopSaved is the saved return a replayed end was built from.
+	loopSaved  *savedLoopReturn
 	stackIndex int
 	requestID  string
 	jobID      string

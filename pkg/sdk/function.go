@@ -65,6 +65,9 @@ type SDKFunction struct {
 	// the current one, depending on the mode.
 	Singleton *inngest.Singleton `json:"singleton,omitempty"`
 
+	// Loop is set when the function is a loop, fsm, or agent.
+	Loop *inngest.Loop `json:"loop,omitempty"`
+
 	Steps map[string]SDKStep `json:"steps"`
 }
 
@@ -82,6 +85,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Debounce:    s.Debounce,
 		Timeouts:    s.Timeouts,
 		Singleton:   s.Singleton,
+		Loop:        s.Loop,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.

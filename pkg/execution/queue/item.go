@@ -614,6 +614,12 @@ func decodePayloadForKind(kind string, payload json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return *p, nil
+	case KindLoopWake, KindLoopTick:
+		p := &PayloadLoop{}
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
+		}
+		return *p, nil
 	case KindLatencyTrack:
 		// No payload for latency tracking items.
 		return nil, nil
@@ -660,6 +666,21 @@ type PayloadPauseTimeout struct {
 	// Pause is the full pause struct for the timeout job.  Note that the identifier
 	// should not exist in the pause, as it already exists in the queue item.
 	Pause state.Pause `json:"pause"`
+}
+
+// PayloadLoop names the loop instance and the input a timer item delivers.
+// the item has no run id.  the run is created when the item is handled.
+type PayloadLoop struct {
+	// Key is the loop key the instance was opened with.
+	Key string `json:"key"`
+	// Kind is one of the loops package input kinds.
+	Kind string `json:"kind"`
+	// ID is the wake id.  it is empty for a tick.
+	ID string `json:"id,omitempty"`
+	// Nonce is the id of the run that enqueued the item.  the event id of
+	// the run the item starts is derived from it, so every run of the same
+	// item starts the same run.
+	Nonce string `json:"n,omitempty"`
 }
 
 // PayloadPauseFunction represents the queue item payload for the internal system queue for
