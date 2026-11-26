@@ -33,12 +33,18 @@ type Opts struct {
 	// Defaults to os.Getenv("INNGEST_DEV") if set as a URL (for development), and
 	// "https://api.inngest.com" in production.
 	APIBaseURL string
+	// InstanceID is the connect worker's instance ID.  when it is empty,
+	// checkpoint requests send the INNGEST_CONNECT_INSTANCE_ID env var.
+	InstanceID string
 }
 
 // New returns a new checkpointer for a specific run.
 func New(o Opts) Checkpointer {
 	client := NewClient(o.APIBaseURL, o.SigningKey, o.SigningKeyFallback)
 	client.environment = o.Environment
+	if o.InstanceID != "" {
+		client.instanceID = o.InstanceID
+	}
 
 	return &checkpointer{
 		opts:       o,

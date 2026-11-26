@@ -13,6 +13,7 @@ const (
 	InBandSyncV1 string = "v1"
 	TrustProbeV1 string = "v1"
 	ConnectV1    string = "v1"
+	LoopV1       string = "v1"
 )
 
 // RegisterRequest represents a new deploy request from SDK-based functions.
@@ -64,4 +65,7 @@ type Capabilities struct {
 	InBandSync string `json:"in_band_sync"`
 	TrustProbe string `json:"trust_probe"`
 	Connect    string `json:"connect"`
+	// Loop says the SDK runs loop functions.  the server rejects a
+	// function with a loop block when this is empty.
+	Loop string `json:"loop"`
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/inngest/inngestgo"
+	"github.com/inngest/inngestgo/pkg/checkpoint"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,6 +40,9 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		EventKey:    &key,
 		Logger:      slog.New(slog.DiscardHandler),
 		RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		// checkpointed steps skip the step limit and the state size limit set
+		// for the function.  a function that sets its own Checkpoint keeps it.
+		Checkpoint: &checkpoint.Config{Disable: true},
 	}
 
 	for _, o := range copts {
@@ -86,6 +90,9 @@ func NewSDKConnectHandler(t *testing.T, appID string, copts ...opt) inngestgo.Cl
 		EventKey:    &key,
 		Logger:      logger.StdlibLogger(context.Background()).SLog(),
 		RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		// checkpointed steps skip the step limit and the state size limit set
+		// for the function.  a function that sets its own Checkpoint keeps it.
+		Checkpoint: &checkpoint.Config{Disable: true},
 	}
 
 	for _, o := range copts {

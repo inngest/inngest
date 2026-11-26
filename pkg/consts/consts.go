@@ -51,6 +51,17 @@ const (
 	// a larger state fails the run without retry and commits nothing.
 	MaxLoopStateSize = 512 * 1024
 
+	// MinLoopIdleTTL is the shortest idle_ttl a loop can sync with.
+	MinLoopIdleTTL = time.Minute
+
+	// MaxLoopIdleTTL is the longest idle_ttl a loop can sync with.  it is
+	// also the longest wake a LoopReturn can schedule.  a loop that waits
+	// longer wakes again from the wake run.
+	MaxLoopIdleTTL = 7 * 24 * time.Hour
+
+	// DefaultLoopIdleTTL is the idle_ttl of a loop that syncs without one.
+	DefaultLoopIdleTTL = 7 * 24 * time.Hour
+
 	// MaxMetadataSpanSize is the maximum size of a single metadata span in bytes (64 KB).
 	MaxMetadataSpanSize = 64 * 1024
 

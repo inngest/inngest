@@ -49,6 +49,7 @@ var (
 		InBandSync: types.InBandSyncV1,
 		TrustProbe: types.TrustProbeV1,
 		Connect:    types.ConnectV1,
+		Loop:       types.LoopV1,
 	}
 )
 
@@ -709,7 +710,13 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		return req, nil
 	}
 
+	httpClient := http.DefaultClient
+	if cImpl, ok := h.client.(*apiClient); ok && cImpl.HTTPClient != nil {
+		httpClient = cImpl.HTTPClient
+	}
+
 	resp, err := fetchWithAuthFallback(
+		httpClient,
 		createRequest,
 		h.GetSigningKey(),
 		h.GetSigningKeyFallback(),
@@ -717,6 +724,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("error performing registration request: %w", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode > 299 {
 		body := map[string]any{}
 		byt, _ := io.ReadAll(resp.Body)
@@ -877,6 +885,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			resp, ops, err := invoke(
 				r.Context(),
 				h.client,
+				h.GetAPIBaseURL(),
 				mw,
 				fn,
 				h.GetSigningKey(),
@@ -910,6 +919,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		resp, ops, invokeErr = invoke(
 			r.Context(),
 			h.client,
+			h.GetAPIBaseURL(),
 			mw,
 			fn,
 			h.GetSigningKey(),
@@ -1253,6 +1263,7 @@ type StreamResponse struct {
 func invoke(
 	ctx context.Context,
 	client Client,
+	apiBaseURL string,
 	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
 	signingKey string,
@@ -1288,7 +1299,7 @@ func invoke(
 		SigningKey:         signingKey,
 		SigningKeyFallback: signingKeyFallback,
 		Mode:               sdkrequest.StepModeYield,
-		APIBaseURL:         env.APIServerURL(client.Options().APIBaseURL),
+		APIBaseURL:         apiBaseURL,
 	})
 	defer mgr.CloseCheckpointer()
 	fCtx = sdkrequest.SetManager(fCtx, mgr)
@@ -1321,9 +1332,26 @@ func invoke(
 	}
 	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
+	isLoop := sf.Config().Loop != nil
+	// stateVal is the *STATE a loop handler gets as its third argument.
+	// it is the zero Value for a normal function.
+	var stateVal reflect.Value
+	if isLoop {
+		var err error
+		stateVal, err = loopState(sf, fVal.Type().In(2).Elem(), inputVal, input)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	var (
 		res      []reflect.Value
 		panicErr error
+
+		// hijacked is set whenever the panic value is ControlHijack,
+		// whatever raised it.  a hijack that appended no op and set no
+		// error still ends a loop run without a LoopReturn.
+		hijacked bool
 
 		// fnResponse is the actual response from the fn
 		fnResponse any
@@ -1340,6 +1368,7 @@ func invoke(
 				//
 				// XXX: I'm not very happy with using this;  it is dirty
 				if _, ok := r.(sdkrequest.ControlHijack); ok {
+					hijacked = true
 					// Step attempt ended (completed or errored).
 					//
 					// Note that if this is a step.Run, middleware has already been invoked
@@ -1403,19 +1432,31 @@ func invoke(
 		}
 
 		// Call the defined function with the input data.
-		res = fVal.Call([]reflect.Value{
+		args := []reflect.Value{
 			reflect.ValueOf(fCtx),
 			inputVal,
-		})
-
-		// Set the function response.
-		if len(res) >= 1 {
-			fnResponse = res[0].Interface()
 		}
+		if isLoop {
+			args = append(args, stateVal)
+		}
+		res = fVal.Call(args)
 
-		// Function ended.  Get the types for the middleare call.
-		if len(res) >= 2 && !res[1].IsNil() {
-			fnError = res[1].Interface().(error)
+		if isLoop {
+			// a loop handler returns one value, the error.  the state is
+			// read through stateVal after the call.
+			if len(res) >= 1 && !res[0].IsNil() {
+				fnError = res[0].Interface().(error)
+			}
+		} else {
+			// Set the function response.
+			if len(res) >= 1 {
+				fnResponse = res[0].Interface()
+			}
+
+			// Function ended.  Get the types for the middleare call.
+			if len(res) >= 2 && !res[1].IsNil() {
+				fnError = res[1].Interface().(error)
+			}
 		}
 
 		mw.AfterExecution(ctx, mgr.CallContext(), fnResponse, fnError)
@@ -1441,7 +1482,79 @@ func invoke(
 		fnError = mgr.Err()
 	}
 
-	return fnResponse, mgr.Ops(), fnError
+	ops := mgr.Ops()
+	if isLoop && fnError == nil && !hijacked {
+		// the handler returned nil and no step hijacked the run.  checkpointed
+		// steps are already saved and are not in ops.  a step op left in ops
+		// is a step that was not sent yet.  it goes to the executor first and
+		// the LoopReturn goes last, so the executor saves the step and the
+		// next request does not run it again.
+		op, err := loopReturnOp(mgr, stateVal)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, append(ops, op), nil
+	}
+	if isLoop && hijacked && len(ops) == 0 && fnError == nil {
+		// a hijack with no op and no error has no state to commit and no
+		// step for the executor to run.  the executor retries the run.
+		return nil, nil, fmt.Errorf("loop run ended without a LoopReturn")
+	}
+
+	return fnResponse, ops, fnError
+}
+
+// loopState allocates a STATE from the request's loop block and fills the
+// Loop field of the LoopInput.  it returns the *STATE the handler gets as
+// its third argument.  a null or absent state gets the function's initial
+// state.
+func loopState(sf ServableFunction, stateType reflect.Type, inputVal reflect.Value, input *sdkrequest.Request) (reflect.Value, error) {
+	if input.Loop == nil {
+		return reflect.Value{}, sdkerrors.NoRetryError(fmt.Errorf("loop function %s was invoked without a loop block", sf.ID()))
+	}
+
+	state := input.Loop.State
+	if len(state) == 0 || string(state) == "null" {
+		stateful, ok := sf.(fn.StatefulFunction)
+		if !ok {
+			return reflect.Value{}, sdkerrors.NoRetryError(fmt.Errorf("loop function %s has no initial state", sf.ID()))
+		}
+		state = stateful.InitialState()
+	}
+
+	stateVal := reflect.New(stateType)
+	if err := json.Unmarshal(state, stateVal.Interface()); err != nil {
+		return reflect.Value{}, sdkerrors.NoRetryError(fmt.Errorf("error unmarshalling loop state for function %s: %w", sf.ID(), err))
+	}
+
+	inputVal.FieldByName("Loop").Set(reflect.ValueOf(fn.LoopCtx{
+		Kind:    fn.LoopInputKind(input.Loop.Input.Kind),
+		ID:      input.Loop.Input.ID,
+		Key:     input.Loop.Key,
+		Version: input.Loop.Version,
+	}))
+	return stateVal, nil
+}
+
+// loopReturnOp marshals the handler's state pointer and wraps the
+// collector's result as the LoopReturn opcode.
+func loopReturnOp(mgr sdkrequest.InvocationManager, stateVal reflect.Value) (sdkrequest.GeneratorOpcode, error) {
+	// marshal the pointer so a pointer receiver MarshalJSON on STATE is
+	// used.
+	state, err := json.Marshal(stateVal.Interface())
+	if err != nil {
+		return sdkrequest.GeneratorOpcode{}, sdkerrors.NoRetryError(fmt.Errorf("error marshalling loop state: %w", err))
+	}
+	data, err := json.Marshal(mgr.Loop().Result(state, mgr.Request().Loop.Version))
+	if err != nil {
+		return sdkrequest.GeneratorOpcode{}, sdkerrors.NoRetryError(fmt.Errorf("error marshalling loop return: %w", err))
+	}
+	return sdkrequest.GeneratorOpcode{
+		Op:   enums.OpcodeLoopReturn,
+		ID:   mgr.NewOp(enums.OpcodeLoopReturn, "loop").MustHash(),
+		Name: "loop",
+		Data: data,
+	}, nil
 }
 
 // updateInput applies the middleware input to the function input.
