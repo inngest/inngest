@@ -173,8 +173,7 @@ type queueProcessor struct {
 
 	// roleLeaseIDs stores per-role lease IDs.
 	roleLeaseIDs map[string]*ulid.ULID
-	// roleLeaseLock ensures that there are no data races writing to
-	// or reading from roleLeaseIDs in parallel.
+	// roleLeaseLock guards concurrent access to roleLeaseIDs and roles.
 	roleLeaseLock *sync.RWMutex
 
 	// shardLeaseID stores the lease ID for the primary shard this queue is processing from.
@@ -271,7 +270,10 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	if err := q.configureScannerRoles(scanner); err != nil {
 		return err
 	}
-	for _, role := range q.roles {
+	q.roleLeaseLock.RLock()
+	roles := append([]QueueRole(nil), q.roles...)
+	q.roleLeaseLock.RUnlock()
+	for _, role := range roles {
 		go q.runRole(ctx, role)
 	}
 

@@ -304,3 +304,37 @@ func TestQueueRoleLeaseNamePreservesOriginalFirstSlot(t *testing.T) {
 	require.Equal(t, QueueRoleSequential, queueRoleLeaseName(QueueRoleSequential, 0))
 	require.Equal(t, QueueRoleSequential+"-1", queueRoleLeaseName(QueueRoleSequential, 1))
 }
+
+func TestConfigureScannerRolesConcurrentWithActiveRoles(t *testing.T) {
+	role := queueRole{
+		name:             "exclusive",
+		leaseDuration:    RoleLeaseDuration,
+		excludesScanning: true,
+	}
+
+	active, err := ulid.New(uint64(time.Now().Add(time.Minute).UnixMilli()), rand.Reader)
+	require.NoError(t, err)
+
+	for i := 0; i < 100; i++ {
+		qp := &queueProcessor{
+			QueueOptions:  NewQueueOptions(WithQueueRoles(role)),
+			roleLeaseLock: &sync.RWMutex{},
+			roleLeaseIDs:  map[string]*ulid.ULID{role.Name(): &active},
+		}
+		qp.configureQueueRoles()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for j := 0; j < 20; j++ {
+				_ = qp.ActiveRoles()
+				_ = qp.scanningExcludedByRole()
+			}
+		}()
+
+		require.NoError(t, qp.configureScannerRoles(roleProvidingScanner{
+			roles: []QueueRole{queueRole{name: "scanner-role", leaseDuration: RoleLeaseDuration}},
+		}))
+		<-done
+	}
+}
