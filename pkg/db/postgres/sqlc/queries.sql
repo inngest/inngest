@@ -188,8 +188,8 @@ UPDATE functions SET archived_at = NOW() WHERE id = ANY(@ids::text[]);
 
 -- name: InsertFunctionRun :exec
 INSERT INTO function_runs
-    (run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron) VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+    (run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id, cron, workspace_id) VALUES
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 -- name: InsertFunctionFinish :exec
 INSERT INTO function_finishes

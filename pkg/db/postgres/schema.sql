@@ -98,7 +98,8 @@ CREATE TABLE public.function_runs (
     event_id bytea NOT NULL,
     batch_id bytea,
     original_run_id bytea,
-    cron character varying
+    cron character varying,
+    workspace_id uuid
 );
 
 --

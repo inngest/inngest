@@ -86,6 +86,7 @@ type FunctionRun struct {
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
 	Cron            sql.NullString
+	WorkspaceID     uuid.UUID
 }
 
 type GooseDbVersion struct {
