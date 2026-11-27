@@ -104,11 +104,11 @@ export function AccountConcurrency() {
   const marketplaceBillingURL = data?.account.marketplaceBillingURL;
   const sectionRef = useScrollIntoViewOnHash(ACCOUNT_CONCURRENCY_SECTION_ID);
 
-  if (error || !series || !operation || series.burstLimit == null) {
+  if (error || !series || !operation) {
     return null;
   }
   const { baseLimit, burstLimit } = series;
-  const multiplier = burstMultiplier(burstLimit, baseLimit);
+  const multiplier = burstLimit == null ? undefined : burstMultiplier(burstLimit, baseLimit);
   const fetchedRange = operation.variables;
 
   const backlogSeries = backlog.data?.account.backlogTimeSeries;
@@ -151,12 +151,14 @@ export function AccountConcurrency() {
       </div>
       <div className="mb-4 flex flex-wrap gap-4">
         <Tile title="Account concurrency">{baseLimit} steps</Tile>
-        <Tile title="Concurrency during burst">
-          {burstLimit} steps
-          {multiplier && (
-            <span className="text-muted ml-2 text-xs">({multiplier})</span>
-          )}
-        </Tile>
+        {burstLimit != null && (
+          <Tile title="Concurrency during burst">
+            {burstLimit} steps
+            {multiplier && (
+              <span className="text-muted ml-2 text-xs">({multiplier})</span>
+            )}
+          </Tile>
+        )}
       </div>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-center justify-between">

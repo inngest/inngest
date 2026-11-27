@@ -129,6 +129,7 @@ describe('createBacklogChartOptions', () => {
   const range = { from: hour(0), to: new Date(at(24)).toISOString() };
   const bands = {
     baseLimit: 50,
+    burstLimit: 100,
     buckets: [
       { bucket: hour(1), value: 80 },
       { bucket: hour(2), value: 10 },
@@ -167,5 +168,41 @@ describe('createBacklogChartOptions', () => {
     expect(
       seriesList.find((s) => s.name === 'Concurrency hit')?.markArea?.data,
     ).toEqual([[{ xAxis: at(2) }, { xAxis: at(3) }]]);
+  });
+});
+
+describe('charts for accounts without burst concurrency', () => {
+  const range = { from: hour(0), to: hour(4) };
+  const series: ConcurrencyTimeSeries = {
+    baseLimit: 5,
+    burstLimit: null,
+    buckets: [{ bucket: hour(1), value: 8 }],
+    limitHits: [{ bucket: hour(2), value: 3 }],
+  };
+
+  it.each([
+    { chart: 'account', options: createConcurrencyChartOptions(series, range) },
+    {
+      chart: 'backlog',
+      options: createBacklogChartOptions({ buckets: [] }, series, range),
+    },
+  ])('keeps limit-hit shading but omits bursts in the $chart chart', ({ options }) => {
+    const seriesList = options.series as {
+      name: string;
+      markArea?: { data: unknown };
+    }[];
+
+    expect(seriesList.map(({ name }) => name)).not.toContain('Concurrency burst');
+    expect(options.legend).toHaveProperty(
+      'data',
+      expect.arrayContaining(['Concurrency hit']),
+    );
+    expect(options.legend).not.toHaveProperty(
+      'data',
+      expect.arrayContaining(['Concurrency burst']),
+    );
+    expect(
+      seriesList.find(({ name }) => name === 'Concurrency hit')?.markArea?.data,
+    ).toEqual([[{ xAxis: ms(hour(2)) }, { xAxis: ms(hour(3)) }]]);
   });
 });
