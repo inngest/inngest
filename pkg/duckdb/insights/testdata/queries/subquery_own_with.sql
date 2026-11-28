@@ -1,0 +1,1 @@
+SELECT * FROM (WITH c AS (SELECT run_id FROM runs) SELECT * FROM c) t

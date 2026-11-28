@@ -436,6 +436,7 @@ func TestToTraceSpanMetadata(t *testing.T) {
 		{
 			Scope:     enums.MetadataScopeRun,
 			Kind:      tracemetadata.Kind("userland.custom"),
+			IsUser:    true,
 			Values:    tracemetadata.Values{"key": json.RawMessage(`"value"`)},
 			UpdatedAt: updatedAt,
 		},
@@ -444,6 +445,7 @@ func TestToTraceSpanMetadata(t *testing.T) {
 	require.Len(t, result, 1)
 	require.Equal(t, "run", result[0].Scope)
 	require.Equal(t, "userland.custom", result[0].Kind)
+	require.True(t, result[0].IsUser)
 	require.Equal(t, map[string]string{"key": `"value"`}, result[0].Values)
 	require.Equal(t, updatedAt, result[0].UpdatedAt.AsTime())
 	require.Nil(t, toTraceSpanMetadata(nil))

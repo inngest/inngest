@@ -263,3 +263,40 @@ export function isHobbyPlan(
 ): boolean {
   return isHobbyFreePlan(plan);
 }
+
+export function executionUsageDescription(
+  plan: Pick<BillingPlan, 'name'>,
+  executions: { limit: number | null; overageAllowed: boolean },
+): string {
+  // Most Enterprise plans leave executions_overage_allowed unset, so they keep
+  // their existing copy instead of following the entitlement.
+  if (isEnterprisePlan(plan)) {
+    return 'Additional usage billed at the start of the next billing cycle.';
+  }
+
+  // Decide from the entitlement, not the plan slug: legacy free plans such as
+  // "free-tier" do not match the Hobby slugs but cannot pay for overage.
+  if (!executions.overageAllowed) {
+    return 'The maximum number of executions per month';
+  }
+
+  const includedExecutions = executions.limit;
+  if (includedExecutions === null) {
+    return 'Additional usage billed at the start of the next billing cycle.';
+  }
+
+  // Match executionOverageTiers in monorepo/pkg/billing/invoice/consts.go.
+  // Tier boundaries include the account's execution allowance, not just overages.
+  const pricePerMillion =
+    includedExecutions < 5_000_000
+      ? 50
+      : includedExecutions < 15_000_000
+      ? 25
+      : includedExecutions < 50_000_000
+      ? 20
+      : 15;
+
+  return `Usage beyond ${includedExecutions.toLocaleString(
+    'en-US',
+  )} is billed at $${pricePerMillion} per 1,000,000 at the start of the next billing cycle.`;
+}

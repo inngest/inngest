@@ -13,10 +13,21 @@ import (
 )
 
 const (
+	keyTypeString    = "string"
+	keyTypeHash      = "hash"
+	keyTypeList      = "list"
+	keyTypeSet       = "set"
+	keyTypeHll       = "hll"
+	keyTypeSortedSet = "zset"
+	keyTypeStream    = "stream"
+)
+
+const (
 	msgWrongType            = "WRONGTYPE Operation against a key holding the wrong kind of value"
 	msgNotValidHllValue     = "WRONGTYPE Key is not a valid HyperLogLog string value."
 	msgInvalidInt           = "ERR value is not an integer or out of range"
 	msgIntOverflow          = "ERR increment or decrement would overflow"
+	msgStringTooLong        = "ERR string exceeds maximum allowed size (proto-max-bulk-len)"
 	msgInvalidFloat         = "ERR value is not a valid float"
 	msgInvalidMinMax        = "ERR min or max is not a float"
 	msgInvalidRangeItem     = "ERR min or max not valid string range item"
@@ -59,6 +70,10 @@ const (
 	msgMaxLengthIsNegative  = "ERR MAXLEN can't be negative"
 	msgLimitIsNegative      = "ERR LIMIT can't be negative"
 	msgMemorySubcommand     = "ERR unknown subcommand '%s'. Try MEMORY HELP."
+	msgNumFieldsParameter   = "ERR The `numfields` parameter must match the number of arguments"
+	msgNumFieldsInvalid     = "ERR Parameter `numFields` should be greater than 0"
+	msgNumFieldsPositive    = "ERR Number of fields must be a positive integer"
+	msgMandatoryArgument    = "ERR Mandatory argument %s is missing or not at the right position"
 )
 
 func errWrongNumber(cmd string) string {

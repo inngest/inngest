@@ -1,0 +1,1 @@
+SELECT * EXCEPT (inputs, output) FROM runs

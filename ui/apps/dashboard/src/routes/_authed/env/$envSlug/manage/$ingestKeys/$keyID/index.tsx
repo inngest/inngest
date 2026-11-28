@@ -21,6 +21,7 @@ import EditKeyNameModal from '@/components/Manage/EditKeyNameModal';
 import TransformEvent from '@/components/Manage/TransformEvent';
 import DeleteKeyModal from '@/components/Manage/DeleteKeyModal';
 import FilterEvents from '@/components/Manage/FilterEvents';
+import WebhookHealth from '@/components/Manage/WebhookHealth';
 import { Provider } from '@/components/Manage/Context';
 
 const GetKeyDocument = graphql(`
@@ -184,6 +185,9 @@ function KeyComponent() {
             }}
             keyName={key.name}
           />
+          {ingestKeys === 'webhooks' && (
+            <WebhookHealth key={keyID} keyID={keyID} />
+          )}
         </Provider>
       </div>
     </div>

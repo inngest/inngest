@@ -48,6 +48,7 @@ type runValidator struct {
 func (r *runValidator) validate(ctx context.Context) error {
 	chain := []func(ctx context.Context) error{
 		r.checkStepLimit,
+		r.checkInboxStateSize,
 		r.checkStartTimeout,
 		r.checkFinishTimeout,
 	}
@@ -62,11 +63,6 @@ func (r *runValidator) validate(ctx context.Context) error {
 }
 
 func (r *runValidator) checkStepLimit(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx).With(
-		"run_id", r.md.ID.RunID.String(),
-		"workflow_id", r.md.ID.FunctionID.String(),
-	)
-
 	var limit int
 
 	if r.e.steplimit != nil {
@@ -81,50 +77,93 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 	}
 
 	if limit > 0 && r.md.Metrics.StepCount >= limit {
-		// Create a new driver response to map as the function finished error.
-		resp := state.DriverResponse{}
-
-		gracefulErr := state.StandardError{
+		return r.overflow(ctx, state.StandardError{
 			Error:   state.ErrFunctionOverflowed.Error(),
 			Name:    state.InngestErrFunctionOverflowed,
 			Message: fmt.Sprintf("The function run exceeded the step limit of %d steps.", limit),
-		}.Serialize(execution.StateErrorKey)
-
-		resp.Err = &gracefulErr
-		resp.SetFinal()
-
-		// This is the function result.
-		if err := r.e.Finalize(ctx, execution.FinalizeOpts{
-			Metadata: r.md,
-			Response: execution.FinalizeResponse{
-				Type:           execution.FinalizeResponseDriver,
-				DriverResponse: resp, // contains the error.
-			},
-			Optional: execution.FinalizeOptional{
-				FnSlug:      r.f.GetSlug(),
-				InputEvents: r.evts,
-				Reason:      "validation-step-limit-reached",
-			},
-		}); err != nil {
-			l.ReportError(err, "error running finish handler")
-		}
-
-		// Can be reached multiple times for parallel discovery steps
-		for _, e := range r.e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
-		}
-
-		// Stop the function from running, but don't return an error as we don't
-		// want the step to retry.
-		r.stopWithoutRetry = true
+		}, "validation-step-limit-reached")
 	}
+
+	return nil
+}
+
+// checkInboxStateSize ends the run if the call was queued by an inbox message
+// that did not fit in the run's state, with the error a step output that does
+// not fit gets.
+func (r *runValidator) checkInboxStateSize(ctx context.Context) error {
+	if r.stopWithoutRetry || r.item.Metadata[inboxOverflowKey] != inboxOverflowState {
+		return nil
+	}
+
+	size := consts.DefaultMaxStateSizeLimit
+	if r.e.stateSizeLimit != nil {
+		if configured := r.e.stateSizeLimit(r.md.ID); configured != 0 {
+			size = configured
+		}
+	}
+
+	return r.overflow(ctx, state.StandardError{
+		Error:   state.ErrStateOverflowed.Error(),
+		Name:    state.InngestErrStateOverflowed,
+		Message: fmt.Sprintf("The function run exceeded the state size limit of %d bytes.", size),
+	}, "validation-state-size-reached")
+}
+
+// overflow finishes the run with err and stops it from running.
+func (r *runValidator) overflow(ctx context.Context, err state.StandardError, reason string) error {
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", r.md.ID.RunID.String(),
+		"workflow_id", r.md.ID.FunctionID.String(),
+	)
+
+	// Create a new driver response to map as the function finished error.
+	resp := state.DriverResponse{}
+
+	gracefulErr := err.Serialize(execution.StateErrorKey)
+
+	resp.Err = &gracefulErr
+	resp.SetFinal()
+
+	// This is the function result.
+	if err := r.e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: r.md,
+		Response: execution.FinalizeResponse{
+			Type:           execution.FinalizeResponseDriver,
+			DriverResponse: resp, // contains the error.
+		},
+		Optional: execution.FinalizeOptional{
+			FnSlug:      r.f.GetSlug(),
+			InputEvents: r.evts,
+			Reason:      reason,
+		},
+	}); err != nil {
+		l.ReportError(err, "error running finish handler")
+	}
+
+	// Can be reached multiple times for parallel discovery steps
+	for _, e := range r.e.lifecycles {
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), r.md, r.item, r.evts, resp)
+	}
+
+	// Stop the function from running, but don't return an error as we don't
+	// want the step to retry.
+	r.stopWithoutRetry = true
+
 	return nil
 }
 
 func (r *runValidator) checkStartTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Start != nil {
+	// The duration is nil if the timeout is empty or unparseable, which functions
+	// synced before these were validated may still have.  Treat those as unset, as
+	// panicking here would retry the queue item forever.
+	var timeout *time.Duration
+	if r.f.Timeouts != nil {
+		timeout = r.f.Timeouts.StartDuration()
+	}
+
+	if timeout != nil && *timeout > 0 {
 		since := time.Since(ulid.Time(r.md.ID.RunID.Time()))
-		if *r.f.Timeouts.StartDuration() > 0 && since > *r.f.Timeouts.StartDuration() && r.md.Config.StartedAt.IsZero() {
+		if since > *timeout && r.md.Config.StartedAt.IsZero() {
 			logger.StdlibLogger(ctx).Debug("start timeout reached", "run_id", r.md.ID.RunID.String())
 			if err := r.e.Cancel(ctx, r.md.ID, execution.CancelRequest{}); err != nil {
 				return err
@@ -138,10 +177,16 @@ func (r *runValidator) checkStartTimeout(ctx context.Context) error {
 }
 
 func (r *runValidator) checkFinishTimeout(ctx context.Context) error {
-	if r.f.Timeouts != nil && r.f.Timeouts.Finish != nil && *r.f.Timeouts.FinishDuration() > 0 {
+	// As with the start timeout, empty or unparseable values are treated as unset.
+	var timeout *time.Duration
+	if r.f.Timeouts != nil {
+		timeout = r.f.Timeouts.FinishDuration()
+	}
+
+	if timeout != nil && *timeout > 0 {
 		started := r.md.Config.StartedAt
 
-		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *r.f.Timeouts.FinishDuration() {
+		if started.IsZero() || started.Unix() == 0 || time.Since(started) <= *timeout {
 			return nil
 		}
 		logger.StdlibLogger(ctx).Info(

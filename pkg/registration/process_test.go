@@ -3,12 +3,20 @@ package registration
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/execution/driver/schemes"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	schemes.Register("test", func(u *url.URL) string {
+		return "test"
+	})
+}
 
 func TestProcessFunctions(t *testing.T) {
 	tests := []struct {
@@ -117,6 +125,59 @@ func TestProcessFunctions(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "registered scheme",
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
+					{
+						Name: "lol",
+						Triggers: []inngest.Trigger{
+							{
+								EventTrigger: &inngest.EventTrigger{
+									Event: "my/event",
+								},
+							},
+						},
+						Steps: map[string]sdk.SDKStep{
+							"step": {
+								ID:   "step",
+								Name: "step",
+								Runtime: map[string]any{
+									"url": "test://serve?fnId=app-hello&stepId=step",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "unregistered scheme",
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
+					{
+						Name: "lol",
+						Triggers: []inngest.Trigger{
+							{
+								EventTrigger: &inngest.EventTrigger{
+									Event: "my/event",
+								},
+							},
+						},
+						Steps: map[string]sdk.SDKStep{
+							"step": {
+								ID:   "step",
+								Name: "step",
+								Runtime: map[string]any{
+									"url": "foo://serve?fnId=app-hello&stepId=step",
+								},
+							},
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("Non-supported step schema: foo"),
 		},
 	}
 

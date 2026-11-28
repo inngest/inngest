@@ -1,0 +1,4 @@
+{
+  "description": "A literal must have the column's own type: no implicit casts.",
+  "mode": "product"
+}

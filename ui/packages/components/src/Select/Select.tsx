@@ -14,6 +14,7 @@ import { useMenuInputModality } from '../DropdownMenu/useMenuInputModality';
 import { cn } from '../utils/classNames';
 
 type SelectProps = {
+  disabled?: boolean;
   label?: string;
   isLabelVisible?: boolean;
   children: React.ReactNode;
@@ -42,6 +43,7 @@ type SingleProps = {
 type Props = SelectProps & (MultiProps | SingleProps);
 
 export function Select({
+  disabled = false,
   value,
   label,
   isLabelVisible = true,
@@ -52,12 +54,13 @@ export function Select({
   size = 'medium',
 }: Props) {
   return (
-    <Listbox value={value} onChange={onChange} multiple={multiple}>
+    <Listbox value={value} onChange={onChange} multiple={multiple} disabled={disabled}>
       {({ open: _open }) => (
         <span
           className={cn(
             isLabelVisible && 'divide-muted text-muted divide-x',
-            'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
+            'flex items-center rounded border',
+            disabled ? 'border-disabled bg-disabled text-disabled' : 'border-muted',
             size === 'small' ? 'text-[13px]' : 'text-sm',
             className
           )}
@@ -95,13 +98,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           !isLabelVisible && 'rounded-l',
           // Real height is 26px and 34px, but we add the 2px border
           size === 'small' ? 'h-[24px] text-xs' : 'h-[32px] py-1.5 text-sm',
-          'disabled:bg-disabled disabled:text-disabled text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5',
+          'disabled:bg-disabled disabled:text-disabled text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5 disabled:cursor-not-allowed',
           className
         )}
       >
         {children}
         <RiArrowDownSLine
-          className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-200"
+          className="ui-open:-rotate-180 ui-disabled:text-disabled text-subtle h-4 w-4 transition-transform duration-200"
           aria-hidden="true"
         />
       </Component>
@@ -224,6 +227,7 @@ Select.CheckboxOption = (props: React.PropsWithChildren<{ option: Option }>) => 
 Select.Footer = Footer;
 
 export function SelectWithSearch({
+  disabled = false,
   value,
   label,
   isLabelVisible = true,
@@ -237,7 +241,8 @@ export function SelectWithSearch({
     <span
       className={cn(
         isLabelVisible && 'divide-muted text-muted divide-x',
-        'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
+        'flex items-center rounded border',
+        disabled ? 'border-disabled bg-disabled text-disabled' : 'border-muted',
         size === 'small' ? 'text-[13px]' : 'text-sm',
         className
       )}
@@ -260,14 +265,14 @@ export function SelectWithSearch({
   // `onChange` vary with `multiple`
   if (multiple) {
     return (
-      <Combobox value={value} onChange={onChange} multiple={multiple}>
+      <Combobox value={value} onChange={onChange} multiple={multiple} disabled={disabled}>
         {({ open }) => renderContent(open)}
       </Combobox>
     );
   }
 
   return (
-    <Combobox value={value} onChange={onChange} multiple={multiple}>
+    <Combobox value={value} onChange={onChange} multiple={multiple} disabled={disabled}>
       {({ open }) => renderContent(open)}
     </Combobox>
   );

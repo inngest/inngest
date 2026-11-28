@@ -1,0 +1,42 @@
+%YAML 1.2
+---
+urn: extension:io.substrait:functions_aggregate_generic
+aggregate_functions:
+  - name: "count"
+    description: Count the number of values or records.
+    impls:
+      - description: Count the non-null values in a set of values.
+        args:
+          - name: x
+            value: any
+        options:
+          overflow:
+            values: [SILENT, SATURATE, ERROR]
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: i64
+        return: i64
+      - description: Count the number of records (not field-referenced).
+        options:
+          overflow:
+            values: [SILENT, SATURATE, ERROR]
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: i64
+        return: i64
+  - name: "any_value"
+    description: >
+      Selects an arbitrary value from a group of values.
+
+      If the input is empty, the function returns null.
+    impls:
+      - args:
+          - name: x
+            value: any1
+        options:
+          ignore_nulls:
+            values: [ "TRUE", "FALSE" ]
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: any1?
+        return: any1?

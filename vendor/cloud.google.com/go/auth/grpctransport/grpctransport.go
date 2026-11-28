@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package grpctransport provides functionality for managing gRPC client
+// connections to Google Cloud services.
 package grpctransport
 
 import (
@@ -19,16 +21,28 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 
 	"cloud.google.com/go/auth"
 	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/internal"
 	"cloud.google.com/go/auth/internal/transport"
-	"go.opencensus.io/plugin/ocgrpc"
+	"cloud.google.com/go/auth/internal/transport/headers"
+	"github.com/googleapis/gax-go/v2"
+	"github.com/googleapis/gax-go/v2/callctx"
+	"github.com/googleapis/gax-go/v2/internallog"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	grpccreds "google.golang.org/grpc/credentials"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/stats"
 )
 
 const (
@@ -38,8 +52,32 @@ const (
 	// Check env to decide if using google-c2p resolver for DirectPath traffic.
 	enableDirectPathXdsEnvVar = "GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS"
 
-	quotaProjectHeaderKey = "X-Goog-User-Project"
+	quotaProjectHeaderKey = "X-goog-user-project"
 )
+
+// codeToStr is a reversal of the `strToCode` map in
+// https://github.com/grpc/grpc-go/blob/master/codes/codes.go
+// The gRPC specification has exactly 17 status codes, defined
+// as a contiguous block of integers from 0 to 16.
+var codeToStr = [...]string{
+	"OK",                  // codes.OK = 0
+	"CANCELED",            // codes.Canceled = 1
+	"UNKNOWN",             // codes.Unknown = 2
+	"INVALID_ARGUMENT",    // codes.InvalidArgument = 3
+	"DEADLINE_EXCEEDED",   // codes.DeadlineExceeded = 4
+	"NOT_FOUND",           // codes.NotFound = 5
+	"ALREADY_EXISTS",      // codes.AlreadyExists = 6
+	"PERMISSION_DENIED",   // codes.PermissionDenied = 7
+	"RESOURCE_EXHAUSTED",  // codes.ResourceExhausted = 8
+	"FAILED_PRECONDITION", // codes.FailedPrecondition = 9
+	"ABORTED",             // codes.Aborted = 10
+	"OUT_OF_RANGE",        // codes.OutOfRange = 11
+	"UNIMPLEMENTED",       // codes.Unimplemented = 12
+	"INTERNAL",            // codes.Internal = 13
+	"UNAVAILABLE",         // codes.Unavailable = 14
+	"DATA_LOSS",           // codes.DataLoss = 15
+	"UNAUTHENTICATED",     // codes.Unauthenticated = 16
+}
 
 var (
 	// Set at init time by dial_socketopt.go. If nil, socketopt is not supported.
@@ -90,6 +128,11 @@ type Options struct {
 	// APIKey specifies an API key to be used as the basis for authentication.
 	// If set DetectOpts are ignored.
 	APIKey string
+	// Logger is used for debug logging. If provided, logging will be enabled
+	// at the loggers configured level. By default logging is disabled unless
+	// enabled by setting GOOGLE_SDK_GO_LOGGING_LEVEL in which case a default
+	// logger will be used. Optional.
+	Logger *slog.Logger
 
 	// InternalOptions are NOT meant to be set directly by consumers of this
 	// package, they should only be set by generated client code.
@@ -103,6 +146,10 @@ func (o *Options) client() *http.Client {
 		return o.DetectOpts.Client
 	}
 	return nil
+}
+
+func (o *Options) logger() *slog.Logger {
+	return internallog.New(o.Logger)
 }
 
 func (o *Options) validate() error {
@@ -146,6 +193,9 @@ func (o *Options) resolveDetectOptions() *credentials.DetectOptions {
 		do.Client = transport.DefaultHTTPClientWithTLS(tlsConfig)
 		do.TokenURL = credentials.GoogleMTLSTokenURL
 	}
+	if do.Logger == nil {
+		do.Logger = o.logger()
+	}
 	return do
 }
 
@@ -164,6 +214,10 @@ type InternalOptions struct {
 	EnableDirectPathXds bool
 	// EnableJWTWithScope specifies if scope can be used with self-signed JWT.
 	EnableJWTWithScope bool
+	// AllowHardBoundTokens allows libraries to request a hard-bound token.
+	// Obtaining hard-bound tokens requires the connection to be established
+	// using either ALTS or mTLS with S2A.
+	AllowHardBoundTokens []string
 	// DefaultAudience specifies a default audience to be used as the audience
 	// field ("aud") for the JWT token authentication.
 	DefaultAudience string
@@ -176,8 +230,17 @@ type InternalOptions struct {
 	// service.
 	DefaultScopes []string
 	// SkipValidation bypasses validation on Options. It should only be used
-	// internally for clients that needs more control over their transport.
+	// internally for clients that need more control over their transport.
 	SkipValidation bool
+	// TelemetryAttributes specifies a map of telemetry attributes to be added
+	// to all OpenTelemetry signals, such as tracing and metrics, for purposes
+	// including representing the static identity of the client (e.g., service
+	// name, version). These attributes are expected to be consistent across all
+	// signals to enable cross-signal correlation.
+	//
+	// It should only be used internally by generated clients. Callers should not
+	// modify the map after it is passed in.
+	TelemetryAttributes map[string]string
 }
 
 // Dial returns a GRPCClientConnPool that can be used to communicate with a
@@ -214,6 +277,7 @@ func dial(ctx context.Context, secure bool, opts *Options) (*grpc.ClientConn, er
 		ClientCertProvider: opts.ClientCertProvider,
 		Client:             opts.client(),
 		UniverseDomain:     opts.UniverseDomain,
+		Logger:             opts.logger(),
 	}
 	if io := opts.InternalOptions; io != nil {
 		tOpts.DefaultEndpointTemplate = io.DefaultEndpointTemplate
@@ -221,13 +285,13 @@ func dial(ctx context.Context, secure bool, opts *Options) (*grpc.ClientConn, er
 		tOpts.EnableDirectPath = io.EnableDirectPath
 		tOpts.EnableDirectPathXds = io.EnableDirectPathXds
 	}
-	transportCreds, endpoint, err := transport.GetGRPCTransportCredsAndEndpoint(tOpts)
+	transportCreds, err := transport.GetGRPCTransportCredsAndEndpoint(tOpts)
 	if err != nil {
 		return nil, err
 	}
 
 	if !secure {
-		transportCreds = grpcinsecure.NewCredentials()
+		transportCreds.TransportCredentials = grpcinsecure.NewCredentials()
 	}
 
 	// Initialize gRPC dial options with transport-level security options.
@@ -256,8 +320,21 @@ func dial(ctx context.Context, secure bool, opts *Options) (*grpc.ClientConn, er
 		if opts.Credentials != nil {
 			creds = opts.Credentials
 		} else {
+			// This condition is only met for non-DirectPath clients because
+			// TransportTypeMTLSS2A is used only when InternalOptions.EnableDirectPath
+			// is false.
+			optsClone := opts.resolveDetectOptions()
+			if transportCreds.TransportType == transport.TransportTypeMTLSS2A {
+				// Check that the client allows requesting hard-bound token for the transport type mTLS using S2A.
+				for _, ev := range opts.InternalOptions.AllowHardBoundTokens {
+					if ev == "MTLS_S2A" {
+						optsClone.TokenBindingType = credentials.MTLSHardBinding
+						break
+					}
+				}
+			}
 			var err error
-			creds, err = credentials.DetectDefault(opts.resolveDetectOptions())
+			creds, err = credentials.DetectDefault(optsClone)
 			if err != nil {
 				return nil, err
 			}
@@ -271,27 +348,33 @@ func dial(ctx context.Context, secure bool, opts *Options) (*grpc.ClientConn, er
 			if metadata == nil {
 				metadata = make(map[string]string, 1)
 			}
-			metadata[quotaProjectHeaderKey] = qp
+			// Don't overwrite user specified quota
+			if _, ok := metadata[quotaProjectHeaderKey]; !ok {
+				metadata[quotaProjectHeaderKey] = qp
+			}
 		}
 		grpcOpts = append(grpcOpts,
 			grpc.WithPerRPCCredentials(&grpcCredentialsProvider{
 				creds:                creds,
 				metadata:             metadata,
 				clientUniverseDomain: opts.UniverseDomain,
+				endpoint:             transportCreds.Endpoint,
 			}),
 		)
-
 		// Attempt Direct Path
-		grpcOpts, endpoint = configureDirectPath(grpcOpts, opts, endpoint, creds)
+		grpcOpts, transportCreds.Endpoint, err = configureDirectPath(grpcOpts, opts, transportCreds.Endpoint, creds)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Add tracing, but before the other options, so that clients can override the
 	// gRPC stats handler.
 	// This assumes that gRPC options are processed in order, left to right.
-	grpcOpts = addOCStatsHandler(grpcOpts, opts)
+	grpcOpts = addOpenTelemetryStatsHandler(grpcOpts, opts, transportCreds.Endpoint)
 	grpcOpts = append(grpcOpts, opts.GRPCDialOpts...)
 
-	return grpc.DialContext(ctx, endpoint, grpcOpts...)
+	return grpc.DialContext(ctx, transportCreds.Endpoint, grpcOpts...)
 }
 
 // grpcKeyProvider satisfies https://pkg.go.dev/google.golang.org/grpc/credentials#PerRPCCredentials.
@@ -323,17 +406,26 @@ type grpcCredentialsProvider struct {
 	// Additional metadata attached as headers.
 	metadata             map[string]string
 	clientUniverseDomain string
+	endpoint             string
 }
 
-// getClientUniverseDomain returns the default service domain for a given Cloud universe.
-// The default value is "googleapis.com". This is the universe domain
-// configured for the client, which will be compared to the universe domain
-// that is separately configured for the credentials.
+// getClientUniverseDomain returns the default service domain for a given Cloud
+// universe, with the following precedence:
+//
+// 1. A non-empty option.WithUniverseDomain or similar client option.
+// 2. A non-empty environment variable GOOGLE_CLOUD_UNIVERSE_DOMAIN.
+// 3. The default value "googleapis.com".
+//
+// This is the universe domain configured for the client, which will be compared
+// to the universe domain that is separately configured for the credentials.
 func (c *grpcCredentialsProvider) getClientUniverseDomain() string {
-	if c.clientUniverseDomain == "" {
-		return internal.DefaultUniverseDomain
+	if c.clientUniverseDomain != "" {
+		return c.clientUniverseDomain
 	}
-	return c.clientUniverseDomain
+	if envUD := os.Getenv(internal.UniverseDomainEnvVar); envUD != "" {
+		return envUD
+	}
+	return internal.DefaultUniverseDomain
 }
 
 func (c *grpcCredentialsProvider) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
@@ -357,30 +449,229 @@ func (c *grpcCredentialsProvider) GetRequestMetadata(ctx context.Context, uri ..
 		}
 	}
 	metadata := make(map[string]string, len(c.metadata)+1)
-	setAuthMetadata(token, metadata)
+	headers.SetAuthMetadata(ctx, token, c.endpoint, metadata)
 	for k, v := range c.metadata {
 		metadata[k] = v
 	}
 	return metadata, nil
 }
 
-// setAuthMetadata uses the provided token to set the Authorization metadata.
-// If the token.Type is empty, the type is assumed to be Bearer.
-func setAuthMetadata(token *auth.Token, m map[string]string) {
-	typ := token.Type
-	if typ == "" {
-		typ = internal.TokenTypeBearer
-	}
-	m["authorization"] = typ + " " + token.Value
-}
-
 func (c *grpcCredentialsProvider) RequireTransportSecurity() bool {
 	return c.secure
 }
 
-func addOCStatsHandler(dialOpts []grpc.DialOption, opts *Options) []grpc.DialOption {
+func addOpenTelemetryStatsHandler(dialOpts []grpc.DialOption, opts *Options, endpoint string) []grpc.DialOption {
 	if opts.DisableTelemetry {
 		return dialOpts
 	}
-	return append(dialOpts, grpc.WithStatsHandler(&ocgrpc.ClientHandler{}))
+	if gax.IsFeatureEnabled("METRICS") {
+		host, port := extractHostPort(endpoint)
+		dialOpts = append(dialOpts, grpc.WithChainUnaryInterceptor(openTelemetryUnaryClientInterceptor(host, port)))
+	}
+	if !gax.IsFeatureEnabled("TRACING") && !gax.IsFeatureEnabled("LOGGING") {
+		return append(dialOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	}
+	var staticAttrs []attribute.KeyValue
+	var scopedLogger *slog.Logger
+
+	if gax.IsFeatureEnabled("LOGGING") && opts.Logger != nil {
+		scopedLogger = opts.Logger
+	}
+
+	if opts.InternalOptions != nil {
+		staticAttrs = transport.StaticTelemetryAttributes(opts.InternalOptions.TelemetryAttributes)
+		if scopedLogger != nil {
+			var staticLogAttrs []any
+			for _, attr := range staticAttrs {
+				staticLogAttrs = append(staticLogAttrs, slog.String(string(attr.Key), attr.Value.AsString()))
+			}
+			scopedLogger = scopedLogger.With(staticLogAttrs...)
+		}
+	}
+	var otelOpts []otelgrpc.Option
+	if gax.IsFeatureEnabled("TRACING") {
+		otelOpts = append(otelOpts, otelgrpc.WithSpanAttributes(staticAttrs...))
+	}
+	return append(dialOpts, grpc.WithStatsHandler(&otelHandler{
+		Handler: otelgrpc.NewClientHandler(otelOpts...),
+		logger:  scopedLogger,
+	}))
+}
+
+// Extract the host and port from a target address
+func extractHostPort(target string) (string, int) {
+	if idx := strings.Index(target, "://"); idx != -1 {
+		target = target[idx+3:]
+		// Ensure any leading authorities (like 8.8.8.8 in dns://8.8.8.8/foo) are stripped
+		if slashIdx := strings.Index(target, "/"); slashIdx != -1 {
+			target = target[slashIdx+1:]
+		}
+	}
+	host, portStr, err := net.SplitHostPort(target)
+	if err != nil {
+		return target, 0
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return host, 0
+	}
+	return host, port
+}
+
+// openTelemetryUnaryClientInterceptor returns an interceptor that populates
+// TransportTelemetryData with the server peer address.
+func openTelemetryUnaryClientInterceptor(host string, port int) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		transportData := gax.ExtractTransportTelemetry(ctx)
+		if transportData != nil {
+			if host != "" {
+				transportData.SetServerAddress(host)
+			}
+			if port != 0 {
+				transportData.SetServerPort(port)
+			}
+		}
+
+		err := invoker(ctx, method, req, reply, cc, opts...)
+
+		return err
+	}
+}
+
+// otelHandler is a wrapper around the OpenTelemetry gRPC client handler that
+// adds custom Google Cloud-specific attributes to spans and metrics.
+type otelHandler struct {
+	stats.Handler
+	logger *slog.Logger
+}
+
+// TagRPC intercepts the RPC start to extract dynamic attributes like resource
+// name and retry count from the outgoing context metadata and attach them to
+// the current span.
+func (h *otelHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
+	ctx = h.Handler.TagRPC(ctx, info)
+
+	var span trace.Span
+	if gax.IsFeatureEnabled("TRACING") {
+		if s := trace.SpanFromContext(ctx); s != nil && s.IsRecording() {
+			span = s
+		}
+	}
+
+	if span == nil {
+		return ctx
+	}
+	var attrs []attribute.KeyValue
+	if resName, ok := callctx.TelemetryFromContext(ctx, "resource_name"); ok {
+		attrs = append(attrs, attribute.String("gcp.resource.destination.id", resName))
+	}
+	if resendCountStr, ok := callctx.TelemetryFromContext(ctx, "resend_count"); ok {
+		if count, err := strconv.Atoi(resendCountStr); err == nil {
+			attrs = append(attrs, attribute.Int("gcp.grpc.resend_count", count))
+		}
+	}
+	if len(attrs) > 0 {
+		span.SetAttributes(attrs...)
+	}
+	return ctx
+}
+
+// HandleRPC intercepts the RPC completion to capture and format error-related
+// attributes ensuring they conform to Google Cloud observability standards.
+func (h *otelHandler) HandleRPC(ctx context.Context, s stats.RPCStats) {
+	end, ok := s.(*stats.End)
+	if !ok {
+		h.Handler.HandleRPC(ctx, s)
+		return
+	}
+
+	var span trace.Span
+	if gax.IsFeatureEnabled("TRACING") {
+		if s := trace.SpanFromContext(ctx); s != nil && s.IsRecording() {
+			span = s
+		}
+	}
+
+	var logger *slog.Logger
+	if gax.IsFeatureEnabled("LOGGING") {
+		if l := h.logger; l != nil && l.Enabled(ctx, slog.LevelDebug) {
+			logger = l
+		}
+	}
+
+	if span == nil && logger == nil {
+		h.Handler.HandleRPC(ctx, s)
+		return
+	}
+
+	if end.Error != nil {
+		h.handleRPCError(ctx, span, logger, end)
+	} else {
+		h.handleRPCSuccess(span)
+	}
+	h.Handler.HandleRPC(ctx, s)
+}
+
+func (h *otelHandler) handleRPCError(ctx context.Context, span trace.Span, logger *slog.Logger, end *stats.End) {
+	info := gax.ExtractTelemetryErrorInfo(ctx, end.Error)
+
+	if logger != nil {
+		logActionableError(ctx, logger, info)
+	}
+
+	if span != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("error.type", info.ErrorType),
+			attribute.String("status.message", info.StatusMessage),
+			attribute.String("rpc.response.status_code", info.StatusCode),
+			attribute.String("exception.type", fmt.Sprintf("%T", end.Error)),
+		}
+		span.SetAttributes(attrs...)
+	}
+}
+
+func (h *otelHandler) handleRPCSuccess(span trace.Span) {
+	if span != nil {
+		attrs := []attribute.KeyValue{
+			attribute.String("rpc.response.status_code", "OK"),
+		}
+		span.SetAttributes(attrs...)
+	}
+}
+
+func logActionableError(ctx context.Context, logger *slog.Logger, info gax.TelemetryErrorInfo) {
+	baseLogAttrs := []slog.Attr{
+		slog.String("rpc.system.name", "grpc"),
+		slog.String("rpc.response.status_code", info.StatusCode),
+	}
+
+	if resendCountStr, ok := callctx.TelemetryFromContext(ctx, "resend_count"); ok {
+		if count, e := strconv.Atoi(resendCountStr); e == nil {
+			baseLogAttrs = append(baseLogAttrs, slog.Int64("gcp.grpc.resend_count", int64(count)))
+		}
+	}
+
+	msg := info.StatusMessage
+	if msg == "" {
+		msg = "API call failed"
+	}
+
+	if rpcMethod, ok := callctx.TelemetryFromContext(ctx, "rpc_method"); ok {
+		baseLogAttrs = append(baseLogAttrs, slog.String("rpc.method", rpcMethod))
+	}
+
+	if resName, ok := callctx.TelemetryFromContext(ctx, "resource_name"); ok {
+		baseLogAttrs = append(baseLogAttrs, slog.String("gcp.resource.destination.id", resName))
+	}
+
+	if info.Domain != "" {
+		baseLogAttrs = append(baseLogAttrs, slog.String("gcp.errors.domain", info.Domain))
+	}
+	for k, v := range info.Metadata {
+		baseLogAttrs = append(baseLogAttrs, slog.String("gcp.errors.metadata."+k, v))
+	}
+
+	baseLogAttrs = append(baseLogAttrs, slog.String("error.type", info.ErrorType))
+
+	logger.LogAttrs(ctx, slog.LevelDebug, msg, baseLogAttrs...)
 }

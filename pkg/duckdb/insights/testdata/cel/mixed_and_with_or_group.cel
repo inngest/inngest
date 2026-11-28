@@ -1,0 +1,1 @@
+event.name == "y" && (event.data.a == 1 || output.ok == true)

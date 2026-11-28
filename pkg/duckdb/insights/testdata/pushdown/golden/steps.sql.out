@@ -1,0 +1,16 @@
+{
+  "description": "steps collapses to the latest attempt per step, so only run-level columns are pushed.",
+  "mode": "product",
+  "tables": {
+    "steps": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "spans.run_id = '01J0000000000000000000000A'",
+        "pushed": true,
+        "joined": [
+          "metadata.run_id = '01J0000000000000000000000A'"
+        ]
+      }
+    ]
+  }
+}

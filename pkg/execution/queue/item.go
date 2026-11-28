@@ -145,6 +145,21 @@ type CapacityLease struct {
 	// release is a handle to invoke the Constraint API.
 	// This is passed during item processing.
 	release func() error
+
+	// keepManualSemaphores is the handle behind KeepManualSemaphores.
+	// This is passed during item processing.
+	keepManualSemaphores func()
+}
+
+// KeepManualSemaphores tells the queue to leave the manual-release semaphores
+// of this item taken, because the run now has StartedAt in run metadata and
+// Finalize releases them.  the queue gives them back with the capacity lease
+// on every exit without this call.  after this call a retry of the item no
+// longer carries them.
+func (c *CapacityLease) KeepManualSemaphores() {
+	if c.keepManualSemaphores != nil {
+		c.keepManualSemaphores()
+	}
 }
 
 // Release frees up all acquired capacity that is not time-bound (i.e. concurrency capacity).
@@ -258,6 +273,24 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 	// expected static (item in the future) and dynamic (time spent waiting due to concurrency limits) delays.
 	// note: System delays may be included in this.
 	return q.RefillDelay() + q.ExpectedDelay()
+}
+
+// StartLatency is the time from the item being due to now, including any wait
+// for user-defined capacity. Unlike Latency it ignores refill and peek stamps,
+// so it is computed identically for every queue backend.
+func (q QueueItem) StartLatency(now time.Time) time.Duration {
+	dueMS := q.WallTimeMS
+	if dueMS == 0 {
+		dueMS = q.AtMS
+	}
+	// An item enqueued after its due time (e.g. a requeue) is due when enqueued.
+	if q.EnqueuedAt > dueMS {
+		dueMS = q.EnqueuedAt
+	}
+	if dueMS == 0 || now.UnixMilli() < dueMS {
+		return 0
+	}
+	return now.Sub(time.UnixMilli(dueMS))
 }
 
 // Latency represents the processing delay excluding sojourn latency.

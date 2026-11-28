@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 
+import { QuickstartProvider } from './Quickstart/QuickstartProvider';
 import { store } from '@/store/store';
 import { SharedContextProvider } from './SharedContextProvider';
 
@@ -14,7 +15,9 @@ export default function StoreProvider({ children }: StoreProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <SharedContextProvider>{children}</SharedContextProvider>
+        <SharedContextProvider>
+          <QuickstartProvider>{children}</QuickstartProvider>
+        </SharedContextProvider>
       </Provider>
     </QueryClientProvider>
   );

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,6 +45,9 @@ var (
 // BroadcasterOpts configures optional broadcaster behaviour.
 type BroadcasterOpts struct {
 	ShutdownGracePeriod time.Duration
+	// SubscriptionRecoveryTimeout bounds recovery after an established Redis
+	// subscription fails. Zero uses the default of 30 seconds.
+	SubscriptionRecoveryTimeout time.Duration
 }
 
 // NewRedisBroadcaster returns a broadcaster that uses Redis pub/sub for
@@ -59,15 +61,20 @@ func NewRedisBroadcaster(pubc, subc rueidis.Client, opts ...BroadcasterOpts) Bro
 	if len(opts) > 0 && opts[0].ShutdownGracePeriod > 0 {
 		gracePeriod = opts[0].ShutdownGracePeriod
 	}
+	recoveryTimeout := 30 * time.Second
+	if len(opts) > 0 && opts[0].SubscriptionRecoveryTimeout > 0 {
+		recoveryTimeout = opts[0].SubscriptionRecoveryTimeout
+	}
 	return &broadcaster{
-		closing:             0,
-		subs:                map[uuid.UUID]*activesub{},
-		topics:              map[string]topicsub{},
-		l:                   &sync.RWMutex{},
-		pubc:                pubc,
-		subc:                subc,
-		topicCancelFuncs:    map[string]context.CancelFunc{},
-		shutdownGracePeriod: gracePeriod,
+		closing:                     0,
+		subs:                        map[uuid.UUID]*activesub{},
+		topics:                      map[string]topicsub{},
+		l:                           &sync.RWMutex{},
+		pubc:                        pubc,
+		subc:                        subc,
+		topicWorkers:                map[string]*topicWorker{},
+		shutdownGracePeriod:         gracePeriod,
+		subscriptionRecoveryTimeout: recoveryTimeout,
 	}
 }
 
@@ -104,22 +111,19 @@ type broadcaster struct {
 	// subc is the client connected to Redis for subscribing to pub-sub streams.
 	subc rueidis.Client
 
-	// topicCancelMu protects topicCancelFuncs.
-	topicCancelMu sync.Mutex
+	// topicWorkers is protected by l. Cancelled workers remain until Redis
+	// cleanup completes, so a replacement cannot be unsubscribed by its predecessor.
+	topicWorkers map[string]*topicWorker
 
-	// topicCancelFuncs maps topic keys to the cancel function for their
-	// `runTopic` goroutine. Used by `stopTopic` (last subscriber leaves) and
-	// `Close` (broadcaster shutdown) to terminate the Redis subscription.
-	topicCancelFuncs map[string]context.CancelFunc
-
-	shutdownGracePeriod time.Duration
+	shutdownGracePeriod         time.Duration
+	subscriptionRecoveryTimeout time.Duration
 }
 
-// topicReady pairs a topic with its ready channel from startTopic, used to
-// wait for Redis subscription confirmation after releasing the lock.
+// topicReady records the worker whose initial confirmation Subscribe waits for
+// after releasing the lock. It also identifies the generation to roll back.
 type topicReady struct {
-	topic Topic
-	ready <-chan error
+	topic  Topic
+	worker *topicWorker
 }
 
 func (b *broadcaster) Subscribe(ctx context.Context, s Subscription, topics []streamingtypes.Topic) error {
@@ -143,6 +147,10 @@ func (b *broadcaster) subscribe(
 	}
 
 	b.l.Lock()
+	if atomic.LoadInt32(&b.closing) == 1 {
+		b.l.Unlock()
+		return ErrBroadcasterClosed
+	}
 
 	var pendingTopics []topicReady
 	for _, t := range topics {
@@ -172,23 +180,20 @@ func (b *broadcaster) subscribe(
 		if !seen {
 			topicsubs.subscriptions.Insert(skiplistSub{s})
 			topicsubs.refCount++
-			b.topics[topicHash] = topicsubs
 
 			if topicsubs.refCount == 1 {
-				// Launch the goroutine now (fast, no I/O). Collect the ready
-				// channel to wait on after releasing the lock.
-				pendingTopics = append(pendingTopics, topicReady{
-					topic: t,
-					ready: b.startTopic(t),
-				})
+				topicsubs.worker = b.startTopic(t)
 			}
+			b.topics[topicHash] = topicsubs
+			// All concurrent subscribers wait for the same initial confirmation.
+			pendingTopics = append(pendingTopics, topicReady{topic: t, worker: topicsubs.worker})
 		}
 	}
 
 	if as, ok := b.subs[s.ID()]; ok {
 		as.AddTopics(topics...)
 	} else {
-		as = &activesub{Subscription: s}
+		as = &activesub{Subscription: s, done: make(chan struct{})}
 		as.AddTopics(topics...)
 		b.subs[s.ID()] = as
 		// This is the first time we've seen a subscription.  Send
@@ -218,9 +223,9 @@ func (b *broadcaster) subscribe(
 	var anyErr error
 	for _, pt := range pendingTopics {
 		select {
-		case err := <-pt.ready:
-			if err != nil {
-				anyErr = fmt.Errorf("error starting topic %s: %w", pt.topic.String(), err)
+		case <-pt.worker.ready:
+			if pt.worker.readyErr != nil {
+				anyErr = fmt.Errorf("error starting topic %s: %w", pt.topic.String(), pt.worker.readyErr)
 			}
 		case <-ctx.Done():
 			anyErr = fmt.Errorf("context canceled waiting for topic %s: %w", pt.topic.String(), ctx.Err())
@@ -240,35 +245,38 @@ func (b *broadcaster) subscribe(
 // each topic, cleans up the subscriber record, and stops `runTopic` goroutines
 // for topics that have no remaining subscribers.
 func (b *broadcaster) rollbackPendingTopics(s Subscription, pendingTopics []topicReady) {
-	var topicsToStop []Topic
 	b.l.Lock()
 	for _, pt := range pendingTopics {
 		topicHash := pt.topic.String()
 		topicsubs, ok := b.topics[topicHash]
+		if !ok || topicsubs.worker != pt.worker {
+			// Already removed or replaced by a concurrent subscription.
+			continue
+		}
+		as, ok := b.subs[s.ID()]
 		if !ok {
-			// Already removed by a concurrent `Unsubscribe`.
+			continue
+		}
+		if _, ok := as.Topics[topicHash]; !ok {
 			continue
 		}
 		topicsubs.subscriptions.Delete(skiplistSub{s})
 		topicsubs.refCount--
 		if topicsubs.refCount == 0 {
 			delete(b.topics, topicHash)
-			topicsToStop = append(topicsToStop, pt.topic)
+			b.stopTopic(pt.topic)
 		} else {
 			b.topics[topicHash] = topicsubs
 		}
 		if as, ok := b.subs[s.ID()]; ok {
 			delete(as.Topics, pt.topic.String())
 			if len(as.Topics) == 0 {
+				close(as.done)
 				delete(b.subs, s.ID())
 			}
 		}
 	}
 	b.l.Unlock()
-
-	for _, t := range topicsToStop {
-		b.stopTopic(t)
-	}
 }
 
 // Unsubscribe removes a subscription from specific topics.
@@ -322,17 +330,21 @@ func (b *broadcaster) Unsubscribe(ctx context.Context, subID uuid.UUID, topics [
 // from the subscription map.
 func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid.UUID) error {
 	b.l.Lock()
-	defer b.l.Unlock()
+	sub := b.removeSubscription(subscriptionID)
+	b.l.Unlock()
+	if sub != nil {
+		return sub.Close()
+	}
+	return nil
+}
 
+// removeSubscription detaches a client while l is held. Socket I/O must happen
+// after releasing l so a stalled close cannot block unrelated topics.
+func (b *broadcaster) removeSubscription(subscriptionID uuid.UUID) Subscription {
 	as, ok := b.subs[subscriptionID]
 	if !ok {
 		return nil
 	}
-
-	if err := as.Close(); err != nil {
-		logger.StdlibLogger(ctx).Warn("error closing subscription", "error", err, "sub_id", subscriptionID)
-	}
-
 	// Delete all subscriptions from the topic lookup
 	for _, t := range as.Topics {
 		str := t.String()
@@ -353,9 +365,10 @@ func (b *broadcaster) CloseSubscription(ctx context.Context, subscriptionID uuid
 
 	// Then remove the subscription from our subscription map
 	delete(b.subs, subscriptionID)
+	close(as.done)
 
-	b.recordConnectionMetrics(ctx)
-	return nil
+	b.recordConnectionMetrics(context.Background())
+	return as.Subscription
 }
 
 func (b *broadcaster) recordConnectionMetrics(ctx context.Context) {
@@ -397,11 +410,16 @@ func (b *broadcaster) Close(ctx context.Context) error {
 		CreatedAt: time.Now(),
 	}
 
-	// Send a close notification to all active subscriptions.
+	// A client awaiting its first subscription acknowledgement may not have
+	// committed its SSE headers yet. Do not let its closing write block shutdown.
 	b.l.RLock()
-	defer b.l.RUnlock()
+	var notify []Subscription
 	for _, s := range b.subs {
-		b.publishTo(ctx, s.Subscription, msg)
+		notify = append(notify, s.Subscription)
+	}
+	b.l.RUnlock()
+	for _, sub := range notify {
+		b.wg.Go(func() { b.publishTo(ctx, sub, msg) })
 	}
 
 	go func() {
@@ -417,25 +435,31 @@ func (b *broadcaster) Close(ctx context.Context) error {
 		// all `runTopic` goroutines so `wg.WaitAndRecover` can return.
 		time.Sleep(b.shutdownGracePeriod)
 
-		// Close subs
-		b.l.RLock()
-		for _, s := range b.subs {
-			if err := s.Subscription.Close(); err != nil {
-				logger.StdlibLogger(ctx).Warn("error closing realtime subscription", "error", err)
-			}
+		b.l.Lock()
+		var subs []Subscription
+		for id := range b.subs {
+			subs = append(subs, b.removeSubscription(id))
 		}
-		b.l.RUnlock()
-
-		// Cancel topics
-		b.topicCancelMu.Lock()
-		for _, cancel := range b.topicCancelFuncs {
-			cancel()
+		for _, worker := range b.topicWorkers {
+			worker.cancel()
 		}
-		clear(b.topicCancelFuncs)
-		b.topicCancelMu.Unlock()
+		b.l.Unlock()
+		b.closeSubscriptions(ctx, subs)
 	}()
 
 	return nil
+}
+
+// Detach before calling this helper. Close independent sockets concurrently so
+// a client that does not finish its close handshake cannot delay the others.
+func (b *broadcaster) closeSubscriptions(ctx context.Context, subs []Subscription) {
+	for _, sub := range subs {
+		b.wg.Go(func() {
+			if err := sub.Close(); err != nil {
+				logger.StdlibLogger(ctx).Warn("error closing realtime subscription", "error", err)
+			}
+		})
+	}
 }
 
 // Publish publishes a message to Redis pub/sub. The message is delivered to
@@ -704,160 +728,13 @@ func (b *broadcaster) keepalive(ctx context.Context, subID uuid.UUID) {
 			return
 		}
 
-		<-time.After(KeepaliveInterval)
-	}
-}
-
-// startTopic is called when the first subscriber connects to a topic. It
-// launches the `runTopic` goroutine and returns a channel that signals when the
-// Redis subscription is confirmed (or failed). This is safe to call under `b.l`
-// because it does not block on I/O: the caller should wait on the returned
-// channel after releasing the lock.
-func (b *broadcaster) startTopic(t Topic) <-chan error {
-	b.topicCancelMu.Lock()
-	defer b.topicCancelMu.Unlock()
-
-	key := t.String()
-	if _, ok := b.topicCancelFuncs[key]; ok {
-		// Already running. Return a pre-resolved channel.
-		ch := make(chan error, 1)
-		ch <- nil
-		return ch
-	}
-
-	bgCtx, cancel := context.WithCancel(context.Background())
-	b.topicCancelFuncs[key] = cancel
-
-	// runTopic blocks for the lifetime of the subscription (Receive loops
-	// until ctx is cancelled), so it must run in a goroutine. The ready
-	// channel signals when Redis confirms the subscription.
-	ready := make(chan error, 1)
-	b.wg.Go(func() {
-		b.runTopic(bgCtx, t, ready)
-	})
-	return ready
-}
-
-// stopTopic is called when the last subscriber disconnects from a topic. It
-// cancels the background subscriber goroutine.
-func (b *broadcaster) stopTopic(t Topic) {
-	b.topicCancelMu.Lock()
-	defer b.topicCancelMu.Unlock()
-
-	key := t.String()
-	if cancel, ok := b.topicCancelFuncs[key]; ok {
-		cancel()
-		delete(b.topicCancelFuncs, key)
-	}
-}
-
-// runTopic subscribes to a Redis pub/sub channel for the given topic and
-// forwards received messages to local subscriptions. It signals ready once the
-// Redis subscription is confirmed.
-func (b *broadcaster) runTopic(ctx context.Context, t Topic, ready chan<- error) {
-	var signalReady sync.Once
-
-	defer func() {
-		if r := recover(); r != nil {
-			logger.StdlibLogger(ctx).Error("panic in redis topic subscriber", "panic", r, "topic", t)
-			signalReady.Do(func() { ready <- fmt.Errorf("panic in runTopic: %v", r) })
-		}
-
-		// Explicitly unsubscribe from the topic to ensure that we don't keep
-		// receiving messages on the connection.
-		cmd := b.subc.B().Unsubscribe().Channel(t.String()).Build()
-		if err := b.subc.Do(context.WithoutCancel(ctx), cmd).Error(); err != nil {
-			logger.StdlibLogger(ctx).Warn("failed to unsubscribe from redis topic", "topic", t, "error", err)
-		}
-	}()
-
-	// Use `WithOnSubscriptionHook` to signal readiness once Redis confirms the
-	// subscription.
-	hookCtx := rueidis.WithOnSubscriptionHook(ctx, func(s rueidis.PubSubSubscription) {
-		signalReady.Do(func() { ready <- nil })
-	})
-
-	cmd := b.subc.B().Subscribe().Channel(t.String()).Build()
-	err := b.subc.Receive(hookCtx, cmd, func(msg rueidis.PubSubMessage) {
-		metrics.IncrRealtimeRedisOpsTotal(ctx, metrics.CounterOpt{
-			PkgName: "realtime",
-			Tags: map[string]any{
-				"op": "receive",
-			},
-		})
-
-		// Check if this is raw data (prefixed with redisRawDataPrefix)
-		if strings.HasPrefix(msg.Message, redisRawDataPrefix) {
-			metrics.IncrRealtimeRedisMessageTypesTotal(ctx, metrics.CounterOpt{
-				PkgName: "realtime",
-				Tags: map[string]any{
-					"type": "raw",
-				},
-			})
-			rawData := []byte(msg.Message[len(redisRawDataPrefix):])
-			b.writeToTopic(ctx, t, rawData)
+		timer := time.NewTimer(KeepaliveInterval)
+		select {
+		case <-sub.done:
+			timer.Stop()
 			return
+		case <-timer.C:
 		}
-
-		// Check if this is a chunk (prefixed with redisChunkPrefix)
-		if strings.HasPrefix(msg.Message, redisChunkPrefix) {
-			metrics.IncrRealtimeRedisMessageTypesTotal(ctx, metrics.CounterOpt{
-				PkgName: "realtime",
-				Tags: map[string]any{
-					"type": "chunk",
-				},
-			})
-			var c Chunk
-			if err := json.Unmarshal([]byte(msg.Message[len(redisChunkPrefix):]), &c); err != nil {
-				logger.StdlibLogger(ctx).Error(
-					"error unmarshalling chunk for realtime redis pubsub",
-					"error", err,
-				)
-				return
-			}
-			b.publishChunkToTopic(ctx, t, c)
-			return
-		}
-
-		metrics.IncrRealtimeRedisMessageTypesTotal(ctx, metrics.CounterOpt{
-			PkgName: "realtime",
-			Tags: map[string]any{
-				"type": "structured",
-			},
-		})
-		m := Message{}
-		err := json.Unmarshal([]byte(msg.Message), &m)
-		if err != nil {
-			metrics.IncrRealtimeRedisErrorsTotal(ctx, metrics.CounterOpt{
-				PkgName: "realtime",
-				Tags: map[string]any{
-					"op": "unmarshal",
-				},
-			})
-			logger.StdlibLogger(ctx).Error(
-				"error unmarshalling for realtime redis pubsub",
-				"error", err,
-			)
-			return
-		}
-		b.publishToTopic(ctx, t, m)
-	})
-
-	// On the happy path the subscription hook already signaled ready and
-	// `sync.Once` makes this a no-op. On the sad path (e.g. connection failure
-	// before the hook fires) this is the first call, so we forward the error to
-	// `startTopic` to unblock it.
-	signalReady.Do(func() { ready <- err })
-
-	// We only care about a non-nil error when the context is not cancelled.
-	// Context cancellation is part of the happy path: context is cancelled when
-	// the last subscriber disconnects (i.e. `stopTopic` calls `cancel()`).
-	if err != nil && ctx.Err() == nil {
-		logger.StdlibLogger(ctx).Error(
-			"redis topic subscription error",
-			"error", err,
-			"topic", t,
-		)
 	}
 }
 
@@ -929,6 +806,7 @@ func (b *broadcaster) redisPublish(ctx context.Context, channel, message string)
 // more Topics, for lookup from subscriber -> topics.
 type activesub struct {
 	Subscription
+	done chan struct{}
 
 	// Topics lists all topics that the subscription is interested in
 	Topics map[string]Topic
@@ -948,6 +826,7 @@ func (a *activesub) AddTopics(t ...Topic) {
 // by topic -> subscribers.
 type topicsub struct {
 	Topic
+	worker *topicWorker
 
 	subscriptions *skiplist.SkipList
 	refCount      int

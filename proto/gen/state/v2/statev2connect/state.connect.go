@@ -59,6 +59,20 @@ const (
 	// RunServiceSaveRejectedDeferProcedure is the fully-qualified name of the RunService's
 	// SaveRejectedDefer RPC.
 	RunServiceSaveRejectedDeferProcedure = "/state.v2.RunService/SaveRejectedDefer"
+	// RunServiceSaveInboxMessageProcedure is the fully-qualified name of the RunService's
+	// SaveInboxMessage RPC.
+	RunServiceSaveInboxMessageProcedure = "/state.v2.RunService/SaveInboxMessage"
+	// RunServiceRecordInboxWaitProcedure is the fully-qualified name of the RunService's
+	// RecordInboxWait RPC.
+	RunServiceRecordInboxWaitProcedure = "/state.v2.RunService/RecordInboxWait"
+	// RunServiceTimeoutInboxWaitProcedure is the fully-qualified name of the RunService's
+	// TimeoutInboxWait RPC.
+	RunServiceTimeoutInboxWaitProcedure = "/state.v2.RunService/TimeoutInboxWait"
+	// RunServiceCloseInboxProcedure is the fully-qualified name of the RunService's CloseInbox RPC.
+	RunServiceCloseInboxProcedure = "/state.v2.RunService/CloseInbox"
+	// RunServiceDeleteInboxWaitProcedure is the fully-qualified name of the RunService's
+	// DeleteInboxWait RPC.
+	RunServiceDeleteInboxWaitProcedure = "/state.v2.RunService/DeleteInboxWait"
 	// RunServiceLoadMetadataProcedure is the fully-qualified name of the RunService's LoadMetadata RPC.
 	RunServiceLoadMetadataProcedure = "/state.v2.RunService/LoadMetadata"
 	// RunServiceLoadEventsProcedure is the fully-qualified name of the RunService's LoadEvents RPC.
@@ -87,6 +101,11 @@ type RunServiceClient interface {
 	SaveDefer(context.Context, *connect.Request[v2.SaveDeferRequest]) (*connect.Response[v2.SaveDeferResponse], error)
 	SetDeferStatus(context.Context, *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error)
 	SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error)
+	SaveInboxMessage(context.Context, *connect.Request[v2.SaveInboxMessageRequest]) (*connect.Response[v2.SaveInboxMessageResponse], error)
+	RecordInboxWait(context.Context, *connect.Request[v2.RecordInboxWaitRequest]) (*connect.Response[v2.RecordInboxWaitResponse], error)
+	TimeoutInboxWait(context.Context, *connect.Request[v2.TimeoutInboxWaitRequest]) (*connect.Response[v2.TimeoutInboxWaitResponse], error)
+	CloseInbox(context.Context, *connect.Request[v2.CloseInboxRequest]) (*connect.Response[v2.CloseInboxResponse], error)
+	DeleteInboxWait(context.Context, *connect.Request[v2.DeleteInboxWaitRequest]) (*connect.Response[v2.DeleteInboxWaitResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -172,6 +191,36 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("SaveRejectedDefer")),
 			connect.WithClientOptions(opts...),
 		),
+		saveInboxMessage: connect.NewClient[v2.SaveInboxMessageRequest, v2.SaveInboxMessageResponse](
+			httpClient,
+			baseURL+RunServiceSaveInboxMessageProcedure,
+			connect.WithSchema(runServiceMethods.ByName("SaveInboxMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		recordInboxWait: connect.NewClient[v2.RecordInboxWaitRequest, v2.RecordInboxWaitResponse](
+			httpClient,
+			baseURL+RunServiceRecordInboxWaitProcedure,
+			connect.WithSchema(runServiceMethods.ByName("RecordInboxWait")),
+			connect.WithClientOptions(opts...),
+		),
+		timeoutInboxWait: connect.NewClient[v2.TimeoutInboxWaitRequest, v2.TimeoutInboxWaitResponse](
+			httpClient,
+			baseURL+RunServiceTimeoutInboxWaitProcedure,
+			connect.WithSchema(runServiceMethods.ByName("TimeoutInboxWait")),
+			connect.WithClientOptions(opts...),
+		),
+		closeInbox: connect.NewClient[v2.CloseInboxRequest, v2.CloseInboxResponse](
+			httpClient,
+			baseURL+RunServiceCloseInboxProcedure,
+			connect.WithSchema(runServiceMethods.ByName("CloseInbox")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteInboxWait: connect.NewClient[v2.DeleteInboxWaitRequest, v2.DeleteInboxWaitResponse](
+			httpClient,
+			baseURL+RunServiceDeleteInboxWaitProcedure,
+			connect.WithSchema(runServiceMethods.ByName("DeleteInboxWait")),
+			connect.WithClientOptions(opts...),
+		),
 		loadMetadata: connect.NewClient[v2.LoadMetadataRequest, v2.LoadMetadataResponse](
 			httpClient,
 			baseURL+RunServiceLoadMetadataProcedure,
@@ -224,6 +273,11 @@ type runServiceClient struct {
 	saveDefer         *connect.Client[v2.SaveDeferRequest, v2.SaveDeferResponse]
 	setDeferStatus    *connect.Client[v2.SetDeferStatusRequest, v2.SetDeferStatusResponse]
 	saveRejectedDefer *connect.Client[v2.SaveRejectedDeferRequest, v2.SaveRejectedDeferResponse]
+	saveInboxMessage  *connect.Client[v2.SaveInboxMessageRequest, v2.SaveInboxMessageResponse]
+	recordInboxWait   *connect.Client[v2.RecordInboxWaitRequest, v2.RecordInboxWaitResponse]
+	timeoutInboxWait  *connect.Client[v2.TimeoutInboxWaitRequest, v2.TimeoutInboxWaitResponse]
+	closeInbox        *connect.Client[v2.CloseInboxRequest, v2.CloseInboxResponse]
+	deleteInboxWait   *connect.Client[v2.DeleteInboxWaitRequest, v2.DeleteInboxWaitResponse]
 	loadMetadata      *connect.Client[v2.LoadMetadataRequest, v2.LoadMetadataResponse]
 	loadEvents        *connect.Client[v2.LoadEventsRequest, v2.LoadEventsResponse]
 	loadSteps         *connect.Client[v2.LoadStepsRequest, v2.LoadStepsResponse]
@@ -287,6 +341,31 @@ func (c *runServiceClient) SaveRejectedDefer(ctx context.Context, req *connect.R
 	return c.saveRejectedDefer.CallUnary(ctx, req)
 }
 
+// SaveInboxMessage calls state.v2.RunService.SaveInboxMessage.
+func (c *runServiceClient) SaveInboxMessage(ctx context.Context, req *connect.Request[v2.SaveInboxMessageRequest]) (*connect.Response[v2.SaveInboxMessageResponse], error) {
+	return c.saveInboxMessage.CallUnary(ctx, req)
+}
+
+// RecordInboxWait calls state.v2.RunService.RecordInboxWait.
+func (c *runServiceClient) RecordInboxWait(ctx context.Context, req *connect.Request[v2.RecordInboxWaitRequest]) (*connect.Response[v2.RecordInboxWaitResponse], error) {
+	return c.recordInboxWait.CallUnary(ctx, req)
+}
+
+// TimeoutInboxWait calls state.v2.RunService.TimeoutInboxWait.
+func (c *runServiceClient) TimeoutInboxWait(ctx context.Context, req *connect.Request[v2.TimeoutInboxWaitRequest]) (*connect.Response[v2.TimeoutInboxWaitResponse], error) {
+	return c.timeoutInboxWait.CallUnary(ctx, req)
+}
+
+// CloseInbox calls state.v2.RunService.CloseInbox.
+func (c *runServiceClient) CloseInbox(ctx context.Context, req *connect.Request[v2.CloseInboxRequest]) (*connect.Response[v2.CloseInboxResponse], error) {
+	return c.closeInbox.CallUnary(ctx, req)
+}
+
+// DeleteInboxWait calls state.v2.RunService.DeleteInboxWait.
+func (c *runServiceClient) DeleteInboxWait(ctx context.Context, req *connect.Request[v2.DeleteInboxWaitRequest]) (*connect.Response[v2.DeleteInboxWaitResponse], error) {
+	return c.deleteInboxWait.CallUnary(ctx, req)
+}
+
 // LoadMetadata calls state.v2.RunService.LoadMetadata.
 func (c *runServiceClient) LoadMetadata(ctx context.Context, req *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {
 	return c.loadMetadata.CallUnary(ctx, req)
@@ -330,6 +409,11 @@ type RunServiceHandler interface {
 	SaveDefer(context.Context, *connect.Request[v2.SaveDeferRequest]) (*connect.Response[v2.SaveDeferResponse], error)
 	SetDeferStatus(context.Context, *connect.Request[v2.SetDeferStatusRequest]) (*connect.Response[v2.SetDeferStatusResponse], error)
 	SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error)
+	SaveInboxMessage(context.Context, *connect.Request[v2.SaveInboxMessageRequest]) (*connect.Response[v2.SaveInboxMessageResponse], error)
+	RecordInboxWait(context.Context, *connect.Request[v2.RecordInboxWaitRequest]) (*connect.Response[v2.RecordInboxWaitResponse], error)
+	TimeoutInboxWait(context.Context, *connect.Request[v2.TimeoutInboxWaitRequest]) (*connect.Response[v2.TimeoutInboxWaitResponse], error)
+	CloseInbox(context.Context, *connect.Request[v2.CloseInboxRequest]) (*connect.Response[v2.CloseInboxResponse], error)
+	DeleteInboxWait(context.Context, *connect.Request[v2.DeleteInboxWaitRequest]) (*connect.Response[v2.DeleteInboxWaitResponse], error)
 	LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error)
 	LoadEvents(context.Context, *connect.Request[v2.LoadEventsRequest]) (*connect.Response[v2.LoadEventsResponse], error)
 	LoadSteps(context.Context, *connect.Request[v2.LoadStepsRequest]) (*connect.Response[v2.LoadStepsResponse], error)
@@ -411,6 +495,36 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("SaveRejectedDefer")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceSaveInboxMessageHandler := connect.NewUnaryHandler(
+		RunServiceSaveInboxMessageProcedure,
+		svc.SaveInboxMessage,
+		connect.WithSchema(runServiceMethods.ByName("SaveInboxMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceRecordInboxWaitHandler := connect.NewUnaryHandler(
+		RunServiceRecordInboxWaitProcedure,
+		svc.RecordInboxWait,
+		connect.WithSchema(runServiceMethods.ByName("RecordInboxWait")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceTimeoutInboxWaitHandler := connect.NewUnaryHandler(
+		RunServiceTimeoutInboxWaitProcedure,
+		svc.TimeoutInboxWait,
+		connect.WithSchema(runServiceMethods.ByName("TimeoutInboxWait")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceCloseInboxHandler := connect.NewUnaryHandler(
+		RunServiceCloseInboxProcedure,
+		svc.CloseInbox,
+		connect.WithSchema(runServiceMethods.ByName("CloseInbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceDeleteInboxWaitHandler := connect.NewUnaryHandler(
+		RunServiceDeleteInboxWaitProcedure,
+		svc.DeleteInboxWait,
+		connect.WithSchema(runServiceMethods.ByName("DeleteInboxWait")),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceLoadMetadataHandler := connect.NewUnaryHandler(
 		RunServiceLoadMetadataProcedure,
 		svc.LoadMetadata,
@@ -471,6 +585,16 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceSetDeferStatusHandler.ServeHTTP(w, r)
 		case RunServiceSaveRejectedDeferProcedure:
 			runServiceSaveRejectedDeferHandler.ServeHTTP(w, r)
+		case RunServiceSaveInboxMessageProcedure:
+			runServiceSaveInboxMessageHandler.ServeHTTP(w, r)
+		case RunServiceRecordInboxWaitProcedure:
+			runServiceRecordInboxWaitHandler.ServeHTTP(w, r)
+		case RunServiceTimeoutInboxWaitProcedure:
+			runServiceTimeoutInboxWaitHandler.ServeHTTP(w, r)
+		case RunServiceCloseInboxProcedure:
+			runServiceCloseInboxHandler.ServeHTTP(w, r)
+		case RunServiceDeleteInboxWaitProcedure:
+			runServiceDeleteInboxWaitHandler.ServeHTTP(w, r)
 		case RunServiceLoadMetadataProcedure:
 			runServiceLoadMetadataHandler.ServeHTTP(w, r)
 		case RunServiceLoadEventsProcedure:
@@ -534,6 +658,26 @@ func (UnimplementedRunServiceHandler) SetDeferStatus(context.Context, *connect.R
 
 func (UnimplementedRunServiceHandler) SaveRejectedDefer(context.Context, *connect.Request[v2.SaveRejectedDeferRequest]) (*connect.Response[v2.SaveRejectedDeferResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SaveRejectedDefer is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) SaveInboxMessage(context.Context, *connect.Request[v2.SaveInboxMessageRequest]) (*connect.Response[v2.SaveInboxMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.SaveInboxMessage is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) RecordInboxWait(context.Context, *connect.Request[v2.RecordInboxWaitRequest]) (*connect.Response[v2.RecordInboxWaitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.RecordInboxWait is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) TimeoutInboxWait(context.Context, *connect.Request[v2.TimeoutInboxWaitRequest]) (*connect.Response[v2.TimeoutInboxWaitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.TimeoutInboxWait is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) CloseInbox(context.Context, *connect.Request[v2.CloseInboxRequest]) (*connect.Response[v2.CloseInboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.CloseInbox is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) DeleteInboxWait(context.Context, *connect.Request[v2.DeleteInboxWaitRequest]) (*connect.Response[v2.DeleteInboxWaitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.DeleteInboxWait is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) LoadMetadata(context.Context, *connect.Request[v2.LoadMetadataRequest]) (*connect.Response[v2.LoadMetadataResponse], error) {

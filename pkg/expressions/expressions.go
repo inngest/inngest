@@ -24,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -37,6 +38,7 @@ var (
 
 	exprCompiler expr.CELCompiler
 	treeParser   expr.TreeParser
+	planBuilds   singleflight.Group
 )
 
 func init() {
@@ -159,20 +161,19 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if vars != nil {
 			lifted = vars.Map()
 		}
-		eval := &expressionEvaluator{
-			ast:        ast,
-			env:        e,
-			expression: expression,
-			liftedVars: lifted,
-		}
-		if err := eval.parseAttributes(ctx); err != nil {
-			return nil, err
-		}
-		prog, err := buildProgram(ast, e, true)
+		plan, err := cachedExpressionPlan(ctx, ast, e)
 		if err != nil {
 			return nil, err
 		}
-		eval.prog = prog
+		eval := &expressionEvaluator{
+			liftedVars: lifted,
+			prog:       plan.prog,
+			fullPaths:  plan.fullPaths,
+			patterns:   plan.patterns,
+			attrs:      plan.attrs,
+			ast:        plan.ast,
+			env:        plan.env,
+		}
 		cache.Set(cacheKey, eval, CacheTTL)
 		return eval, nil
 	}
@@ -197,19 +198,18 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 	if issues != nil {
 		return nil, NewCompileError(issues.Err())
 	}
-	eval := &expressionEvaluator{
-		ast:        ast,
-		env:        e,
-		expression: expression,
-	}
-	if err := eval.parseAttributes(ctx); err != nil {
-		return nil, err
-	}
-	prog, err := buildProgram(ast, e, true)
+	plan, err := buildExpressionPlan(ctx, ast, e)
 	if err != nil {
 		return nil, err
 	}
-	eval.prog = prog
+	eval := &expressionEvaluator{
+		prog:      plan.prog,
+		fullPaths: plan.fullPaths,
+		patterns:  plan.patterns,
+		attrs:     plan.attrs,
+		ast:       plan.ast,
+		env:       plan.env,
+	}
 	cache.Set("eval:"+expression, eval, CacheTTL)
 	return eval, nil
 }
@@ -235,29 +235,84 @@ func (b booleanEvaluator) Evaluate(ctx context.Context, data *Data) (bool, error
 	return result, err
 }
 
-type expressionEvaluator struct {
+type expressionPlan struct {
 	ast *cel.Ast
 	env *cel.Env
-
-	// expression is the raw expression
-	expression string
-
-	// liftedVars are vars lifted from the expression, if parsed with a lifting
-	// parser.
-	liftedVars map[string]any
 
 	// attrs determines which attributes are referenced within the expression.
 	// Used to build PartialActivations and to optimistically load only necessary data.
 	attrs *UsedAttributes
 
 	// prog is the compiled, data-independent cel.Program built once and reused across
-	// all evaluations of this expression.  Safe for concurrent use.
+	// all evaluations of expressions with the same lifted AST. Safe for concurrent use.
 	prog *celProgram
 
 	// fullPaths and patterns are pre-computed from attrs once and reused on every
-	// Evaluate call.  fullPaths[i] and patterns[i] refer to the same attribute path.
+	// Evaluate call. fullPaths[i] and patterns[i] refer to the same attribute path.
 	fullPaths [][]string
 	patterns  []*interpreter.AttributePattern
+}
+
+type expressionEvaluator struct {
+	// liftedVars are vars lifted from the expression, if parsed with a lifting
+	// parser.
+	liftedVars map[string]any
+
+	// Keep fields used by Evaluate together; evaluators are invoked concurrently
+	// on the pause matching hot path.
+	prog      *celProgram
+	fullPaths [][]string
+	patterns  []*interpreter.AttributePattern
+
+	attrs *UsedAttributes
+	ast   *cel.Ast
+	env   *cel.Env
+}
+
+func cachedExpressionPlan(ctx context.Context, ast *cel.Ast, env *cel.Env) (*expressionPlan, error) {
+	key := "plan:" + ast.Source().Content()
+	if cached := cache.Get(key); cached != nil {
+		cached.Extend(CacheExtendTime)
+		return cached.Value().(*expressionPlan), nil
+	}
+
+	value, err, _ := planBuilds.Do(key, func() (any, error) {
+		if cached := cache.Get(key); cached != nil {
+			cached.Extend(CacheExtendTime)
+			return cached.Value().(*expressionPlan), nil
+		}
+
+		plan, err := buildExpressionPlan(ctx, ast, env)
+		if err != nil {
+			return nil, err
+		}
+		cache.Set(key, plan, CacheTTL)
+		return plan, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*expressionPlan), nil
+}
+
+func buildExpressionPlan(ctx context.Context, ast *cel.Ast, env *cel.Env) (*expressionPlan, error) {
+	attrs, err := parseUsedAttributes(ctx, ast)
+	if err != nil {
+		return nil, err
+	}
+	fullPaths, patterns := precomputePatterns(attrs)
+	prog, err := buildProgram(ast, env, true)
+	if err != nil {
+		return nil, err
+	}
+	return &expressionPlan{
+		ast:       ast,
+		env:       env,
+		attrs:     attrs,
+		prog:      prog,
+		fullPaths: fullPaths,
+		patterns:  patterns,
+	}, nil
 }
 
 // Evaluate evaluates the cached expression against the provided data.
@@ -328,19 +383,4 @@ func (e *expressionEvaluator) FilteredAttributes(ctx context.Context, d *Data) *
 	// Data field.  This prevents us from needlesly mapifying
 	// data from a constructor.
 	return &Data{data: filtered}
-}
-
-// ParseAttributes returns the attributes used within the expression.
-func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
-	if e.attrs != nil {
-		return nil
-	}
-
-	attrs, err := parseUsedAttributes(ctx, e.ast)
-	if err != nil {
-		return err
-	}
-	e.attrs = attrs
-	e.fullPaths, e.patterns = precomputePatterns(attrs)
-	return nil
 }

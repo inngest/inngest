@@ -69,6 +69,44 @@ type GetAppsResult struct {
 	HasMore bool
 }
 
+type AppSyncProvider interface {
+	// ListAppSyncs returns syncs scoped to app and the current environment,
+	// ordered by created_at DESC, id DESC. Cursor is the last returned sync ID
+	// and is exclusive; an unknown cursor or one belonging to another app or
+	// environment returns ErrInvalidCursor (HTTP 400).
+	ListAppSyncs(ctx context.Context, app App, opts ListAppSyncsOpts) (*ListAppSyncsResult, error)
+	// GetAppSync is scoped to app and the current environment. Missing syncs,
+	// including those belonging to another app or environment, return ErrAppSyncNotFound.
+	GetAppSync(ctx context.Context, app App, syncID uuid.UUID) (AppSyncRecord, error)
+}
+
+type ListAppSyncsOpts struct {
+	Cursor uuid.UUID
+	Limit  int
+}
+
+type ListAppSyncsResult struct {
+	Syncs   []AppSyncRecord
+	HasMore bool
+}
+
+type AppSyncRecord struct {
+	ID          uuid.UUID
+	Status      string
+	URL         string
+	SDKLanguage string
+	SDKVersion  string
+	Framework   string
+	AppVersion  string
+	Error       *SyncError
+	CreatedAt   time.Time
+}
+
+type SyncError struct {
+	Code    string
+	Message string
+}
+
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be
 	// executed via our async execution engine as quickly as possible.
@@ -86,6 +124,11 @@ type EventPublisher interface {
 }
 
 type EventSender func(context.Context, *event.Event) (string, error)
+
+type EventProvider interface {
+	GetEvent(ctx context.Context, id ulid.ULID) (*cqrs.Event, error)
+	GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error)
+}
 
 type FunctionPauser interface {
 	// idempotent pause and resume; may apply asynchronously
@@ -245,4 +288,13 @@ type ScoreProvider interface {
 	// missing runs or steps may not surface in queries. Implementations return
 	// ErrScoresNotEnabled when the account cannot submit scores.
 	CreateScores(ctx context.Context, params CreateScoresParams) error
+}
+
+type CreateCancellationOpts struct {
+	From, Until time.Time
+	If, Name    *string
+}
+
+type CancellationCreator interface {
+	CreateCancellation(context.Context, inngest.DeployedFunction, CreateCancellationOpts) (*cqrs.Cancellation, error)
 }

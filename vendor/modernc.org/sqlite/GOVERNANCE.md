@@ -2,6 +2,8 @@
 
  * **Primary Maintainer:** Jan Mercl, GitLab @cznic, GitHub @j-modernc-org
 
+ * **Maintainer:** Ian Chechin, GitLab @Deln0r, GitHub @Deln0r
+
  * **Canonical Source:** GitLab ([cznic/sqlite](https://gitlab.com/cznic/sqlite))
 
  * **Community Hub:** GitHub ([modernc-org/sqlite](https://github.com/modernc-org/sqlite))

@@ -1,0 +1,20 @@
+{
+  "description": "Each side of a join gets its own table's predicates.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "name = 'app/evt'",
+        "physical": "events.event_name = 'app/evt'",
+        "pushed": true
+      }
+    ],
+    "runs": [
+      {
+        "logical": "function_id = 'my-fn'",
+        "physical": "runs.function_slug = 'my-fn'",
+        "pushed": true
+      }
+    ]
+  }
+}

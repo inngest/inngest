@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
-import type { SpanMetadata, SpanMetadataKind } from './types';
+import { canonicalMetadataKind } from './metadataKind';
+import type { SpanMetadata } from './types';
 
 const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
@@ -11,7 +12,7 @@ const inngestKindLabels: Record<string, string> = {
   warnings: 'Warnings',
 };
 
-const getKindLabel = (kind: SpanMetadataKind): string => {
+const getKindLabel = (kind: string): string => {
   const [namespace, kindName] = kind.split('.');
   if (!kindName) {
     return `Unknown Metadata (kind: ${kind})`;
@@ -34,7 +35,8 @@ const getKindLabel = (kind: SpanMetadataKind): string => {
 // to accept any arm's values (including generated interface types like
 // AIMetadata, which lack an implicit index signature).
 type MetadataAttrRowProps = {
-  kind: SpanMetadataKind;
+  // The full kind, see canonicalMetadataKind.
+  kind: string;
   scope: SpanMetadata['scope'];
   values: SpanMetadata['values'];
   updatedAt: string;
@@ -100,8 +102,8 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
 
             return (
               <MetadataAttrRow
-                key={`metadata-attr-${md.scope}-${md.kind}`}
-                kind={md.kind}
+                key={`metadata-attr-${md.scope}-${canonicalMetadataKind(md)}`}
+                kind={canonicalMetadataKind(md)}
                 scope={md.scope}
                 values={md.values}
                 updatedAt={md.updatedAt}

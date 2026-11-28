@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_datetime.yaml'
+
+# basic: Basic examples without any special cases
+add_intervals('PT10H'::iday, 'PT5H'::iday) = 'P0DT15H0M0S'::iday
+add_intervals('P10D'::iday, 'P5D'::iday) = 'P15D'::iday
+add_intervals('P1D'::iday, 'PT10H'::iday) = 'P1DT10H0M0S'::iday
+
+# null_input: Basic examples where the input args or return is null
+add_intervals(null::iyear?, 'P1Y'::iyear) = null::iyear?
+add_intervals(null::iday?, 'P1D'::iday) = null::iday?

@@ -1,0 +1,28 @@
+{
+  "description": "An OR, a NOT, a LIKE and a NOT IN each become one predicate tree.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "(status = 'Failed' OR app_id LIKE 'billing-%')",
+        "physical": "(runs.status = 'Failed' OR runs.app_name LIKE 'billing-%')",
+        "pushed": true
+      },
+      {
+        "logical": "NOT status = 'Running'",
+        "physical": "NOT runs.status = 'Running'",
+        "pushed": true
+      },
+      {
+        "logical": "NOT app_id IN ('a', 'b')",
+        "physical": "NOT runs.app_name IN ('a', 'b')",
+        "pushed": true
+      },
+      {
+        "logical": "attributes-\u003e\u003e'user.tier' LIKE 'g%'",
+        "physical": "runs.attributes-\u003e\u003e'user.tier' LIKE 'g%'",
+        "pushed": true
+      }
+    ]
+  }
+}

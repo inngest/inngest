@@ -1,0 +1,13 @@
+{
+  "description": "An IN-subquery's own WHERE is extracted for its table.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "name = 'app/evt'",
+        "physical": "events.event_name = 'app/evt'",
+        "pushed": true
+      }
+    ]
+  }
+}

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -302,4 +303,32 @@ func GetBoolValue(cmd *cli.Command, key string, defaultValue bool) bool {
 
 	// Finally return default
 	return defaultValue
+}
+
+// NonDefaultFlags returns the names of cmd's flags whose resolved value (CLI
+// flag, env var, or config file, using the same priority as the getters above)
+// differs from the flag's default, as a set (every value is true). Only flag
+// names are reported, never values, so this is safe to send as telemetry.
+func NonDefaultFlags(cmd *cli.Command) map[string]bool {
+	out := map[string]bool{}
+	for _, f := range cmd.Flags {
+		name := f.Names()[0]
+		var nonDefault bool
+		switch flag := f.(type) {
+		case *cli.BoolFlag:
+			nonDefault = GetBoolValue(cmd, name, flag.Value) != flag.Value
+		case *cli.IntFlag:
+			nonDefault = GetIntValue(cmd, name, flag.Value) != flag.Value
+		case *cli.StringFlag:
+			nonDefault = GetValue(cmd, name, flag.Value) != flag.Value
+		case *cli.StringSliceFlag:
+			nonDefault = !slices.Equal(GetStringSlice(cmd, name), flag.Value)
+		default:
+			nonDefault = cmd.IsSet(name)
+		}
+		if nonDefault {
+			out[name] = true
+		}
+	}
+	return out
 }

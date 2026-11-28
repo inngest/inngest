@@ -25,6 +25,33 @@
       }
     }
   },
+  "/account/usage": {
+    "get": {
+      "200": {
+        "data": {
+          "executions": "12500",
+          "executionsLimit": "50000",
+          "periodStart": "2026-11-01T00:00:00Z",
+          "periodEnd": "2026-12-01T00:00:00Z",
+          "executionCap": {
+            "limit": "50000",
+            "enforced": true
+          },
+          "seats": {
+            "used": "2",
+            "limit": "5"
+          },
+          "limits": {
+            "concurrentSteps": "5",
+            "workers": "3"
+          }
+        },
+        "metadata": {
+          "fetchedAt": "2026-11-16T12:00:00Z"
+        }
+      }
+    }
+  },
   "/apps/{appId}": {
     "get": {
       "200": {
@@ -401,6 +428,189 @@
           {
             "code": "internal_error",
             "message": "Something went wrong"
+          }
+        ]
+      }
+    }
+  },
+  "/apps/{appId}/functions/pause": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": true,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions/resume": {
+    "post": {
+      "200": {
+        "data": [
+          {
+            "functionId": "send-welcome-email",
+            "function": {
+              "app": {
+                "id": "my-app"
+              },
+              "configuration": {
+                "retries": {
+                  "isDefault": true,
+                  "value": 3
+                }
+              },
+              "id": "send-welcome-email",
+              "isArchived": false,
+              "isPaused": false,
+              "name": "Send welcome email",
+              "slug": "send-welcome-email",
+              "triggers": [
+                {
+                  "type": "EVENT",
+                  "value": "user.created"
+                }
+              ]
+            }
+          },
+          {
+            "functionId": "sync-user",
+            "error": {
+              "code": "not_found",
+              "message": "Function not found"
+            }
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-11-06T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/syncs": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "id": "7d9a8e1b-3f24-4d6c-9a50-2e7f6b8c1d03",
+            "appId": "my-app",
+            "status": "success",
+            "url": "https://example.com/api/inngest",
+            "sdkLanguage": "typescript",
+            "sdkVersion": "3.22.0",
+            "framework": "nextjs",
+            "appVersion": "v1.2.3",
+            "createdAt": "2026-06-10T11:55:00Z"
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        },
+        "page": {
+          "limit": 20,
+          "hasMore": false
+        }
+      }
+    }
+  },
+  "/apps/{appId}/syncs/{syncId}": {
+    "get": {
+      "200": {
+        "data": {
+          "id": "7d9a8e1b-3f24-4d6c-9a50-2e7f6b8c1d03",
+          "appId": "my-app",
+          "status": "success",
+          "url": "https://example.com/api/inngest",
+          "sdkLanguage": "typescript",
+          "sdkVersion": "3.22.0",
+          "framework": "nextjs",
+          "appVersion": "v1.2.3",
+          "createdAt": "2026-06-10T11:55:00Z"
+        },
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        }
+      }
+    }
+  },
+  "/webhooks/{id}": {
+    "post": {
+      "200": {
+        "data": {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "name": "Payment Processing Webhook",
+          "url": "https://inn.gs/e/example-webhook",
+          "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+          "environment": "production",
+          "createdAt": "2024-01-10T09:15:00Z",
+          "updatedAt": "2024-01-20T14:22:33Z"
+        },
+        "metadata": {
+          "fetchedAt": "2024-01-20T14:22:33Z",
+          "cachedUntil": null
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Name or transform is required"
+          }
+        ]
+      },
+      "404": {
+        "errors": [
+          {
+            "code": "not_found",
+            "message": "Webhook not found"
+          }
+        ]
+      },
+      "413": {
+        "errors": [
+          {
+            "code": "invalid_request",
+            "message": "Request body cannot exceed 16384 bytes"
+          }
+        ]
+      },
+      "429": {
+        "errors": [
+          {
+            "code": "rate_limited",
+            "message": "API rate limit exceeded. The request was rejected and the webhook was not updated."
           }
         ]
       }

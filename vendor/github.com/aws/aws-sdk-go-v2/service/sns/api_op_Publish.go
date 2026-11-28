@@ -4,11 +4,8 @@ package sns
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Sends a message to an Amazon SNS topic, a text message (SMS message) directly
@@ -105,29 +102,64 @@ type PublishInput struct {
 	// Message attributes for Publish action.
 	MessageAttributes map[string]types.MessageAttributeValue
 
-	// This parameter applies only to FIFO (first-in-first-out) topics. The
-	// MessageDeduplicationId can contain up to 128 alphanumeric characters (a-z, A-Z,
-	// 0-9) and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
+	//   - This parameter applies only to FIFO (first-in-first-out) topics. The
+	//   MessageDeduplicationId can contain up to 128 alphanumeric characters (a-z,
+	//   A-Z, 0-9) and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	//
-	// Every message must have a unique MessageDeduplicationId , which is a token used
-	// for deduplication of sent messages. If a message with a particular
-	// MessageDeduplicationId is sent successfully, any message sent with the same
-	// MessageDeduplicationId during the 5-minute deduplication interval is treated as
-	// a duplicate.
+	//   - Every message must have a unique MessageDeduplicationId , which is a token
+	//   used for deduplication of sent messages within the 5 minute minimum
+	//   deduplication interval.
 	//
-	// If the topic has ContentBasedDeduplication set, the system generates a
-	// MessageDeduplicationId based on the contents of the message. Your
-	// MessageDeduplicationId overrides the generated one.
+	//   - The scope of deduplication depends on the FifoThroughputScope attribute,
+	//   when set to Topic the message deduplication scope is across the entire topic,
+	//   when set to MessageGroup the message deduplication scope is within each
+	//   individual message group.
+	//
+	//   - If a message with a particular MessageDeduplicationId is sent successfully,
+	//   subsequent messages within the deduplication scope and interval, with the same
+	//   MessageDeduplicationId , are accepted successfully but aren't delivered.
+	//
+	//   - Every message must have a unique MessageDeduplicationId :
+	//
+	//   - You may provide a MessageDeduplicationId explicitly.
+	//
+	//   - If you aren't able to provide a MessageDeduplicationId and you enable
+	//   ContentBasedDeduplication for your topic, Amazon SNS uses a SHA-256 hash to
+	//   generate the MessageDeduplicationId using the body of the message (but not the
+	//   attributes of the message).
+	//
+	//   - If you don't provide a MessageDeduplicationId and the topic doesn't have
+	//   ContentBasedDeduplication set, the action fails with an error.
+	//
+	//   - If the topic has a ContentBasedDeduplication set, your
+	//   MessageDeduplicationId overrides the generated one.
+	//
+	//   - When ContentBasedDeduplication is in effect, messages with identical content
+	//   sent within the deduplication scope and interval are treated as duplicates and
+	//   only one copy of the message is delivered.
+	//
+	//   - If you send one message with ContentBasedDeduplication enabled, and then
+	//   another message with a MessageDeduplicationId that is the same as the one
+	//   generated for the first MessageDeduplicationId , the two messages are treated
+	//   as duplicates, within the deduplication scope and interval, and only one copy of
+	//   the message is delivered.
 	MessageDeduplicationId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) topics. The
-	// MessageGroupId can contain up to 128 alphanumeric characters (a-z, A-Z, 0-9)
+	// The MessageGroupId can contain up to 128 alphanumeric characters (a-z, A-Z, 0-9)
 	// and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	//
-	// The MessageGroupId is a tag that specifies that a message belongs to a specific
-	// message group. Messages that belong to the same message group are processed in a
-	// FIFO manner (however, messages in different message groups might be processed
-	// out of order). Every message must include a MessageGroupId .
+	// For FIFO topics: The MessageGroupId is a tag that specifies that a message
+	// belongs to a specific message group. Messages that belong to the same message
+	// group are processed in a FIFO manner (however, messages in different message
+	// groups might be processed out of order). Every message must include a
+	// MessageGroupId .
+	//
+	// For standard topics: The MessageGroupId is optional and is forwarded only to
+	// Amazon SQS standard subscriptions to activate [fair queues]. The MessageGroupId is not used
+	// for, or sent to, any other endpoint types. When provided, the same validation
+	// rules apply as for FIFO topics.
+	//
+	// [fair queues]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-fair-queues.html
 	MessageGroupId *string
 
 	// Set MessageStructure to json if you want to send a different message for each
@@ -195,9 +227,6 @@ type PublishOutput struct {
 }
 
 func (c *Client) addOperationPublishMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpPublish{}, middleware.After)
 	if err != nil {
 		return err
@@ -206,62 +235,20 @@ func (c *Client) addOperationPublishMiddlewares(stack *middleware.Stack, options
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "Publish"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpPublishValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opPublish(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -276,13 +263,8 @@ func (c *Client) addOperationPublishMiddlewares(stack *middleware.Stack, options
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opPublish(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "Publish",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

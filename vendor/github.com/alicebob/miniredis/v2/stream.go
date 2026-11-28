@@ -57,9 +57,7 @@ func newStreamKey() *streamKey {
 }
 
 // generateID doesn't lock the mutex
-func (s *streamKey) generateID(now time.Time) string {
-	ts := uint64(now.UnixNano()) / 1_000_000
-
+func (s *streamKey) generateID(ts uint64) string {
 	next := fmt.Sprintf("%d-%d", ts, 0)
 	if s.lastAllocatedID != "" && streamCmp(s.lastAllocatedID, next) >= 0 {
 		last, _ := parseStreamID(s.lastAllocatedID)
@@ -98,7 +96,14 @@ func (s *streamKey) copy() *streamKey {
 	defer s.mu.Unlock()
 
 	cpy := &streamKey{
-		entries: s.entries,
+		entries:         make([]StreamEntry, len(s.entries)),
+		lastAllocatedID: s.lastAllocatedID,
+	}
+	for i, entry := range s.entries {
+		cpy.entries[i] = StreamEntry{
+			ID:     entry.ID,
+			Values: append([]string(nil), entry.Values...),
+		}
 	}
 	groups := map[string]*streamGroup{}
 	for k, v := range s.groups {
@@ -230,14 +235,23 @@ func (s *streamKey) createGroup(group, id string) error {
 }
 
 // streamAdd adds an entry to a stream. Returns the new entry ID.
-// If id is empty or "*" the ID will be generated automatically.
+// If id is empty, "*", or "123-*", the ID will be generated automatically.
 // `values` should have an even length.
 func (s *streamKey) add(entryID string, values []string, now time.Time) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if entryID == "" || entryID == "*" {
-		entryID = s.generateID(now)
+	switch {
+	case entryID == "" || entryID == "*":
+		entryID = s.generateID(uint64(now.UnixMilli()))
+	default:
+		// "<timestamp>-*"
+		parts := strings.Split(entryID, "-")
+		if len(parts) == 2 && parts[1] == "*" {
+			if ts, err := strconv.ParseUint(parts[0], 10, 64); err == nil {
+				entryID = s.generateID(uint64(ts))
+			}
+		}
 	}
 
 	entryID, err := formatStreamID(entryID)
@@ -255,6 +269,7 @@ func (s *streamKey) add(entryID string, values []string, now time.Time) (string,
 		ID:     entryID,
 		Values: values,
 	})
+	s.lastAllocatedID = entryID
 	return entryID, nil
 }
 
@@ -371,12 +386,17 @@ func (g *streamGroup) readGroup(
 	msgs := g.pendingAfter(id)
 	var res []StreamEntry
 	for i, p := range msgs {
+		if count > 0 && len(res) >= count {
+			break
+		}
 		if p.consumer != consumerID {
 			continue
 		}
 		_, entry := g.stream.get(p.id)
-		// not found. Weird?
 		if entry == nil {
+			// deleted with XDEL, but still pending. Redis returns the ID
+			// with nil values.
+			res = append(res, StreamEntry{ID: p.id})
 			continue
 		}
 		p.deliveryCount += 1
@@ -413,10 +433,6 @@ func (g *streamGroup) ack(ids []string) (int, error) {
 		consumer.numPendingEntries--
 
 		g.pending = append(g.pending[:pos], g.pending[pos+1:]...)
-		// don't count deleted entries
-		if _, e := g.stream.get(id); e == nil {
-			continue
-		}
 		count++
 	}
 	return count, nil
@@ -440,6 +456,13 @@ func (s *streamKey) delete(ids []string) (int, error) {
 	return count, nil
 }
 
+func (g *streamGroup) pendingAfterOrEqual(id string) []pendingEntry {
+	pos := sort.Search(len(g.pending), func(i int) bool {
+		return streamCmp(id, g.pending[i].id) <= 0
+	})
+	return g.pending[pos:]
+}
+
 func (g *streamGroup) pendingAfter(id string) []pendingEntry {
 	pos := sort.Search(len(g.pending), func(i int) bool {
 		return streamCmp(id, g.pending[i].id) < 0
@@ -449,26 +472,12 @@ func (g *streamGroup) pendingAfter(id string) []pendingEntry {
 
 func (g *streamGroup) pendingCount(consumer string) int {
 	n := 0
-	for _, p := range g.activePending() {
+	for _, p := range g.pending {
 		if p.consumer == consumer {
 			n++
 		}
 	}
 	return n
-}
-
-// pending entries without the entries deleted from the group
-func (g *streamGroup) activePending() []pendingEntry {
-	var pe []pendingEntry
-	for _, p := range g.pending {
-		// drop deleted ones
-		if _, e := g.stream.get(p.id); e == nil {
-			continue
-		}
-		p := p
-		pe = append(pe, p)
-	}
-	return pe
 }
 
 func (g *streamGroup) copy() *streamGroup {
@@ -480,7 +489,7 @@ func (g *streamGroup) copy() *streamGroup {
 	return &streamGroup{
 		// don't copy stream
 		lastID:    g.lastID,
-		pending:   g.pending,
+		pending:   append([]pendingEntry(nil), g.pending...),
 		consumers: cns,
 	}
 }

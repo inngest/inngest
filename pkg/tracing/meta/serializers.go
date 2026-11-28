@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -192,8 +193,42 @@ type attr[T any] struct {
 	wrap        func(attribute.Value) any
 }
 
+// StringAttrKeys returns the keys of every attribute whose value is a
+// string (string, UUID and ULID attributes): the ones a text comparison
+// means the same thing on in any store that holds them.
+func StringAttrKeys() []string {
+	var keys []string
+	for k, s := range AttrsByKey {
+		switch s.(type) {
+		case attr[*string], attr[*uuid.UUID], attr[*ulid.ULID]:
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func (a attr[T]) Key() string {
 	return a.key
+}
+
+// isJSONEncoded reports whether the attribute's string value is itself a
+// JSON document: the attrs with a wrap func (JsonAttr), which wraps that
+// string as a json.RawMessage.
+func (a attr[T]) isJSONEncoded() bool { return a.wrap != nil }
+
+// JSONAttrKeys returns the keys of every JsonAttr in AttrsByKey: attributes
+// whose string value is itself a JSON document. A writer that stores
+// attributes as structured JSON (rather than OTel strings) can unwrap these.
+func JSONAttrKeys() []string {
+	var keys []string
+	for k, s := range AttrsByKey {
+		if j, ok := s.(interface{ isJSONEncoded() bool }); ok && j.isJSONEncoded() {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (a attr[T]) WrapValue(Value attribute.Value) any {

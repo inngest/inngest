@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+bit_length('abc'::str) = 24::i64
+bit_length(''::str) = 0::i64
+bit_length(' '::str) = 8::i64
+bit_length('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'::str) = 384::i64
+bit_length('   456'::str) = 48::i64
+
+# null_input: Examples with null as input
+bit_length(null::str?) = null::i64?
+
+# unicode: Examples with unicode characters as input
+bit_length('à'::str) = 16::i64
+bit_length('😄'::str) = 32::i64

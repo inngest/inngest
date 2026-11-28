@@ -13,6 +13,7 @@ export const MenuItem = ({
   collapsed,
   href,
   to,
+  onClick,
   exact = false,
   prefetch = false,
   comingSoon = false,
@@ -25,6 +26,7 @@ export const MenuItem = ({
   collapsed: boolean;
   href?: string;
   to?: LinkComponentProps['to'] | string;
+  onClick?: LinkComponentProps['onClick'];
   exact?: boolean;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;
@@ -36,7 +38,12 @@ export const MenuItem = ({
   const active = isMenuItemActive(location.href, href || to || '', exact);
 
   return (
-    <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
+    <OptionalLink
+      href={comingSoon ? '' : href}
+      to={comingSoon ? undefined : to}
+      onClick={onClick}
+      preload={prefetch}
+    >
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(

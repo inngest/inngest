@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
@@ -19,6 +19,7 @@ import type { Run, ViewScope } from './types';
 
 type RunsTableProps = {
   data: Run[] | undefined;
+  initialExpandedRunID?: string;
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
@@ -32,6 +33,7 @@ type RunsTableProps = {
 
 export default function RunsTable({
   data = [],
+  initialExpandedRunID,
   isLoading,
   error,
   onRefresh,
@@ -47,7 +49,17 @@ export default function RunsTable({
   // Manually track expanded rows because getIsExpanded seems to be index-based,
   // which means polling can shift the expanded row. We may be able to switch
   // back to getIsExpanded when we replace polling with websockets
-  const [expandedRunIDs, setExpandedRunIDs] = useState<string[]>([]);
+  const [expandedRunIDs, setExpandedRunIDs] = useState<string[]>(() =>
+    initialExpandedRunID ? [initialExpandedRunID] : []
+  );
+  // Open a linked run once; polling must not undo a user's manual collapse.
+  useEffect(() => {
+    if (initialExpandedRunID) {
+      setExpandedRunIDs((previous) =>
+        previous.includes(initialExpandedRunID) ? previous : [...previous, initialExpandedRunID]
+      );
+    }
+  }, [initialExpandedRunID]);
   const numberOfVisibleColumns =
     columnVisibility && Object.values(columnVisibility).filter((value) => value === true).length;
   // Render 8 empty lines for skeletons when data is loading

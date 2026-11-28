@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -29,106 +30,116 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
-	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
-type Opt func(s *svc)
+type Opt func(s *Service)
 
-func WithExecutionManager(l cqrs.Manager) func(s *svc) {
-	return func(s *svc) {
+func WithExecutionManager(l cqrs.Manager) func(s *Service) {
+	return func(s *Service) {
 		s.data = l
 	}
 }
 
-func WithState(sm state.Manager) func(s *svc) {
-	return func(s *svc) {
+func WithState(sm state.Manager) func(s *Service) {
+	return func(s *Service) {
 		s.state = sm
 	}
 }
 
-func WithServiceExecutor(exec execution.Executor) func(s *svc) {
-	return func(s *svc) {
+func WithServiceExecutor(exec execution.Executor) func(s *Service) {
+	return func(s *Service) {
 		s.exec = exec
 	}
 }
 
-func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
-	return func(s *svc) {
+func WithExecutorOpts(opts ...ExecutorOpt) func(s *Service) {
+	return func(s *Service) {
 		s.opts = opts
 	}
 }
 
-func WithServiceQueueProcessor(qp queue.QueueProcessor) func(s *svc) {
-	return func(s *svc) {
+func WithServiceQueueProcessor(qp queue.QueueProcessor) func(s *Service) {
+	return func(s *Service) {
 		s.queueProcessor = qp
 		s.queue = qp.Queue()
 	}
 }
 
-func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
-	return func(s *svc) {
+func WithServiceDebouncer(d debounce.Debouncer) func(s *Service) {
+	return func(s *Service) {
 		s.debouncer = d
 	}
 }
 
-func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
-	return func(s *svc) {
+func WithServiceBatcher(b batch.BatchManager) func(s *Service) {
+	return func(s *Service) {
 		s.batcher = b
 	}
 }
 
-func WithServiceCroner(c cron.CronManager) func(s *svc) {
-	return func(s *svc) {
+func WithServiceCroner(c cron.CronManager) func(s *Service) {
+	return func(s *Service) {
 		s.croner = c
 	}
 }
 
-func WithServiceLogger(l logger.Logger) func(s *svc) {
-	return func(s *svc) {
+func WithServiceLogger(l logger.Logger) func(s *Service) {
+	return func(s *Service) {
 		s.log = l
 	}
 }
 
-func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *svc) {
-	return func(s *svc) {
+func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *Service) {
+	return func(s *Service) {
 		s.shards = shards
 	}
 }
 
-func WithServicePublisher(p pubsub.Publisher) func(*svc) {
-	return func(s *svc) {
+func WithServicePublisher(p pubsub.Publisher) func(*Service) {
+	return func(s *Service) {
 		s.publisher = p
 	}
 }
 
-func NewService(c config.Config, opts ...Opt) service.Service {
-	svc := &svc{
+// NewService creates the service that runs the jobs on the queue.  it sets
+// the finalizer of the executor, which publishes the events of finished runs
+// with the publisher of WithServicePublisher.
+func NewService(c config.Config, opts ...Opt) (*Service, error) {
+	s := &Service{
 		config: c,
 		log:    logger.StdlibLogger(context.Background()),
 	}
 	for _, o := range opts {
-		o(svc)
-	}
-	if svc.shards == nil {
-		panic("shard registry must be provided for executor service")
-	}
-	if svc.queueProcessor == nil {
-		panic("queue processor must be provided for executor service")
-	}
-	if svc.queue == nil {
-		panic("queue must be provided for executor service")
+		o(s)
 	}
 
-	return svc
+	switch {
+	case s.shards == nil:
+		return nil, errors.New("shard registry must be provided for executor service")
+	case s.queueProcessor == nil, s.queue == nil:
+		return nil, errors.New("queue processor must be provided for executor service")
+	case s.state == nil:
+		return nil, errors.New("state must be provided for executor service")
+	case s.exec == nil:
+		return nil, errors.New("executor must be provided for executor service")
+	case s.publisher == nil:
+		return nil, errors.New("publisher must be provided for executor service")
+	}
+
+	s.exec.SetFinalizer(s.finishHandler())
+	return s, nil
 }
 
-type svc struct {
+// Service runs the jobs that the queue holds, such as steps, pause timeouts,
+// debounces, batches, cancellations, and crons.
+type Service struct {
 	config config.Config
 	// data provides an interface for data access
 	data cqrs.Manager
@@ -153,40 +164,12 @@ type svc struct {
 	publisher pubsub.Publisher
 }
 
-func (s *svc) Name() string {
-	return "executor"
-}
-
-func (s *svc) Pre(ctx context.Context) error {
-	var err error
-
-	if s.state == nil {
-		return fmt.Errorf("no state provided")
-	}
-
-	if s.queue == nil {
-		return fmt.Errorf("no queue provided")
-	}
-
-	finishHandler, err := s.getFinishHandler(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create finish handler: %w", err)
-	}
-	s.exec.SetFinalizer(finishHandler)
-
-	return nil
-}
-
-func (s *svc) Executor() execution.Executor {
+func (s *Service) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.ID, []event.Event) error, error) {
-	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create publisher: %w", err)
-	}
-
+// finishHandler publishes the events of a finished run.
+func (s *Service) finishHandler() func(context.Context, sv2.ID, []event.Event) error {
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
 	return func(ctx context.Context, id sv2.ID, events []event.Event) error {
@@ -204,7 +187,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 				carrier := itrace.NewTraceCarrier()
 				itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
-				err = pb.Publish(
+				err = s.publisher.Publish(
 					ctx,
 					topicName,
 					pubsub.Message{
@@ -224,14 +207,14 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 		}
 
 		return eg.Wait()
-	}, nil
+	}
 }
 
 // Decide if the given `err` is an unexpected run error or part of the usual
 // flow. The return value of handling queue items can sometimes return errors in
 // order to trigger retries, but it's not actually an error of the system that
 // should be logged or cause issue.
-func (s *svc) isUnexpectedRunError(err error) bool {
+func (s *Service) isUnexpectedRunError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -251,7 +234,8 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 	return true
 }
 
-func (s *svc) Run(ctx context.Context) error {
+// Run runs the jobs on the queue until ctx is done.
+func (s *Service) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
 	return s.queueProcessor.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
@@ -301,7 +285,9 @@ func (s *svc) Run(ctx context.Context) error {
 	})
 }
 
-func (s *svc) Stop(ctx context.Context) error {
+// Stop closes the lifecycle listeners of the executor and waits for the jobs
+// that are running.  call it after Run returns.
+func (s *Service) Stop(ctx context.Context) error {
 	s.exec.CloseLifecycleListeners(ctx)
 
 	// Wait for all in-flight queue runs to finish
@@ -309,7 +295,7 @@ func (s *svc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error) {
+func (s *Service) handleQueueItem(ctx context.Context, item queue.Item) (bool, error) {
 	payload, err := queue.GetEdge(item)
 	if err != nil {
 		return false, fmt.Errorf("unable to get edge from queue item: %w", err)
@@ -368,7 +354,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 	return false, nil
 }
 
-func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
+func (s *Service) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	l := s.log.With("run_id", item.Identifier.RunID.String())
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
@@ -393,7 +379,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 }
 
 // handleScheduledBatch checks for
-func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
+func (s *Service) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	opts := batch.ScheduleBatchOpts{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &opts); err != nil {
 		return err
@@ -401,17 +387,13 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	batchID := opts.BatchID
 
-	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID, opts.BatchPointer)
+	status, err := s.batcher.StartExecution(ctx, opts.AccountID, opts.FunctionID, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
 	}
-	if status == enums.BatchStatusStarted.String() {
-		// batch already started, abort
-		return nil
-	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
-		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
+		_, _ = s.batcher.DeleteKeys(ctx, opts.AccountID, opts.FunctionID, batchID)
 		return nil
 	}
 
@@ -435,7 +417,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
-func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
+func (s *Service) handleDebounce(ctx context.Context, item queue.Item) error {
 	d := debounce.DebouncePayload{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
 		return fmt.Errorf("error unmarshalling debounce payload: %w", err)
@@ -527,6 +509,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 					continue
 				}
+				s.deleteStateOnFinalRoutingError(ctx, item, err)
 				return err
 			}
 
@@ -546,7 +529,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 // handleCancel handles eager cancellation
 //
 // TODO: halt work if a user decides to cancel this cancellation
-func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
+func (s *Service) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
 		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
@@ -558,20 +541,17 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	case enums.CancellationKindFinishTimeout:
 		return s.handleEagerCancelFinishTimeout(ctx, c, item)
 	case enums.CancellationKindRun:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelRun(ctx, c)
 	case enums.CancellationKindBulkRun:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBulkRun(ctx, c)
 	case enums.CancellationKindBacklog:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBacklog(ctx, c)
 	default:
 		return fmt.Errorf("unhandled cancellation kind: %s", c.Kind)
 	}
 }
 
-func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
+func (s *Service) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -651,7 +631,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	return nil
 }
 
-func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
+func (s *Service) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancellation, item queue.Item) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -732,7 +712,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	return nil
 }
 
-func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
+func (s *Service) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -809,7 +789,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 	return nil
 }
 
-func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) error {
+func (s *Service) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -836,7 +816,7 @@ func (s *svc) handleEagerCancelRun(ctx context.Context, c cqrs.Cancellation) err
 	})
 }
 
-func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation) error {
+func (s *Service) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation) error {
 	l := s.log.With(
 		"kind", c.Kind.String(),
 		"cancellation", c,
@@ -844,8 +824,10 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 
 	var from time.Time
 	if c.StartedAfter != nil {
-		from = *c.StartedAfter
+		from = c.StartedAfter.Add(-time.Duration(consts.PriorityFactorMax) * time.Second)
 	}
+	// Queue scores include priority; filter the original run times below.
+	until := c.StartedBefore.Add(-time.Duration(consts.PriorityFactorMin) * time.Second)
 
 	scope := queue.Scope{
 		AccountID:  c.AccountID,
@@ -861,7 +843,10 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		AccountID:  c.AccountID,
 		EnvID:      c.WorkspaceID,
 		FunctionID: c.FunctionID,
-	}, c.FunctionID.String(), from, c.StartedBefore)
+	}, c.FunctionID.String(), from, until)
+	if errors.Is(err, rueidis.Nil) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("error retrieving partition items: %w", err)
 	}
@@ -874,11 +859,15 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 			continue
 		}
 
+		if !cancellation.ContainsTime(c, ulid.Time(qi.Data.Identifier.RunID.Time())) {
+			continue
+		}
+
 		if c.If != nil {
 			st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
 			if err != nil {
-				l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
-				return fmt.Errorf("error loading state for cancellation: %w", err)
+				l.Warn("error loading state for cancellation", "error", err, "queue_item", qi)
+				continue
 			}
 
 			event := st.Event()
@@ -898,13 +887,14 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
 			CancellationID: &c.ID,
 		}); err != nil {
-			return err
+			l.Warn("error cancelling run", "error", err, "queue_item", qi)
+			continue
 		}
 	}
 	return nil
 }
 
-func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
+func (s *Service) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "cron-health-check")
 
 	var ci cron.CronItem
@@ -993,7 +983,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 	return s.croner.EnqueueNextHealthCheck(ctx)
 }
 
-func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
+func (s *Service) handleCronSync(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "cron-sync")
 
 	var ci cron.CronItem
@@ -1018,7 +1008,7 @@ func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
 // NOTE
 // operations need to be idempotent for this function so it doesn't end up breaking the
 // scheduling loop for random reasons
-func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
+func (s *Service) handleCron(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "cron")
 
 	var ci cron.CronItem
@@ -1153,6 +1143,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			!errors.Is(err, state.ErrIdentifierExists) &&
 			!errors.Is(err, ErrFunctionSkippedIdempotency) {
 			l.ReportError(err, "error scheduling cron function execution")
+			s.deleteStateOnFinalRoutingError(ctx, item, err)
 			return fmt.Errorf("error scheduling run for cron: %w", err)
 		}
 		l.Trace("cron function run already scheduled")
@@ -1165,7 +1156,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	return err
 }
 
-func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+func (s *Service) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
 	fns, err := s.data.Functions(ctx)
 	if err != nil {
 		return nil, err
@@ -1178,7 +1169,7 @@ func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Fu
 	return nil, fmt.Errorf("no function found with ID: %s", fnID)
 }
 
-func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
+func (s *Service) handleJobPromote(ctx context.Context, item queue.Item) error {
 	l := s.log.With("run_id", item.Identifier.RunID.String())
 
 	data, ok := item.Payload.(queue.PayloadJobPromote)

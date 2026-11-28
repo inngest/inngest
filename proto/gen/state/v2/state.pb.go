@@ -79,6 +79,68 @@ func (DeferStatus) EnumDescriptor() ([]byte, []int) {
 	return file_state_v2_state_proto_rawDescGZIP(), []int{0}
 }
 
+type InboxSaveOutcome int32
+
+const (
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_UNSPECIFIED InboxSaveOutcome = 0
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_SAVED       InboxSaveOutcome = 1
+	// The run already has as many steps as it is allowed. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_STEPS_FULL InboxSaveOutcome = 2
+	// The message would take the run's state past its size bound. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_STATE_FULL InboxSaveOutcome = 3
+	// The message's inbox was closed. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_CLOSED InboxSaveOutcome = 4
+	// The run has ended. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_RUN_GONE InboxSaveOutcome = 5
+)
+
+// Enum value maps for InboxSaveOutcome.
+var (
+	InboxSaveOutcome_name = map[int32]string{
+		0: "INBOX_SAVE_OUTCOME_UNSPECIFIED",
+		1: "INBOX_SAVE_OUTCOME_SAVED",
+		2: "INBOX_SAVE_OUTCOME_STEPS_FULL",
+		3: "INBOX_SAVE_OUTCOME_STATE_FULL",
+		4: "INBOX_SAVE_OUTCOME_CLOSED",
+		5: "INBOX_SAVE_OUTCOME_RUN_GONE",
+	}
+	InboxSaveOutcome_value = map[string]int32{
+		"INBOX_SAVE_OUTCOME_UNSPECIFIED": 0,
+		"INBOX_SAVE_OUTCOME_SAVED":       1,
+		"INBOX_SAVE_OUTCOME_STEPS_FULL":  2,
+		"INBOX_SAVE_OUTCOME_STATE_FULL":  3,
+		"INBOX_SAVE_OUTCOME_CLOSED":      4,
+		"INBOX_SAVE_OUTCOME_RUN_GONE":    5,
+	}
+)
+
+func (x InboxSaveOutcome) Enum() *InboxSaveOutcome {
+	p := new(InboxSaveOutcome)
+	*p = x
+	return p
+}
+
+func (x InboxSaveOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InboxSaveOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_state_v2_state_proto_enumTypes[1].Descriptor()
+}
+
+func (InboxSaveOutcome) Type() protoreflect.EnumType {
+	return &file_state_v2_state_proto_enumTypes[1]
+}
+
+func (x InboxSaveOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InboxSaveOutcome.Descriptor instead.
+func (InboxSaveOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{1}
+}
+
 type Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2631,6 +2693,912 @@ func (x *ConsumePauseResponse) GetResult() *ConsumePauseResult {
 	return nil
 }
 
+type InboxMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StepId        string                 `protobuf:"bytes,1,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	Value         []byte                 `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
+	MaxSteps      int64                  `protobuf:"varint,4,opt,name=max_steps,json=maxSteps,proto3" json:"max_steps,omitempty"`
+	MaxStateSize  int64                  `protobuf:"varint,5,opt,name=max_state_size,json=maxStateSize,proto3" json:"max_state_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxMessage) Reset() {
+	*x = InboxMessage{}
+	mi := &file_state_v2_state_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxMessage) ProtoMessage() {}
+
+func (x *InboxMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxMessage.ProtoReflect.Descriptor instead.
+func (*InboxMessage) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *InboxMessage) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *InboxMessage) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
+func (x *InboxMessage) GetValue() []byte {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *InboxMessage) GetMaxSteps() int64 {
+	if x != nil {
+		return x.MaxSteps
+	}
+	return 0
+}
+
+func (x *InboxMessage) GetMaxStateSize() int64 {
+	if x != nil {
+		return x.MaxStateSize
+	}
+	return 0
+}
+
+type InboxBatch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Drain         bool                   `protobuf:"varint,1,opt,name=drain,proto3" json:"drain,omitempty"`
+	Unread        bool                   `protobuf:"varint,2,opt,name=unread,proto3" json:"unread,omitempty"`
+	Max           *int64                 `protobuf:"varint,3,opt,name=max,proto3,oneof" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxBatch) Reset() {
+	*x = InboxBatch{}
+	mi := &file_state_v2_state_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxBatch) ProtoMessage() {}
+
+func (x *InboxBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxBatch.ProtoReflect.Descriptor instead.
+func (*InboxBatch) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *InboxBatch) GetDrain() bool {
+	if x != nil {
+		return x.Drain
+	}
+	return false
+}
+
+func (x *InboxBatch) GetUnread() bool {
+	if x != nil {
+		return x.Unread
+	}
+	return false
+}
+
+func (x *InboxBatch) GetMax() int64 {
+	if x != nil && x.Max != nil {
+		return *x.Max
+	}
+	return 0
+}
+
+type InboxWait struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Inbox               string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	Seen                string                 `protobuf:"bytes,3,opt,name=seen,proto3" json:"seen,omitempty"`
+	Timer               bool                   `protobuf:"varint,4,opt,name=timer,proto3" json:"timer,omitempty"`
+	Batch               *InboxBatch            `protobuf:"bytes,5,opt,name=batch,proto3" json:"batch,omitempty"`
+	Incoming            string                 `protobuf:"bytes,6,opt,name=incoming,proto3" json:"incoming,omitempty"`
+	GroupId             string                 `protobuf:"bytes,7,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	MaxAttempts         *int64                 `protobuf:"varint,8,opt,name=max_attempts,json=maxAttempts,proto3,oneof" json:"max_attempts,omitempty"`
+	ParallelMode        int64                  `protobuf:"varint,9,opt,name=parallel_mode,json=parallelMode,proto3" json:"parallel_mode,omitempty"`
+	ParallelCoalesceKey string                 `protobuf:"bytes,10,opt,name=parallel_coalesce_key,json=parallelCoalesceKey,proto3" json:"parallel_coalesce_key,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *InboxWait) Reset() {
+	*x = InboxWait{}
+	mi := &file_state_v2_state_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxWait) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxWait) ProtoMessage() {}
+
+func (x *InboxWait) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxWait.ProtoReflect.Descriptor instead.
+func (*InboxWait) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *InboxWait) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *InboxWait) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
+func (x *InboxWait) GetSeen() string {
+	if x != nil {
+		return x.Seen
+	}
+	return ""
+}
+
+func (x *InboxWait) GetTimer() bool {
+	if x != nil {
+		return x.Timer
+	}
+	return false
+}
+
+func (x *InboxWait) GetBatch() *InboxBatch {
+	if x != nil {
+		return x.Batch
+	}
+	return nil
+}
+
+func (x *InboxWait) GetIncoming() string {
+	if x != nil {
+		return x.Incoming
+	}
+	return ""
+}
+
+func (x *InboxWait) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *InboxWait) GetMaxAttempts() int64 {
+	if x != nil && x.MaxAttempts != nil {
+		return *x.MaxAttempts
+	}
+	return 0
+}
+
+func (x *InboxWait) GetParallelMode() int64 {
+	if x != nil {
+		return x.ParallelMode
+	}
+	return 0
+}
+
+func (x *InboxWait) GetParallelCoalesceKey() string {
+	if x != nil {
+		return x.ParallelCoalesceKey
+	}
+	return ""
+}
+
+type InboxClose struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StepId        string                 `protobuf:"bytes,1,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxClose) Reset() {
+	*x = InboxClose{}
+	mi := &file_state_v2_state_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxClose) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxClose) ProtoMessage() {}
+
+func (x *InboxClose) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxClose.ProtoReflect.Descriptor instead.
+func (*InboxClose) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *InboxClose) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *InboxClose) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
+type InboxWake struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Wait        *InboxWait             `protobuf:"bytes,1,opt,name=wait,proto3" json:"wait,omitempty"`
+	MessageStep string                 `protobuf:"bytes,2,opt,name=message_step,json=messageStep,proto3" json:"message_step,omitempty"`
+	TimedOut    bool                   `protobuf:"varint,3,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	Closed      bool                   `protobuf:"varint,4,opt,name=closed,proto3" json:"closed,omitempty"`
+	HasPending  bool                   `protobuf:"varint,5,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
+	// Set by RecordInboxWait when another path already ended the read. Nothing was
+	// recorded and the run is already continued.
+	Ended         bool `protobuf:"varint,6,opt,name=ended,proto3" json:"ended,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxWake) Reset() {
+	*x = InboxWake{}
+	mi := &file_state_v2_state_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxWake) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxWake) ProtoMessage() {}
+
+func (x *InboxWake) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxWake.ProtoReflect.Descriptor instead.
+func (*InboxWake) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *InboxWake) GetWait() *InboxWait {
+	if x != nil {
+		return x.Wait
+	}
+	return nil
+}
+
+func (x *InboxWake) GetMessageStep() string {
+	if x != nil {
+		return x.MessageStep
+	}
+	return ""
+}
+
+func (x *InboxWake) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
+func (x *InboxWake) GetClosed() bool {
+	if x != nil {
+		return x.Closed
+	}
+	return false
+}
+
+func (x *InboxWake) GetHasPending() bool {
+	if x != nil {
+		return x.HasPending
+	}
+	return false
+}
+
+func (x *InboxWake) GetEnded() bool {
+	if x != nil {
+		return x.Ended
+	}
+	return false
+}
+
+type SaveInboxMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Message       *InboxMessage          `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveInboxMessageRequest) Reset() {
+	*x = SaveInboxMessageRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveInboxMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveInboxMessageRequest) ProtoMessage() {}
+
+func (x *SaveInboxMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveInboxMessageRequest.ProtoReflect.Descriptor instead.
+func (*SaveInboxMessageRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *SaveInboxMessageRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *SaveInboxMessageRequest) GetMessage() *InboxMessage {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+// wake is unset when the message did not satisfy the inbox's wait.
+type SaveInboxMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Outcome       InboxSaveOutcome       `protobuf:"varint,1,opt,name=outcome,proto3,enum=state.v2.InboxSaveOutcome" json:"outcome,omitempty"`
+	Wake          *InboxWake             `protobuf:"bytes,2,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveInboxMessageResponse) Reset() {
+	*x = SaveInboxMessageResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveInboxMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveInboxMessageResponse) ProtoMessage() {}
+
+func (x *SaveInboxMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveInboxMessageResponse.ProtoReflect.Descriptor instead.
+func (*SaveInboxMessageResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *SaveInboxMessageResponse) GetOutcome() InboxSaveOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return InboxSaveOutcome_INBOX_SAVE_OUTCOME_UNSPECIFIED
+}
+
+func (x *SaveInboxMessageResponse) GetWake() *InboxWake {
+	if x != nil {
+		return x.Wake
+	}
+	return nil
+}
+
+type RecordInboxWaitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Wait          *InboxWait             `protobuf:"bytes,2,opt,name=wait,proto3" json:"wait,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordInboxWaitRequest) Reset() {
+	*x = RecordInboxWaitRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordInboxWaitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordInboxWaitRequest) ProtoMessage() {}
+
+func (x *RecordInboxWaitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordInboxWaitRequest.ProtoReflect.Descriptor instead.
+func (*RecordInboxWaitRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *RecordInboxWaitRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *RecordInboxWaitRequest) GetWait() *InboxWait {
+	if x != nil {
+		return x.Wait
+	}
+	return nil
+}
+
+// wake is unset when no saved message satisfied the wait.
+type RecordInboxWaitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Wake          *InboxWake             `protobuf:"bytes,1,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordInboxWaitResponse) Reset() {
+	*x = RecordInboxWaitResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordInboxWaitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordInboxWaitResponse) ProtoMessage() {}
+
+func (x *RecordInboxWaitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordInboxWaitResponse.ProtoReflect.Descriptor instead.
+func (*RecordInboxWaitResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *RecordInboxWaitResponse) GetWake() *InboxWake {
+	if x != nil {
+		return x.Wake
+	}
+	return nil
+}
+
+type TimeoutInboxWaitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	WaitId        string                 `protobuf:"bytes,3,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimeoutInboxWaitRequest) Reset() {
+	*x = TimeoutInboxWaitRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimeoutInboxWaitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimeoutInboxWaitRequest) ProtoMessage() {}
+
+func (x *TimeoutInboxWaitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimeoutInboxWaitRequest.ProtoReflect.Descriptor instead.
+func (*TimeoutInboxWaitRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *TimeoutInboxWaitRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *TimeoutInboxWaitRequest) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
+func (x *TimeoutInboxWaitRequest) GetWaitId() string {
+	if x != nil {
+		return x.WaitId
+	}
+	return ""
+}
+
+func (x *TimeoutInboxWaitRequest) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// wake is unset when the inbox's wait was no longer that wait.
+type TimeoutInboxWaitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Wake          *InboxWake             `protobuf:"bytes,1,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimeoutInboxWaitResponse) Reset() {
+	*x = TimeoutInboxWaitResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimeoutInboxWaitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimeoutInboxWaitResponse) ProtoMessage() {}
+
+func (x *TimeoutInboxWaitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimeoutInboxWaitResponse.ProtoReflect.Descriptor instead.
+func (*TimeoutInboxWaitResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *TimeoutInboxWaitResponse) GetWake() *InboxWake {
+	if x != nil {
+		return x.Wake
+	}
+	return nil
+}
+
+type CloseInboxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Closing       *InboxClose            `protobuf:"bytes,2,opt,name=closing,proto3" json:"closing,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloseInboxRequest) Reset() {
+	*x = CloseInboxRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloseInboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloseInboxRequest) ProtoMessage() {}
+
+func (x *CloseInboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloseInboxRequest.ProtoReflect.Descriptor instead.
+func (*CloseInboxRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *CloseInboxRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *CloseInboxRequest) GetClosing() *InboxClose {
+	if x != nil {
+		return x.Closing
+	}
+	return nil
+}
+
+// wake is unset when the inbox had no wait recorded.
+type CloseInboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Wake          *InboxWake             `protobuf:"bytes,1,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
+	HasPending    bool                   `protobuf:"varint,2,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CloseInboxResponse) Reset() {
+	*x = CloseInboxResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CloseInboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CloseInboxResponse) ProtoMessage() {}
+
+func (x *CloseInboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CloseInboxResponse.ProtoReflect.Descriptor instead.
+func (*CloseInboxResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *CloseInboxResponse) GetWake() *InboxWake {
+	if x != nil {
+		return x.Wake
+	}
+	return nil
+}
+
+func (x *CloseInboxResponse) GetHasPending() bool {
+	if x != nil {
+		return x.HasPending
+	}
+	return false
+}
+
+type DeleteInboxWaitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	WaitId        string                 `protobuf:"bytes,3,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteInboxWaitRequest) Reset() {
+	*x = DeleteInboxWaitRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteInboxWaitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteInboxWaitRequest) ProtoMessage() {}
+
+func (x *DeleteInboxWaitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteInboxWaitRequest.ProtoReflect.Descriptor instead.
+func (*DeleteInboxWaitRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *DeleteInboxWaitRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *DeleteInboxWaitRequest) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
+func (x *DeleteInboxWaitRequest) GetWaitId() string {
+	if x != nil {
+		return x.WaitId
+	}
+	return ""
+}
+
+type DeleteInboxWaitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteInboxWaitResponse) Reset() {
+	*x = DeleteInboxWaitResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteInboxWaitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteInboxWaitResponse) ProtoMessage() {}
+
+func (x *DeleteInboxWaitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteInboxWaitResponse.ProtoReflect.Descriptor instead.
+func (*DeleteInboxWaitResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{61}
+}
+
 var File_state_v2_state_proto protoreflect.FileDescriptor
 
 const file_state_v2_state_proto_rawDesc = "" +
@@ -2826,14 +3794,91 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x05pause\x18\x01 \x01(\v2\x0f.state.v2.PauseR\x05pause\x12.\n" +
 	"\x04opts\x18\x02 \x01(\v2\x1a.state.v2.ConsumePauseOptsR\x04opts\"L\n" +
 	"\x14ConsumePauseResponse\x124\n" +
-	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result*\x94\x01\n" +
+	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result\"\x96\x01\n" +
+	"\fInboxMessage\x12\x17\n" +
+	"\astep_id\x18\x01 \x01(\tR\x06stepId\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\fR\x05value\x12\x1b\n" +
+	"\tmax_steps\x18\x04 \x01(\x03R\bmaxSteps\x12$\n" +
+	"\x0emax_state_size\x18\x05 \x01(\x03R\fmaxStateSize\"Y\n" +
+	"\n" +
+	"InboxBatch\x12\x14\n" +
+	"\x05drain\x18\x01 \x01(\bR\x05drain\x12\x16\n" +
+	"\x06unread\x18\x02 \x01(\bR\x06unread\x12\x15\n" +
+	"\x03max\x18\x03 \x01(\x03H\x00R\x03max\x88\x01\x01B\x06\n" +
+	"\x04_max\"\xd0\x02\n" +
+	"\tInboxWait\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x12\n" +
+	"\x04seen\x18\x03 \x01(\tR\x04seen\x12\x14\n" +
+	"\x05timer\x18\x04 \x01(\bR\x05timer\x12*\n" +
+	"\x05batch\x18\x05 \x01(\v2\x14.state.v2.InboxBatchR\x05batch\x12\x1a\n" +
+	"\bincoming\x18\x06 \x01(\tR\bincoming\x12\x19\n" +
+	"\bgroup_id\x18\a \x01(\tR\agroupId\x12&\n" +
+	"\fmax_attempts\x18\b \x01(\x03H\x00R\vmaxAttempts\x88\x01\x01\x12#\n" +
+	"\rparallel_mode\x18\t \x01(\x03R\fparallelMode\x122\n" +
+	"\x15parallel_coalesce_key\x18\n" +
+	" \x01(\tR\x13parallelCoalesceKeyB\x0f\n" +
+	"\r_max_attempts\";\n" +
+	"\n" +
+	"InboxClose\x12\x17\n" +
+	"\astep_id\x18\x01 \x01(\tR\x06stepId\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\"\xc3\x01\n" +
+	"\tInboxWake\x12'\n" +
+	"\x04wait\x18\x01 \x01(\v2\x13.state.v2.InboxWaitR\x04wait\x12!\n" +
+	"\fmessage_step\x18\x02 \x01(\tR\vmessageStep\x12\x1b\n" +
+	"\ttimed_out\x18\x03 \x01(\bR\btimedOut\x12\x16\n" +
+	"\x06closed\x18\x04 \x01(\bR\x06closed\x12\x1f\n" +
+	"\vhas_pending\x18\x05 \x01(\bR\n" +
+	"hasPending\x12\x14\n" +
+	"\x05ended\x18\x06 \x01(\bR\x05ended\"i\n" +
+	"\x17SaveInboxMessageRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x120\n" +
+	"\amessage\x18\x02 \x01(\v2\x16.state.v2.InboxMessageR\amessage\"\x87\x01\n" +
+	"\x18SaveInboxMessageResponse\x124\n" +
+	"\aoutcome\x18\x01 \x01(\x0e2\x1a.state.v2.InboxSaveOutcomeR\aoutcome\x12,\n" +
+	"\x04wake\x18\x02 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
+	"\x05_wake\"_\n" +
+	"\x16RecordInboxWaitRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12'\n" +
+	"\x04wait\x18\x02 \x01(\v2\x13.state.v2.InboxWaitR\x04wait\"P\n" +
+	"\x17RecordInboxWaitResponse\x12,\n" +
+	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
+	"\x05_wake\"z\n" +
+	"\x17TimeoutInboxWaitRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x17\n" +
+	"\await_id\x18\x03 \x01(\tR\x06waitId\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\"Q\n" +
+	"\x18TimeoutInboxWaitResponse\x12,\n" +
+	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
+	"\x05_wake\"a\n" +
+	"\x11CloseInboxRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12.\n" +
+	"\aclosing\x18\x02 \x01(\v2\x14.state.v2.InboxCloseR\aclosing\"l\n" +
+	"\x12CloseInboxResponse\x12,\n" +
+	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01\x12\x1f\n" +
+	"\vhas_pending\x18\x02 \x01(\bR\n" +
+	"hasPendingB\a\n" +
+	"\x05_wake\"e\n" +
+	"\x16DeleteInboxWaitRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x17\n" +
+	"\await_id\x18\x03 \x01(\tR\x06waitId\"\x19\n" +
+	"\x17DeleteInboxWaitResponse*\x94\x01\n" +
 	"\vDeferStatus\x12\x18\n" +
 	"\x14DEFER_STATUS_UNKNOWN\x10\x00\x12\x1a\n" +
 	"\x16DEFER_STATUS_SCHEDULED\x10\x01\x12\x1a\n" +
 	"\x16DEFER_STATUS_AFTER_RUN\x10\x02\x12\x18\n" +
 	"\x14DEFER_STATUS_ABORTED\x10\x03\x12\x19\n" +
-	"\x15DEFER_STATUS_REJECTED\x10\x042\xc5\n" +
-	"\n" +
+	"\x15DEFER_STATUS_REJECTED\x10\x04*\xda\x01\n" +
+	"\x10InboxSaveOutcome\x12\"\n" +
+	"\x1eINBOX_SAVE_OUTCOME_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18INBOX_SAVE_OUTCOME_SAVED\x10\x01\x12!\n" +
+	"\x1dINBOX_SAVE_OUTCOME_STEPS_FULL\x10\x02\x12!\n" +
+	"\x1dINBOX_SAVE_OUTCOME_STATE_FULL\x10\x03\x12\x1d\n" +
+	"\x19INBOX_SAVE_OUTCOME_CLOSED\x10\x04\x12\x1f\n" +
+	"\x1bINBOX_SAVE_OUTCOME_RUN_GONE\x10\x052\xfe\r\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
@@ -2846,7 +3891,13 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\fConsumePause\x12\x1d.state.v2.ConsumePauseRequest\x1a\x1e.state.v2.ConsumePauseResponse\"\x00\x12F\n" +
 	"\tSaveDefer\x12\x1a.state.v2.SaveDeferRequest\x1a\x1b.state.v2.SaveDeferResponse\"\x00\x12U\n" +
 	"\x0eSetDeferStatus\x12\x1f.state.v2.SetDeferStatusRequest\x1a .state.v2.SetDeferStatusResponse\"\x00\x12^\n" +
-	"\x11SaveRejectedDefer\x12\".state.v2.SaveRejectedDeferRequest\x1a#.state.v2.SaveRejectedDeferResponse\"\x00\x12O\n" +
+	"\x11SaveRejectedDefer\x12\".state.v2.SaveRejectedDeferRequest\x1a#.state.v2.SaveRejectedDeferResponse\"\x00\x12[\n" +
+	"\x10SaveInboxMessage\x12!.state.v2.SaveInboxMessageRequest\x1a\".state.v2.SaveInboxMessageResponse\"\x00\x12X\n" +
+	"\x0fRecordInboxWait\x12 .state.v2.RecordInboxWaitRequest\x1a!.state.v2.RecordInboxWaitResponse\"\x00\x12[\n" +
+	"\x10TimeoutInboxWait\x12!.state.v2.TimeoutInboxWaitRequest\x1a\".state.v2.TimeoutInboxWaitResponse\"\x00\x12I\n" +
+	"\n" +
+	"CloseInbox\x12\x1b.state.v2.CloseInboxRequest\x1a\x1c.state.v2.CloseInboxResponse\"\x00\x12X\n" +
+	"\x0fDeleteInboxWait\x12 .state.v2.DeleteInboxWaitRequest\x1a!.state.v2.DeleteInboxWaitResponse\"\x00\x12O\n" +
 	"\fLoadMetadata\x12\x1d.state.v2.LoadMetadataRequest\x1a\x1e.state.v2.LoadMetadataResponse\"\x00\x12I\n" +
 	"\n" +
 	"LoadEvents\x12\x1b.state.v2.LoadEventsRequest\x1a\x1c.state.v2.LoadEventsResponse\"\x00\x12F\n" +
@@ -2868,149 +3919,190 @@ func file_state_v2_state_proto_rawDescGZIP() []byte {
 	return file_state_v2_state_proto_rawDescData
 }
 
-var file_state_v2_state_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_state_v2_state_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_state_v2_state_proto_goTypes = []any{
 	(DeferStatus)(0),                  // 0: state.v2.DeferStatus
-	(*Metadata)(nil),                  // 1: state.v2.Metadata
-	(*ID)(nil),                        // 2: state.v2.ID
-	(*Config)(nil),                    // 3: state.v2.Config
-	(*ConcurrencyKey)(nil),            // 4: state.v2.ConcurrencyKey
-	(*RunMetrics)(nil),                // 5: state.v2.RunMetrics
-	(*Tenant)(nil),                    // 6: state.v2.Tenant
-	(*CreateStateRequest)(nil),        // 7: state.v2.CreateStateRequest
-	(*CreateStateResponse)(nil),       // 8: state.v2.CreateStateResponse
-	(*DeleteStateRequest)(nil),        // 9: state.v2.DeleteStateRequest
-	(*DeleteStateResponse)(nil),       // 10: state.v2.DeleteStateResponse
-	(*LoadMetadataRequest)(nil),       // 11: state.v2.LoadMetadataRequest
-	(*LoadMetadataResponse)(nil),      // 12: state.v2.LoadMetadataResponse
-	(*UpdateMetadataRequest)(nil),     // 13: state.v2.UpdateMetadataRequest
-	(*UpdateMetadataResponse)(nil),    // 14: state.v2.UpdateMetadataResponse
-	(*SaveStepRequest)(nil),           // 15: state.v2.SaveStepRequest
-	(*SaveStepResponse)(nil),          // 16: state.v2.SaveStepResponse
-	(*SavePendingRequest)(nil),        // 17: state.v2.SavePendingRequest
-	(*SavePendingResponse)(nil),       // 18: state.v2.SavePendingResponse
-	(*ExistsRequest)(nil),             // 19: state.v2.ExistsRequest
-	(*ExistsResponse)(nil),            // 20: state.v2.ExistsResponse
-	(*LookupIdempotencyRequest)(nil),  // 21: state.v2.LookupIdempotencyRequest
-	(*IdempotencyEntry)(nil),          // 22: state.v2.IdempotencyEntry
-	(*LookupIdempotencyResponse)(nil), // 23: state.v2.LookupIdempotencyResponse
-	(*LoadEventsRequest)(nil),         // 24: state.v2.LoadEventsRequest
-	(*LoadEventsResponse)(nil),        // 25: state.v2.LoadEventsResponse
-	(*LoadStepsRequest)(nil),          // 26: state.v2.LoadStepsRequest
-	(*LoadStepsResponse)(nil),         // 27: state.v2.LoadStepsResponse
-	(*LoadStateRequest)(nil),          // 28: state.v2.LoadStateRequest
-	(*LoadStateResponse)(nil),         // 29: state.v2.LoadStateResponse
-	(*Defer)(nil),                     // 30: state.v2.Defer
-	(*DeferMeta)(nil),                 // 31: state.v2.DeferMeta
-	(*SaveDeferRequest)(nil),          // 32: state.v2.SaveDeferRequest
-	(*SaveDeferResponse)(nil),         // 33: state.v2.SaveDeferResponse
-	(*SetDeferStatusRequest)(nil),     // 34: state.v2.SetDeferStatusRequest
-	(*SetDeferStatusResponse)(nil),    // 35: state.v2.SetDeferStatusResponse
-	(*SaveRejectedDeferRequest)(nil),  // 36: state.v2.SaveRejectedDeferRequest
-	(*SaveRejectedDeferResponse)(nil), // 37: state.v2.SaveRejectedDeferResponse
-	(*LoadDefersRequest)(nil),         // 38: state.v2.LoadDefersRequest
-	(*LoadDefersResponse)(nil),        // 39: state.v2.LoadDefersResponse
-	(*LoadDefersMetaRequest)(nil),     // 40: state.v2.LoadDefersMetaRequest
-	(*LoadDefersMetaResponse)(nil),    // 41: state.v2.LoadDefersMetaResponse
-	(*PauseIdentifier)(nil),           // 42: state.v2.PauseIdentifier
-	(*Pause)(nil),                     // 43: state.v2.Pause
-	(*ConsumePauseOpts)(nil),          // 44: state.v2.ConsumePauseOpts
-	(*ConsumePauseResult)(nil),        // 45: state.v2.ConsumePauseResult
-	(*ConsumePauseRequest)(nil),       // 46: state.v2.ConsumePauseRequest
-	(*ConsumePauseResponse)(nil),      // 47: state.v2.ConsumePauseResponse
-	nil,                               // 48: state.v2.CreateStateResponse.StepsEntry
-	nil,                               // 49: state.v2.LoadStepsResponse.StepsEntry
-	nil,                               // 50: state.v2.LoadStateResponse.StepsEntry
-	nil,                               // 51: state.v2.LoadDefersResponse.DefersEntry
-	nil,                               // 52: state.v2.LoadDefersMetaResponse.DefersEntry
-	(*timestamppb.Timestamp)(nil),     // 53: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 54: google.protobuf.Struct
+	(InboxSaveOutcome)(0),             // 1: state.v2.InboxSaveOutcome
+	(*Metadata)(nil),                  // 2: state.v2.Metadata
+	(*ID)(nil),                        // 3: state.v2.ID
+	(*Config)(nil),                    // 4: state.v2.Config
+	(*ConcurrencyKey)(nil),            // 5: state.v2.ConcurrencyKey
+	(*RunMetrics)(nil),                // 6: state.v2.RunMetrics
+	(*Tenant)(nil),                    // 7: state.v2.Tenant
+	(*CreateStateRequest)(nil),        // 8: state.v2.CreateStateRequest
+	(*CreateStateResponse)(nil),       // 9: state.v2.CreateStateResponse
+	(*DeleteStateRequest)(nil),        // 10: state.v2.DeleteStateRequest
+	(*DeleteStateResponse)(nil),       // 11: state.v2.DeleteStateResponse
+	(*LoadMetadataRequest)(nil),       // 12: state.v2.LoadMetadataRequest
+	(*LoadMetadataResponse)(nil),      // 13: state.v2.LoadMetadataResponse
+	(*UpdateMetadataRequest)(nil),     // 14: state.v2.UpdateMetadataRequest
+	(*UpdateMetadataResponse)(nil),    // 15: state.v2.UpdateMetadataResponse
+	(*SaveStepRequest)(nil),           // 16: state.v2.SaveStepRequest
+	(*SaveStepResponse)(nil),          // 17: state.v2.SaveStepResponse
+	(*SavePendingRequest)(nil),        // 18: state.v2.SavePendingRequest
+	(*SavePendingResponse)(nil),       // 19: state.v2.SavePendingResponse
+	(*ExistsRequest)(nil),             // 20: state.v2.ExistsRequest
+	(*ExistsResponse)(nil),            // 21: state.v2.ExistsResponse
+	(*LookupIdempotencyRequest)(nil),  // 22: state.v2.LookupIdempotencyRequest
+	(*IdempotencyEntry)(nil),          // 23: state.v2.IdempotencyEntry
+	(*LookupIdempotencyResponse)(nil), // 24: state.v2.LookupIdempotencyResponse
+	(*LoadEventsRequest)(nil),         // 25: state.v2.LoadEventsRequest
+	(*LoadEventsResponse)(nil),        // 26: state.v2.LoadEventsResponse
+	(*LoadStepsRequest)(nil),          // 27: state.v2.LoadStepsRequest
+	(*LoadStepsResponse)(nil),         // 28: state.v2.LoadStepsResponse
+	(*LoadStateRequest)(nil),          // 29: state.v2.LoadStateRequest
+	(*LoadStateResponse)(nil),         // 30: state.v2.LoadStateResponse
+	(*Defer)(nil),                     // 31: state.v2.Defer
+	(*DeferMeta)(nil),                 // 32: state.v2.DeferMeta
+	(*SaveDeferRequest)(nil),          // 33: state.v2.SaveDeferRequest
+	(*SaveDeferResponse)(nil),         // 34: state.v2.SaveDeferResponse
+	(*SetDeferStatusRequest)(nil),     // 35: state.v2.SetDeferStatusRequest
+	(*SetDeferStatusResponse)(nil),    // 36: state.v2.SetDeferStatusResponse
+	(*SaveRejectedDeferRequest)(nil),  // 37: state.v2.SaveRejectedDeferRequest
+	(*SaveRejectedDeferResponse)(nil), // 38: state.v2.SaveRejectedDeferResponse
+	(*LoadDefersRequest)(nil),         // 39: state.v2.LoadDefersRequest
+	(*LoadDefersResponse)(nil),        // 40: state.v2.LoadDefersResponse
+	(*LoadDefersMetaRequest)(nil),     // 41: state.v2.LoadDefersMetaRequest
+	(*LoadDefersMetaResponse)(nil),    // 42: state.v2.LoadDefersMetaResponse
+	(*PauseIdentifier)(nil),           // 43: state.v2.PauseIdentifier
+	(*Pause)(nil),                     // 44: state.v2.Pause
+	(*ConsumePauseOpts)(nil),          // 45: state.v2.ConsumePauseOpts
+	(*ConsumePauseResult)(nil),        // 46: state.v2.ConsumePauseResult
+	(*ConsumePauseRequest)(nil),       // 47: state.v2.ConsumePauseRequest
+	(*ConsumePauseResponse)(nil),      // 48: state.v2.ConsumePauseResponse
+	(*InboxMessage)(nil),              // 49: state.v2.InboxMessage
+	(*InboxBatch)(nil),                // 50: state.v2.InboxBatch
+	(*InboxWait)(nil),                 // 51: state.v2.InboxWait
+	(*InboxClose)(nil),                // 52: state.v2.InboxClose
+	(*InboxWake)(nil),                 // 53: state.v2.InboxWake
+	(*SaveInboxMessageRequest)(nil),   // 54: state.v2.SaveInboxMessageRequest
+	(*SaveInboxMessageResponse)(nil),  // 55: state.v2.SaveInboxMessageResponse
+	(*RecordInboxWaitRequest)(nil),    // 56: state.v2.RecordInboxWaitRequest
+	(*RecordInboxWaitResponse)(nil),   // 57: state.v2.RecordInboxWaitResponse
+	(*TimeoutInboxWaitRequest)(nil),   // 58: state.v2.TimeoutInboxWaitRequest
+	(*TimeoutInboxWaitResponse)(nil),  // 59: state.v2.TimeoutInboxWaitResponse
+	(*CloseInboxRequest)(nil),         // 60: state.v2.CloseInboxRequest
+	(*CloseInboxResponse)(nil),        // 61: state.v2.CloseInboxResponse
+	(*DeleteInboxWaitRequest)(nil),    // 62: state.v2.DeleteInboxWaitRequest
+	(*DeleteInboxWaitResponse)(nil),   // 63: state.v2.DeleteInboxWaitResponse
+	nil,                               // 64: state.v2.CreateStateResponse.StepsEntry
+	nil,                               // 65: state.v2.LoadStepsResponse.StepsEntry
+	nil,                               // 66: state.v2.LoadStateResponse.StepsEntry
+	nil,                               // 67: state.v2.LoadDefersResponse.DefersEntry
+	nil,                               // 68: state.v2.LoadDefersMetaResponse.DefersEntry
+	(*timestamppb.Timestamp)(nil),     // 69: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 70: google.protobuf.Struct
 }
 var file_state_v2_state_proto_depIdxs = []int32{
-	2,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
-	3,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
-	5,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
-	6,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
-	53, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
-	4,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
-	54, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
-	53, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
-	1,  // 8: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
-	1,  // 9: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
-	48, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
-	2,  // 11: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
-	2,  // 12: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
-	1,  // 13: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
-	2,  // 14: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	53, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
-	2,  // 16: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
-	2,  // 17: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
-	2,  // 18: state.v2.ExistsRequest.id:type_name -> state.v2.ID
-	2,  // 19: state.v2.LookupIdempotencyRequest.id:type_name -> state.v2.ID
-	22, // 20: state.v2.LookupIdempotencyResponse.entry:type_name -> state.v2.IdempotencyEntry
-	2,  // 21: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
-	2,  // 22: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	49, // 23: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
-	2,  // 24: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
-	1,  // 25: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	50, // 26: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	3,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
+	4,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
+	6,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
+	7,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
+	69, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
+	5,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
+	70, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
+	69, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
+	2,  // 8: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
+	2,  // 9: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
+	64, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	3,  // 11: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
+	3,  // 12: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
+	2,  // 13: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
+	3,  // 14: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
+	69, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	3,  // 16: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
+	3,  // 17: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
+	3,  // 18: state.v2.ExistsRequest.id:type_name -> state.v2.ID
+	3,  // 19: state.v2.LookupIdempotencyRequest.id:type_name -> state.v2.ID
+	23, // 20: state.v2.LookupIdempotencyResponse.entry:type_name -> state.v2.IdempotencyEntry
+	3,  // 21: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
+	3,  // 22: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
+	65, // 23: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	3,  // 24: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
+	2,  // 25: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
+	66, // 26: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
 	0,  // 27: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
 	0,  // 28: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
-	2,  // 29: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
-	30, // 30: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
-	2,  // 31: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
+	3,  // 29: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
+	31, // 30: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
+	3,  // 31: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
 	0,  // 32: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
-	2,  // 33: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
-	2,  // 34: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
-	51, // 35: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
-	2,  // 36: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
-	52, // 37: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
-	42, // 38: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
-	43, // 39: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
-	44, // 40: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
-	45, // 41: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
-	30, // 42: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
-	31, // 43: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
-	7,  // 44: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	9,  // 45: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	19, // 46: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	21, // 47: state.v2.RunService.LookupIdempotency:input_type -> state.v2.LookupIdempotencyRequest
-	13, // 48: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	15, // 49: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	17, // 50: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	46, // 51: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
-	32, // 52: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
-	34, // 53: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
-	36, // 54: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
-	11, // 55: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	24, // 56: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	26, // 57: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	28, // 58: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	38, // 59: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
-	40, // 60: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
-	8,  // 61: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	10, // 62: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	20, // 63: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	23, // 64: state.v2.RunService.LookupIdempotency:output_type -> state.v2.LookupIdempotencyResponse
-	14, // 65: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	16, // 66: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	18, // 67: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	47, // 68: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
-	33, // 69: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
-	35, // 70: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
-	37, // 71: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
-	12, // 72: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	25, // 73: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	27, // 74: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	29, // 75: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	39, // 76: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
-	41, // 77: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
-	61, // [61:78] is the sub-list for method output_type
-	44, // [44:61] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	3,  // 33: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
+	3,  // 34: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
+	67, // 35: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
+	3,  // 36: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
+	68, // 37: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
+	43, // 38: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
+	44, // 39: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
+	45, // 40: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
+	46, // 41: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
+	50, // 42: state.v2.InboxWait.batch:type_name -> state.v2.InboxBatch
+	51, // 43: state.v2.InboxWake.wait:type_name -> state.v2.InboxWait
+	3,  // 44: state.v2.SaveInboxMessageRequest.id:type_name -> state.v2.ID
+	49, // 45: state.v2.SaveInboxMessageRequest.message:type_name -> state.v2.InboxMessage
+	1,  // 46: state.v2.SaveInboxMessageResponse.outcome:type_name -> state.v2.InboxSaveOutcome
+	53, // 47: state.v2.SaveInboxMessageResponse.wake:type_name -> state.v2.InboxWake
+	3,  // 48: state.v2.RecordInboxWaitRequest.id:type_name -> state.v2.ID
+	51, // 49: state.v2.RecordInboxWaitRequest.wait:type_name -> state.v2.InboxWait
+	53, // 50: state.v2.RecordInboxWaitResponse.wake:type_name -> state.v2.InboxWake
+	3,  // 51: state.v2.TimeoutInboxWaitRequest.id:type_name -> state.v2.ID
+	53, // 52: state.v2.TimeoutInboxWaitResponse.wake:type_name -> state.v2.InboxWake
+	3,  // 53: state.v2.CloseInboxRequest.id:type_name -> state.v2.ID
+	52, // 54: state.v2.CloseInboxRequest.closing:type_name -> state.v2.InboxClose
+	53, // 55: state.v2.CloseInboxResponse.wake:type_name -> state.v2.InboxWake
+	3,  // 56: state.v2.DeleteInboxWaitRequest.id:type_name -> state.v2.ID
+	31, // 57: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
+	32, // 58: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
+	8,  // 59: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	10, // 60: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	20, // 61: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	22, // 62: state.v2.RunService.LookupIdempotency:input_type -> state.v2.LookupIdempotencyRequest
+	14, // 63: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	16, // 64: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	18, // 65: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	47, // 66: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
+	33, // 67: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
+	35, // 68: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
+	37, // 69: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
+	54, // 70: state.v2.RunService.SaveInboxMessage:input_type -> state.v2.SaveInboxMessageRequest
+	56, // 71: state.v2.RunService.RecordInboxWait:input_type -> state.v2.RecordInboxWaitRequest
+	58, // 72: state.v2.RunService.TimeoutInboxWait:input_type -> state.v2.TimeoutInboxWaitRequest
+	60, // 73: state.v2.RunService.CloseInbox:input_type -> state.v2.CloseInboxRequest
+	62, // 74: state.v2.RunService.DeleteInboxWait:input_type -> state.v2.DeleteInboxWaitRequest
+	12, // 75: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	25, // 76: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	27, // 77: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	29, // 78: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	39, // 79: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
+	41, // 80: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
+	9,  // 81: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	11, // 82: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	21, // 83: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	24, // 84: state.v2.RunService.LookupIdempotency:output_type -> state.v2.LookupIdempotencyResponse
+	15, // 85: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	17, // 86: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	19, // 87: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	48, // 88: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
+	34, // 89: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
+	36, // 90: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
+	38, // 91: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
+	55, // 92: state.v2.RunService.SaveInboxMessage:output_type -> state.v2.SaveInboxMessageResponse
+	57, // 93: state.v2.RunService.RecordInboxWait:output_type -> state.v2.RecordInboxWaitResponse
+	59, // 94: state.v2.RunService.TimeoutInboxWait:output_type -> state.v2.TimeoutInboxWaitResponse
+	61, // 95: state.v2.RunService.CloseInbox:output_type -> state.v2.CloseInboxResponse
+	63, // 96: state.v2.RunService.DeleteInboxWait:output_type -> state.v2.DeleteInboxWaitResponse
+	13, // 97: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	26, // 98: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	28, // 99: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	30, // 100: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	40, // 101: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
+	42, // 102: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
+	81, // [81:103] is the sub-list for method output_type
+	59, // [59:81] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }
@@ -3019,13 +4111,19 @@ func file_state_v2_state_proto_init() {
 		return
 	}
 	file_state_v2_state_proto_msgTypes[2].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[48].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[49].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[53].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[55].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[57].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[59].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_v2_state_proto_rawDesc), len(file_state_v2_state_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   52,
+			NumEnums:      2,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

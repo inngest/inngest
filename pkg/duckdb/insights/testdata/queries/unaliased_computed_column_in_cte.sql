@@ -1,0 +1,1 @@
+WITH x AS (SELECT COUNT(*) FROM runs) SELECT * FROM x

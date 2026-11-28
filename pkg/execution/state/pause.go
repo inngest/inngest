@@ -14,7 +14,6 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
@@ -29,10 +28,10 @@ type PauseMutater interface {
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 
 	// PauseIDsForRun returns all pause IDs associated with a run.
-	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error)
 
 	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
-	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 
 	// DeletePausesForRun deletes all pauses associated with a run.
 	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
@@ -61,7 +60,7 @@ type PauseGetter interface {
 	// that have not yet been consumed in order to properly handle timeouts.
 	//
 	// This should not return consumed pauses.
-	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
+	PauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) (*Pause, error)
 
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
@@ -246,6 +245,11 @@ type Pause struct {
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
+	// Subscribe is set on the pause of an inbox's source. Such a pause is not
+	// consumed by a matching event: the event is saved as a message of the
+	// inbox and the pause stays until the inbox closes or the run ends.
+	Subscribe *PauseSubscribe `json:"sub,omitempty"`
+
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
 
@@ -264,6 +268,17 @@ type Pause struct {
 	// timeframes are based on this timestamp (previously only available as the
 	// sort score in pause indexes).
 	CreatedAt time.Time `json:"ca"`
+}
+
+// PauseSubscribe marks a pause as the source of an inbox.
+type PauseSubscribe struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+
+	// Untimed marks the timer of a read that has no timeout. The timer exists
+	// only so the run always holds a queue item while it waits, and does nothing
+	// when it fires.
+	Untimed bool `json:"untimed,omitempty"`
 }
 
 // CreatedAfter reports whether this pause was created after the given

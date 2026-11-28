@@ -1,0 +1,18 @@
+{
+  "description": "Raw mode applies the same push policies.",
+  "mode": "raw",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status = 'Running'",
+        "physical": "runs.status = 'Running'",
+        "pushed": true
+      },
+      {
+        "logical": "attributes-\u003e\u003e'_inngest.dynamic.status' = 'Running'",
+        "physical": "runs.attributes-\u003e\u003e'_inngest.dynamic.status' = 'Running'",
+        "pushed": true
+      }
+    ]
+  }
+}

@@ -903,6 +903,11 @@ func TestProxyGRPCForwardError(t *testing.T) {
 			require.Contains(t, err.Error(), "failed to route request to gateway")
 			require.Equal(t, tc.attempts, mockForwarder.calls)
 			require.Equal(t, tc.retry, queue.ShouldRetry(fmt.Errorf("driver: %w", err), 0, 20))
+			// A forward error can be ambiguous: preserve the request lease so
+			// a retry can recover SDK work that might already be running.
+			leased, err := sm.IsRequestLeased(ctx, envID, reqID)
+			require.NoError(t, err)
+			require.True(t, leased)
 		})
 	}
 }

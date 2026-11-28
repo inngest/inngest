@@ -8,10 +8,10 @@ import { Table, TableBlankState } from '@inngest/components/Table';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import { useBatchedSearchParams } from '@inngest/components/hooks/useSearchParams';
 import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
-import { type Session } from '@inngest/components/types/session';
+import { type Session, type SessionsPage } from '@inngest/components/types/session';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiExternalLinkLine } from '@remixicon/react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, type LinkComponentProps } from '@tanstack/react-router';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
@@ -35,12 +35,15 @@ type SessionResultsProps = {
     session: (params: { sessionKey: string; sessionId: string }) => RoutePath;
     function: (params: { functionSlug: string }) => RoutePath;
   };
+  // Returning a SessionsPage (rather than a bare Session[]) enables "Load
+  // more" paging; cursor is the previous page's nextCursor.
   getSessions: (params: {
     sessionKey: string;
     sessionIdSearch?: string;
     startTime: string;
     endTime: string;
-  }) => Promise<Session[]>;
+    cursor?: string | null;
+  }) => Promise<Session[] | SessionsPage>;
   onEditSearch: () => void;
 };
 
@@ -95,19 +98,33 @@ export function SessionResults({
     [batchUpdate]
   );
 
-  const { data, error, isPending, isFetching, refetch } = useQuery({
+  const {
+    data,
+    error,
+    isPending,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ['sessions', envID, sessionKey, debouncedSearch, startTime, endTime],
-    queryFn: () =>
-      getSessions({
+    queryFn: async ({ pageParam }: { pageParam: string | null }): Promise<SessionsPage> => {
+      const page = await getSessions({
         sessionKey,
         sessionIdSearch: debouncedSearch,
         startTime,
         endTime,
-      }),
+        cursor: pageParam,
+      });
+      return Array.isArray(page) ? { sessions: page, nextCursor: null } : page;
+    },
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchOnWindowFocus: false,
   });
 
-  const sessions = useMemo(() => data ?? [], [data]);
+  const sessions = useMemo(() => data?.pages.flatMap((page) => page.sessions) ?? [], [data]);
 
   return (
     <div className="bg-canvasBase text-basis flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
@@ -166,7 +183,7 @@ export function SessionResults({
             <Table
               columns={columns}
               data={sessions}
-              isLoading={isPending || isFetching}
+              isLoading={isPending || (isFetching && !isFetchingNextPage)}
               blankState={
                 <TableBlankState
                   icon={<SessionsIcon />}
@@ -204,6 +221,18 @@ export function SessionResults({
                 })
               }
             />
+            {hasNextPage && (
+              <div className="flex flex-col items-center py-2">
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  label="Load more"
+                  onClick={() => fetchNextPage()}
+                  loading={isFetchingNextPage}
+                  disabled={isFetchingNextPage}
+                />
+              </div>
+            )}
           </>
         )}
       </div>

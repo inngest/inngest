@@ -1,0 +1,366 @@
+package main
+
+import (
+	"math/rand"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/stretchr/testify/require"
+)
+
+// TestSortRuns pins runs' key: (year(queued_at), month(queued_at),
+// account_id, env_id, run_id, queued_at). Tenant grouping outranks
+// chronological order within the same year/month, so a later-queued run in
+// an alphabetically-earlier account must still sort first.
+func TestSortRuns(t *testing.T) {
+	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	accountA := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	accountB := uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	envID := uuid.New()
+
+	rows := []RunRow{
+		{RunID: "b-run", AccountID: accountB, EnvID: envID, QueuedAt: sameMonth.Add(-time.Hour)}, // earlier in time, later account
+		{RunID: "a-run", AccountID: accountA, EnvID: envID, QueuedAt: sameMonth},                 // later in time, earlier account
+	}
+
+	sortRuns(rows)
+
+	require.Equal(t, []string{"a-run", "b-run"}, []string{rows[0].RunID, rows[1].RunID},
+		"account_id must outrank queued_at within the same year/month")
+}
+
+// TestSortSpans pins run_trace_spans' key:
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// run_id, start_time, end_time).
+func TestSortSpans(t *testing.T) {
+	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	runA := uuid.MustParse("00000000-0000-0000-0000-000000000001").String()
+	runB := uuid.MustParse("00000000-0000-0000-0000-000000000002").String()
+	accountID, envID := uuid.New(), uuid.New()
+
+	rows := []SpanRow{
+		{RunID: runB, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, StartTime: sameMonth.Add(-time.Hour), EndTime: sameMonth.Add(-time.Hour)},
+		{RunID: runA, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, StartTime: sameMonth, EndTime: sameMonth},
+	}
+
+	sortSpans(rows)
+
+	require.Equal(t, []string{runA, runB}, []string{rows[0].RunID, rows[1].RunID},
+		"run_id must outrank start_time within the same year/month/tenant")
+}
+
+// TestSortEvents pins events' key:
+// (year(received_at), month(received_at), account_id, env_id,
+// internal_id, received_at).
+func TestSortEvents(t *testing.T) {
+	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	accountID, envID := uuid.New(), uuid.New()
+
+	rows := []EventRow{
+		{InternalID: "01B", AccountID: accountID, EnvID: envID, ReceivedAt: sameMonth.Add(-time.Hour)},
+		{InternalID: "01A", AccountID: accountID, EnvID: envID, ReceivedAt: sameMonth},
+	}
+
+	sortEvents(rows)
+
+	require.Equal(t, []string{"01A", "01B"}, []string{rows[0].InternalID, rows[1].InternalID},
+		"internal_id must outrank received_at within the same year/month/tenant")
+}
+
+// TestSortMetadata pins run_metadata's key:
+// (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// run_id, scope, step_id, step_index, step_attempt, span_id, kind).
+func TestSortMetadata(t *testing.T) {
+	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	runID := uuid.New().String()
+	accountID, envID := uuid.New(), uuid.New()
+
+	rows := []MetadataRow{
+		{RunID: runID, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, Scope: "step", SpanID: "b-span"},
+		{RunID: runID, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, Scope: "run", SpanID: "a-span"},
+	}
+
+	sortMetadata(rows)
+
+	require.Equal(t, []string{"a-span", "b-span"}, []string{rows[0].SpanID, rows[1].SpanID},
+		"scope must outrank span_id (\"run\" sorts before \"step\")")
+}
+
+func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
+	connector, db := newTestDB(t, 1)
+	ctx := t.Context()
+
+	tmpl := testTemplates()
+	cfg := GenerateConfig{RunCount: 3, Window: time.Hour, Now: time.Now().UTC()}
+	generated, err := GenerateRuns(rand.New(rand.NewSource(1)), tmpl, cfg)
+	require.NoError(t, err)
+
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 10, Parallelism: 1})
+	require.NoError(t, err)
+	require.Equal(t, 3, summary.Runs)
+
+	wantSpans, wantEvents, wantMetadata := 0, 0, 0
+	for _, g := range generated {
+		wantSpans += len(g.Spans)
+		wantEvents += len(g.Events)
+		wantMetadata += len(g.Metadata)
+	}
+	require.Equal(t, wantSpans, summary.Spans)
+	require.Equal(t, wantEvents, summary.Events)
+	require.Equal(t, wantMetadata, summary.Metadata)
+	require.Greater(t, wantMetadata, 0, "testTemplates' MetadataProfiles should produce some metadata across 3 runs")
+
+	var runCount int
+	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;")
+	require.NoError(t, row.Scan(&runCount))
+	require.Equal(t, 3, runCount)
+
+	var spanCount int
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_trace_spans;")
+	require.NoError(t, row.Scan(&spanCount))
+	require.Equal(t, wantSpans, spanCount)
+
+	var eventCount int
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".events;")
+	require.NoError(t, row.Scan(&eventCount))
+	require.Equal(t, wantEvents, eventCount)
+
+	var metadataCount int
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_metadata;")
+	require.NoError(t, row.Scan(&metadataCount))
+	require.Equal(t, wantMetadata, metadataCount)
+}
+
+func TestInsertGeneratedRunsWithNoRunsIsANoop(t *testing.T) {
+	connector, _ := newTestDB(t, 1)
+
+	summary, err := InsertGeneratedRuns(t.Context(), connector, nil, InsertOptions{BatchSize: 10, Parallelism: 1})
+	require.NoError(t, err)
+	require.Equal(t, Summary{}, summary)
+}
+
+func TestInsertGeneratedRunsReportsProgressAfterEachBatch(t *testing.T) {
+	connector, _ := newTestDB(t, 1)
+	ctx := t.Context()
+
+	tmpl := testTemplates()
+	cfg := GenerateConfig{RunCount: 3, Window: time.Hour, Now: time.Now().UTC()}
+	generated, err := GenerateRuns(rand.New(rand.NewSource(1)), tmpl, cfg)
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	var progress [][4]int
+	onProgress := func(batchIndex, totalBatches, done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		progress = append(progress, [4]int{batchIndex, totalBatches, done, total})
+	}
+
+	// batchSize=1 and parallelism=1 means one flush per run, strictly in
+	// order — the same granularity and ordering as before batching existed.
+	_, err = InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 1, Parallelism: 1, OnProgress: onProgress})
+	require.NoError(t, err)
+
+	require.Equal(t, [][4]int{{1, 3, 1, 3}, {2, 3, 2, 3}, {3, 3, 3, 3}}, progress)
+}
+
+func TestInsertGeneratedRunsBatchesAcrossMultipleRunsPerFlush(t *testing.T) {
+	connector, db := newTestDB(t, 1)
+	ctx := t.Context()
+
+	tmpl := testTemplates()
+	cfg := GenerateConfig{RunCount: 5, Window: time.Hour, Now: time.Now().UTC()}
+	generated, err := GenerateRuns(rand.New(rand.NewSource(2)), tmpl, cfg)
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	var progress [][4]int
+	onProgress := func(batchIndex, totalBatches, done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		progress = append(progress, [4]int{batchIndex, totalBatches, done, total})
+	}
+
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 2, Parallelism: 1, OnProgress: onProgress})
+	require.NoError(t, err)
+
+	require.Equal(t, [][4]int{{1, 3, 2, 5}, {2, 3, 4, 5}, {3, 3, 5, 5}}, progress,
+		"flushes every 2 runs, plus a final partial batch; batchIndex/totalBatches reflect the real 3-batch chunking")
+
+	wantSpans, wantEvents := 0, 0
+	for _, g := range generated {
+		wantSpans += len(g.Spans)
+		wantEvents += len(g.Events)
+	}
+	require.Equal(t, 5, summary.Runs)
+	require.Equal(t, wantSpans, summary.Spans)
+	require.Equal(t, wantEvents, summary.Events)
+
+	var runCount int
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.Equal(t, 5, runCount)
+}
+
+// TestInsertGeneratedRunsProgressBatchIndicesAreDistinctUnderConcurrency
+// pins that batchIndex is the batch's real, stable identity — not derived
+// from the running done count, which under concurrency can no longer be
+// trusted to line up with any particular batch. Every batch must still
+// report a distinct index in [1, totalBatches], and parallelism > 1 must
+// still write every row exactly once (proving the per-worker appenderSet
+// design doesn't lose or duplicate rows).
+func TestInsertGeneratedRunsProgressBatchIndicesAreDistinctUnderConcurrency(t *testing.T) {
+	connector, db := newTestDB(t, 4)
+	ctx := t.Context()
+
+	tmpl := testTemplates()
+	cfg := GenerateConfig{RunCount: 40, Window: time.Hour, Now: time.Now().UTC()}
+	generated, err := GenerateRuns(rand.New(rand.NewSource(4)), tmpl, cfg)
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	seen := map[int]bool{}
+	var totalBatchesSeen int
+	onProgress := func(batchIndex, totalBatches, done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen[batchIndex] = true
+		totalBatchesSeen = totalBatches
+	}
+
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 5, Parallelism: 4, OnProgress: onProgress})
+	require.NoError(t, err)
+
+	require.Equal(t, 8, totalBatchesSeen)
+	require.Len(t, seen, 8)
+	for i := 1; i <= 8; i++ {
+		require.True(t, seen[i], "batch index %d must have been reported exactly once", i)
+	}
+
+	require.Equal(t, 40, summary.Runs)
+	var runCount, distinctRunIDs int
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.Equal(t, 40, runCount)
+	require.Equal(t, 40, distinctRunIDs, "no run should have been written more than once")
+}
+
+func TestInsertGeneratedRunsClampsNonPositiveBatchSizeToOne(t *testing.T) {
+	connector, _ := newTestDB(t, 1)
+	ctx := t.Context()
+
+	tmpl := testTemplates()
+	cfg := GenerateConfig{RunCount: 2, Window: time.Hour, Now: time.Now().UTC()}
+	generated, err := GenerateRuns(rand.New(rand.NewSource(3)), tmpl, cfg)
+	require.NoError(t, err)
+
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 0, Parallelism: 1})
+	require.NoError(t, err)
+	require.Equal(t, 2, summary.Runs)
+}
+
+// TestGenerateAndInsertMatchesPreGeneratingThenInserting is the core
+// equivalence proof for interleaved generation: GenerateRuns' output only
+// ever depends on the shared rng's current state and per-call cfg — never
+// on how many runs a prior call asked for — so calling it once per batch
+// (interleaved with each batch's insert) must produce byte-identical rows,
+// in the same order, as generating the whole run in one call up front. Both
+// paths seed a fresh rng from the same source seed and write into separate
+// DBs so the comparison is apples to apples.
+func TestGenerateAndInsertMatchesPreGeneratingThenInserting(t *testing.T) {
+	ctx := t.Context()
+	tmpl := testTemplates()
+	genCfg := GenerateConfig{RunCount: 11, Window: time.Hour, Now: time.Now().UTC()}
+
+	preGenerated, err := GenerateRuns(rand.New(rand.NewSource(9)), tmpl, genCfg)
+	require.NoError(t, err)
+	preGenConnector, preGenDB := newTestDB(t, 1)
+	wantSummary, err := InsertGeneratedRuns(ctx, preGenConnector, preGenerated, InsertOptions{BatchSize: 4, Parallelism: 1})
+	require.NoError(t, err)
+
+	interleavedConnector, interleavedDB := newTestDB(t, 1)
+	gotSummary, _, err := GenerateAndInsert(ctx, interleavedConnector, rand.New(rand.NewSource(9)), tmpl, genCfg, InsertOptions{BatchSize: 4, Parallelism: 1})
+	require.NoError(t, err)
+
+	require.Equal(t, wantSummary, gotSummary)
+
+	wantRunIDs := runIDsInDB(t, preGenDB)
+	gotRunIDs := runIDsInDB(t, interleavedDB)
+	require.Equal(t, wantRunIDs, gotRunIDs, "interleaved generation must produce the exact same run IDs as pre-generating everything")
+}
+
+func TestGenerateAndInsertReportsProgressPerBatch(t *testing.T) {
+	connector, _ := newTestDB(t, 1)
+	tmpl := testTemplates()
+	genCfg := GenerateConfig{RunCount: 5, Window: time.Hour, Now: time.Now().UTC()}
+
+	var mu sync.Mutex
+	var progress [][4]int
+	onProgress := func(batchIndex, totalBatches, done, total int) {
+		mu.Lock()
+		defer mu.Unlock()
+		progress = append(progress, [4]int{batchIndex, totalBatches, done, total})
+	}
+
+	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, InsertOptions{BatchSize: 2, Parallelism: 1, OnProgress: onProgress})
+	require.NoError(t, err)
+	require.Equal(t, 5, summary.Runs)
+
+	require.Equal(t, [][4]int{{1, 3, 2, 5}, {2, 3, 4, 5}, {3, 3, 5, 5}}, progress)
+}
+
+// TestGenerateAndInsertPropagatesGenerationErrors proves a generation
+// failure (here: no tenants to attribute runs to) surfaces as a real error
+// rather than silently inserting nothing.
+func TestGenerateAndInsertPropagatesGenerationErrors(t *testing.T) {
+	connector, _ := newTestDB(t, 1)
+	tmpl := testTemplates()
+	tmpl.Tenants = nil
+	genCfg := GenerateConfig{RunCount: 5, Window: time.Hour, Now: time.Now().UTC()}
+
+	_, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, InsertOptions{BatchSize: 2, Parallelism: 1})
+	require.Error(t, err)
+}
+
+// TestGenerateAndInsertReturnsWriteErrors drops a table so its writers fail
+// w/ batches still pending, and checks GenerateAndInsert returns that error
+// instead of leaving the generator blocked on work.
+func TestGenerateAndInsertReturnsWriteErrors(t *testing.T) {
+	connector, db := newTestDB(t, 1)
+	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.LakeAlias+".run_trace_spans;")
+	require.NoError(t, err)
+	genCfg := GenerateConfig{RunCount: 50, Window: time.Hour, Now: time.Now().UTC()}
+
+	errc := make(chan error, 1)
+	go func() {
+		_, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), testTemplates(), genCfg, InsertOptions{BatchSize: 2, Parallelism: 1})
+		errc <- err
+	}()
+	select {
+	case err := <-errc:
+		require.ErrorContains(t, err, "run_trace_spans")
+	case <-time.After(30 * time.Second):
+		t.Fatal("GenerateAndInsert hung after a write error")
+	}
+}
+
+// TestGenerateAndInsertWithParallelism proves the interleaved
+// generate+insert path also writes every row exactly once when multiple
+// Appender workers run concurrently.
+func TestGenerateAndInsertWithParallelism(t *testing.T) {
+	connector, db := newTestDB(t, 4)
+	tmpl := testTemplates()
+	genCfg := GenerateConfig{RunCount: 40, Window: time.Hour, Now: time.Now().UTC()}
+
+	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(5)), tmpl, genCfg, InsertOptions{BatchSize: 5, Parallelism: 4})
+	require.NoError(t, err)
+	require.Equal(t, 40, summary.Runs)
+
+	var runCount, distinctRunIDs int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.Equal(t, 40, runCount)
+	require.Equal(t, 40, distinctRunIDs)
+}

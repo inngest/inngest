@@ -1,6 +1,122 @@
 ## Changelog
 
 
+## v2.41.0
+
+- Add ZDIFF and ZDIFFSTORE commands (thanks @LuisFigueroaG)
+- Add ZINTERCARD command (thanks @LuisFigueroaG)
+- Move ZINTERCARD unit test next to the other ZINTER tests (thanks @LuisFigueroaG)
+- Test ZDIFF and ZDIFFSTORE in MULTI and from Lua (thanks @LuisFigueroaG)
+- Test ZINTERCARD in MULTI and from Lua (thanks @LuisFigueroaG)
+- Add BLMPOP command (thanks @LuisFigueroaG)
+- Return a RESP3 null from empty blocking pops and ZMPOP (thanks @LuisFigueroaG)
+- Return a RESP3 null from XREAD, XPENDING, ZRANK, GEOPOS and EXEC (thanks @LuisFigueroaG)
+- Add LPOS to the README command list (thanks @LuisFigueroaG)
+- Fix XREAD with '$' in a transaction (thanks @LuisFigueroaG)
+- Return an empty reply from ZPOPMIN and ZPOPMAX with a zero count (thanks @LindseyZ1205)
+- Preserve TTL and WATCH state for same-key SMOVE (thanks @Harshil-1603)
+- Honor GT and LT conditions with ZADD INCR (thanks @Harshil-1603)
+- Reject NaN sorted-set scores before modifying members (thanks @Harshil-1603)
+- Don't store empty results from the set and sorted set STORE commands (thanks @wleeaf)
+- Reject a negative XTRIM MAXLEN (thanks @wleeaf)
+- Check LMOVE and BLMOVE directions before moving anything (thanks @wleeaf)
+- Reject infinite string and hash floating-point increments (thanks @Harshil-1603)
+- Send only the WRONGTYPE error from XLEN on a non-stream key (thanks @LindseyZ1205)
+- Process repeated ZADD members in command order (thanks @Harshil-1603)
+- Remove deleted stream entries during XAUTOCLAIM (thanks @Harshil-1603)
+- Match Redis pending-entry cleanup in XACK and XCLAIM (thanks @Harshil-1603)
+- Return a null array from XRANGE with COUNT 0 or less (thanks @LuisFigueroaG)
+- Delete fields right away on HEXPIRE 0 and reject a negative TTL (thanks @LindseyZ1205)
+- Keep copied streams and consumer groups independent (thanks @Harshil-1603)
+- Compare copied pending groups without idle-time jitter (thanks @Harshil-1603)
+- Remove a field's TTL when HSET overwrites it or HDEL deletes it (thanks @LindseyZ1205)
+- Implement XACKDEL stream command (thanks @wiptgdxv)
+- Return deleted pending entries from XREADGROUP history (thanks @LuisFigueroaG)
+- Abort a watching transaction when a command changes the key in place (thanks @LindseyZ1205)
+- Match Redis on an empty SETRANGE value and offsets past the 512MB limit (thanks @LindseyZ1205)
+- Preserve expiry when GETEX rejects a non-string key (thanks @Harshil-1603)
+- Reject conflicting SET options without changing keys (thanks @Harshil-1603)
+- Reject NaN coordinates in GEOADD (thanks @Harshil-1603)
+- Reject invalid BITPOS bit arguments (thanks @Harshil-1603)
+- Return empty PING payloads as bulk strings (thanks @Harshil-1603)
+- Require a strictly smaller expiration for LT (thanks @Harshil-1603)
+- Round TTL responses to the nearest second (thanks @Harshil-1603)
+- Reject DECRBY with the minimum signed decrement (thanks @Harshil-1603)
+- Validate the decrement before looking up the key type (thanks @Harshil-1603)
+- Keep a watching transaction when a command leaves the key unchanged (thanks @LindseyZ1205)
+- Merge upstream master and preserve DECRBY regression tests (thanks @Harshil-1603)
+- Accept PFADD with only a key, which creates an empty HyperLogLog (thanks @LindseyZ1205)
+- Reject noncanonical stored integer counter values (thanks @Harshil-1603)
+- support 32bit architectures (thanks @auyer)
+- Reject invalid MOVE database arguments (thanks @Harshil-1603)
+- Clear destination expiry after BITOP (thanks @Harshil-1603)
+- Reply to XREAD and XREADGROUP with a map in RESP3 (thanks @LindseyZ1205)
+- Merge upstream counter validation and preserve DECRBY overflow checks (thanks @Harshil-1603)
+- Honor the min-idle-time in XCLAIM (thanks @LindseyZ1205)
+- Specify hash expiration behavior and Redis syntax compatibility (thanks @KiKoS0)
+- Align HEXPIRE argument parsing with Redis (thanks @KiKoS0)
+- Add HEXPIREAT hash field expiration (thanks @KiKoS0)
+- Format the shared hash expiration handler (thanks @KiKoS0)
+- Reply to ZRANGE WITHSCORES with member/score pairs in RESP3 (thanks @LuisFigueroaG)
+
+
+## v2.40.0
+
+- support testing/synctest (thanks @alexluong)
+- fix RENAME panic (thanks @gianzanuz)
+- fix SetError() (thanks @WillAbides)
+- fix LPOST COUNT (thanks @akezwang)
+- support ZMPOP and BZMPOP (thanks @Lephiziel)
+- fix HRANDFIELD (thanks @anuththedev)
+- support LMPOP (thanks @LuisFigueroaG)
+
+
+## v2.39.0
+
+- support GEOSEARCH (thanks @fl4metf)
+- support HPERSIST, HTTL, HPTTL, and HSETEX (thanks @adamrothman)
+- support BZPOPMIN and BZPOPMAX (thanks @ChrisJr404)
+
+
+## v2.38.0
+
+- XADD TRIM (thanks @evan-choi)
+- update XINFO STREAM (thanks @TomBailey167)
+- lua fix (thanks @infastin)
+- partial support for DELEX
+
+
+## v2.37.0
+
+- support HEXPIRE (thanks @mojixcoder)
+
+
+## v2.36.1
+
+- support CLUSTER SHARDS (thanks @dadrus)
+
+
+## v2.36.0
+
+- return actual server address by CLUSTER NODES (thanks @nastik-kum)
+- support DUMP and RESTORE (thanks @alyssaruth)
+- support EVALRO (thanks @max-frank)
+- add WAIT command as no-op (thanks @aroullet)
+- support info stats (thanks @destinyoooo)
+- add "<timestamp>-*" keys
+- compare against Redis 8.4.0
+
+
+## v2.35.0
+
+- add Lua redis.setresp({2,3})
+- embed gopher-json package
+- fix XAUTOCLAIM (thanks @kgunning)
+- fix writeXpending (thanks @gnpaone)
+- fix BLMOVE TTL special case
+- constants for key types @alyssaruth
+
+
 ### v2.34.0
 
 - fix ZINTERSTORE where target is one of the source sets

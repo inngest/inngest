@@ -1,0 +1,28 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+sqrt(25::dec<2, 0>) = 5::fp64
+sqrt(0::dec<1, 0>) = 0::fp64
+
+# max_input: max allowed input returns correct result
+sqrt(99999999999999999999999999999999999999::dec<38, 0>) = 1e+19::fp64
+
+# real_number: real number as input
+sqrt(6.25::dec<3, 2>) = 2.5::fp64
+sqrt(2.0000007152557373046875::dec<23, 22>) = 1.4142138152541635::fp64
+
+# verify_real_number: verify real number operation are different and doesnt behave as nearby int
+sqrt(9::dec<1, 0>) = 3::fp64
+sqrt(8.3::dec<2, 1>) = 2.8809720581775866::fp64
+sqrt(8.5::dec<2, 1>) = 2.9154759474226504::fp64
+sqrt(8.7::dec<2, 1>) = 2.949576240750525::fp64
+sqrt(9.2::dec<2, 1>) = 3.03315017762062::fp64
+
+# negative_input: negative input returns error
+sqrt(-9223372036854775800::dec<19, 0>) = <!ERROR>
+sqrt(-2.5::dec<2, 1>) = <!ERROR>
+
+# null_values: test with null values
+sqrt(null::dec?<38, 0>) = null::fp64?
+sqrt(null::dec?<1, 0>) = null::fp64?

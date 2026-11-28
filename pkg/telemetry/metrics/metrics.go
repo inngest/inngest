@@ -25,6 +25,11 @@ const (
 	MeterTypePrometheus
 )
 
+// unlimitedCardinality keeps the pre-v1.44 sdk/metric behavior. v1.44 changed
+// the default cardinality limit from 0 (unlimited) to 2000, and series past the
+// limit get folded into a single `otel.metric.overflow=true` series.
+var unlimitedCardinality = metric.WithCardinalityLimit(0)
+
 func MeterSetup(svc string, mtype MeterType) (func(), error) {
 	ctx := context.Background()
 
@@ -56,6 +61,7 @@ func NewPrometheusMeterProvider(ctx context.Context, svc string) (*meter, error)
 	}
 
 	mp := metric.NewMeterProvider(
+		unlimitedCardinality,
 		metric.WithReader(exp),
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -79,6 +85,7 @@ func NewIOMeterProvider(ctx context.Context, svc string) (*meter, error) {
 
 	reader := metric.NewPeriodicReader(exp)
 	mp := metric.NewMeterProvider(
+		unlimitedCardinality,
 		metric.WithReader(reader),
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -119,6 +126,7 @@ func NewOTLPMeterProvider(ctx context.Context, svc string) (*meter, error) {
 
 	reader := metric.NewPeriodicReader(exp)
 	mp := metric.NewMeterProvider(
+		unlimitedCardinality,
 		metric.WithReader(reader),
 		metric.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,

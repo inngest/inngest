@@ -10,26 +10,7 @@ import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
-import { getLineChartOptions, mapEntityLines, sum } from './utils';
-
-export type CompletedType =
-  FunctionStatusMetricsQuery['workspace']['completed'];
-export type CompletedMetricsType =
-  FunctionStatusMetricsQuery['workspace']['completed']['metrics'];
-
-const filter = ({ metrics }: CompletedType) =>
-  metrics.filter(({ tagValue }) => tagValue === 'Failed');
-
-const sort = (metrics: CompletedMetricsType) =>
-  metrics.sort(({ data: data1 }, { data: data2 }) => sum(data2) - sum(data1));
-
-const mapFailed = (
-  { completed }: FunctionStatusMetricsQuery['workspace'],
-  entities: EntityLookup,
-) => {
-  const failed = sort(filter(completed));
-  return mapEntityLines(failed, entities);
-};
+import { getLineChartOptions, mapEntityLines } from './utils';
 
 // SQL carried by the "Open in Insights" deep link. Kept local so the chart
 // doesn't depend on a matching entry inside the Insights templates module —
@@ -50,17 +31,22 @@ const INSIGHTS_QUERY_NAME = 'Failed function runs (24h)';
 
 export const FailedFunctions = ({
   workspace,
-  entities,
   functions,
 }: {
   workspace?: FunctionStatusMetricsQuery['workspace'];
-  entities: EntityLookup;
   functions: EntityLookup;
 }) => {
   const env = useEnvironment();
   const navigate = useNavigate();
 
-  const metrics = workspace && mapFailed(workspace, entities);
+  const metrics =
+    workspace &&
+    mapEntityLines(
+      workspace.completedByFunction.metrics.filter(
+        ({ tagValue }) => tagValue === 'Failed',
+      ),
+      functions,
+    );
 
   return (
     <div className="bg-canvasBase border-subtle overflowx-hidden relative flex h-[384px] w-full flex-col rounded-md border p-5">

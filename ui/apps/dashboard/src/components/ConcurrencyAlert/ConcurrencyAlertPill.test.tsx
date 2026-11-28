@@ -41,7 +41,7 @@ function alert(overrides: Partial<ConcurrencyAlert>): ConcurrencyAlert {
     limit: 300,
     minutesRemaining: 42,
     usedRatio: 0.5,
-    linkProps: (surface) => ({ to: `/link/${surface}` }),
+    linkProps: { to: '/link/pill', onClick: vi.fn() },
     ...overrides,
   };
 }

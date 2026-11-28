@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { Trace } from '../types';
+import type { SpanMetadata, Trace } from '../types';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -32,6 +32,38 @@ describe('traceConversion', () => {
   });
 
   describe('traceToTimelineData', () => {
+    it('turns the ticks of a span into markers at their arrival times', () => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({
+            spanID: 'open',
+            ticks: [
+              {
+                id: 'm1',
+                sources: ['p1'],
+                at: '2024-01-01T00:00:03Z',
+                readAt: '2024-01-01T00:00:05Z',
+              },
+              { id: 'm2', sources: ['p1', 'p2'], at: '2024-01-01T00:00:04Z', readAt: null },
+            ],
+          }),
+        ],
+      });
+      const [open] = traceToTimelineData(trace, { runID: 'run-1' }).bars[0]!.children!;
+
+      expect(open!.markers).toEqual([
+        {
+          id: 'm1',
+          at: new Date('2024-01-01T00:00:03Z'),
+        },
+        {
+          id: 'm2',
+          at: new Date('2024-01-01T00:00:04Z'),
+        },
+      ]);
+    });
+
     it('converts a simple trace to timeline data', () => {
       const trace = createTrace({ isRoot: true });
       const result = traceToTimelineData(trace, { runID: 'run-1' });
@@ -158,6 +190,16 @@ describe('traceConversion', () => {
       const result = traceToTimelineData(trace, { runID: 'run-1' });
 
       expect(result.bars[0]?.children?.[0]?.style).toBe('step.sleep');
+    });
+
+    it.each(['SUBSCRIBE', 'INBOX_READ'])('returns "step.waitForEvent" for %s stepOp', (stepOp) => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ stepOp, spanID: 'inbox-step' })],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.style).toBe('step.waitForEvent');
     });
 
     it('returns "step.waitForEvent" for WAIT_FOR_EVENT stepOp', () => {
@@ -978,6 +1020,31 @@ describe('traceConversion', () => {
         { name: 'passed', value: true },
       ]);
       expect(result.bars[0]?.children?.[1]?.scores).toBeUndefined();
+    });
+
+    it('attaches scores from prefix-stripped kinds, skipping user kinds', () => {
+      const trace = createTrace({
+        isRoot: true,
+        metadata: [
+          {
+            scope: 'run',
+            kind: 'score.relevance',
+            isUser: false,
+            updatedAt: '2024-01-01T00:00:05Z',
+            values: { value: 0.5 },
+          },
+          {
+            scope: 'run',
+            kind: 'score.relevance',
+            isUser: true,
+            updatedAt: '2024-01-01T00:00:06Z',
+            values: { value: 1 },
+          },
+        ] as unknown as SpanMetadata[],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.scores).toEqual([{ name: 'relevance', value: 0.5 }]);
     });
 
     it('preserves spanID as bar id', () => {

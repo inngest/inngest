@@ -1,0 +1,11 @@
+[flake8]
+ignore = E203, E266, E501, W503, F403, F401
+max-line-length = 88
+select = B,C,E,F,W,T4,B9
+exclude =
+    # exclude generated test parser
+    tests/coverage/antlr_parser/*.py,
+    # exclude generated type parser
+    tests/type/antlr_parser/*.py,
+    # exclude generated files
+    gen/

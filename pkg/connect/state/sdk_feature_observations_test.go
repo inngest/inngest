@@ -77,6 +77,44 @@ func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
 	require.Equal(t, group, groupManager.updated)
 }
 
+func TestWorkerGroupSyncSendsPlatformHeader(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+	syncID := uuid.New()
+
+	var header http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header = r.Header.Clone()
+		require.NoError(t, json.NewEncoder(w).Encode(cqsync.Reply{
+			OK:     true,
+			AppID:  &appID,
+			SyncID: &syncID,
+		}))
+	}))
+	defer server.Close()
+
+	group := &WorkerGroup{
+		AccountID: uuid.New(),
+		EnvID:     uuid.New(),
+		AppName:   "serve-app",
+		Hash:      "worker-group-hash",
+		SyncData: SyncData{
+			Functions: []sdk.SDKFunction{{Name: "Test function", Slug: "test-function"}},
+		},
+	}
+	// a group without a previous sync always sends the sync request
+	groupManager := &testWorkerGroupManager{existing: &WorkerGroup{}}
+
+	err := group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
+		AuthData:     &connectpb.AuthData{SyncToken: "sync-token"},
+		Capabilities: []byte(`{"connect":"v1"}`),
+		Platform:     new("inngest-serverless"),
+	}, true)
+	require.NoError(t, err)
+	require.NotNil(t, header, "expected a sync request")
+	require.Equal(t, "inngest-serverless", header.Get("X-Inngest-Platform"))
+}
+
 func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
 	ctx := context.Background()
 	existingAppID := uuid.New()

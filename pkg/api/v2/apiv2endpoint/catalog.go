@@ -21,7 +21,9 @@ var hiddenMethods = map[string]struct{}{
 }
 
 var commandNames = map[string]string{
-	"ListRuns": "get-function-runs",
+	"ListRuns":     "get-function-runs",
+	"ListEvents":   "list-events",
+	"ListAppSyncs": "list-app-syncs",
 }
 
 var toolNames = map[string]string{
@@ -131,6 +133,14 @@ func HTTPRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
 	}
 	rule, _ := proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
 	return rule
+}
+
+func HTTPBindings(method protoreflect.MethodDescriptor) []*annotations.HttpRule {
+	rule := HTTPRule(method)
+	if rule == nil {
+		return nil
+	}
+	return append([]*annotations.HttpRule{rule}, rule.AdditionalBindings...)
 }
 
 func AuthzPermission(method protoreflect.MethodDescriptor) string {

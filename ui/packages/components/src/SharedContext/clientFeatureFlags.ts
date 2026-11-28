@@ -5,6 +5,9 @@ export const clientFeatureFlags = [
   'ai-overview-dashboard',
   'connect-worker-concurrency-metrics',
   'dedicated-slack-channel',
+  // Dev-server only: served by the devserver's /dev features map, not LaunchDarkly.
+  'duckdb-insights',
+  'duckdb-reads',
   'enable-step-metadata',
   'hobby-execution-limit-ui',
   'incident-banner',
@@ -13,6 +16,7 @@ export const clientFeatureFlags = [
   'overdue-invoice-banner',
   'polling-disabled',
   'supabase-integration',
+  'webhook-failure-rows',
 ] as const;
 
 export type ClientFeatureFlagKey = (typeof clientFeatureFlags)[number];

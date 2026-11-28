@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -24,10 +25,13 @@ type Service struct {
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
 	apps           AppProvider
+	appSyncs       AppSyncProvider
 	functions      FunctionProvider
 	functionPauser FunctionPauser
+	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
+	events         EventProvider
 	replays        ReplayProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
@@ -37,6 +41,13 @@ type Service struct {
 	scores         ScoreProvider
 	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
+	// duckDB is the dual-write DuckDB connection QueryInsights runs
+	// against -- nil unless --duckdb dual-write started successfully, same
+	// connection as coreapi.Options.DuckDB / queryResolver.DuckDB
+	// (pkg/coreapi/graph/resolvers/resolver.go). A nil duckDB means
+	// QueryInsights errors clearly rather than resolving empty, matching
+	// that resolver's own precedent.
+	duckDB *sql.DB
 }
 
 // ServiceOptions contains configuration for the V2 service
@@ -44,10 +55,13 @@ type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
 	Apps                AppProvider
+	AppSyncs            AppSyncProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
+	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
+	Events              EventProvider
 	Replays             ReplayProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
@@ -56,6 +70,9 @@ type ServiceOptions struct {
 	MaxEventSize        int
 	Scores              ScoreProvider
 	RateLimitProvider   RateLimitProvider
+	// DuckDB is the dual-write DuckDB connection backing QueryInsights --
+	// see Service.duckDB.
+	DuckDB *sql.DB
 }
 
 func NewService(opts ServiceOptions) *Service {
@@ -71,10 +88,13 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		apps:           opts.Apps,
+		appSyncs:       opts.AppSyncs,
 		functions:      opts.Functions,
 		functionPauser: opts.FunctionPauser,
+		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
+		events:         opts.Events,
 		replays:        opts.Replays,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
@@ -84,6 +104,7 @@ func NewService(opts ServiceOptions) *Service {
 		scores:         opts.Scores,
 		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),
+		duckDB:         opts.DuckDB,
 	}
 }
 
@@ -234,13 +255,25 @@ func normalizedV2Path(path string) string {
 func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		type route struct{ method, path string }
-		limits := map[string]int64{"SendEvent": maxEventBytes, "CreateReplay": 64 << 10}
+		limits := map[string]int64{
+			"SendEvent":       maxEventBytes,
+			"CreateReplay":    64 << 10,
+			"PauseFunctions":  256 << 10,
+			"ResumeFunctions": 256 << 10,
+			"CreateWebhook":   64 << 10,
+			"UpdateWebhook":   16 << 10,
+		}
 		handlers := map[route]http.Handler{}
 		paths := chi.NewRouter()
-		for _, endpoint := range apiv2endpoint.Discover() {
-			if limit, ok := limits[endpoint.MethodName]; ok {
-				paths.Method(endpoint.HTTPMethod, endpoint.Path, next)
-				handlers[route{endpoint.HTTPMethod, endpoint.Path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+		methods := apiv2.File_api_v2_service_proto.Services().ByName("V2").Methods()
+		for i := 0; i < methods.Len(); i++ {
+			method := methods.Get(i)
+			if limit, ok := limits[string(method.Name())]; ok {
+				for _, binding := range apiv2endpoint.HTTPBindings(method) {
+					httpMethod, path := apiv2endpoint.MethodAndPath(binding)
+					paths.Method(httpMethod, path, next)
+					handlers[route{httpMethod, path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+				}
 			}
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

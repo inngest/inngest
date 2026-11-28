@@ -55,8 +55,12 @@ func TestScheduleRunSpanIncludesFunctionMetadata(t *testing.T) {
 			},
 		},
 	}
+	rawEvent, err := json.Marshal(req.Events[0].GetEvent())
+	require.NoError(t, err)
+	req.SerializedEvents, err = event.NewSerializedEvents([]json.RawMessage{rawEvent})
+	require.NoError(t, err)
 
-	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+	_, _, err = e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 	require.ErrorIs(t, err, ErrFunctionSkipped)
 
 	var runSpan *createSpanCall

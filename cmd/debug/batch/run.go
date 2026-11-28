@@ -46,13 +46,30 @@ func RunCommand() *cli.Command {
 				return fmt.Errorf("failed to run batch: %w", err)
 			}
 
-			if !resp.Scheduled {
-				fmt.Println("No batch found to run")
-				return nil
+			// Older servers only fill the top-level fields.
+			stores := resp.Stores
+			if len(stores) == 0 {
+				stores = []*dbgpb.RunBatchResult{{
+					Scheduled: resp.Scheduled,
+					BatchId:   resp.BatchId,
+					ItemCount: resp.ItemCount,
+				}}
 			}
 
-			fmt.Printf("Scheduled batch: %s\n", resp.BatchId)
-			fmt.Printf("Items in batch:  %d\n", resp.ItemCount)
+			for i, store := range stores {
+				if i > 0 {
+					fmt.Println()
+				}
+				if store.Store != "" {
+					fmt.Printf("Store:           %s\n", store.Store)
+				}
+				if !store.Scheduled {
+					fmt.Println("No batch found to run")
+					continue
+				}
+				fmt.Printf("Scheduled batch: %s\n", store.BatchId)
+				fmt.Printf("Items in batch:  %d\n", store.ItemCount)
+			}
 
 			return nil
 		},

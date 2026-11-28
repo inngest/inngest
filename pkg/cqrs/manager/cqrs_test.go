@@ -3169,8 +3169,9 @@ func TestSpanOutputReadBack(t *testing.T) {
 	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{RunID: runID, SpanID: spanID})
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
-	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted.
+	// Compared as JSON since postgres' jsonb re-serializes it (`{"num": 42}`).
+	assert.JSONEq(t, `{"num":42}`, string(out.Data), "output should contain raw JSON, not double-encoded")
 }
 
 // TestExtendedTraceReparenting verifies that orphaned userland spans (extended
@@ -3814,5 +3815,29 @@ func TestSpanRunCursorTimeIgnoresOutOfRangeNanoseconds(t *testing.T) {
 	} {
 		got := spanRunCursorTime(&cqrs.TraceCursor{Value: base.UnixMicro(), NanosecondRemainder: tc.ns})
 		require.Equal(t, tc.want, got, "ns=%d", tc.ns)
+	}
+}
+
+// TestRollupSpanMetadataFromFragmentsSetsIsUser checks IsUser follows the
+// fragments' kind prefix, so it agrees with DuckDB's stored is_user.
+func TestRollupSpanMetadataFromFragmentsSetsIsUser(t *testing.T) {
+	for kind, isUser := range map[string]bool{
+		"userland.score": true,
+		"inngest.score":  false,
+	} {
+		attrs, err := json.Marshal(map[string]any{
+			"_inngest.metadata.scope":  enums.MetadataScopeRun,
+			"_inngest.metadata.kind":   kind,
+			"_inngest.metadata.op":     enums.MetadataOpcodeSet,
+			"_inngest.metadata.values": `{"v":1}`,
+		})
+		require.NoError(t, err)
+
+		md, err := rollupSpanMetadataFromFragments(context.Background(), []map[string]any{
+			{"attributes": string(attrs)},
+		}, time.Now())
+		require.NoError(t, err)
+		require.Equal(t, metadata.Kind(kind), md.Kind)
+		require.Equal(t, isUser, md.IsUser, kind)
 	}
 }

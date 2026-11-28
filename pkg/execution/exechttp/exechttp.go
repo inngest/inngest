@@ -79,6 +79,13 @@ func WithDevServerRealtimePublishing(publishURL string) ClientOpt {
 	}
 }
 
+// WithResetTrace returns transport diagnostics with connection resets.
+func WithResetTrace() ClientOpt {
+	return func(e *ExtendedClient) {
+		e.resetTrace = true
+	}
+}
+
 type ClientOpt func(e *ExtendedClient)
 
 // Client returns a new HTTP client which fulfils the ClientExecutor interface, allowing us to
@@ -107,6 +114,7 @@ type ExtendedClient struct {
 	// streamed to the realtime publishing endpoint specified in each request.
 	publish             bool
 	devServerPublishURL string
+	resetTrace          bool
 }
 
 // DoRequest performs the SerializableRequest with tracking, reading the response and handling
@@ -120,7 +128,11 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	}
 
 	tracking := &httpstat.Result{}
-	req = req.WithContext(httpstat.WithHTTPStat(ctx, tracking))
+	if e.resetTrace {
+		req = req.WithContext(httpstat.WithHTTPStatProgress(ctx, tracking))
+	} else {
+		req = req.WithContext(httpstat.WithHTTPStat(ctx, tracking))
+	}
 	resp, err := e.Do(req)
 	tracking.End(time.Now())
 
@@ -134,11 +146,11 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	if isUnreachable(resp, err) {
 		// keep the dial error so logs show if the request was refused, had no
 		// route, or got an EOF.
-		return nil, fmt.Errorf("%w: %w", ErrUnableToReach, err)
+		return nil, e.withResetTrace(tracking, fmt.Errorf("%w: %w", ErrUnableToReach, err), err)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("error performing request: %w", err)
+		return nil, e.withResetTrace(tracking, fmt.Errorf("error performing request: %w", err), err)
 	}
 
 	if resp == nil {
@@ -147,7 +159,7 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 
 	body, bodyEncoding, bodyCloser, err := decodeResponseBody(resp)
 	if err != nil {
-		return nil, err
+		return nil, e.withResetTrace(tracking, err, err)
 	}
 	if bodyEncoding != "" {
 		// Clear the Content-Encoding header after decompression so that
@@ -206,9 +218,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 			return nil, ctx.Err()
 		}
 		if bodyEncoding != "" {
-			return nil, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err)
+			return nil, e.withResetTrace(tracking, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err), err)
 		}
-		return nil, ErrUnexpectedEnd
+		return nil, e.withResetTrace(tracking, ErrUnexpectedEnd, err)
 	}
 
 	out := &Response{

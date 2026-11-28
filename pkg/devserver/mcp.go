@@ -132,17 +132,12 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"GetSandboxProcess":          {},
 	"GetSandboxProcessOutput":    {},
 	"ListExperiments":            {},
-	"ListInsightsEventSchemas":   {},
-	"ListInsightsTables":         {},
+	"ListInsightsEventSchemas":   {}, // no event-schema-catalog capability in OSS yet
 	"ListSandboxProcesses":       {},
 	"ListSandboxes":              {},
-	"ListSessionKeys":            {},
-	"ListSessionRuns":            {},
-	"ListSessions":               {},
 	"ListWebhooks":               {},
 	"PatchEnv":                   {},
-	"QueryInsights":              {},
-	"QueryInsightsPrompt":        {},
+	"QueryInsightsPrompt":        {}, // no NL->SQL capability in OSS yet
 	"ReadSandboxFile":            {},
 	"SendEvent":                  {},
 	"SignalSandboxProcess":       {},
@@ -150,6 +145,7 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"StreamSandboxLogs":          {},
 	"StreamSandboxProcessOutput": {},
 	"SyncApp":                    {},
+	"UpdateWebhook":              {},
 	"WaitSandboxProcess":         {},
 	"WriteSandboxFile":           {},
 }
@@ -240,16 +236,30 @@ type sanitizeMCPResponseWriter struct {
 	http.ResponseWriter
 }
 
-func (w *sanitizeMCPResponseWriter) WriteHeader(statusCode int) {
+func (w *sanitizeMCPResponseWriter) stripTransferEncoding() {
 	delete(w.Header(), "transfer-encoding")
 	delete(w.Header(), "Transfer-Encoding")
+}
+
+func (w *sanitizeMCPResponseWriter) WriteHeader(statusCode int) {
+	w.stripTransferEncoding()
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *sanitizeMCPResponseWriter) Write(b []byte) (int, error) {
-	delete(w.Header(), "transfer-encoding")
-	delete(w.Header(), "Transfer-Encoding")
+	w.stripTransferEncoding()
 	return w.ResponseWriter.Write(b)
+}
+
+func (w *sanitizeMCPResponseWriter) Flush() {
+	w.stripTransferEncoding()
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *sanitizeMCPResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 func (h *MCPHandler) handler() http.Handler {

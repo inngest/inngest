@@ -22,6 +22,7 @@ local signalCorrelationID = ARGV[5]
 local extendedExpiry = tonumber(ARGV[6])
 local nowUnixSeconds = tonumber(ARGV[7])
 local canReplaceSignal = tonumber(ARGV[8])
+local expireEventBodies = tonumber(ARGV[9]) == 1
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -31,19 +32,23 @@ end
 -- Populate global index
 redis.call("SADD", keyPausesIdx, pauseID)
 
-redis.call("EXPIRE", pauseKey, extendedExpiry)
+redis.call("EXPIREAT", pauseKey, extendedExpiry)
 
 -- Add an index of when the pause was added.
 redis.call("ZADD", keyPauseAddIdx, nowUnixSeconds, pauseID)
 -- Add an index of when the pause expires.  This lets us manually
 -- garbage collect expired pauses from the HSET below.
-redis.call("ZADD", keyPauseExpIdx, nowUnixSeconds+extendedExpiry, pauseID)
+redis.call("ZADD", keyPauseExpIdx, extendedExpiry, pauseID)
 
 -- SADD to store the pause for this run
 redis.call("SADD", keyRunPauses, pauseID)
 
 if event ~= false and event ~= "" and event ~= nil then
 	redis.call("HSET", pauseEvtKey, pauseID, pause)
+	if expireEventBodies then
+		-- HEXPIREAT is available in Valkey 9.0.0+; disabled for legacy MemoryDB.
+		redis.call("HEXPIREAT", pauseEvtKey, extendedExpiry, "FIELDS", 1, pauseID)
+	end
 end
 
 if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelationID ~= nil then

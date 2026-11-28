@@ -40,6 +40,69 @@ describe('TimelineBar', () => {
     style: 'step.run' as const,
   };
 
+  describe('markers', () => {
+    const markers = [
+      { id: 'm1', startPercent: 30 },
+      { id: 'm2', startPercent: 60 },
+    ];
+
+    it('draws a dot at each marker position', () => {
+      render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
+      const dots = screen.getAllByTestId('bar-marker');
+
+      expect(dots.map((dot) => dot.style.left)).toEqual(['30%', '60%']);
+    });
+
+    it('draws every dot the same, whatever the bar pattern or state', () => {
+      const looks = [
+        { style: 'step.run' as const },
+        { style: 'step.waitForEvent' as const, status: 'RUNNING' as const },
+        { style: 'step.waitForEvent' as const, status: 'COMPLETED' as const },
+      ].map((props) => {
+        const { unmount } = render(<TimelineBar {...defaultProps} {...props} markers={markers} />, {
+          wrapper: Wrapper,
+        });
+        const classes = screen.getAllByTestId('bar-marker').map((dot) => dot.className);
+        unmount();
+
+        return classes;
+      });
+
+      expect(new Set(looks.flat()).size).toBe(1);
+    });
+
+    it('stays visible while the row is expanded', () => {
+      render(
+        <TimelineBar {...defaultProps} markers={markers} expandable expanded>
+          <div />
+        </TimelineBar>,
+        { wrapper: Wrapper }
+      );
+
+      expect(screen.getAllByTestId('bar-marker')).toHaveLength(2);
+    });
+
+    it('drops markers outside the visible window and rescales the rest', () => {
+      render(
+        <TimelineBar {...defaultProps} markers={markers} viewStartOffset={20} viewEndOffset={50} />,
+        { wrapper: Wrapper }
+      );
+      const dots = screen.getAllByTestId('bar-marker');
+
+      expect(dots).toHaveLength(1);
+      expect(dots[0]!.style.left).toBe('33.33333333333333%');
+    });
+
+    it('is decorative: not focusable, no label, no hover card', () => {
+      render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
+      const dot = screen.getAllByTestId('bar-marker')[0]!;
+
+      expect(dot.getAttribute('aria-hidden')).toBe('true');
+      expect(dot.getAttribute('tabindex')).toBeNull();
+      expect(dot.getAttribute('aria-label')).toBeNull();
+    });
+  });
+
   // T009: renders bar with name and duration
   describe('renders bar with name and duration', () => {
     it('displays the step name', () => {

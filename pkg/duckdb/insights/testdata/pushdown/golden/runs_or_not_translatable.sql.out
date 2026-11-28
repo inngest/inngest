@@ -1,0 +1,4 @@
+{
+  "description": "An OR with a branch that can't be translated (a function of a column), ILIKE, and a LIKE with ESCAPE yield no predicate.",
+  "mode": "product"
+}

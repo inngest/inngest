@@ -4,11 +4,10 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Delivers a message to the specified queue.
@@ -18,10 +17,9 @@ import (
 //
 // #x9 | #xA | #xD | #x20 to #xD7FF | #xE000 to #xFFFD | #x10000 to #x10FFFF
 //
-// Amazon SQS does not throw an exception or completely reject the message if it
-// contains invalid characters. Instead, it replaces those invalid characters with
-// U+FFFD before storing the message in the queue, as long as the message body
-// contains at least one valid character.
+// If a message contains characters outside the allowed set, Amazon SQS rejects
+// the message and returns an InvalidMessageContents error. Ensure that your
+// message body includes only valid characters to avoid this exception.
 //
 // [W3C specification for characters]: http://www.w3.org/TR/REC-xml/#charsets
 func (c *Client) SendMessage(ctx context.Context, params *SendMessageInput, optFns ...func(*Options)) (*SendMessageOutput, error) {
@@ -41,18 +39,17 @@ func (c *Client) SendMessage(ctx context.Context, params *SendMessageInput, optF
 
 type SendMessageInput struct {
 
-	// The message to send. The minimum size is one character. The maximum size is 256
-	// KiB.
+	// The message to send. The minimum size is one character. The maximum size is 1
+	// MiB or 1,048,576 bytes
 	//
 	// A message can include only XML, JSON, and unformatted text. The following
 	// Unicode characters are allowed. For more information, see the [W3C specification for characters].
 	//
 	// #x9 | #xA | #xD | #x20 to #xD7FF | #xE000 to #xFFFD | #x10000 to #x10FFFF
 	//
-	// Amazon SQS does not throw an exception or completely reject the message if it
-	// contains invalid characters. Instead, it replaces those invalid characters with
-	// U+FFFD before storing the message in the queue, as long as the message body
-	// contains at least one valid character.
+	// If a message contains characters outside the allowed set, Amazon SQS rejects
+	// the message and returns an InvalidMessageContents error. Ensure that your
+	// message body includes only valid characters to avoid this exception.
 	//
 	// [W3C specification for characters]: http://www.w3.org/TR/REC-xml/#charsets
 	//
@@ -134,31 +131,45 @@ type SendMessageInput struct {
 	// [Exactly-once processing]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues-exactly-once-processing.html
 	MessageDeduplicationId *string
 
-	// This parameter applies only to FIFO (first-in-first-out) queues.
+	// MessageGroupId is an attribute used in Amazon SQS FIFO (First-In-First-Out) and
+	// standard queues. In FIFO queues, MessageGroupId organizes messages into
+	// distinct groups. Messages within the same message group are always processed one
+	// at a time, in strict order, ensuring that no two messages from the same group
+	// are processed simultaneously. In standard queues, using MessageGroupId enables
+	// fair queues. It is used to identify the tenant a message belongs to, helping
+	// maintain consistent message dwell time across all tenants during noisy neighbor
+	// events. Unlike FIFO queues, messages with the same MessageGroupId can be
+	// processed in parallel, maintaining the high throughput of standard queues.
 	//
-	// The tag that specifies that a message belongs to a specific message group.
-	// Messages that belong to the same message group are processed in a FIFO manner
-	// (however, messages in different message groups might be processed out of order).
-	// To interleave multiple ordered streams within a single queue, use MessageGroupId
-	// values (for example, session data for multiple users). In this scenario,
-	// multiple consumers can process the queue, but the session data of each user is
-	// processed in a FIFO fashion.
+	//   - FIFO queues: MessageGroupId acts as the tag that specifies that a message
+	//   belongs to a specific message group. Messages that belong to the same message
+	//   group are processed in a FIFO manner (however, messages in different message
+	//   groups might be processed out of order). To interleave multiple ordered streams
+	//   within a single queue, use MessageGroupId values (for example, session data
+	//   for multiple users). In this scenario, multiple consumers can process the queue,
+	//   but the session data of each user is processed in a FIFO fashion.
 	//
-	//   - You must associate a non-empty MessageGroupId with a message. If you don't
-	//   provide a MessageGroupId , the action fails.
+	// If you do not provide a MessageGroupId when sending a message to a FIFO queue,
+	//   the action fails.
 	//
-	//   - ReceiveMessage might return messages with multiple MessageGroupId values.
-	//   For each MessageGroupId , the messages are sorted by time sent. The caller
-	//   can't specify a MessageGroupId .
+	// ReceiveMessage might return messages with multiple MessageGroupId values. For
+	//   each MessageGroupId , the messages are sorted by time sent.
 	//
-	// The maximum length of MessageGroupId is 128 characters. Valid values:
-	// alphanumeric characters and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
+	//   - Standard queues:Use MessageGroupId in standard queues to enable fair queues.
+	//   The MessageGroupId identifies the tenant a message belongs to. A tenant can be
+	//   any entity that shares a queue with others, such as your customer, a client
+	//   application, or a request type. When one tenant sends a disproportionately large
+	//   volume of messages or has messages that require longer processing time, fair
+	//   queues ensure other tenants' messages maintain low dwell time. This preserves
+	//   quality of service for all tenants while maintaining the scalability and
+	//   throughput of standard queues. We recommend that you include a MessageGroupId
+	//   in all messages when using fair queues.
+	//
+	// The length of MessageGroupId is 128 characters. Valid values: alphanumeric
+	// characters and punctuation (!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~) .
 	//
 	// For best practices of using MessageGroupId , see [Using the MessageGroupId Property] in the Amazon SQS Developer
 	// Guide.
-	//
-	// MessageGroupId is required for FIFO queues. You can't use it for Standard
-	// queues.
 	//
 	// [Using the MessageGroupId Property]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagegroupid-property.html
 	MessageGroupId *string
@@ -175,6 +186,32 @@ type SendMessageInput struct {
 	MessageSystemAttributes map[string]types.MessageSystemAttributeValue
 
 	noSmithyDocumentSerde
+}
+
+func (v *SendMessageInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.SendMessageRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *SendMessageInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.DelaySeconds != 0 {
+		s.WriteInt32(schemas.SendMessageRequest_DelaySeconds, v.DelaySeconds)
+	}
+	serializeMessageBodyAttributeMap(s, schemas.SendMessageRequest_MessageAttributes, v.MessageAttributes)
+	if v.MessageBody != nil {
+		s.WriteString(schemas.SendMessageRequest_MessageBody, *v.MessageBody)
+	}
+	if v.MessageDeduplicationId != nil {
+		s.WriteString(schemas.SendMessageRequest_MessageDeduplicationId, *v.MessageDeduplicationId)
+	}
+	if v.MessageGroupId != nil {
+		s.WriteString(schemas.SendMessageRequest_MessageGroupId, *v.MessageGroupId)
+	}
+	serializeMessageBodySystemAttributeMap(s, schemas.SendMessageRequest_MessageSystemAttributes, v.MessageSystemAttributes)
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.SendMessageRequest_QueueUrl, *v.QueueUrl)
+	}
 }
 
 // The MD5OfMessageBody and MessageId elements.
@@ -221,77 +258,75 @@ type SendMessageOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *SendMessageOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.SendMessageResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *SendMessageOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.MD5OfMessageAttributes != nil {
+		s.WriteString(schemas.SendMessageResult_MD5OfMessageAttributes, *v.MD5OfMessageAttributes)
+	}
+	if v.MD5OfMessageBody != nil {
+		s.WriteString(schemas.SendMessageResult_MD5OfMessageBody, *v.MD5OfMessageBody)
+	}
+	if v.MD5OfMessageSystemAttributes != nil {
+		s.WriteString(schemas.SendMessageResult_MD5OfMessageSystemAttributes, *v.MD5OfMessageSystemAttributes)
+	}
+	if v.MessageId != nil {
+		s.WriteString(schemas.SendMessageResult_MessageId, *v.MessageId)
+	}
+	if v.SequenceNumber != nil {
+		s.WriteString(schemas.SendMessageResult_SequenceNumber, *v.SequenceNumber)
+	}
+}
+func (v *SendMessageOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.SendMessageResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.SendMessageResult_MD5OfMessageAttributes:
+			v.MD5OfMessageAttributes = new(string)
+			return d.ReadString(schemas.SendMessageResult_MD5OfMessageAttributes, v.MD5OfMessageAttributes)
+		case schemas.SendMessageResult_MD5OfMessageBody:
+			v.MD5OfMessageBody = new(string)
+			return d.ReadString(schemas.SendMessageResult_MD5OfMessageBody, v.MD5OfMessageBody)
+		case schemas.SendMessageResult_MD5OfMessageSystemAttributes:
+			v.MD5OfMessageSystemAttributes = new(string)
+			return d.ReadString(schemas.SendMessageResult_MD5OfMessageSystemAttributes, v.MD5OfMessageSystemAttributes)
+		case schemas.SendMessageResult_MessageId:
+			v.MessageId = new(string)
+			return d.ReadString(schemas.SendMessageResult_MessageId, v.MessageId)
+		case schemas.SendMessageResult_SequenceNumber:
+			v.SequenceNumber = new(string)
+			return d.ReadString(schemas.SendMessageResult_SequenceNumber, v.SequenceNumber)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationSendMessageMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.SendMessage, schemas.SendMessageRequest, schemas.SendMessageResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpSendMessage{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.SendMessage, schemas.SendMessageRequest, schemas.SendMessageResult), output: &SendMessageOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpSendMessage{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "SendMessage"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addValidateSendMessageChecksum(stack, options); err != nil {
 		return err
 	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpSendMessageValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opSendMessage(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -306,13 +341,8 @@ func (c *Client) addOperationSendMessageMiddlewares(stack *middleware.Stack, opt
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opSendMessage(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "SendMessage",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

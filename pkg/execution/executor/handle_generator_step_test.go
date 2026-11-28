@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -159,6 +160,51 @@ func TestHandleGeneratorStepPlanned_StampsCoalesceKey(t *testing.T) {
 	for _, item := range q.enqueued {
 		require.NotNil(t, item.ParallelCoalesceKey)
 		require.Equal(t, ck, *item.ParallelCoalesceKey)
+	}
+}
+
+// Planned steps call the SDK, so each planned step's queue item must carry the
+// run's auto-release semaphores (eg. connect worker concurrency) like every
+// other step item.  Manual-release semaphores stay on the start job only.
+func TestHandleGeneratorStepPlanned_AddsStepSemaphores(t *testing.T) {
+	appSem := constraintapi.Semaphore{
+		ID:      constraintapi.SemaphoreIDApp(uuid.New()),
+		Weight:  1,
+		Release: constraintapi.SemaphoreReleaseAuto,
+	}
+	fnSem := constraintapi.Semaphore{
+		ID:      constraintapi.SemaphoreIDFn(uuid.New()),
+		Weight:  1,
+		Release: constraintapi.SemaphoreReleaseManual,
+	}
+
+	q := &stubQueue{}
+	e := &executor{
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	rc := &mockRunContext{md: sv2.Metadata{
+		ID: sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New()},
+		Config: *sv2.InitConfig(&sv2.Config{
+			Semaphores: []constraintapi.Semaphore{appSem, fnSem},
+		}),
+	}}
+
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+	for _, id := range []string{"step-a", "step-b"} {
+		err := e.handleGeneratorStepPlanned(
+			context.Background(), rc,
+			state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: id},
+			edge, OpcodeGroup{},
+		)
+		require.NoError(t, err)
+	}
+
+	require.Len(t, q.enqueued, 2)
+	for _, item := range q.enqueued {
+		require.Equal(t, []constraintapi.Semaphore{appSem}, item.Semaphores)
 	}
 }
 

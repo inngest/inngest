@@ -118,6 +118,9 @@ func (m *MockStateManager) CreateLease(ctx context.Context, envID uuid.UUID, req
 func (m *MockStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error {
 	panic("not implemented")
 }
+func (m *MockStateManager) ReleaseRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID) error {
+	panic("not implemented")
+}
 func (m *MockStateManager) GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error) {
 	panic("not implemented")
 }

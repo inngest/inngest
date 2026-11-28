@@ -1,0 +1,23 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+between(5::i8, 0::i8, 127::i8) = true::bool
+between(20000::i16, 1::i16, 30000::i16) = true::bool
+between(1030000000::i32, 1000000000::i32, 2000000000::i32) = true::bool
+between(10300000000900::i64, 1000000000::i64, 9223372036854775807::i64) = true::bool
+between(2::i8, 1::i8, -120::i8) = false::bool
+between(2::i8, 2::i8, 3::i8) = true::bool
+between(2::i8, 1::i8, 2::i8) = true::bool
+between(-10000::i16, -20000::i16, -30000::i16) = false::bool
+between(-100000000::i32, -1000000000::i32, -2000000000::i32) = false::bool
+between(92233720368547758::i64, 1::i64, -9223372036854775807::i64) = false::bool
+between(14.01::fp32, 20.90::fp32, 88.00::fp32) = false::bool
+between(14.011::fp64, 0.00::fp64, inf::fp64) = true::bool
+between(inf::fp64, 0.00::fp64, 100.09::fp64) = false::bool
+between(-100.0011::fp64, -inf::fp64, 0.00::fp64) = true::bool
+
+# null_input: Examples with null as input
+between(null::i8?, 1::i8, 10::i8) = null::bool?
+between(1::i64, null::i64?, 10::i64) = null::bool?
+between(1::i64, 1::i64, null::i64?) = null::bool?

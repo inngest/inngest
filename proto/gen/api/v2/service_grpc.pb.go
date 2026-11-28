@@ -26,11 +26,13 @@ const (
 	V2_CreateEnv_FullMethodName                  = "/api.v2.V2/CreateEnv"
 	V2_FetchPartnerAccounts_FullMethodName       = "/api.v2.V2/FetchPartnerAccounts"
 	V2_FetchAccount_FullMethodName               = "/api.v2.V2/FetchAccount"
+	V2_GetAccountUsage_FullMethodName            = "/api.v2.V2/GetAccountUsage"
 	V2_FetchAccountEnvs_FullMethodName           = "/api.v2.V2/FetchAccountEnvs"
 	V2_FetchAccountEventKeys_FullMethodName      = "/api.v2.V2/FetchAccountEventKeys"
 	V2_FetchAccountSigningKeys_FullMethodName    = "/api.v2.V2/FetchAccountSigningKeys"
 	V2_CreateWebhook_FullMethodName              = "/api.v2.V2/CreateWebhook"
 	V2_ListWebhooks_FullMethodName               = "/api.v2.V2/ListWebhooks"
+	V2_UpdateWebhook_FullMethodName              = "/api.v2.V2/UpdateWebhook"
 	V2_PatchEnv_FullMethodName                   = "/api.v2.V2/PatchEnv"
 	V2_GetFunctionRun_FullMethodName             = "/api.v2.V2/GetFunctionRun"
 	V2_ListRuns_FullMethodName                   = "/api.v2.V2/ListRuns"
@@ -46,6 +48,11 @@ const (
 	V2_GetBuild_FullMethodName                   = "/api.v2.V2/GetBuild"
 	V2_ListBuilds_FullMethodName                 = "/api.v2.V2/ListBuilds"
 	V2_CancelBuild_FullMethodName                = "/api.v2.V2/CancelBuild"
+	V2_CreateDeploy_FullMethodName               = "/api.v2.V2/CreateDeploy"
+	V2_CommitDeploy_FullMethodName               = "/api.v2.V2/CommitDeploy"
+	V2_GetDeploy_FullMethodName                  = "/api.v2.V2/GetDeploy"
+	V2_ListDeploys_FullMethodName                = "/api.v2.V2/ListDeploys"
+	V2_CancelDeploy_FullMethodName               = "/api.v2.V2/CancelDeploy"
 	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
@@ -69,11 +76,18 @@ const (
 	V2_StreamSandboxProcessOutput_FullMethodName = "/api.v2.V2/StreamSandboxProcessOutput"
 	V2_CreateScore_FullMethodName                = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
+	V2_ListAppSyncs_FullMethodName               = "/api.v2.V2/ListAppSyncs"
+	V2_GetAppSync_FullMethodName                 = "/api.v2.V2/GetAppSync"
 	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
+	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
+	V2_PauseFunctions_FullMethodName             = "/api.v2.V2/PauseFunctions"
+	V2_ResumeFunctions_FullMethodName            = "/api.v2.V2/ResumeFunctions"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
+	V2_ListEvents_FullMethodName                 = "/api.v2.V2/ListEvents"
+	V2_GetEvent_FullMethodName                   = "/api.v2.V2/GetEvent"
 	V2_SendEvent_FullMethodName                  = "/api.v2.V2/SendEvent"
 	V2_InvokeFunction_FullMethodName             = "/api.v2.V2/InvokeFunction"
 	V2_ListInsightsTables_FullMethodName         = "/api.v2.V2/ListInsightsTables"
@@ -85,6 +99,7 @@ const (
 	V2_ListSessionKeys_FullMethodName            = "/api.v2.V2/ListSessionKeys"
 	V2_ListSessions_FullMethodName               = "/api.v2.V2/ListSessions"
 	V2_ListSessionRuns_FullMethodName            = "/api.v2.V2/ListSessionRuns"
+	V2_SubmitFeedback_FullMethodName             = "/api.v2.V2/SubmitFeedback"
 )
 
 // V2Client is the client API for V2 service.
@@ -100,11 +115,13 @@ type V2Client interface {
 	CreateEnv(ctx context.Context, in *CreateEnvRequest, opts ...grpc.CallOption) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(ctx context.Context, in *FetchAccountsRequest, opts ...grpc.CallOption) (*FetchAccountsResponse, error)
 	FetchAccount(ctx context.Context, in *FetchAccountRequest, opts ...grpc.CallOption) (*FetchAccountResponse, error)
+	GetAccountUsage(ctx context.Context, in *GetAccountUsageRequest, opts ...grpc.CallOption) (*GetAccountUsageResponse, error)
 	FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(ctx context.Context, in *FetchAccountEventKeysRequest, opts ...grpc.CallOption) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(ctx context.Context, in *FetchAccountSigningKeysRequest, opts ...grpc.CallOption) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(ctx context.Context, in *CreateWebhookRequest, opts ...grpc.CallOption) (*CreateWebhookResponse, error)
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
+	UpdateWebhook(ctx context.Context, in *UpdateWebhookRequest, opts ...grpc.CallOption) (*UpdateWebhookResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
 	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error)
@@ -120,6 +137,11 @@ type V2Client interface {
 	GetBuild(ctx context.Context, in *GetBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
 	ListBuilds(ctx context.Context, in *ListBuildsRequest, opts ...grpc.CallOption) (*ListBuildsResponse, error)
 	CancelBuild(ctx context.Context, in *CancelBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
+	CreateDeploy(ctx context.Context, in *CreateDeployRequest, opts ...grpc.CallOption) (*CreateDeployResponse, error)
+	CommitDeploy(ctx context.Context, in *CommitDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
+	GetDeploy(ctx context.Context, in *GetDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
+	ListDeploys(ctx context.Context, in *ListDeploysRequest, opts ...grpc.CallOption) (*ListDeploysResponse, error)
+	CancelDeploy(ctx context.Context, in *CancelDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
@@ -143,11 +165,18 @@ type V2Client interface {
 	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
+	ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error)
+	GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
+	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
+	PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error)
+	ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
+	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
+	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error)
 	SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 	ListInsightsTables(ctx context.Context, in *ListInsightsTablesRequest, opts ...grpc.CallOption) (*ListInsightsTablesResponse, error)
@@ -159,6 +188,7 @@ type V2Client interface {
 	ListSessionKeys(ctx context.Context, in *ListSessionKeysRequest, opts ...grpc.CallOption) (*ListSessionKeysResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	ListSessionRuns(ctx context.Context, in *ListSessionRunsRequest, opts ...grpc.CallOption) (*ListSessionRunsResponse, error)
+	SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error)
 }
 
 type v2Client struct {
@@ -229,6 +259,16 @@ func (c *v2Client) FetchAccount(ctx context.Context, in *FetchAccountRequest, op
 	return out, nil
 }
 
+func (c *v2Client) GetAccountUsage(ctx context.Context, in *GetAccountUsageRequest, opts ...grpc.CallOption) (*GetAccountUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountUsageResponse)
+	err := c.cc.Invoke(ctx, V2_GetAccountUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) FetchAccountEnvs(ctx context.Context, in *FetchAccountEnvsRequest, opts ...grpc.CallOption) (*FetchAccountEnvsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchAccountEnvsResponse)
@@ -273,6 +313,16 @@ func (c *v2Client) ListWebhooks(ctx context.Context, in *ListWebhooksRequest, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWebhooksResponse)
 	err := c.cc.Invoke(ctx, V2_ListWebhooks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) UpdateWebhook(ctx context.Context, in *UpdateWebhookRequest, opts ...grpc.CallOption) (*UpdateWebhookResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateWebhookResponse)
+	err := c.cc.Invoke(ctx, V2_UpdateWebhook_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -423,6 +473,56 @@ func (c *v2Client) CancelBuild(ctx context.Context, in *CancelBuildRequest, opts
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BuildResponse)
 	err := c.cc.Invoke(ctx, V2_CancelBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateDeploy(ctx context.Context, in *CreateDeployRequest, opts ...grpc.CallOption) (*CreateDeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateDeployResponse)
+	err := c.cc.Invoke(ctx, V2_CreateDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CommitDeploy(ctx context.Context, in *CommitDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_CommitDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetDeploy(ctx context.Context, in *GetDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_GetDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListDeploys(ctx context.Context, in *ListDeploysRequest, opts ...grpc.CallOption) (*ListDeploysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDeploysResponse)
+	err := c.cc.Invoke(ctx, V2_ListDeploys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CancelDeploy(ctx context.Context, in *CancelDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_CancelDeploy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -686,6 +786,26 @@ func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *v2Client) ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAppSyncsResponse)
+	err := c.cc.Invoke(ctx, V2_ListAppSyncs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAppSyncResponse)
+	err := c.cc.Invoke(ctx, V2_GetAppSync_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionTraceResponse)
@@ -700,6 +820,16 @@ func (c *v2Client) GetFunction(ctx context.Context, in *GetFunctionRequest, opts
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionResponse)
 	err := c.cc.Invoke(ctx, V2_GetFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateCancellationResponse)
+	err := c.cc.Invoke(ctx, V2_CreateCancellation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -726,10 +856,50 @@ func (c *v2Client) ResumeFunction(ctx context.Context, in *ResumeFunctionRequest
 	return out, nil
 }
 
+func (c *v2Client) PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_PauseFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_ResumeFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionsResponse)
 	err := c.cc.Invoke(ctx, V2_GetFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEventsResponse)
+	err := c.cc.Invoke(ctx, V2_ListEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEventResponse)
+	err := c.cc.Invoke(ctx, V2_GetEvent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -846,6 +1016,16 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, in *ListSessionRunsReque
 	return out, nil
 }
 
+func (c *v2Client) SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitFeedbackResponse)
+	err := c.cc.Invoke(ctx, V2_SubmitFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -859,11 +1039,13 @@ type V2Server interface {
 	CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error)
 	FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error)
 	FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error)
+	GetAccountUsage(context.Context, *GetAccountUsageRequest) (*GetAccountUsageResponse, error)
 	FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error)
 	FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error)
 	FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error)
 	CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error)
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
+	UpdateWebhook(context.Context, *UpdateWebhookRequest) (*UpdateWebhookResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
 	ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error)
@@ -879,6 +1061,11 @@ type V2Server interface {
 	GetBuild(context.Context, *GetBuildRequest) (*BuildResponse, error)
 	ListBuilds(context.Context, *ListBuildsRequest) (*ListBuildsResponse, error)
 	CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error)
+	CreateDeploy(context.Context, *CreateDeployRequest) (*CreateDeployResponse, error)
+	CommitDeploy(context.Context, *CommitDeployRequest) (*DeployResponse, error)
+	GetDeploy(context.Context, *GetDeployRequest) (*DeployResponse, error)
+	ListDeploys(context.Context, *ListDeploysRequest) (*ListDeploysResponse, error)
+	CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error)
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
@@ -902,11 +1089,18 @@ type V2Server interface {
 	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
+	ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error)
+	GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
+	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
+	PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error)
+	ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
+	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
+	GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error)
 	SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error)
@@ -918,6 +1112,7 @@ type V2Server interface {
 	ListSessionKeys(context.Context, *ListSessionKeysRequest) (*ListSessionKeysResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error)
+	SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -946,6 +1141,9 @@ func (UnimplementedV2Server) FetchPartnerAccounts(context.Context, *FetchAccount
 func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchAccount not implemented")
 }
+func (UnimplementedV2Server) GetAccountUsage(context.Context, *GetAccountUsageRequest) (*GetAccountUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccountUsage not implemented")
+}
 func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchAccountEnvs not implemented")
 }
@@ -960,6 +1158,9 @@ func (UnimplementedV2Server) CreateWebhook(context.Context, *CreateWebhookReques
 }
 func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWebhooks not implemented")
+}
+func (UnimplementedV2Server) UpdateWebhook(context.Context, *UpdateWebhookRequest) (*UpdateWebhookResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWebhook not implemented")
 }
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PatchEnv not implemented")
@@ -1005,6 +1206,21 @@ func (UnimplementedV2Server) ListBuilds(context.Context, *ListBuildsRequest) (*L
 }
 func (UnimplementedV2Server) CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelBuild not implemented")
+}
+func (UnimplementedV2Server) CreateDeploy(context.Context, *CreateDeployRequest) (*CreateDeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDeploy not implemented")
+}
+func (UnimplementedV2Server) CommitDeploy(context.Context, *CommitDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitDeploy not implemented")
+}
+func (UnimplementedV2Server) GetDeploy(context.Context, *GetDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDeploy not implemented")
+}
+func (UnimplementedV2Server) ListDeploys(context.Context, *ListDeploysRequest) (*ListDeploysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDeploys not implemented")
+}
+func (UnimplementedV2Server) CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelDeploy not implemented")
 }
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
@@ -1075,11 +1291,20 @@ func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
 }
+func (UnimplementedV2Server) ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAppSyncs not implemented")
+}
+func (UnimplementedV2Server) GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAppSync not implemented")
+}
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
 }
 func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
+}
+func (UnimplementedV2Server) CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCancellation not implemented")
 }
 func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PauseFunction not implemented")
@@ -1087,8 +1312,20 @@ func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionReques
 func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeFunction not implemented")
 }
+func (UnimplementedV2Server) PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PauseFunctions not implemented")
+}
+func (UnimplementedV2Server) ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeFunctions not implemented")
+}
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
+}
+func (UnimplementedV2Server) ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListEvents not implemented")
+}
+func (UnimplementedV2Server) GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEvent not implemented")
 }
 func (UnimplementedV2Server) SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendEvent not implemented")
@@ -1122,6 +1359,9 @@ func (UnimplementedV2Server) ListSessions(context.Context, *ListSessionsRequest)
 }
 func (UnimplementedV2Server) ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSessionRuns not implemented")
+}
+func (UnimplementedV2Server) SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitFeedback not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -1252,6 +1492,24 @@ func _V2_FetchAccount_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetAccountUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetAccountUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetAccountUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetAccountUsage(ctx, req.(*GetAccountUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_FetchAccountEnvs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(FetchAccountEnvsRequest)
 	if err := dec(in); err != nil {
@@ -1338,6 +1596,24 @@ func _V2_ListWebhooks_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).ListWebhooks(ctx, req.(*ListWebhooksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_UpdateWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWebhookRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).UpdateWebhook(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_UpdateWebhook_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).UpdateWebhook(ctx, req.(*UpdateWebhookRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1608,6 +1884,96 @@ func _V2_CancelBuild_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).CancelBuild(ctx, req.(*CancelBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateDeploy(ctx, req.(*CreateDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CommitDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CommitDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CommitDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CommitDeploy(ctx, req.(*CommitDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetDeploy(ctx, req.(*GetDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListDeploys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDeploysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListDeploys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListDeploys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListDeploys(ctx, req.(*ListDeploysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CancelDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CancelDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CancelDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CancelDeploy(ctx, req.(*CancelDeployRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2005,6 +2371,42 @@ func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListAppSyncs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAppSyncsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListAppSyncs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListAppSyncs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListAppSyncs(ctx, req.(*ListAppSyncsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetAppSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAppSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetAppSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetAppSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetAppSync(ctx, req.(*GetAppSyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionTraceRequest)
 	if err := dec(in); err != nil {
@@ -2037,6 +2439,24 @@ func _V2_GetFunction_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetFunction(ctx, req.(*GetFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateCancellation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCancellationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateCancellation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateCancellation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateCancellation(ctx, req.(*CreateCancellationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2077,6 +2497,42 @@ func _V2_ResumeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_PauseFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).PauseFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_PauseFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).PauseFunctions(ctx, req.(*PauseFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ResumeFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ResumeFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ResumeFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ResumeFunctions(ctx, req.(*ResumeFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionsRequest)
 	if err := dec(in); err != nil {
@@ -2091,6 +2547,42 @@ func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetFunctions(ctx, req.(*GetFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListEvents(ctx, req.(*ListEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetEvent(ctx, req.(*GetEventRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2293,6 +2785,24 @@ func _V2_ListSessionRuns_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_SubmitFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).SubmitFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_SubmitFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).SubmitFeedback(ctx, req.(*SubmitFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2325,6 +2835,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_FetchAccount_Handler,
 		},
 		{
+			MethodName: "GetAccountUsage",
+			Handler:    _V2_GetAccountUsage_Handler,
+		},
+		{
 			MethodName: "FetchAccountEnvs",
 			Handler:    _V2_FetchAccountEnvs_Handler,
 		},
@@ -2343,6 +2857,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWebhooks",
 			Handler:    _V2_ListWebhooks_Handler,
+		},
+		{
+			MethodName: "UpdateWebhook",
+			Handler:    _V2_UpdateWebhook_Handler,
 		},
 		{
 			MethodName: "PatchEnv",
@@ -2403,6 +2921,26 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelBuild",
 			Handler:    _V2_CancelBuild_Handler,
+		},
+		{
+			MethodName: "CreateDeploy",
+			Handler:    _V2_CreateDeploy_Handler,
+		},
+		{
+			MethodName: "CommitDeploy",
+			Handler:    _V2_CommitDeploy_Handler,
+		},
+		{
+			MethodName: "GetDeploy",
+			Handler:    _V2_GetDeploy_Handler,
+		},
+		{
+			MethodName: "ListDeploys",
+			Handler:    _V2_ListDeploys_Handler,
+		},
+		{
+			MethodName: "CancelDeploy",
+			Handler:    _V2_CancelDeploy_Handler,
 		},
 		{
 			MethodName: "CreateSandbox",
@@ -2485,12 +3023,24 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_SyncApp_Handler,
 		},
 		{
+			MethodName: "ListAppSyncs",
+			Handler:    _V2_ListAppSyncs_Handler,
+		},
+		{
+			MethodName: "GetAppSync",
+			Handler:    _V2_GetAppSync_Handler,
+		},
+		{
 			MethodName: "GetFunctionTrace",
 			Handler:    _V2_GetFunctionTrace_Handler,
 		},
 		{
 			MethodName: "GetFunction",
 			Handler:    _V2_GetFunction_Handler,
+		},
+		{
+			MethodName: "CreateCancellation",
+			Handler:    _V2_CreateCancellation_Handler,
 		},
 		{
 			MethodName: "PauseFunction",
@@ -2501,8 +3051,24 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_ResumeFunction_Handler,
 		},
 		{
+			MethodName: "PauseFunctions",
+			Handler:    _V2_PauseFunctions_Handler,
+		},
+		{
+			MethodName: "ResumeFunctions",
+			Handler:    _V2_ResumeFunctions_Handler,
+		},
+		{
 			MethodName: "GetFunctions",
 			Handler:    _V2_GetFunctions_Handler,
+		},
+		{
+			MethodName: "ListEvents",
+			Handler:    _V2_ListEvents_Handler,
+		},
+		{
+			MethodName: "GetEvent",
+			Handler:    _V2_GetEvent_Handler,
 		},
 		{
 			MethodName: "SendEvent",
@@ -2547,6 +3113,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSessionRuns",
 			Handler:    _V2_ListSessionRuns_Handler,
+		},
+		{
+			MethodName: "SubmitFeedback",
+			Handler:    _V2_SubmitFeedback_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

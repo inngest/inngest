@@ -3,7 +3,6 @@ package apiv1
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/publicerr"
 
@@ -128,10 +127,7 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 	if err != nil {
 		return nil, publicerr.Wrap(err, 404, "function not found")
 	}
-	// Create a new cancellation for the given function ID
-	cancel := cqrs.Cancellation{
-		CreatedAt:     time.Now(),
-		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
+	cancel, err := cancellation.CreateBulkRun(ctx, a.opts.CancellationReadWriter, cancellation.CreateBulkRunOpts{
 		AccountID:     auth.AccountID(),
 		WorkspaceID:   auth.WorkspaceID(),
 		AppID:         fn.AppID,
@@ -140,17 +136,15 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		StartedAfter:  opts.StartedAfter,
 		StartedBefore: opts.StartedBefore,
 		If:            opts.If,
-		Kind:          enums.CancellationKindBulkRun,
-		Type:          enums.CancellationTypeAPI,
-	}
-	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
+	})
+	if err != nil {
 		var compileError *expressions.CompileError
 		if errors.As(err, &compileError) {
 			return nil, publicerr.Wrap(err, 400, fmt.Sprintf("invalid expression: %s", compileError.Message()))
 		}
 		return nil, publicerr.Wrap(err, 500, "Error creating cancellation")
 	}
-	return &cancel, nil
+	return cancel, nil
 }
 
 func (a router) createCancellation(w http.ResponseWriter, r *http.Request) {

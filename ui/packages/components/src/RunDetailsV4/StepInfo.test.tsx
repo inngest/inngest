@@ -330,6 +330,8 @@ describe('Step operation type', () => {
     ['WAIT_FOR_EVENT', 'step.waitForEvent'],
     ['AI_GATEWAY', 'step.ai'],
     ['WAIT_FOR_SIGNAL', 'step.waitForSignal'],
+    ['SUBSCRIBE', 'step.subscribe'],
+    ['INBOX_READ', 'inbox read'],
   ])('maps stepOp "%s" to label "%s"', (stepOp, expectedLabel) => {
     const trace = makeTrace({ stepOp });
     const { unmount } = renderStepInfo(trace);

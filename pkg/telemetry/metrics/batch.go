@@ -6,6 +6,8 @@ import (
 )
 
 var (
+	batchManagerCallDurationBoundaries = []float64{1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000}
+
 	batchResidencyDurationBoundaries = []float64{
 		100,
 		500,
@@ -79,5 +81,40 @@ func HistogramBatchResidencyDuration(ctx context.Context, dur time.Duration, opt
 		Unit:        "ms",
 		Tags:        opts.Tags,
 		Boundaries:  batchResidencyDurationBoundaries,
+	})
+}
+
+// IncrBatchManagerCallsCounter counts calls to each batch manager API. Tags
+// carry the operation, the backing store, and whether the call succeeded.
+func IncrBatchManagerCallsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_manager_calls_total",
+		Description: "Total batch manager API calls by operation, store, and status",
+		Tags:        opts.Tags,
+	})
+}
+
+// HistogramBatchManagerCallDuration records how long each batch manager API
+// call took, tagged with the operation, the backing store, and the status.
+func HistogramBatchManagerCallDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_manager_call_duration",
+		Description: "Distribution of batch manager API call durations by operation, store, and status",
+		Unit:        "ms",
+		Tags:        opts.Tags,
+		Boundaries:  batchManagerCallDurationBoundaries,
+	})
+}
+
+// IncrBatchMigrationFallbackCounter counts migrating-manager reads that missed
+// the account's primary store and fell back to the other store.
+func IncrBatchMigrationFallbackCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_migration_fallback_total",
+		Description: "Total migrating batch manager reads that fell back from the primary store",
+		Tags:        opts.Tags,
 	})
 }

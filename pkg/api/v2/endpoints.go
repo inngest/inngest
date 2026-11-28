@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"time"
+	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
@@ -70,6 +72,14 @@ func (s *Service) FetchAccount(ctx context.Context, req *apiv2.FetchAccountReque
 			CachedUntil: nil,
 		},
 	}, nil
+}
+
+func (s *Service) GetAccountUsage(ctx context.Context, req *apiv2.GetAccountUsageRequest) (*apiv2.GetAccountUsageResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetAccountUsage_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no account usage was fetched.")
+	}
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
+		"Account usage is only available in Inngest Cloud. Run: inngest api --prod get-account-usage")
 }
 
 func (s *Service) FetchAccountEventKeys(ctx context.Context, req *apiv2.FetchAccountEventKeysRequest) (*apiv2.FetchAccountEventKeysResponse, error) {
@@ -235,6 +245,9 @@ func (s *Service) CreateWebhook(ctx context.Context, req *apiv2.CreateWebhookReq
 	if req.Name == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook name is required")
 	}
+	if utf8.RuneCountInString(req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
+	}
 
 	if req.Transform == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Transform function is required")
@@ -273,27 +286,37 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
 
+func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookRequest) (*apiv2.UpdateWebhookResponse, error) {
+	if s.base.GetInngestEnvHeader(ctx) == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "X-Inngest-Env header is required")
+	}
+	if _, err := uuid.Parse(req.Id); err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Invalid webhook ID")
+	}
+	if req.Name == nil && req.Transform == nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Name or transform is required")
+	}
+	if req.Name != nil && *req.Name == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name cannot be empty")
+	}
+	if req.Name != nil && utf8.RuneCountInString(*req.Name) > 128 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Webhook name must be at most 128 characters")
+	}
+	if req.Transform != nil && *req.Transform == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Transform function cannot be empty")
+	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_UpdateWebhook_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and the webhook was not updated.")
+	}
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
+}
+
 func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*apiv2.PatchEnvsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
 }
 
 func (s *Service) SyncApp(ctx context.Context, req *apiv2.SyncAppRequest) (*apiv2.SyncAppResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "App sync not implemented in OSS")
-}
-func (s *Service) ListInsightsEventSchemas(ctx context.Context, req *apiv2.ListInsightsEventSchemasRequest) (*apiv2.ListInsightsEventSchemasResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
-}
-
-func (s *Service) ListInsightsTables(ctx context.Context, req *apiv2.ListInsightsTablesRequest) (*apiv2.ListInsightsTablesResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
-}
-
-func (s *Service) QueryInsightsPrompt(ctx context.Context, req *apiv2.QueryInsightsPromptRequest) (*apiv2.QueryInsightsPromptResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
-}
-
-func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }
 
 func (s *Service) ListExperiments(ctx context.Context, req *apiv2.ListExperimentsRequest) (*apiv2.ListExperimentsResponse, error) {
@@ -304,14 +327,7 @@ func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentReq
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
 }
 
-func (s *Service) ListSessionKeys(ctx context.Context, req *apiv2.ListSessionKeysRequest) (*apiv2.ListSessionKeysResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
-}
-
-func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsRequest) (*apiv2.ListSessionsResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
-}
-
-func (s *Service) ListSessionRuns(ctx context.Context, req *apiv2.ListSessionRunsRequest) (*apiv2.ListSessionRunsResponse, error) {
-	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
+func (s *Service) SubmitFeedback(ctx context.Context, req *apiv2.SubmitFeedbackRequest) (*apiv2.SubmitFeedbackResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
+		"Submit feedback through Inngest Cloud: inngest api --prod submit-feedback --feedback \"Your feedback\"")
 }

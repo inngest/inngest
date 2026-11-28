@@ -35,11 +35,16 @@ const (
 const (
 	// ConsumerServiceDequeueProcedure is the fully-qualified name of the ConsumerService's Dequeue RPC.
 	ConsumerServiceDequeueProcedure = "/queue.v1.ConsumerService/Dequeue"
+	// ConsumerServiceDequeueWithLeaseProcedure is the fully-qualified name of the ConsumerService's
+	// DequeueWithLease RPC.
+	ConsumerServiceDequeueWithLeaseProcedure = "/queue.v1.ConsumerService/DequeueWithLease"
 )
 
 // ConsumerServiceClient is a client for the queue.v1.ConsumerService service.
 type ConsumerServiceClient interface {
 	Dequeue(context.Context, *connect.Request[v1.DequeueRequest]) (*connect.Response[v1.DequeueResponse], error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	DequeueWithLease(context.Context, *connect.Request[v1.DequeueWithLeaseRequest]) (*connect.Response[v1.DequeueWithLeaseResponse], error)
 }
 
 // NewConsumerServiceClient constructs a client for the queue.v1.ConsumerService service. By
@@ -59,12 +64,19 @@ func NewConsumerServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(consumerServiceMethods.ByName("Dequeue")),
 			connect.WithClientOptions(opts...),
 		),
+		dequeueWithLease: connect.NewClient[v1.DequeueWithLeaseRequest, v1.DequeueWithLeaseResponse](
+			httpClient,
+			baseURL+ConsumerServiceDequeueWithLeaseProcedure,
+			connect.WithSchema(consumerServiceMethods.ByName("DequeueWithLease")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // consumerServiceClient implements ConsumerServiceClient.
 type consumerServiceClient struct {
-	dequeue *connect.Client[v1.DequeueRequest, v1.DequeueResponse]
+	dequeue          *connect.Client[v1.DequeueRequest, v1.DequeueResponse]
+	dequeueWithLease *connect.Client[v1.DequeueWithLeaseRequest, v1.DequeueWithLeaseResponse]
 }
 
 // Dequeue calls queue.v1.ConsumerService.Dequeue.
@@ -72,9 +84,16 @@ func (c *consumerServiceClient) Dequeue(ctx context.Context, req *connect.Reques
 	return c.dequeue.CallUnary(ctx, req)
 }
 
+// DequeueWithLease calls queue.v1.ConsumerService.DequeueWithLease.
+func (c *consumerServiceClient) DequeueWithLease(ctx context.Context, req *connect.Request[v1.DequeueWithLeaseRequest]) (*connect.Response[v1.DequeueWithLeaseResponse], error) {
+	return c.dequeueWithLease.CallUnary(ctx, req)
+}
+
 // ConsumerServiceHandler is an implementation of the queue.v1.ConsumerService service.
 type ConsumerServiceHandler interface {
 	Dequeue(context.Context, *connect.Request[v1.DequeueRequest]) (*connect.Response[v1.DequeueResponse], error)
+	// A distinct RPC makes older proxies reject rather than ignore the condition.
+	DequeueWithLease(context.Context, *connect.Request[v1.DequeueWithLeaseRequest]) (*connect.Response[v1.DequeueWithLeaseResponse], error)
 }
 
 // NewConsumerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -90,10 +109,18 @@ func NewConsumerServiceHandler(svc ConsumerServiceHandler, opts ...connect.Handl
 		connect.WithSchema(consumerServiceMethods.ByName("Dequeue")),
 		connect.WithHandlerOptions(opts...),
 	)
+	consumerServiceDequeueWithLeaseHandler := connect.NewUnaryHandler(
+		ConsumerServiceDequeueWithLeaseProcedure,
+		svc.DequeueWithLease,
+		connect.WithSchema(consumerServiceMethods.ByName("DequeueWithLease")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/queue.v1.ConsumerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ConsumerServiceDequeueProcedure:
 			consumerServiceDequeueHandler.ServeHTTP(w, r)
+		case ConsumerServiceDequeueWithLeaseProcedure:
+			consumerServiceDequeueWithLeaseHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +132,8 @@ type UnimplementedConsumerServiceHandler struct{}
 
 func (UnimplementedConsumerServiceHandler) Dequeue(context.Context, *connect.Request[v1.DequeueRequest]) (*connect.Response[v1.DequeueResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ConsumerService.Dequeue is not implemented"))
+}
+
+func (UnimplementedConsumerServiceHandler) DequeueWithLease(context.Context, *connect.Request[v1.DequeueWithLeaseRequest]) (*connect.Response[v1.DequeueWithLeaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ConsumerService.DequeueWithLease is not implemented"))
 }
