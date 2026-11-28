@@ -185,6 +185,10 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			er.Event.ID = evtID
 			er.Ctx.MaxAttempts = 0
 
+			// The executor always lists its capabilities and the expected ctx doesn't carry them.
+			require.Contains(t.test, er.Ctx.Capabilities, driver.CapabilitySubscribe)
+			er.Ctx.Capabilities = nil
+
 			for _, m := range modifiers {
 				m(&t.requestCtx)
 			}

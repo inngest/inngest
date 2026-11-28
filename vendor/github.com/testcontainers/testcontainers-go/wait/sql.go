@@ -17,7 +17,7 @@ var (
 const defaultForSQLQuery = "SELECT 1"
 
 // ForSQL constructs a new waitForSql strategy for the given driver
-func ForSQL(port string, driver string, url func(host string, port string) string) *waitForSQL {
+func ForSQL(port string, driver string, url func(host string, port network.Port) string) *waitForSQL {
 	return &waitForSQL{
 		Port:           port,
 		URL:            url,
@@ -31,7 +31,7 @@ func ForSQL(port string, driver string, url func(host string, port string) strin
 type waitForSQL struct {
 	timeout *time.Duration
 
-	URL            func(host string, port string) string
+	URL            func(host string, port network.Port) string
 	Driver         string
 	Port           string
 	startupTimeout time.Duration
@@ -114,7 +114,7 @@ func (w *waitForSQL) WaitUntilReady(ctx context.Context, target StrategyTarget) 
 		}
 	}
 
-	db, err := sql.Open(w.Driver, w.URL(host, port.String()))
+	db, err := sql.Open(w.Driver, w.URL(host, port))
 	if err != nil {
 		return fmt.Errorf("sql.Open: %w", err)
 	}

@@ -17,3 +17,10 @@ export type SessionKey = {
   sessionKey: string;
   createdAt: string;
 };
+
+// SessionsPage is one page of a paginated sessions listing; nextCursor is
+// null on the last page.
+export type SessionsPage = {
+  sessions: Session[];
+  nextCursor: string | null;
+};

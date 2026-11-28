@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +40,25 @@ func groupedStep(id string, at, secs int, status enums.StepStatus, path ...meta.
 	}
 }
 
-func convertGroupedRun(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTraceSpan {
+// runConverters are both RunTrace converters, which must group spans alike:
+// the tree conversion, and the flat one DuckDB-backed traces use.
+var runConverters = map[string]func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error){
+	"tree": convertDynamicRunSpanToGQL,
+	"flat": convertFlatRunSpanToGQL,
+}
+
+// forEachConverter runs test once per converter, with its convertGroupedRun.
+func forEachConverter(t *testing.T, test func(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan)) {
+	for name, convert := range runConverters {
+		t.Run(name, func(t *testing.T) {
+			test(t, func(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTraceSpan {
+				return groupedRun(t, convert, children...)
+			})
+		})
+	}
+}
+
+func groupedRun(t *testing.T, convert func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error), children ...*cqrs.OtelSpan) *models.RunTraceSpan {
 	t.Helper()
 
 	run := &cqrs.OtelSpan{
@@ -48,7 +67,7 @@ func convertGroupedRun(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTrac
 		Children:    children,
 	}
 
-	result, err := ConvertRunSpan(context.Background(), run)
+	result, err := convert(context.Background(), run)
 	require.NoError(t, err)
 	return result
 }
@@ -62,12 +81,83 @@ func childNames(span *models.RunTraceSpan) []string {
 }
 
 func TestGroupBySpanPath(t *testing.T) {
+	forEachConverter(t, testGroupBySpanPath)
+}
+
+func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan) {
 	completed := enums.StepStatusCompleted
 	failed := enums.StepStatusFailed
 	running := enums.StepStatusRunning
 
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 	search := meta.SpanPathElement{ID: "search", Name: "search tool"}
+
+	t.Run("a group row of an inbox op that waits takes its step op", func(t *testing.T) {
+		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
+		next := meta.SpanPathElement{ID: "next", Name: "next", Kind: "tag"}
+		atOnce := meta.SpanPathElement{ID: "next-1", Name: "next", Kind: "tag"}
+
+		open := groupedStep("in", 0, 1, completed, subscribe)
+		open.Attributes.StepOp = new(enums.OpcodeSubscribe)
+		waited := groupedStep("in:next", 1, 1, completed, next)
+		waited.Attributes.StepOp = new(enums.OpcodeSubscribeWait)
+		answered := groupedStep("in:next:1", 2, 1, completed, atOnce)
+		answered.Attributes.StepOp = new(enums.OpcodeSubscribeRead)
+
+		result := convertGroupedRun(t, open, waited, answered)
+
+		require.Len(t, result.ChildrenSpans, 3)
+		for i, want := range []models.StepOp{models.StepOpSubscribe, models.StepOpInboxRead} {
+			require.NotNil(t, result.ChildrenSpans[i].StepOp)
+			assert.Equal(t, want, *result.ChildrenSpans[i].StepOp)
+			assert.Equal(t, SpanGroupStepType, result.ChildrenSpans[i].StepType)
+		}
+		assert.Nil(t, result.ChildrenSpans[2].StepOp)
+	})
+
+	t.Run("a group around a real wait stays a plain group", func(t *testing.T) {
+		wait := groupedStep("wait", 0, 1, completed, agent)
+		wait.Attributes.StepOp = new(enums.OpcodeWaitForEvent)
+
+		result := convertGroupedRun(t, wait)
+
+		require.Len(t, result.ChildrenSpans, 1)
+		assert.Nil(t, result.ChildrenSpans[0].StepOp)
+	})
+
+	t.Run("a group row carries the ticks of the steps inside it", func(t *testing.T) {
+		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
+		open := groupedStep("in", 0, 1, completed, subscribe)
+		open.Ticks = []*cqrs.SpanTick{
+			{ID: "m1", Sources: []string{"p1"}, At: spanGroupsBase},
+			{ID: "m2", Sources: []string{"p1"}, At: spanGroupsBase.Add(time.Second)},
+		}
+
+		result := convertGroupedRun(t, open)
+
+		require.Len(t, result.ChildrenSpans, 1)
+		require.Len(t, result.ChildrenSpans[0].Ticks, 2)
+		assert.Equal(t, "m1", result.ChildrenSpans[0].Ticks[0].ID)
+		assert.Equal(t, "m2", result.ChildrenSpans[0].Ticks[1].ID)
+	})
+
+	t.Run("a group row lists the messages its read took", func(t *testing.T) {
+		read := meta.SpanPathElement{ID: "next", Name: "next", Kind: "tag"}
+		op := groupedStep("in:next", 0, 1, completed, read)
+		op.Metadata = []*cqrs.SpanMetadata{{
+			Kind:   "inngest.inbox",
+			Values: metadata.Values{"messages": []byte(`["m1","m2"]`)},
+		}}
+
+		result := convertGroupedRun(t, op, groupedStep("m1", 0, 1, completed, read))
+
+		require.Len(t, result.ChildrenSpans, 1)
+
+		group := result.ChildrenSpans[0]
+		require.Len(t, group.Metadata, 1)
+		assert.Equal(t, metadata.Kind("inngest.inbox"), group.Metadata[0].Kind)
+		assert.JSONEq(t, `["m1","m2"]`, string(group.Metadata[0].Values["messages"]))
+	})
 
 	t.Run("runs without span paths are unchanged", func(t *testing.T) {
 		result := convertGroupedRun(t,
@@ -224,6 +314,10 @@ func TestGroupBySpanPath(t *testing.T) {
 }
 
 func TestSpanGroupStartsAtEarliestChildStart(t *testing.T) {
+	forEachConverter(t, testSpanGroupStartsAtEarliestChildStart)
+}
+
+func testSpanGroupStartsAtEarliestChildStart(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan) {
 	completed := enums.StepStatusCompleted
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 

@@ -12,7 +12,9 @@ export function ExecutionLimitPill() {
 
   const linkProps = upgradeLinkProps(
     data.marketplaceBillingURL,
-    'app-hobby-execution-limit-pill',
+    data.band === 'grace'
+      ? 'app-hobby-execution-grace-pill'
+      : 'app-hobby-execution-limit-pill',
   );
 
   if (!data.enhanced) {
@@ -40,7 +42,7 @@ export function ExecutionLimitPill() {
     );
   }
 
-  const content = pillContent(data.band, data.isVercel);
+  const content = pillContent(data.band, data.isVercel, data.remaining);
   if (!content) return null;
 
   return (

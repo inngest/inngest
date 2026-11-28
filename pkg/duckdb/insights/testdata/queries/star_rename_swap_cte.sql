@@ -1,0 +1,1 @@
+WITH q AS (SELECT * RENAME (run_id AS status, status AS old_status) FROM runs) SELECT status, old_status FROM q

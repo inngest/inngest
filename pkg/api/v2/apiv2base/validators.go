@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -328,27 +329,10 @@ func getProtoMessageForPath(path, method string) proto.Message {
 	for i := 0; i < methods.Len(); i++ {
 		methodDesc := methods.Get(i)
 
-		// Get the HTTP method and path from protobuf annotations
-		httpMethod := getHTTPMethod(methodDesc)
-		httpPath := getHTTPPath(methodDesc)
-
-		// Skip if no HTTP annotations or path doesn't match
-		if httpPath == "" {
-			continue
-		}
-
-		// Add /api/v2 prefix to the path for comparison
-		fullPath := "/api/v2" + httpPath
-
-		// Check if this matches the requested path and method
-		if matchesHTTPPath(fullPath, path) && httpMethod == method {
-			// Get the input message type for this method
-			inputDesc := methodDesc.Input()
-
-			// Create a new instance of the input message
-			inputMsg := createMessageFromDescriptor(inputDesc)
-			if inputMsg != nil {
-				return inputMsg
+		for _, binding := range apiv2endpoint.HTTPBindings(methodDesc) {
+			httpMethod, httpPath := apiv2endpoint.MethodAndPath(binding)
+			if httpPath != "" && matchesHTTPPath("/api/v2"+httpPath, path) && httpMethod == method {
+				return createMessageFromDescriptor(methodDesc.Input())
 			}
 		}
 	}

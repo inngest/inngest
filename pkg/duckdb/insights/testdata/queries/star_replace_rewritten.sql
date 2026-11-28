@@ -1,0 +1,1 @@
+SELECT * REPLACE (sessions.id AS output) FROM runs

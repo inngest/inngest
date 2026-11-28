@@ -20,7 +20,7 @@ import (
 
 const (
 	// hubSshdImage {
-	sshdImage string = "testcontainers/sshd:1.3.0"
+	sshdImage string = "testcontainers/sshd:1.4.0"
 	// }
 
 	// HostInternal is the internal hostname used to reach the host from the container,

@@ -778,7 +778,7 @@ func jsonToStruct(raw json.RawMessage) *structpb.Struct {
 }
 
 func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool) (*apiv2.FunctionTrace, error) {
-	span, err := loader.ConvertRunSpan(ctx, root)
+	span, err := loader.ConvertRunSpanFor(ctx, reader, root)
 	if err != nil {
 		return nil, err
 	}
@@ -904,6 +904,7 @@ func toTraceSpanMetadata(metadata []*models.SpanMetadata) []*apiv2.TraceSpanMeta
 		result = append(result, &apiv2.TraceSpanMetadata{
 			Scope:     item.Scope.String(),
 			Kind:      item.Kind.String(),
+			IsUser:    item.IsUser,
 			Values:    toTraceSpanMetadataValues(item.Values),
 			UpdatedAt: timestamppb.New(item.UpdatedAt),
 		})

@@ -9,14 +9,14 @@ import { useQuery } from 'urql';
 import PaymentStatusPill from '@/components/Billing/Payments/PaymentStatusPill';
 import { graphql } from '@/gql';
 
-const GetPaymentIntentsDocument = graphql(`
-  query GetPaymentIntents {
+const GetInvoicesDocument = graphql(`
+  query GetInvoices {
     account {
-      paymentIntents {
+      invoices {
+        number
         status
         createdAt
         amountLabel
-        description
         invoiceURL
       }
     }
@@ -25,7 +25,7 @@ const GetPaymentIntentsDocument = graphql(`
 
 type TableRow = {
   status: string;
-  description: string;
+  number: string;
   createdAt: string;
   amount: React.ReactNode;
   url: React.ReactNode;
@@ -39,19 +39,17 @@ const columns = [
     cell: (props) => <PaymentStatusPill status={props.getValue()} />,
     enableSorting: false,
   }),
-  columnHelper.accessor('description', {
-    header: () => <span>Description</span>,
+  columnHelper.accessor('number', {
+    header: () => <span>Invoice</span>,
     cell: (props) => <TextCell>{props.getValue()}</TextCell>,
   }),
   columnHelper.accessor('amount', {
     header: () => <span>Amount</span>,
     cell: (props) => {
-      const isCanceled = props.row.original.status === 'canceled';
+      const isVoid = props.row.original.status === 'void';
       return (
         <TextCell>
-          <span className={isCanceled ? 'text-muted' : ''}>
-            {props.getValue()}
-          </span>
+          <span className={isVoid ? 'text-muted' : ''}>{props.getValue()}</span>
         </TextCell>
       );
     },
@@ -66,12 +64,11 @@ const columns = [
     header: () => <span />,
     cell: (props) => {
       const url = props.getValue();
-      const requiresConfirmation =
-        props.row.original.status === 'requires_confirmation';
+      const isOpen = props.row.original.status === 'open';
       if (url) {
         return (
           <Link href={url as string} size="small" target="_blank">
-            {requiresConfirmation ? 'Pay invoice' : 'View invoice'}
+            {isOpen ? 'Pay invoice' : 'View invoice'}
           </Link>
         );
       }
@@ -84,10 +81,10 @@ const columns = [
 export default function Payments() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [{ data, fetching }] = useQuery({
-    query: GetPaymentIntentsDocument,
+    query: GetInvoicesDocument,
   });
 
-  const payments = useMemo(() => data?.account.paymentIntents || [], [data]);
+  const invoices = useMemo(() => data?.account.invoices || [], [data]);
 
   const tableColumns = useMemo(
     () =>
@@ -112,16 +109,16 @@ export default function Payments() {
         }) as unknown as TableRow[]; // Casting is bad but we need to do this for the loading skeleton
     }
 
-    return payments.map(
-      (payment): TableRow => ({
-        status: payment.status,
-        description: payment.description,
-        createdAt: formatDayString(new Date(payment.createdAt)),
-        amount: payment.amountLabel,
-        url: payment.invoiceURL,
+    return invoices.map(
+      (invoice): TableRow => ({
+        status: invoice.status,
+        number: invoice.number,
+        createdAt: formatDayString(new Date(invoice.createdAt)),
+        amount: invoice.amountLabel,
+        url: invoice.invoiceURL,
       }),
     );
-  }, [fetching, payments]);
+  }, [fetching, invoices]);
 
   return (
     <main
@@ -132,7 +129,7 @@ export default function Payments() {
         isLoading={fetching}
         columns={tableColumns}
         data={paymentTableData}
-        blankState={!fetching && <p>You have no prior payments</p>}
+        blankState={!fetching && <p>You have no invoices</p>}
       />
     </main>
   );

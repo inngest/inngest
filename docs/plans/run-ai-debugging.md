@@ -128,9 +128,11 @@ Do not require rerun/write permission to inspect a run. Hide this feature in
 public/shared views and local development. Do not infer public-view access
 from the enabled state of Rerun; use explicit Cloud/authenticated context.
 
-Reuse the discovery tracking transport and action vocabulary with
+Reuse the discovery Segment transport and action vocabulary with
 `surface: "run_details"` and `template_version: "run_debug_v1"` on
-`app/runs.ai_assist.action` (event version 1). Track trigger viewed/opened,
+`Assistant Action Performed` with `feature: "runs-ai-assist"` and an explicit
+`account_id`. Segment provides the existing user identity. This replaces the
+legacy Inngest event `app/runs.ai_assist.action`. Track trigger viewed/opened,
 setup choice/copy, prompt copy success/failure, and guide clicks. Count a view
 once per mounted run entry, not on each polling update. Use `detail_view` with
 `inline` or `standalone` to compare placement. Do not send prompt text, run IDs,

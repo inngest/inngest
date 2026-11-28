@@ -85,6 +85,10 @@ type RequestStateManager interface {
 	// DeleteLease allows the executor to clean up the lease once the request is done processing.
 	DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error
 
+	// ReleaseRequestLease removes an unsent request's lease only if leaseID still matches.
+	// A missing or replaced lease is left untouched.
+	ReleaseRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID) error
+
 	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
 	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
 
@@ -374,6 +378,12 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		// Provide environment name for branch environments
 		if initialReq.GetEnvironment() != "" {
 			req.Header.Set("X-Inngest-Env", initialReq.GetEnvironment())
+		}
+
+		// sdk.FromReadCloser replaces the body's headers with the request
+		// headers, so the platform is only read from this header
+		if initialReq.GetPlatform() != "" {
+			req.Header.Set("X-Inngest-Platform", initialReq.GetPlatform())
 		}
 
 		client := &http.Client{

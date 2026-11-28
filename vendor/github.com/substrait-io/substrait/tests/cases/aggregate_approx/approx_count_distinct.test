@@ -1,0 +1,12 @@
+### SUBSTRAIT_AGGREGATE_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_aggregate_approx.yaml'
+
+# basic: Basic examples without any special cases
+approx_count_distinct((1, -2, 3, -4, 5, 6)::i8) = 6::i64
+approx_count_distinct((-32767, -20000, 30000, 5, 32767)::i16) = 5::i64
+approx_count_distinct((-2147483648, -10000000, 30000000, 2147483647)::i32) = 4::i64
+approx_count_distinct((-214748364800000, -1000000000, 0, 922337203685477580)::i64) = 4::i64
+approx_count_distinct((1)::i8) = 1::i64
+approx_count_distinct(()::i8) = 0::i64
+approx_count_distinct((Null, Null, Null)::i8) = 0::i64
+approx_count_distinct((Null, Null, 4, 3, Null, 922337203685477580, 12833888)::i64) = 4::i64

@@ -41,6 +41,7 @@ describe('useExecutionLimit', () => {
     executionCap: {
       usage: number;
       limit: number;
+      overageLimit: number;
       enforced: boolean;
       exceeded: boolean;
     } | null;
@@ -64,6 +65,7 @@ describe('useExecutionLimit', () => {
       executionCap: {
         usage: 50_000,
         limit: 50_000,
+        overageLimit: 0,
         enforced: false,
         exceeded: true,
       },
@@ -121,13 +123,46 @@ describe('useExecutionLimit', () => {
       accountID: 'enhanced-account',
       enhanced: true,
       isCapHit: false,
-      band: 'limitReached',
+      band: '90',
       isVercel: true,
       marketplaceBillingURL: 'https://vercel.com/billing',
     });
     expect(
       mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
     ).toEqual([true, false]);
+  });
+
+  it('counts granted extra executions toward what remains', () => {
+    flag = { value: true, isReady: true };
+    enhancedAccount.executionCap = {
+      usage: 52_000,
+      limit: 50_000,
+      overageLimit: 10_000,
+      enforced: true,
+      exceeded: false,
+    };
+
+    expect(useExecutionLimit()).toMatchObject({
+      band: 'grace',
+      isCapHit: false,
+      remaining: 8_000,
+    });
+  });
+
+  it('never reports a negative remainder', () => {
+    flag = { value: true, isReady: true };
+    enhancedAccount.executionCap = {
+      usage: 61_000,
+      limit: 50_000,
+      overageLimit: 10_000,
+      enforced: true,
+      exceeded: true,
+    };
+
+    expect(useExecutionLimit()).toMatchObject({
+      band: 'limitReached',
+      remaining: 0,
+    });
   });
 
   it('hides overage-eligible legacy accounts', () => {

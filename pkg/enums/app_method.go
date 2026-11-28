@@ -8,4 +8,6 @@ const (
 	AppMethodServe AppMethod = iota
 	AppMethodConnect
 	AppMethodAPI
+	// AppMethodInngestServe is an inngest-hosted Serve app.
+	AppMethodInngestServe
 )

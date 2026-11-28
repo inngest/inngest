@@ -14,8 +14,12 @@ const (
 	// Used for worker concurrency where each step independently acquires and releases.
 	SemaphoreReleaseAuto SemaphoreReleaseMode = 0
 
-	// SemaphoreReleaseManual requires explicit release via the SemaphoreManager API.
-	// Used for function concurrency where the hold persists across the entire run.
+	// SemaphoreReleaseManual keeps the slot past the lease that acquired it,
+	// for function concurrency.  the slot is taken when the run's start item
+	// is leased, and the run has it from the moment the executor writes
+	// StartedAt to run metadata, until Finalize releases it.  when the start
+	// item exits before that write, and when the lease expires after an
+	// executor crash, the release of the lease gives the slot back.
 	SemaphoreReleaseManual SemaphoreReleaseMode = 1
 )
 

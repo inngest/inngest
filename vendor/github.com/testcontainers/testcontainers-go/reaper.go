@@ -345,10 +345,12 @@ func (r *reaperSpawner) fromContainer(ctx context.Context, sessionID string, pro
 	log.Printf("⏳ Waiting for Reaper %q to be ready", dockerContainer.ID[:8])
 
 	// Reusing an existing container so we determine the port from the container's exposed ports.
-	if err := wait.ForExposedPort().
-		WithPollInterval(100*time.Millisecond).
-		SkipInternalCheck().
-		WaitUntilReady(ctx, dockerContainer); err != nil {
+	if err := wait.ForAll(
+		wait.ForLog("Started"),
+		wait.ForExposedPort().
+			WithPollInterval(100*time.Millisecond).
+			SkipInternalCheck(),
+	).WaitUntilReady(ctx, dockerContainer); err != nil {
 		return nil, fmt.Errorf("wait for reaper %s: %w", dockerContainer.ID[:8], err)
 	}
 
@@ -367,6 +369,20 @@ func (r *reaperSpawner) fromContainer(ctx context.Context, sessionID string, pro
 	}, nil
 }
 
+// defaultRyukWaitStrategy returns the wait strategy used when creating a new
+// reaper container. It combines a log match for "Started" (the moment ryuk's
+// TCP listener is bound inside the container, which is the readiness signal
+// also used by other Testcontainers libraries) with a host port-mapping check,
+// to guard against the docker-proxy accepting TCP connections before the ryuk
+// process is actually listening — a race that surfaced once the ryuk binary
+// was UPX-compressed.
+func defaultRyukWaitStrategy(port string) wait.Strategy {
+	return wait.ForAll(
+		wait.ForLog("Started"),
+		wait.ForListeningPort(port),
+	)
+}
+
 // newReaper creates a connected Reaper with a sessionID to identify containers
 // and a provider to use.
 func (r *reaperSpawner) newReaper(ctx context.Context, sessionID string, provider ReaperProvider) (reaper *Reaper, err error) {
@@ -378,7 +394,7 @@ func (r *reaperSpawner) newReaper(ctx context.Context, sessionID string, provide
 		Image:        config.ReaperDefaultImage,
 		ExposedPorts: []string{port.String()},
 		Labels:       core.DefaultLabels(sessionID),
-		WaitingFor:   wait.ForListeningPort(port.String()),
+		WaitingFor:   defaultRyukWaitStrategy(port.String()),
 		Name:         reaperContainerNameFromSessionID(sessionID),
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.AutoRemove = true

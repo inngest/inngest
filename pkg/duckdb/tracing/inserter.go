@@ -1,0 +1,319 @@
+package tracing
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/oklog/ulid/v2"
+)
+
+// Span is one run trace span, as the listener's hooks produce it (via this
+// listener's own TracerProvider and spanExportRow). It is the source for
+// both inngest.run_trace_spans and, for run-level span names, inngest.runs.
+type Span struct {
+	AccountID    string
+	EnvID        string
+	AppID        string
+	AppName      string
+	FunctionID   string
+	FunctionSlug string
+	RunID        string
+	RunQueuedAt  time.Time
+
+	TraceID      string
+	SpanID       string
+	ParentSpanID string
+	Name         string
+	StartTime    time.Time
+	EndTime      time.Time
+
+	// Attributes is always set (a JSON object).
+	Attributes json.RawMessage
+	// Output and Error are the span's output envelope split
+	// (cqrs.SplitSpanOutputEnvelope): Output is its data value and Error its
+	// error value, nil unless the span failed. Output, Error and Input are
+	// nil when the span carries none (stored as NULL).
+	Output json.RawMessage
+	Error  json.RawMessage
+	Input  json.RawMessage
+}
+
+// Event is one received event, as OnEventReceived produces it.
+type Event struct {
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	InternalID ulid.ULID
+	ReceivedAt time.Time
+	Source     string
+	// SourceID is nil when the event has no ingest source ID (stored as NULL).
+	SourceID  *string
+	EventID   string
+	EventName string
+	EventTS   time.Time
+	// EventData and EventMeta are always set (EventData defaults to {}).
+	EventData json.RawMessage
+	EventMeta json.RawMessage
+	EventV    string
+}
+
+// RunMetadata is one metadata emission, as OnMetadataEntry produces it.
+type RunMetadata struct {
+	AccountID   string
+	EnvID       string
+	RunID       string
+	RunQueuedAt time.Time
+	SpanID      string
+	Scope       string
+	Kind        string
+	IsUser      bool
+	Values      json.RawMessage
+	CreatedAt   time.Time
+	// Step fields are nil for run-scoped metadata.
+	StepID      *string
+	StepIndex   *int
+	StepAttempt *int
+}
+
+// Inserter persists the entities the listener produces. The listener buffers
+// each entity type in its own batcher (batch.go) and calls the matching
+// method once per flushed batch, so an Inserter only does the write. Runs are
+// not an entity of their own here: they're derived from run-level spans, and
+// it's up to the Inserter how (DuckDBInserter builds inngest.runs rows from
+// each span batch; a ClickHouse-backed one would rely on a materialized view).
+//
+// Each entity's batcher runs on its own goroutine, so implementations must
+// be safe for concurrent calls across methods. A returned error drops that
+// batch after logging, except driver.ErrDisabled, which stops every batcher
+// sharing the listener's disabled state. If an Inserter also implements
+// interface{ Close() error }, the listener's Close calls it after every
+// batcher has drained.
+type Inserter interface {
+	InsertSpans(ctx context.Context, spans []Span) error
+	InsertEvents(ctx context.Context, events []Event) error
+	InsertRunMetadata(ctx context.Context, entries []RunMetadata) error
+}
+
+// DuckDBInserter is the Inserter for the DuckDB dual-write: one literal
+// multi-row INSERT per batch into inngest.<table> (span batches also
+// write their runs rows, see InsertSpans).
+type DuckDBInserter struct {
+	db *sql.DB
+}
+
+// NewDuckDBInserter returns a DuckDBInserter writing to db. Its Close closes
+// db.
+func NewDuckDBInserter(db *sql.DB) *DuckDBInserter {
+	return &DuckDBInserter{db: db}
+}
+
+var spanColumns = []string{
+	"account_id", "env_id", "app_id", "app_name", "function_id", "function_slug",
+	"run_id", "run_queued_at", "trace_id", "span_id", "parent_span_id", "name",
+	"start_time", "end_time", "attributes", "output", "error", "input", "bucket_at",
+}
+
+// spanBatchTable is the per-connection temp table InsertSpans stages each
+// span batch in.
+const spanBatchTable = "temp.main.dualwrite_span_batch"
+
+// rollbackTimeout bounds the ROLLBACK after a failed span batch.
+const rollbackTimeout = 5 * time.Second
+
+// InsertSpans stages the batch once in a temp table (spanBatchTable) and
+// inserts both inngest.run_trace_spans and inngest.runs from it (see
+// runsInsertSQL), so building the batch's runs rows never reads the lake.
+//
+// When the lake commits several tables atomically
+// (driver.AtomicMultiTableCommit: plain tables over quack), the whole thing runs
+// as one transaction, so a failure can't leave the batch's spans w/o their
+// runs rows (nothing ever rebuilds runs from spans, so that run row would be
+// lost for good). Otherwise it runs the same statements w/o one: the
+// jsonlines transport (tests) can't recover from a failed statement inside
+// a transaction, and a lake that can't commit 2 tables at once (IE an
+// Iceberg catalog w/o /v1/transactions/commit) rejects the transaction
+// outright, so there spans and runs are 2 commits. If the runs commit fails
+// after the spans landed, the error is a partialFlushError so a retry only
+// redoes the runs insert.
+func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
+	if len(spans) == 0 {
+		return nil
+	}
+	bucketAt := bucketAtNow()
+	rows := make([][]any, len(spans))
+	for i, s := range spans {
+		rows[i] = []any{
+			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
+			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
+			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Error), nullableJSON(s.Input), bucketAt,
+		}
+	}
+
+	cols := strings.Join(spanColumns, ", ")
+	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows)
+	stage := []string{
+		// Clones run_trace_spans' column types (VARIANT etc.) so the runs
+		// projection sees exactly what it would reading the stored span.
+		// LIMIT 0 is planned as an empty result, so this doesn't scan the
+		// lake.
+		"CREATE OR REPLACE TEMP TABLE " + spanBatchTable + " AS SELECT * FROM inngest.run_trace_spans LIMIT 0;",
+		stageSQL,
+	}
+	insertSpans := []string{fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable)}
+	var insertRuns []string
+	if slices.ContainsFunc(spans, func(s Span) bool { return slices.Contains(runsMaterializingSpanNames, s.Name) }) {
+		insertRuns = []string{runsInsertSQL(spanBatchTable)}
+	}
+	drop := []string{"DROP TABLE " + spanBatchTable + ";"}
+
+	conn, err := d.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if !driver.AtomicMultiTableCommit(conn) {
+		// Spans and runs are separate commits here, so if the runs insert
+		// fails after the spans landed, a retry has to restage the batch
+		// and insert just its runs rows (see partialFlushError).
+		if len(insertRuns) == 0 {
+			_, err = conn.ExecContext(ctx, script(stage, insertSpans, drop), args...)
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(stage, insertSpans), args...); err != nil {
+			return err
+		}
+		if _, err := conn.ExecContext(ctx, script(insertRuns, drop)); err != nil {
+			return &partialFlushError{err: err, retry: func(ctx context.Context) error {
+				_, err := d.db.ExecContext(ctx, script(stage, insertRuns, drop), args...)
+				return err
+			}}
+		}
+		return nil
+	}
+
+	txn := script([]string{"BEGIN TRANSACTION;"}, stage, insertSpans, insertRuns, drop, []string{"COMMIT;"})
+	if _, err := conn.ExecContext(ctx, txn, args...); err != nil {
+		// A failed statement leaves the transaction aborted on this session
+		// (a failed COMMIT has already rolled back, and this just errors).
+		// Roll back so the pooled conn is usable again.
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		_, _ = conn.ExecContext(rctx, "ROLLBACK;")
+		cancel()
+		return err
+	}
+	return nil
+}
+
+var eventColumns = []string{
+	"account_id", "env_id", "internal_id", "received_at", "source", "source_id", "event_id",
+	"event_name", "event_ts", "event_data", "event_v", "event_meta", "bucket_at",
+}
+
+func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error {
+	bucketAt := bucketAtNow()
+	rows := make([][]any, len(events))
+	for i, e := range events {
+		rows[i] = []any{
+			e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt, e.Source, nullable(e.SourceID), e.EventID,
+			e.EventName, e.EventTS, e.EventData, e.EventV, e.EventMeta, bucketAt,
+		}
+	}
+	return d.insert(ctx, "inngest.events", eventColumns, rows)
+}
+
+var runMetadataColumns = []string{
+	"account_id", "env_id", "run_id", "run_queued_at", "span_id", "scope", "kind",
+	"is_user", "values", "created_at", "step_id", "step_index", "step_attempt", "bucket_at",
+}
+
+func (d *DuckDBInserter) InsertRunMetadata(ctx context.Context, entries []RunMetadata) error {
+	bucketAt := bucketAtNow()
+	rows := make([][]any, len(entries))
+	for i, m := range entries {
+		rows[i] = []any{
+			m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt, m.SpanID, m.Scope, m.Kind,
+			m.IsUser, m.Values, m.CreatedAt, nullable(m.StepID), nullable(m.StepIndex), nullable(m.StepAttempt), bucketAt,
+		}
+	}
+	return d.insert(ctx, "inngest.run_metadata", runMetadataColumns, rows)
+}
+
+// Close closes the db passed to NewDuckDBInserter.
+func (d *DuckDBInserter) Close() error {
+	return d.db.Close()
+}
+
+// insert writes rows (each in cols order) into table with one literal
+// multi-row INSERT.
+func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string, rows [][]any) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	query, args := insertSQL(table, cols, rows)
+	_, err := d.db.ExecContext(ctx, query, args...)
+	return err
+}
+
+// insertSQL builds one literal multi-row INSERT of rows (each in cols order)
+// into table, w/ a ? per value.
+func insertSQL(table string, cols []string, rows [][]any) (string, []any) {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, strings.Join(cols, ", "))
+
+	placeholders := "(" + strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ") + ")"
+	args := make([]any, 0, len(rows)*len(cols))
+	for i, row := range rows {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(placeholders)
+		args = append(args, row...)
+	}
+	sb.WriteString(";")
+	return sb.String(), args
+}
+
+// script joins groups of statements into one script.
+func script(parts ...[]string) string {
+	return strings.Join(slices.Concat(parts...), "\n")
+}
+
+// bucketAtNow is a batch's bucket_at: when it became visible, at the ms
+// precision the ClickHouse buffer stores. Writers set it explicitly since an
+// Iceberg column default is a literal frozen at CREATE TABLE time.
+func bucketAtNow() time.Time {
+	return time.Now().UTC().Truncate(time.Millisecond)
+}
+
+// nullableJSON maps an absent JSON value to SQL NULL rather than an empty
+// (invalid) JSON literal.
+func nullableJSON(v json.RawMessage) any {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+// nullableString maps "" to SQL NULL, so a root span's parent_span_id is
+// NULL rather than empty.
+func nullableString(v string) any {
+	if v == "" {
+		return nil
+	}
+	return v
+}
+
+// nullable maps a nil pointer to SQL NULL and a set one to its value.
+func nullable[T any](v *T) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}

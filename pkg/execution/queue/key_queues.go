@@ -37,3 +37,8 @@ func (o QueueOptions) ItemEnableKeyQueues(ctx context.Context, item QueueItem) b
 
 	return false
 }
+
+func (o QueueOptions) ItemAllowKeyQueueCapacityLeaseRepair(ctx context.Context, item QueueItem) bool {
+	return o.AllowKeyQueueCapacityLeaseRepair != nil && o.ItemEnableKeyQueues(ctx, item) &&
+		o.AllowKeyQueueCapacityLeaseRepair(ctx, item.Data.Identifier.AccountID, item.Data.Identifier.WorkspaceID, item.FunctionID)
+}

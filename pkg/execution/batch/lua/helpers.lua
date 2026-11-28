@@ -28,3 +28,21 @@ end
 local function get_batch_status(key)
   return redis.call("HGET", key, "status")
 end
+
+-- Legacy and mixed-writer batches keep their original size check until deleted.
+-- Only new batches, with no unaccounted-for appends, use the serialized tally.
+local function update_batch_bytes(batchKey, metadataKey, previousCount, count, addedBytes)
+  local bytes = 0
+  if previousCount > 0 then
+    -- TODO: Remove bytes_count and this fallback once all writers are upgraded and old batches have drained.
+    local tally = redis.call("HMGET", metadataKey, "bytes", "bytes_count")
+    if is_empty(tally[1]) or tonumber(tally[2]) ~= previousCount then
+      return redis.call("MEMORY", "USAGE", batchKey) or 0
+    end
+    bytes = tonumber(tally[1])
+  end
+
+  bytes = bytes + addedBytes
+  redis.call("HSET", metadataKey, "bytes", bytes, "bytes_count", count)
+  return bytes
+end

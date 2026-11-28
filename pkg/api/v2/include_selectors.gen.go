@@ -6,6 +6,13 @@ import (
 	apiv2endpoint "github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 )
 
+// GetEventInclude is an internal expansion selected by generated API parsers.
+type GetEventInclude uint8
+
+const (
+	GetEventIncludePayload GetEventInclude = iota + 1
+)
+
 // GetEventRunsInclude is an internal expansion selected by generated API parsers.
 type GetEventRunsInclude uint8
 
@@ -27,6 +34,13 @@ const (
 	GetFunctionTraceIncludeOutput GetFunctionTraceInclude = iota + 1
 )
 
+// ListEventsInclude is an internal expansion selected by generated API parsers.
+type ListEventsInclude uint8
+
+const (
+	ListEventsIncludePayload ListEventsInclude = iota + 1
+)
+
 // ListFunctionRunsInclude is an internal expansion selected by generated API parsers.
 type ListFunctionRunsInclude uint8
 
@@ -42,6 +56,15 @@ const (
 	ListRunsIncludeDeferredFrom ListRunsInclude = iota + 1
 	ListRunsIncludeOutput
 )
+
+var getEventIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]GetEventInclude{
+	"payload": GetEventIncludePayload,
+})
+
+// ParseGetEventInclude parses a canonical selector or its snake_case compatibility alias.
+func ParseGetEventInclude(value string) (GetEventInclude, error) {
+	return getEventIncludeSelector.Parse(value)
+}
 
 var getEventRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]GetEventRunsInclude{
 	"output": GetEventRunsIncludeOutput,
@@ -68,6 +91,15 @@ var getFunctionTraceIncludeSelector = apiv2endpoint.NewIncludeSelector(map[strin
 // ParseGetFunctionTraceInclude parses a canonical selector or its snake_case compatibility alias.
 func ParseGetFunctionTraceInclude(value string) (GetFunctionTraceInclude, error) {
 	return getFunctionTraceIncludeSelector.Parse(value)
+}
+
+var listEventsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListEventsInclude{
+	"payload": ListEventsIncludePayload,
+})
+
+// ParseListEventsInclude parses a canonical selector or its snake_case compatibility alias.
+func ParseListEventsInclude(value string) (ListEventsInclude, error) {
+	return listEventsIncludeSelector.Parse(value)
 }
 
 var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListFunctionRunsInclude{

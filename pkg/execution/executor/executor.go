@@ -224,6 +224,19 @@ func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	}
 }
 
+// AppNameLoader returns the name (the app ID defined in user code) of an app.
+type AppNameLoader func(ctx context.Context, appID uuid.UUID) (string, error)
+
+// WithAppNameLoader resolves the app name for schedule requests that don't
+// carry one (IE batches and crons, which only have the app's UUID), so every
+// run's state has it.
+func WithAppNameLoader(l AppNameLoader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).appNameLoader = l
+		return nil
+	}
+}
+
 func WithLogger(l logger.Logger) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).log = l
@@ -546,6 +559,7 @@ type executor struct {
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
 	fl                        state.FunctionLoader
+	appNameLoader             AppNameLoader
 	evalFactory               func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	finishHandler             execution.FinalizePublisher
 	invokeFailHandler         execution.InvokeFailHandler
@@ -1120,6 +1134,64 @@ func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleReque
 	return req
 }
 
+func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immutableEvents event.SerializedEvents) ([]json.RawMessage, event.SerializedEvents, string, error) {
+	if immutableEvents.Len() > 0 {
+		if immutableEvents.Len() != len(trackedEvents) {
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("serialized event count does not match event count")
+		}
+		return nil, immutableEvents, immutableEvents.Input(), nil
+	}
+
+	// Legacy compatibility path. Remove after every ScheduleRequest caller provides
+	// SerializedEvents.
+	rawEvents := make([]json.RawMessage, len(trackedEvents))
+	for n, item := range trackedEvents {
+		byt, err := json.Marshal(item.GetEvent())
+		if err != nil {
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling event: %w", err)
+		}
+		rawEvents[n] = byt
+	}
+	bytEvts, err := json.Marshal(rawEvents)
+	if err != nil {
+		return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling events: %w", err)
+	}
+
+	return rawEvents, event.SerializedEvents{}, string(bytEvts), nil
+}
+
+func rawEventPayloads(rawEvents []json.RawMessage, immutableEvents event.SerializedEvents) []json.RawMessage {
+	if len(rawEvents) > 0 {
+		// Raw messages are mutable by type but treated as immutable event payloads.
+		return rawEvents
+	}
+	if immutableEvents.Len() == 0 {
+		return rawEvents
+	}
+
+	// The shared immutable path materializes owned raw messages only for consumers
+	// that still require that representation.
+	return immutableEvents.RawMessages()
+}
+
+// prepareStateEventsForSyncListeners switches state creation to raw event
+// payloads when synchronous listeners are registered. Create consumes these
+// events first; successful scheduling then passes the same buffers to every
+// listener, preserving legacy behavior without a second materialization.
+func (e *executor) prepareStateEventsForSyncListeners(newState *sv2.CreateState) []json.RawMessage {
+	if len(e.syncLifecycles) == 0 {
+		return nil
+	}
+
+	return newState.MaterializeEvents()
+}
+
+func (e *executor) notifyFunctionScheduledSyncListeners(ctx context.Context, metadata sv2.Metadata, item queue.Item, events []json.RawMessage) {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionScheduled(ctx, metadata, item, events)
+	})
+}
+
 func cloneMetadata(md sv2.Metadata) sv2.Metadata {
 	md.Config.Context = maps.Clone(md.Config.Context)
 	return md
@@ -1282,9 +1354,8 @@ func (e *executor) schedule(
 
 	var eventName *string
 
-	evts := make([]json.RawMessage, len(req.Events))
 	sessions := meta.EventSessions{}
-	for n, item := range req.Events {
+	for _, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
@@ -1294,13 +1365,11 @@ func (e *executor) schedule(
 		for name, id := range evt.Meta.Sessions {
 			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
+	}
 
-		// serialize this data to the span at the same time
-		byt, err := json.Marshal(evt)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
-		}
-		evts[n] = byt
+	rawEvents, immutableEvents, traceInput, err := prepareStateAndTraceEventPayloads(req.Events, req.SerializedEvents)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var droppedSessions int
@@ -1370,6 +1439,9 @@ func (e *executor) schedule(
 
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
+	// Nor is the app name, which spans created after scheduling (IE the
+	// duckdb dual-write's) have no other way to get.
+	config.SetAppName(e.resolveAppName(ctx, req))
 	config.SetDebounceFlag(req.PreventDebounce)
 	config.SetEventIDMapping(req.Events)
 
@@ -1403,13 +1475,6 @@ func (e *executor) schedule(
 		},
 		Config: config,
 	}
-
-	bytEvts, err := json.Marshal(evts)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error marshalling events: %w", err)
-	}
-
-	strEvts := string(bytEvts)
 
 	var (
 		runSpanRef       *tracing.DroppableSpan
@@ -1566,18 +1631,21 @@ func (e *executor) schedule(
 	//
 
 	newState := sv2.CreateState{
-		Events:   evts,
-		Metadata: metadata,
-		Steps:    []state.MemoizedStep{},
+		Events:           rawEvents,
+		SerializedEvents: immutableEvents,
+		Metadata:         metadata,
+		Steps:            []state.MemoizedStep{},
 	}
 	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		newState.MaterializeEvents()
 		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
+	var listenerEvents []json.RawMessage
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
@@ -1592,6 +1660,7 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
+		listenerEvents = e.prepareStateEventsForSyncListeners(&newState)
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
@@ -1652,7 +1721,7 @@ func (e *executor) schedule(
 		Attributes: meta.NewAttrSet(
 			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.EventsInput, &traceInput),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ScheduledAt, &scheduledAt),
@@ -1664,11 +1733,7 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
-	var firstEvent json.RawMessage
-	if len(evts) > 0 {
-		firstEvent = evts[0]
-	}
-	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, firstEvent); len(keys) > 0 {
+	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, concurrencyTraceEventInput{decoded: evtMap}); len(keys) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 	if len(sessions) > 0 {
@@ -1735,7 +1800,7 @@ func (e *executor) schedule(
 	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, skipReason)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1826,9 +1891,7 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
-			sl.OnFunctionScheduled(ctx, metadata, item, evts)
-		})
+		e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -1944,17 +2007,17 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), enums.SkipReasonSingleton)
 
-	case errors.Is(err, queue.ErrQueueShardNotFound):
-		if stateCreated {
-			deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
-			if deleteErr != nil && !errors.Is(deleteErr, state.ErrRunNotFound) {
-				l.ReportError(deleteErr, "error deleting function state after permanent queue routing failure")
-				return nil, nil, fmt.Errorf("error deleting function state after queue routing failure: %w", deleteErr)
-			}
+	case errors.Is(err, queue.ErrQueueShardNotFound), errors.Is(err, queue.ErrQueueShardUnavailable):
+		// the run state stays.  the caller decides if the run is retried or
+		// dropped, so only the caller can delete the state.
+		return nil, nil, &ScheduleQueueRoutingError{
+			ID:              sv2.IDFromV1(stv1ID),
+			StateExisted:    !stateCreated,
+			EventInternalID: firstEventInternalID(req.Events),
+			Err:             fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err),
 		}
-		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -1964,9 +2027,7 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
-	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
-		sl.OnFunctionScheduled(ctx, metadata, item, evts)
-	})
+	e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -2037,16 +2098,23 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
+	skip := execution.SkipState{
+		Reason: reason,
+		Events: evts,
+	}
+	if len(req.Events) > 0 {
+		skip.CronSchedule = req.Events[0].GetEvent().CronSchedule()
+	}
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
-				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-					Reason:       reason,
-					Events:       evts,
-				})
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, skip)
 			})
 	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionSkipped", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionSkipped(ctx, metadata, skip, syncNow)
+	})
 	return nil, nil, SkippedError{Reason: reason}
 }
 
@@ -2298,19 +2366,45 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			md.Config.RequestVersion = consts.RequestVersionUnknown
 		}
 
-		// Only just starting:  run lifecycles on first attempt.
-		if item.Attempt == 0 {
+		// the run has its function concurrency slot from the moment
+		// StartedAt is in run metadata, and Finalize releases it.  a start
+		// item that took a slot writes StartedAt on every attempt, and then
+		// tells the queue to leave the slot taken when the item exits.
+		takesSlot := takesFnConcurrencySlot(item)
+
+		if item.Attempt == 0 || takesSlot {
 			// Set the start time and spanID in metadata for subsequent runs
 			// This should be an one time operation and is never updated after,
 			// which is enforced on the Lua script.
-			if err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
+			err := e.smv2.UpdateMetadata(ctx, md.ID, sv2.MutableConfig{
 				StartedAt:      md.Config.StartedAt,
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
-			}); err != nil {
+			})
+			switch {
+			case sv2.IsRunNotFound(err):
+				// the run is gone, and the queue gives the slot back.
+			case err != nil && takesSlot:
+				// we need the metadata update to succeed for fn-level concurrency/
+				// manual semaphores, as releasing these uses the `StartedAt` field.
+				//
+				// in this case, we're not calling
+				//   item.RunInfo.CapacityLease.KeepManualSemaphores()
+				// so function-level semaphores aren't going to be claimed by
+				// the run when we return the error.
+				return nil, fmt.Errorf("error writing run start to metadata: %w", err)
+			case err != nil:
 				l.ReportError(err, "error updating metadata on function start")
+			case takesSlot:
+				// this ensures that fn run semaphores are kept locked
+				// while the run ends.  without this, the queue and constraint api is
+				// going to release the semaphore when the queue item finishes
+				item.RunInfo.CapacityLease.KeepManualSemaphores()
 			}
+		}
 
+		// Only just starting:  run lifecycles on first attempt.
+		if item.Attempt == 0 {
 			// Set some run span details to be explicit that this has been
 			// kicked off
 			if err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
@@ -2361,7 +2455,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if len(events) > 0 {
 		firstEvent = events[0]
 	}
-	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), firstEvent); len(keys) > 0 {
+	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), concurrencyTraceEventInput{raw: firstEvent}); len(keys) > 0 {
 		meta.AddAttr(execAttrs, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 
@@ -2754,8 +2848,7 @@ func correlationID(event event.Event) *string {
 }
 
 func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
-	// If no cancellation checker was provided, assume run should not be cancelled
-	if e.cancellationChecker == nil {
+	if e.cancellationChecker == nil || len(evts) == 0 {
 		return false, nil
 	}
 
@@ -3104,6 +3197,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	evtID := evt.GetInternalID()
 	evtTime := evt.GetReceivedAt()
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
 
@@ -3182,8 +3277,12 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
-	if iter.Error() != context.Canceled {
-		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
+
+	if err := iter.Error(); err != nil && err != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
 
 	return res, goerr
@@ -3221,6 +3320,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		wg    sync.WaitGroup
 	)
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	for _, i := range evals {
 		// Copy pause into function
 		pause := *i
@@ -3250,6 +3351,10 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		}()
 	}
 	wg.Wait()
+
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
 
 	return res, goerr
 }
@@ -3305,6 +3410,16 @@ func (e *executor) handlePause(
 			return nil
 		}
 
+		// A source of an inbox is not consumed. The event is collected, and
+		// saved as a message once every matching pause has been handled.
+		if pause.Subscribe != nil {
+			if arrivals := inboxArrivalsFrom(ctx); arrivals != nil {
+				arrivals.add(pause)
+			}
+
+			return nil
+		}
+
 		// Ensure that we store the group ID for this pause, letting us properly track cancellation
 		// or continuation history
 		ctx = state.WithGroupID(ctx, pause.GroupID)
@@ -3346,17 +3461,9 @@ func (e *executor) handlePause(
 				return fmt.Errorf("error cancelling function: %w", err)
 			}
 
-			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-			// NOTE: cleanup closure is ignored here since there's already another one that will be called
-			_, _, err = e.pm.ConsumePause(context.Background(), e.smv2, *pause, state.ConsumePauseOpts{
-				Data: nil,
-			})
-			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-				atomic.AddInt32(&res[1], 1)
-				cleanup(ctx)
-				return nil
-			}
-			return fmt.Errorf("error consuming pause after cancel: %w", err)
+			atomic.AddInt32(&res[1], 1)
+			cleanup(ctx)
+			return nil
 		}
 
 		resumeData := pause.GetResumeData(evt.GetEvent())
@@ -3395,14 +3502,12 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	var (
 		evtID = evt.GetInternalID()
-		wsID  = evt.GetWorkspaceID()
 		l     = e.log.With("event_id", evtID.String())
 
 		eventName string
 	)
 
-	// find the pause with correlationID
-	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
+	pause, err := e.invokePause(ctx, evt, correlationID)
 	if err != nil {
 		return err
 	}
@@ -3562,6 +3667,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// The timer of an inbox read times the read out, not a pause.
+	if pause.Subscribe != nil {
+		return e.timeoutInboxRead(ctx, pause)
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -3995,7 +4105,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 			update.HasAI = true
 		}
 		if update != nil {
-			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil {
+			if err := e.smv2.UpdateMetadata(ctx, i.md.ID, *update); err != nil && !sv2.IsRunNotFound(err) {
 				return fmt.Errorf("error updating function metadata: %w", err)
 			}
 		}
@@ -4153,6 +4263,14 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorSleep(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribe:
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge)
+	case enums.OpcodeSubscribeWait:
+		return e.handleGeneratorSubscribeWait(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribeRead:
+		return e.handleGeneratorSubscribeRead(ctx, runCtx, gen, edge)
+	case enums.OpcodeSubscribeClose:
+		return e.handleGeneratorSubscribeClose(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeInvokeFunction:
 		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeAIGateway:
@@ -4810,6 +4928,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload: queue.PayloadEdge{
@@ -4911,7 +5030,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
+	// Include the run so a reused event key cannot collide with an older sleep.
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s-%s", runCtx.Metadata().IdempotencyKey(), runCtx.Metadata().ID.RunID, gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
@@ -5721,6 +5841,40 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	return err
 }
 
+// interpolateTriggerEvent replaces `event.` references in an expression with the
+// run's trigger event data, as values. Matching is faster with values, because
+// the expression can then go into aggregate trees. An expression without an
+// `event.` reference, or none at all, is returned as it was.
+func (e *executor) interpolateTriggerEvent(ctx context.Context, runCtx execution.RunContext, expr *string) (*string, error) {
+	if expr == nil || !strings.Contains(*expr, "event.") {
+		return expr, nil
+	}
+
+	evt := event.Event{}
+	if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
+		logger.StdlibLogger(ctx).Error("error unmarshalling trigger event", "error", err)
+	}
+
+	interpolated, err := expressions.Interpolate(ctx, *expr, map[string]any{
+		"event": evt.Map(),
+	})
+	if err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, state.WrapInStandardError(
+				compileError,
+				"CompileError",
+				"Could not compile expression",
+				compileError.Message(),
+			)
+		}
+
+		return nil, err
+	}
+
+	return &interpolated, nil
+}
+
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
@@ -5761,39 +5915,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 
-	expr := opts.If
-	if expr != nil && strings.Contains(*expr, "event.") {
-		// Remove `event` data from the expression and replace with actual event
-		// data as values, now that we have the event.
-		//
-		// This improves performance in matching, as we can then use the values within
-		// aggregate trees.
-		evt := event.Event{}
-		if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
-			logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
-		}
-
-		interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
-			"event": evt.Map(),
-		})
-		if err != nil {
-			var compileError *expressions.CompileError
-			if errors.As(err, &compileError) {
-				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
-					compileError,
-					"CompileError",
-					"Could not compile expression",
-					compileError.Message(),
-				))
-			}
-
-			return fmt.Errorf("error interpolating wait for event expression: %w", err)
-		}
-		expr = &interpolated
-
+	expr, err := e.interpolateTriggerEvent(ctx, runCtx, opts.If)
+	if err != nil {
+		return fmt.Errorf("error interpolating wait for event expression: %w", err)
+	}
+	if expr != nil && opts.If != nil && *expr != *opts.If {
 		// Update the generator to use the interpolated data, ensuring history
 		// is updated. Only `if` changes, so the SDK's other opts survive.
-		if err := gen.SetOpt("if", interpolated); err != nil {
+		if err := gen.SetOpt("if", *expr); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
 	}
@@ -6037,7 +6166,7 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
 	if enableInstrumentation {
@@ -6121,7 +6250,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
-		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+		if _, err := e.batcher.DeleteKeys(ctx, payload.AccountID, payload.FunctionID, payload.BatchID); err != nil {
 			return err
 		}
 	}
@@ -6527,6 +6656,12 @@ func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext
 	queuedAt = item.EnqueuedAt
 	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
 
+	// A sleep item is enqueued when the sleep begins, but steps run while
+	// resuming it can only be queued once the sleep has ended.
+	if item.Kind == queue.KindSleep {
+		queuedAt = scheduledAt
+	}
+
 	if gen != nil {
 		startedAt = gen.Timing.Start()
 		endedAt = gen.Timing.End()
@@ -6663,7 +6798,8 @@ func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 			enums.OpcodeSleep,
 			enums.OpcodeStepPlanned,
 			enums.OpcodeWaitForEvent,
-			enums.OpcodeWaitForSignal:
+			enums.OpcodeWaitForSignal,
+			enums.OpcodeSubscribeWait:
 			return true
 		}
 	}
@@ -6793,4 +6929,19 @@ func normalizeRunSessions(pairs meta.EventSessions) (meta.EventSessions, int) {
 	}
 
 	return pairs, dropped
+}
+
+// resolveAppName returns the request's app name, or the one appNameLoader
+// resolves from its app ID if the request doesn't carry one. A failed lookup
+// just leaves the name empty.
+func (e *executor) resolveAppName(ctx context.Context, req execution.ScheduleRequest) string {
+	if req.AppName != "" || e.appNameLoader == nil || req.AppID == uuid.Nil {
+		return req.AppName
+	}
+	name, err := e.appNameLoader(ctx, req.AppID)
+	if err != nil {
+		e.log.Warn("could not resolve app name for run", "app_id", req.AppID, "error", err)
+		return ""
+	}
+	return name
 }

@@ -14,7 +14,6 @@ export const useBooleanFlag = (
   const loadFeatureFlags = async () => {
     try {
       const response = await fetch(createDevServerURL('/dev'));
-      setLoading(false);
       if (!response.ok) {
         throw new Error('feature flag response not ok');
       }

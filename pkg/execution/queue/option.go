@@ -45,6 +45,11 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// CapacityReleaseWakeEnabled controls whether Redis partitions are woken, and
+// skip cached constraint exhaustion on their next scan, after capacity is
+// released for an account.
+type CapacityReleaseWakeEnabled func(ctx context.Context, accountID uuid.UUID) bool
+
 // BypassArchivedWorkspaceAppSemaphore reports whether the app semaphore may be
 // omitted so an item for an archived workspace can reach executor cleanup.
 type BypassArchivedWorkspaceAppSemaphore func(ctx context.Context, accountID, workspaceID uuid.UUID) bool
@@ -485,8 +490,11 @@ type QueueOptions struct {
 
 	lifecycles QueueLifecycleListeners
 
-	AllowKeyQueues                  AllowKeyQueues
-	PartitionConstraintConfigGetter PartitionConstraintConfigGetter
+	AllowKeyQueues                    AllowKeyQueues
+	AllowKeyQueueRefill               AllowKeyQueueRefill
+	AllowKeyQueueCapacityLeaseRepair  AllowKeyQueueCapacityLeaseRepair
+	keyQueueCapacityLeaseRepairBudget *KeyQueueCapacityLeaseRepairBudget
+	PartitionConstraintConfigGetter   PartitionConstraintConfigGetter
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
@@ -597,6 +605,7 @@ type QueueOptions struct {
 	AcquireCapacityLeaseOnBacklogRefill bool
 	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
 	BypassArchivedWorkspaceAppSemaphore BypassArchivedWorkspaceAppSemaphore
+	CapacityReleaseWakeEnabled          CapacityReleaseWakeEnabled
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -648,6 +657,30 @@ func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AllowKeyQueues = kq
 	}
+}
+
+// AllowKeyQueueRefill controls backlog admission independently of key-queue routing,
+// ready-item execution, and backlog normalization. Returning false pauses all
+// refills for the function, including subsequent steps of existing runs.
+type AllowKeyQueueRefill func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
+
+func WithAllowKeyQueueRefill(allow AllowKeyQueueRefill) QueueOpt {
+	return func(q *QueueOptions) {
+		q.AllowKeyQueueRefill = allow
+	}
+}
+
+// AllowKeyQueueCapacityLeaseRepair gates automatic repair independently of key
+// queue routing and refill. It defaults off so item-leasing processes can deploy
+// generation fencing before any scanner starts repairing legacy items.
+type AllowKeyQueueCapacityLeaseRepair func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool
+
+func WithAllowKeyQueueCapacityLeaseRepair(allow AllowKeyQueueCapacityLeaseRepair) QueueOpt {
+	return func(q *QueueOptions) { q.AllowKeyQueueCapacityLeaseRepair = allow }
+}
+
+func WithKeyQueueCapacityLeaseRepairBudget(budget *KeyQueueCapacityLeaseRepairBudget) QueueOpt {
+	return func(q *QueueOptions) { q.keyQueueCapacityLeaseRepairBudget = budget }
 }
 
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
@@ -787,6 +820,14 @@ func WithDisableSemaphoreConstraintChecks(f DisableSemaphoreConstraintChecks) Qu
 func WithBypassArchivedWorkspaceAppSemaphore(f BypassArchivedWorkspaceAppSemaphore) QueueOpt {
 	return func(q *QueueOptions) {
 		q.BypassArchivedWorkspaceAppSemaphore = f
+	}
+}
+
+// WithCapacityReleaseWakeEnabled gates CapacityReleaseNotifier wakes per
+// account. When unset, wakes are disabled for every account.
+func WithCapacityReleaseWakeEnabled(f CapacityReleaseWakeEnabled) QueueOpt {
+	return func(q *QueueOptions) {
+		q.CapacityReleaseWakeEnabled = f
 	}
 }
 
@@ -983,6 +1024,9 @@ func NewQueueOptions(
 		},
 		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
+		},
+		AllowKeyQueueRefill: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
+			return true
 		},
 		QueueItemEarliestPeekTimeEnabled: func(ctx context.Context, shardName string, acctID, envID, fnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
 			return QueueItemEarliestPeekTimeConfig{}

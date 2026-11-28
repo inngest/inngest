@@ -168,6 +168,13 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("enable-step-metadata") == "" {
 		features["enable-step-metadata"] = true
 	}
+	// Not user-toggleable: reflects whether --duckdb dual-write actually
+	// started, which is what gates the insights GQL field.
+	features["duckdb-insights"] = a.devserver.DuckDB != nil
+	// Also not user-toggleable: whether runs/events are actually read from
+	// DuckDB (--duckdb-reads on top of a started dual-write), which is what
+	// gates CEL event search.
+	features["duckdb-reads"] = a.devserver.DuckDB != nil && a.devserver.Opts.EnableDuckDBReads
 
 	//
 	// inngest feature flags are a map of arbitrary key value
@@ -252,11 +259,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
 
-	method := enums.AppMethodServe
-	if r.IsConnect() {
-		method = enums.AppMethodConnect
-	}
-
 	if len(r.AppName) == 0 {
 		return nil, publicerr.Wrap(err, 400, "App ID required")
 	}
@@ -282,7 +284,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		Url:        r.URL,
 		Metadata:   registration.AppMetadataForRegisterRequest(r),
 		Checksum:   sum,
-		Method:     method.String(),
+		Method:     r.AppMethod().String(),
 		AppVersion: r.AppVersion,
 	}
 

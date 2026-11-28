@@ -1,0 +1,3 @@
+{
+  "error": "insights: unknown column \"events.id\" in EXCLUDE (at 1:8)"
+}

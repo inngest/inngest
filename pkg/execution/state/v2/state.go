@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -20,6 +21,12 @@ var (
 	// past MaxDeferInputAggregateSize. SaveDefer writes a Rejected sentinel.
 	ErrDeferInputAggregateExceeded = fmt.Errorf("defer input aggregate size exceeded")
 )
+
+// IsRunNotFound reports whether err means that the state of the run is
+// deleted or was never written.
+func IsRunNotFound(err error) bool {
+	return errors.Is(err, ErrRunNotFound) || errors.Is(err, ErrMetadataNotFound)
+}
 
 type State struct {
 	Metadata Metadata

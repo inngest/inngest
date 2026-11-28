@@ -132,17 +132,12 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"GetSandboxProcess":          {},
 	"GetSandboxProcessOutput":    {},
 	"ListExperiments":            {},
-	"ListInsightsEventSchemas":   {},
-	"ListInsightsTables":         {},
+	"ListInsightsEventSchemas":   {}, // no event-schema-catalog capability in OSS yet
 	"ListSandboxProcesses":       {},
 	"ListSandboxes":              {},
-	"ListSessionKeys":            {},
-	"ListSessionRuns":            {},
-	"ListSessions":               {},
 	"ListWebhooks":               {},
 	"PatchEnv":                   {},
-	"QueryInsights":              {},
-	"QueryInsightsPrompt":        {},
+	"QueryInsightsPrompt":        {}, // no NL->SQL capability in OSS yet
 	"ReadSandboxFile":            {},
 	"SendEvent":                  {},
 	"SignalSandboxProcess":       {},
@@ -150,16 +145,18 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"StreamSandboxLogs":          {},
 	"StreamSandboxProcessOutput": {},
 	"SyncApp":                    {},
+	"UpdateWebhook":              {},
 	"WaitSandboxProcess":         {},
 	"WriteSandboxFile":           {},
 }
 
+type mcpAuthHeaderContextKey struct{}
+
 type MCPHandler struct {
-	events     api.EventHandler
-	data       cqrs.Manager
-	tick       time.Duration
-	v2         http.Handler
-	signingKey *string
+	events api.EventHandler
+	data   cqrs.Manager
+	tick   time.Duration
+	v2     http.Handler
 
 	serverOnce sync.Once
 	server     *mcp.Server
@@ -226,17 +223,12 @@ func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duratio
 	return newMCPHandler(events, data, tick, v2).handler()
 }
 
-func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler, signingKey ...*string) *MCPHandler {
-	var key *string
-	if len(signingKey) > 0 {
-		key = signingKey[0]
-	}
+func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) *MCPHandler {
 	return &MCPHandler{
 		events:        events,
 		data:          data,
 		tick:          tick,
 		v2:            v2,
-		signingKey:    key,
 		fileCache:     make(map[string][]byte),
 		fileInfoCache: make(map[string]fs.FileInfo),
 	}
@@ -247,11 +239,17 @@ func (h *MCPHandler) handler() http.Handler {
 	//
 	// The dev server accepts cross-origin API requests so locally hosted UIs can connect.
 	originProtection.AddInsecureBypassPattern("/mcp")
-	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+	mcpHTTPHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return h.getMCPServer()
 	}, &mcp.StreamableHTTPOptions{
 		JSONResponse:          true, // Use JSON responses for better compatibility
 		CrossOriginProtection: originProtection,
+	})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+			r = r.WithContext(context.WithValue(r.Context(), mcpAuthHeaderContextKey{}, authHeader))
+		}
+		mcpHTTPHandler.ServeHTTP(w, r)
 	})
 }
 
@@ -342,8 +340,10 @@ func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpo
 		return apiv2mcp.ToolError("REST API v2 is not configured", map[string]any{"status": http.StatusServiceUnavailable}), nil
 	}
 
-	if h.signingKey != nil && *h.signingKey != "" && req.Header.Get("Authorization") == "" {
-		req.Header.Set("Authorization", "Bearer "+*h.signingKey)
+	if req.Header.Get("Authorization") == "" {
+		if authHeader, ok := ctx.Value(mcpAuthHeaderContextKey{}).(string); ok && authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
+		}
 	}
 
 	recorder := httptest.NewRecorder()
@@ -1202,6 +1202,10 @@ func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager, tick 
 	addMCPRoute(r, newMCPHandler(events, data, tick, v2))
 }
 
-func addMCPRoute(r chi.Router, handler *MCPHandler) {
+func addMCPRoute(r chi.Router, handler *MCPHandler, middlewares ...func(http.Handler) http.Handler) {
+	if len(middlewares) > 0 {
+		r.With(middlewares...).Handle("/mcp", handler.handler())
+		return
+	}
 	r.Handle("/mcp", handler.handler())
 }

@@ -208,10 +208,10 @@ type Bufferer interface {
 	PauseBySignalID(ctx context.Context, envID uuid.UUID, signalID string) (*state.Pause, error)
 
 	// PauseIDsForRun returns all pause IDs associated with a run.
-	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error)
 
 	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
-	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 }
 
 // BlockStore is an implementation that reads and writes blocks.

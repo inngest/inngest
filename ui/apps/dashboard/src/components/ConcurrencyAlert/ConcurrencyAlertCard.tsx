@@ -9,7 +9,10 @@ import {
 } from '@remixicon/react';
 
 import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
-import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
+import {
+  boostedStyles,
+  SidebarAlertCard,
+} from '../NavigationV2/SidebarAlertCard';
 import { BURST_MULTIPLIER, minutesLeftLabel } from './concurrencyAlert';
 import {
   useConcurrencyAlert,
@@ -20,15 +23,6 @@ const numberFormatter = new Intl.NumberFormat('en-US');
 
 const arrow = <RiArrowRightLine className="h-3.5 w-3.5" />;
 
-const boostedStyles = {
-  card: 'bg-contrast border-contrast text-onContrast',
-  divider: 'border-contrast',
-  icon: 'text-secondary-moderate',
-  link: 'text-secondary-subtle hover:decoration-secondary-subtle',
-  track: 'bg-[rgb(var(--color-foreground-subtle))]',
-  bar: 'bg-gradient-to-r from-secondary-moderate to-secondary-xSubtle',
-};
-
 const limitedStyles = {
   collapsed: 'border-accent-xSubtle bg-warning',
   icon: 'text-warning',
@@ -36,14 +30,14 @@ const limitedStyles = {
 };
 
 export function ConcurrencyAlertCard({ collapsed }: { collapsed: boolean }) {
-  const alert = useConcurrencyAlert();
+  const alert = useConcurrencyAlert(collapsed ? 'card-collapsed' : 'card');
   if (!alert) return <ExecutionLimitCard collapsed={collapsed} />;
 
   if (collapsed) {
     const boosted = alert.state === 'boosted';
     return (
       <MenuItem
-        {...alert.linkProps('card-collapsed')}
+        {...alert.linkProps}
         className={cn(
           'border',
           boosted ? boostedStyles.card : limitedStyles.collapsed,
@@ -76,10 +70,9 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
   return (
     <SidebarAlertCard
       className={cn('mb-5', boostedStyles.card)}
-      footerClassName={boostedStyles.divider}
       footer={
         <Link
-          {...alert.linkProps('card')}
+          {...alert.linkProps}
           className={cn('gap-0.5 text-xs leading-5', boostedStyles.link)}
           iconAfter={arrow}
         >
@@ -97,8 +90,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
       </p>
       <div className="mt-2 pt-1">
         <ProgressBar
-          className={boostedStyles.track}
-          indicatorClassName={boostedStyles.bar}
+          kind="boost"
           limit={1}
           size="small"
           value={alert.usedRatio}
@@ -123,7 +115,7 @@ function LimitedCard({ alert }: { alert: ConcurrencyAlert }) {
       kind="warning"
       footer={
         <Link
-          {...alert.linkProps('card')}
+          {...alert.linkProps}
           className={cn('gap-0.5 text-xs leading-5', limitedStyles.link)}
           iconAfter={arrow}
         >

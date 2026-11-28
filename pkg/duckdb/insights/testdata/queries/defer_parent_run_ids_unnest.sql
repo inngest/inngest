@@ -1,0 +1,1 @@
+SELECT UNNEST(attributes -> '_inngest.defer.parent_run_ids') FROM extended_trace_spans

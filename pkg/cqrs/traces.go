@@ -62,6 +62,22 @@ type OtelSpan struct {
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
 
 	Metadata []*SpanMetadata `json:"metadata,omitempty,omitzero"`
+
+	// Ticks are the small events of this row, such as the messages that
+	// arrived at an inbox or the ones a read took. They are never rows.
+	Ticks []*SpanTick `json:"ticks,omitempty,omitzero"`
+}
+
+// SpanTick is one tick on a row.
+type SpanTick struct {
+	// ID is what ticked, such as a message's step id.
+	ID string `json:"id"`
+	// Sources are the pauses of the sources it came through, on an arrival.
+	Sources []string `json:"sources"`
+	// At is when it arrived.
+	At time.Time `json:"at"`
+	// ReadAt is when a read took it, on a read's row.
+	ReadAt *time.Time `json:"read_at,omitempty"`
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {
@@ -354,8 +370,12 @@ type SpanLink struct {
 }
 
 type SpanMetadata struct {
-	Scope     metadata.Scope  `json:"scope"`
+	Scope metadata.Scope `json:"scope"`
+	// Kind is the full kind (e.g. "userland.foo") on the cqrs read path, but
+	// stripped of its userland/inngest prefix (e.g. "foo") when read from
+	// DuckDB's inngest.run_metadata. IsUser tells the two apart either way.
 	Kind      metadata.Kind   `json:"kind"`
+	IsUser    bool            `json:"is_user"`
 	Values    metadata.Values `json:"values"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }

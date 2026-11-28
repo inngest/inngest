@@ -82,14 +82,20 @@ type v2 struct {
 
 // Create creates new state in the store for the given run ID.
 func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
-	batchData := make([]map[string]any, len(s.Events))
-	for n, evt := range s.Events {
+	// Supplying both representations is a caller bug. Reject the request rather
+	// than choosing one and risking inconsistent durable state. The legacy Events
+	// representation and this guard will be removed after all callers migrate.
+	if len(s.Events) > 0 && s.SerializedEvents.Len() > 0 {
+		return state.State{}, fmt.Errorf("create state contains raw and immutable event payloads")
+	}
+	rawEvents := s.MaterializeEvents()
+	batchData := make([]map[string]any, len(rawEvents))
+	for n, evt := range rawEvents {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
 			return state.State{}, err
 		}
 		batchData[n] = data
-
 	}
 	st, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
@@ -208,7 +214,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		}
 	}
 
-	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
+	return state.State{Metadata: metadata, Events: rawEvents, Steps: steps}, nil
 }
 
 func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
@@ -363,6 +369,32 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 			}).Error(); err != nil {
 				return fmt.Errorf("redis_state: migrate defers control meta: %w", err)
 			}
+		}
+	}
+
+	if len(s.InboxWaits.Waits) > 0 || len(s.InboxWaits.Closed) > 0 {
+		inboxWaitsKey := fnRunState.kg.InboxWaits(ctx, isSharded, id.FunctionID, id.RunID)
+
+		records := make([]string, 0, len(s.InboxWaits.Waits))
+		for _, wait := range s.InboxWaits.Waits {
+			record, err := json.Marshal(wait)
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal inbox wait %s: %w", wait.ID, err)
+			}
+			records = append(records, string(record))
+		}
+
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(inboxWaitsKey).FieldValue()
+			for n, wait := range s.InboxWaits.Waits {
+				partial = partial.FieldValue(wait.Inbox, records[n])
+			}
+			for _, inbox := range s.InboxWaits.Closed {
+				partial = partial.FieldValue(inbox+inboxClosedSuffix, "1")
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate inbox waits: %w", err)
 		}
 	}
 
@@ -697,7 +729,10 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 			return false, err
 		},
-		v.retryPolicy(),
+		// a run that is gone stays gone, so a retry cannot succeed.
+		v.retryPolicy(util.WithRetryConfRetryableErrors(func(err error) bool {
+			return !errors.Is(err, statev1.ErrRunNotFound)
+		})),
 	)
 
 	return err
@@ -775,6 +810,100 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 	return hasPending, err
 }
 
+func inboxIdentifier(id state.ID) statev1.Identifier {
+	return statev1.Identifier{
+		RunID:      id.RunID,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+}
+
+// SaveInboxMessage saves a message step of an inbox and returns the wait it satisfies.
+func (v v2) SaveInboxMessage(ctx context.Context, id state.ID, msg state.InboxMessage) (*state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.SaveInboxMessage",
+		func(ctx context.Context) (*state.InboxWake, error) {
+			return v.mgr.SaveInboxMessage(ctx, inboxIdentifier(id), msg)
+		},
+		v.retryPolicy(util.WithRetryConfRetryableErrors(func(err error) bool {
+			return v.retryableError(err) && !errors.Is(err, state.ErrRunNotFound)
+		})),
+	)
+}
+
+// RecordInboxWait records a wait and returns it if a saved message satisfies it.
+func (v v2) RecordInboxWait(ctx context.Context, id state.ID, wait state.InboxWait) (*state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.RecordInboxWait",
+		func(ctx context.Context) (*state.InboxWake, error) {
+			return v.mgr.RecordInboxWait(ctx, inboxIdentifier(id), wait)
+		},
+		v.retryPolicy(),
+	)
+}
+
+// TimeoutInboxWait times an inbox's wait out, if it is still recorded.
+func (v v2) TimeoutInboxWait(ctx context.Context, id state.ID, inbox string, waitID string, data []byte) (*state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.TimeoutInboxWait",
+		func(ctx context.Context) (*state.InboxWake, error) {
+			return v.mgr.TimeoutInboxWait(ctx, inboxIdentifier(id), inbox, waitID, data)
+		},
+		v.retryPolicy(),
+	)
+}
+
+// CloseInbox saves a close and ends the inbox's wait.
+func (v v2) CloseInbox(ctx context.Context, id state.ID, closing state.InboxClose) (*state.InboxWake, bool, error) {
+	type closed struct {
+		wake    *state.InboxWake
+		pending bool
+	}
+
+	out, err := util.WithRetry(
+		ctx,
+		"state.CloseInbox",
+		func(ctx context.Context) (closed, error) {
+			wake, pending, err := v.mgr.CloseInbox(ctx, inboxIdentifier(id), closing)
+
+			return closed{wake: wake, pending: pending}, err
+		},
+		v.retryPolicy(),
+	)
+
+	return out.wake, out.pending, err
+}
+
+// DeleteInboxWait removes the inbox's wait if it is the wait waitID.
+func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, inbox string, waitID string) error {
+	_, err := util.WithRetry(
+		ctx,
+		"state.DeleteInboxWait",
+		func(ctx context.Context) (bool, error) {
+			return false, v.mgr.DeleteInboxWait(ctx, inboxIdentifier(id), inbox, waitID)
+		},
+		v.retryPolicy(),
+	)
+
+	return err
+}
+
+// LoadInboxWaits returns the waits recorded for a run, and the inboxes that
+// were closed.
+func (v v2) LoadInboxWaits(ctx context.Context, id state.ID) (state.InboxWaitSet, error) {
+	return util.WithRetry(
+		ctx,
+		"state.LoadInboxWaits",
+		func(ctx context.Context) (state.InboxWaitSet, error) {
+			return v.mgr.LoadInboxWaits(ctx, inboxIdentifier(id))
+		},
+		v.retryPolicy(),
+	)
+}
+
 // SavePending saves pending step IDs for the given run ID.
 func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) error {
 	v1id := statev1.Identifier{
@@ -830,6 +959,11 @@ func (v v2) retryableError(err error) bool {
 	case errors.Is(err, statev1.ErrIdempotentResponse):
 		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
+		return false
+	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull), errors.Is(err, state.ErrInboxClosed):
+		return false
+	case errors.Is(err, statev1.ErrRunNotFound):
+		// the run is deleted, so a retry gets the same result.
 		return false
 	}
 

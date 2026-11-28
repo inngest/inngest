@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	grpcLib "google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -21,7 +25,21 @@ const (
 	DefaultConnectGRPCIP           = "127.0.0.1"
 	// MaxMessageSize covers execution requests and SDK replies, including protobuf overhead.
 	MaxMessageSize = 16 * 1024 * 1024
+	// ForwardTimeout bounds a single Forward call to a gateway. The gateway
+	// answers within 5s plus the lease, grace and write timeouts while it waits
+	// for the worker ack, so this only trips when the call is stuck in transport,
+	// e.g. on a dead TCP connection that would otherwise hang until the kernel
+	// gives up (~15m).
+	ForwardTimeout = consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod + 30*time.Second
 )
+
+// ServerKeepaliveEnforcement lets peers ping every few seconds, even with no
+// active calls, so clients can detect dead connections quickly. The gRPC default
+// rejects pings more often than every 5 minutes with a GOAWAY.
+var ServerKeepaliveEnforcement = keepalive.EnforcementPolicy{
+	MinTime:             5 * time.Second,
+	PermitWithoutStream: true,
+}
 
 type GatewayGRPCForwarder interface {
 	ConnectToGateways(ctx context.Context) error
@@ -53,6 +71,7 @@ type gatewayGRPCManager struct {
 
 	gatewayGRPCPort  int
 	executorGRPCPort int
+	forwardTimeout   time.Duration
 }
 
 type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.ClientConn, error)
@@ -89,6 +108,14 @@ func WithExecutorGRPCPort(p int) GatewayGRPCManagerOption {
 	}
 }
 
+func WithGatewayForwardTimeout(d time.Duration) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		if d > 0 {
+			m.forwardTimeout = d
+		}
+	}
+}
+
 // gatewayURL creates a URL for connecting to a gateway's gRPC port
 func (i *gatewayGRPCManager) gatewayURL(ctx context.Context, gateway *state.Gateway) string {
 	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", i.gatewayGRPCPort))
@@ -98,10 +125,11 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 	mgr := &gatewayGRPCManager{
 		gatewayManager:   stateManager,
 		dialer:           grpcLib.NewClient,
-		grpcServer:       grpcLib.NewServer(grpcLib.MaxRecvMsgSize(MaxMessageSize)),
+		grpcServer:       grpcLib.NewServer(grpcLib.MaxRecvMsgSize(MaxMessageSize), grpcLib.KeepaliveEnforcementPolicy(ServerKeepaliveEnforcement)),
 		logger:           logger.StdlibLogger(ctx),
 		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
 		executorGRPCPort: DefaultConnectExecutorGRPCPort,
+		forwardTimeout:   ForwardTimeout,
 	}
 
 	for _, opt := range opts {
@@ -210,6 +238,11 @@ func (i *gatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 }
 
 func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+	// Bound the whole call, including dialing and pinging a new client, which
+	// can hang just like Forward on a connection that blackholes.
+	forwardCtx, cancel := context.WithTimeout(ctx, i.forwardTimeout)
+	defer cancel()
+
 	grpcClient, err := i.grpcClientManager.GetClient(ctx, gatewayID.String())
 	if err != nil && err != ErrGatewayNotFound {
 		logger.StdlibLogger(ctx).Error("could not get grpc client", "gatewayID", gatewayID.String(), "err", err)
@@ -223,7 +256,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 
 		url := i.gatewayURL(ctx, gateway)
 
-		grpcClient, err = i.grpcClientManager.GetOrCreateClient(ctx, gatewayID.String(), url)
+		grpcClient, err = i.grpcClientManager.GetOrCreateClient(forwardCtx, gatewayID.String(), url)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", "gatewayID", gatewayID.String(), "err", err)
 
@@ -232,16 +265,31 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 		}
 	}
 
-	reply, err := grpcClient.Forward(ctx, &connectpb.ForwardRequest{
+	reply, err := grpcClient.Forward(forwardCtx, &connectpb.ForwardRequest{
 		ConnectionID: connectionID.String(),
 		Data:         data,
 	})
 
 	logger.StdlibLogger(ctx).Trace("grpc message forwarded to connect gateway", "reply", reply, "err", err)
 
+	// A broken connection fails every call on it, so drop the cached client and
+	// let the next Forward dial a fresh one. Skip this when the caller gave up.
+	// Calls on a dead connection time out at staggered times, so only remove the
+	// client this call used, never a fresh one dialed in the meantime.
+	if err != nil && ctx.Err() == nil {
+		switch status.Code(err) {
+		case grpcCodes.Unavailable, grpcCodes.DeadlineExceeded:
+			logger.StdlibLogger(ctx).Warn("removing grpc client after transport failure", "gatewayID", gatewayID.String(), "err", err)
+			i.grpcClientManager.RemoveClientIfCurrent(gatewayID.String(), grpcClient)
+			metrics.IncrConnectGatewayGRPCClientEvictedCounter(ctx, 1, metrics.CounterOpt{
+				Tags: map[string]any{"code": status.Code(err).String()},
+			})
+		}
+	}
+
 	success := err == nil && reply != nil && reply.Success
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{
-		Tags: map[string]any{"success": success},
+		Tags: map[string]any{"success": success, "code": status.Code(err).String()},
 	})
 
 	if err == nil && reply != nil && !reply.Success {

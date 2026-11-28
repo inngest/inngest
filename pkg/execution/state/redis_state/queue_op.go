@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sync/atomic"
 	"time"
 
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -12,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -31,6 +33,12 @@ func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osqueue.DequeueOptionFn) error {
+	return q.dequeue(ctx, i, false, options...)
+}
+
+// Scavenger cleanup may delete an unchanged expired lease, but it must still
+// compare ownership atomically. Public guarded dequeue requires a live lease.
+func (q *queue) dequeue(ctx context.Context, i osqueue.QueueItem, allowExpiredLease bool, options ...osqueue.DequeueOptionFn) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -100,6 +108,17 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		idempotency = *i.IdempotencyPeriod
 	}
 
+	expectedLeaseID := ""
+	if o.MatchItemLease {
+		if (i.LeaseID == nil || *i.LeaseID == (ulid.ULID{})) && !allowExpiredLease {
+			return osqueue.ErrQueueItemLeaseMismatch
+		}
+		expectedLeaseID = (ulid.ULID{}).String()
+		if i.LeaseID != nil {
+			expectedLeaseID = i.LeaseID.String()
+		}
+	}
+
 	args, err := StrSlice([]any{
 		i.ID,
 		partition.PartitionID,
@@ -108,6 +127,9 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
+		expectedLeaseID,
+		q.Clock.Now().UnixMilli(),
+		allowExpiredLease,
 	})
 	if err != nil {
 		return err
@@ -131,10 +153,57 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		return nil
 	case 1:
 		return osqueue.ErrQueueItemNotFound
+	case 2:
+		return osqueue.ErrQueueItemLeaseMismatch
 	default:
 		return fmt.Errorf("unknown response dequeueing item: %d", status)
 	}
 }
+
+// CapacityReleased implements osqueue.CapacityReleaseNotifier. It wakes the
+// item's partition and marks it so the next scan bypasses cached constraint
+// exhaustion, which may have been recorded before this release.
+func (q *queue) CapacityReleased(ctx context.Context, i osqueue.QueueItem) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CapacityReleased"), redis_telemetry.ScopeQueue)
+
+	accountID := i.Data.Identifier.AccountID
+	if q.CapacityReleaseWakeEnabled == nil || !q.CapacityReleaseWakeEnabled(ctx, accountID) {
+		return
+	}
+
+	kg := q.RedisClient.kg
+	partition := osqueue.ItemShadowPartition(ctx, i)
+
+	keys := []string{
+		kg.PartitionItem(),
+		shadowPartitionReadyQueueKey(partition, kg),
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(accountID),
+	}
+	args := []string{partition.PartitionID, accountID.String()}
+
+	_, err := scripts["queue/capacityReleased"].Exec(
+		redis_telemetry.WithScriptName(ctx, "capacityReleased"),
+		q.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		// This runs for every confirmed release, so log at most once per second.
+		now := q.Clock.Now().UnixNano()
+		last := lastCapacityReleasedWarn.Load()
+		if now-last >= int64(time.Second) && lastCapacityReleasedWarn.CompareAndSwap(last, now) {
+			logger.StdlibLogger(ctx).Warn("error waking partition after capacity release", "error", err, "partition_id", partition.PartitionID)
+		}
+	}
+}
+
+// lastCapacityReleasedWarn holds the unix nanos of the last CapacityReleased
+// error log.
+var lastCapacityReleasedWarn atomic.Int64
+
+var _ osqueue.CapacityReleaseNotifier = (*queue)(nil)
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, options ...osqueue.RequeueOptionFn) error {
@@ -144,6 +213,10 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	for _, opt := range options {
 		opt(o)
 	}
+	if o.ExpiredCapacityLeasePartition != nil &&
+		(!q.ItemAllowKeyQueueCapacityLeaseRepair(ctx, i) || i.CapacityLease == nil || (i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "")) {
+		return nil
+	}
 
 	l := logger.StdlibLogger(ctx).With("item", i)
 
@@ -152,6 +225,25 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	now := q.Clock.Now()
 	if at.Before(now) {
 		at = now
+	}
+	expectedGeneration := i.GenerationID
+	expectedCapacityLease := ""
+	expectedRefilledFrom := i.RefilledFrom
+	partitionLease := ""
+	if o.ExpiredCapacityLeasePartition != nil {
+		partitionLease = o.ExpiredCapacityLeasePartition.String()
+		expectedCapacityLease = i.CapacityLease.LeaseID.String()
+		i.CapacityLease = nil
+	}
+
+	// Capture the observed lease before clearing it from the requeued payload.
+	observedLeaseID := i.LeaseID
+	expectedLeaseID := ""
+	if o.MatchItemLease {
+		expectedLeaseID = (ulid.ULID{}).String()
+		if observedLeaseID != nil {
+			expectedLeaseID = observedLeaseID.String()
+		}
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -170,7 +262,9 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	i.RefilledAt = 0
 
 	// Reset enqueuedAt (used for latency calculation)
-	i.EnqueuedAt = now.UnixMilli()
+	if o.ExpiredCapacityLeasePartition == nil {
+		i.EnqueuedAt = now.UnixMilli()
+	}
 	i.EarliestPeekTime = 0
 
 	fnPartition := osqueue.ItemPartition(ctx, i)
@@ -200,7 +294,13 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 				if errors.Is(err, state.ErrEventNotFound) {
 					l.Warn("could not find event for refreshing throttle before requeue")
 
-					err := q.Dequeue(ctx, i)
+					var dequeueOpts []osqueue.DequeueOptionFn
+					if o.MatchItemLease {
+						dequeueOpts = append(dequeueOpts, osqueue.DequeueMatchItemLease())
+					}
+					cleanupItem := i
+					cleanupItem.LeaseID = observedLeaseID
+					err := q.dequeue(ctx, cleanupItem, true, dequeueOpts...)
 					if err != nil && !errors.Is(err, osqueue.ErrQueueItemNotFound) {
 						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
 					}
@@ -263,6 +363,11 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
+		expectedLeaseID,
+		partitionLease,
+		expectedGeneration,
+		expectedCapacityLease,
+		expectedRefilledFrom,
 	})
 	if err != nil {
 		return err
@@ -306,9 +411,18 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 		return nil
 	case 1:
+		if o.ExpiredCapacityLeasePartition != nil {
+			return nil // The cleanup snapshot was deleted after peek.
+		}
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
 		return osqueue.ErrQueueItemNotFound
+	case 2:
+		return nil // A conditional repair lost eligibility; leave the item untouched.
+	case 3:
+		return osqueue.ErrQueueItemLeaseMismatch
+	case 4:
+		return osqueue.ErrPartitionLeaseMismatch
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}

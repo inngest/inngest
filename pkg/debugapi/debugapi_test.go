@@ -225,11 +225,14 @@ func TestGetBatchInfoHandler(t *testing.T) {
 		BatchKey:   "default",
 	})
 	require.NoError(t, err)
-	require.Equal(t, result.BatchID, resp.BatchId)
-	require.Equal(t, int32(1), resp.ItemCount)
-	require.Len(t, resp.Items, 1)
-	require.Equal(t, eventID.String(), resp.Items[0].EventId)
-	require.Equal(t, functionID.String(), resp.Items[0].FunctionId)
+	require.Len(t, resp.Stores, 1)
+	store := resp.Stores[0]
+	require.Equal(t, "default", store.Store)
+	require.Equal(t, result.BatchID, store.BatchId)
+	require.Equal(t, int32(1), store.ItemCount)
+	require.Len(t, store.Items, 1)
+	require.Equal(t, eventID.String(), store.Items[0].EventId)
+	require.Equal(t, functionID.String(), store.Items[0].FunctionId)
 }
 
 // TestGetSingletonInfoHandler tests the debug API handler for singleton info.
@@ -734,9 +737,11 @@ func TestDeleteBatchHandler(t *testing.T) {
 		BatchKey:   "default",
 	})
 	require.NoError(t, err)
-	require.True(t, resp.Deleted)
-	require.Equal(t, result.BatchID, resp.BatchId)
-	require.Equal(t, int32(1), resp.ItemCount)
+	require.Len(t, resp.Stores, 1)
+	require.Equal(t, "default", resp.Stores[0].Store)
+	require.True(t, resp.Stores[0].Deleted)
+	require.Equal(t, result.BatchID, resp.Stores[0].BatchId)
+	require.Equal(t, int32(1), resp.Stores[0].ItemCount)
 
 	// Verify batch no longer exists
 	infoResp, err := d.GetBatchInfo(ctx, &pb.BatchInfoRequest{
@@ -744,7 +749,9 @@ func TestDeleteBatchHandler(t *testing.T) {
 		BatchKey:   "default",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "", infoResp.BatchId)
+	require.Len(t, infoResp.Stores, 1)
+	require.Equal(t, "", infoResp.Stores[0].BatchId)
+	require.Equal(t, "none", infoResp.Stores[0].Status)
 }
 
 // TestRunBatchHandler tests the debug API handler for running batches.
@@ -802,9 +809,11 @@ func TestRunBatchHandler(t *testing.T) {
 		BatchKey:   "default",
 	})
 	require.NoError(t, err)
-	require.True(t, resp.Scheduled)
-	require.Equal(t, result.BatchID, resp.BatchId)
-	require.Equal(t, int32(1), resp.ItemCount)
+	require.Len(t, resp.Stores, 1)
+	require.Equal(t, "default", resp.Stores[0].Store)
+	require.True(t, resp.Stores[0].Scheduled)
+	require.Equal(t, result.BatchID, resp.Stores[0].BatchId)
+	require.Equal(t, int32(1), resp.Stores[0].ItemCount)
 }
 
 // TestDeleteSingletonLockHandler tests the debug API handler for deleting singleton locks.
@@ -1160,4 +1169,58 @@ func TestRunDebounceInvalidFunctionID(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function_id")
+}
+
+func TestBatchResponsesPerStore(t *testing.T) {
+	item := batch.BatchItem{EventID: ulid.Make()}
+
+	t.Run("info copies each store", func(t *testing.T) {
+		infos := []batch.BatchInfo{
+			{Store: "store-a", Status: "none"},
+			{Store: "store-b", BatchID: "next", Items: []batch.BatchItem{item}, Status: "pending"},
+		}
+		resp := BatchInfoResponse(infos)
+		require.Len(t, resp.Stores, 2)
+		for i, info := range infos {
+			require.Equal(t, info.Store, resp.Stores[i].Store)
+			require.Equal(t, info.BatchID, resp.Stores[i].BatchId)
+			require.Equal(t, int32(len(info.Items)), resp.Stores[i].ItemCount)
+			require.Equal(t, info.Status, resp.Stores[i].Status)
+		}
+		require.Len(t, resp.Stores[1].Items, 1)
+		require.Equal(t, item.EventID.String(), resp.Stores[1].Items[0].EventId)
+		// The deprecated top-level fields are no longer populated.
+		require.Empty(t, resp.BatchId)
+		require.Empty(t, resp.Status)
+	})
+
+	t.Run("delete copies each store", func(t *testing.T) {
+		resp := DeleteBatchResponse([]batch.DeleteBatchResult{
+			{Store: "store-a", Deleted: true, BatchID: "current", ItemCount: 2},
+			{Store: "store-b"},
+		})
+		require.Len(t, resp.Stores, 2)
+		require.Equal(t, "store-a", resp.Stores[0].Store)
+		require.True(t, resp.Stores[0].Deleted)
+		require.Equal(t, "current", resp.Stores[0].BatchId)
+		require.Equal(t, int32(2), resp.Stores[0].ItemCount)
+		require.Equal(t, "store-b", resp.Stores[1].Store)
+		require.False(t, resp.Stores[1].Deleted)
+		require.False(t, resp.Deleted)
+	})
+
+	t.Run("run copies each store", func(t *testing.T) {
+		resp := RunBatchResponse([]batch.RunBatchResult{
+			{Store: "store-a"},
+			{Store: "store-b", Scheduled: true, BatchID: "next", ItemCount: 4},
+		})
+		require.Len(t, resp.Stores, 2)
+		require.Equal(t, "store-a", resp.Stores[0].Store)
+		require.False(t, resp.Stores[0].Scheduled)
+		require.Equal(t, "store-b", resp.Stores[1].Store)
+		require.True(t, resp.Stores[1].Scheduled)
+		require.Equal(t, "next", resp.Stores[1].BatchId)
+		require.Equal(t, int32(4), resp.Stores[1].ItemCount)
+		require.False(t, resp.Scheduled)
+	})
 }

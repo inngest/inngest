@@ -1,0 +1,54 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+regexp_match_substring('foobarboopzoo'::str, 'o{1,}'::str, 1::i64, 1::i64, 0::i64) = 'oo'::str
+regexp_match_substring('foobarboopzoo'::str, 'o{1}'::str, 1::i64, 1::i64, 0::i64) = 'o'::str
+regexp_match_substring('abcabcacb'::str, '[bc]'::str, 1::i64, 1::i64, 0::i64) = 'b'::str
+regexp_match_substring('abcdefghi'::str, '(.*)c'::str, 1::i64, 1::i64, 0::i64) = 'abc'::str
+regexp_match_substring('abcdefghi'::str, '(.*)c?'::str, 1::i64, 1::i64, 0::i64) = 'abcdefghi'::str
+regexp_match_substring('foobarboopzoo'::str, 'o{1,}'::str) = 'oo'::str
+regexp_match_substring('foobarboopzoo'::str, 'o{1}'::str) = 'o'::str
+regexp_match_substring('abcabcacb'::str, '[bc]'::str) = 'b'::str
+regexp_match_substring('abcdefghi'::str, '(.*)c'::str) = 'abc'::str
+regexp_match_substring('abcdefghi'::str, '(.*)c?'::str) = 'abcdefghi'::str
+
+# null_input: Examples with null as input
+regexp_match_substring('Hello'::str, null::str?, 1::i64, 1::i64, 0::i64) = null::str?
+regexp_match_substring(null::str?, ' '::str, 1::i64, 1::i64, 0::i64) = null::str?
+regexp_match_substring('Hello'::str, null::str?) = null::str?
+regexp_match_substring(null::str?, ' '::str) = null::str?
+
+# metacharacters: Examples with metacharacters
+regexp_match_substring('abc1abc'::str, '\d'::str, 1::i64, 1::i64, 0::i64) = '1'::str
+regexp_match_substring('abc1abc'::str, '\D'::str, 1::i64, 1::i64, 0::i64) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\s'::str, 1::i64, 1::i64, 0::i64) = ' '::str
+regexp_match_substring('abc def ghi'::str, '\S'::str, 1::i64, 1::i64, 0::i64) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\S+'::str, 1::i64, 1::i64, 0::i64) = 'abc'::str
+regexp_match_substring('abc def ghi'::str, '\w'::str, 1::i64, 1::i64, 0::i64) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\w+'::str, 1::i64, 1::i64, 0::i64) = 'abc'::str
+regexp_match_substring('abc def ghi,'::str, '\W'::str, 1::i64, 1::i64, 0::i64) = ' '::str
+regexp_match_substring('abc1abc'::str, '\d'::str) = '1'::str
+regexp_match_substring('abc1abc'::str, '\D'::str) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\s'::str) = ' '::str
+regexp_match_substring('abc def ghi'::str, '\S'::str) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\S+'::str) = 'abc'::str
+regexp_match_substring('abc def ghi'::str, '\w'::str) = 'a'::str
+regexp_match_substring('abc def ghi'::str, '\w+'::str) = 'abc'::str
+regexp_match_substring('abc def ghi,'::str, '\W'::str) = ' '::str
+
+# lookahead: Examples with lookahead
+regexp_match_substring('100 dollars'::str, '\d+(?= dollars)'::str, 1::i64, 1::i64, 0::i64) [lookaround:TRUE] = '100'::str
+regexp_match_substring('100 dollars'::str, '\d+(?= dollars)'::str) [lookaround:TRUE] = '100'::str
+
+# negative_lookahead: Examples with negative lookahead
+regexp_match_substring('100 pesos'::str, '\d+(?!\d| dollars)'::str, 1::i64, 1::i64, 0::i64) [lookaround:TRUE] = '100'::str
+regexp_match_substring('100 pesos'::str, '\d+(?!\d| dollars)'::str) [lookaround:TRUE] = '100'::str
+
+# lookbehind: Examples with lookbehind
+regexp_match_substring('USD100'::str, '(?<=USD)\d{3}'::str, 1::i64, 1::i64, 0::i64) [lookaround:TRUE] = '100'::str
+regexp_match_substring('USD100'::str, '(?<=USD)\d{3}'::str) [lookaround:TRUE] = '100'::str
+
+# negative_lookbehind: Examples with negative lookbehind
+regexp_match_substring('JPY100'::str, '\d{3}(?<!USD\d{3})'::str, 1::i64, 1::i64, 0::i64) [lookaround:TRUE] = '100'::str
+regexp_match_substring('JPY100'::str, '\d{3}(?<!USD\d{3})'::str) [lookaround:TRUE] = '100'::str

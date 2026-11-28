@@ -1,0 +1,1 @@
+SELECT run_id, [UPPER(e) FOR e IN event_ids IF e IS NOT NULL] AS uppercased_event_ids FROM runs

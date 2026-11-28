@@ -53,6 +53,7 @@ const (
 
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 5 * time.Minute
+	ShadowPartitionRefillDisabledRequeueExtension        = 5 * time.Second
 	BacklogDefaultRequeueExtension                       = 2 * time.Second
 
 	// default values

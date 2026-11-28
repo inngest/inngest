@@ -1,0 +1,1 @@
+SELECT [[y FOR y IN string_split(run_id, '')] FOR x IN string_split(run_id, '')] AS r FROM runs

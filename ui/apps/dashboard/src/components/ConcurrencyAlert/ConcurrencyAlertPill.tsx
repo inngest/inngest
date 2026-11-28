@@ -11,10 +11,10 @@ const linkClassName =
 const arrow = <RiArrowRightLine className="h-3.5 w-3.5" />;
 
 export function ConcurrencyAlertPill() {
-  const alert = useConcurrencyAlert();
+  const alert = useConcurrencyAlert('pill');
   if (!alert) return <ExecutionLimitPill />;
 
-  const linkProps = alert.linkProps('pill');
+  const linkProps = alert.linkProps;
 
   if (alert.state === 'boosted') {
     return (

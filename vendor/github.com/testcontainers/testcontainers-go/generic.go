@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strings"
 	"sync"
 
+	"github.com/testcontainers/testcontainers-go/internal/config"
 	"github.com/testcontainers/testcontainers-go/internal/core"
 	"github.com/testcontainers/testcontainers-go/log"
 )
@@ -78,14 +78,6 @@ func GenericContainer(ctx context.Context, req GenericContainerRequest) (Contain
 	}
 	if err != nil {
 		// At this point `c` might not be nil. Give the caller an opportunity to call Destroy on the container.
-		// TODO: Remove this debugging.
-		if strings.Contains(err.Error(), "toomanyrequests") {
-			// Debugging information for rate limiting.
-			cfg, err := getDockerConfig()
-			if err == nil {
-				fmt.Printf("XXX: too many requests: %+v", cfg)
-			}
-		}
 		return c, fmt.Errorf("create container: %w", err)
 	}
 
@@ -109,7 +101,7 @@ type GenericProvider interface {
 // reaper is enabled, otherwise this is excluded to prevent resources being
 // incorrectly reaped.
 func GenericLabels() map[string]string {
-	return core.DefaultLabels(core.SessionID())
+	return core.DefaultLabels(config.Read().SessionID)
 }
 
 // AddGenericLabels adds the generic labels to target.

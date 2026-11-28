@@ -117,7 +117,7 @@ func (s SubscriptionWS) SendKeepalive(m Message) error {
 }
 
 func (s SubscriptionWS) Close() error {
-	return s.ws.Close(websocket.CloseStatus(nil), string(streamingtypes.MessageKindClosing))
+	return s.ws.Close(websocket.StatusGoingAway, string(streamingtypes.MessageKindClosing))
 }
 
 func (s SubscriptionWS) Poll(ctx context.Context) error {

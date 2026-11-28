@@ -1,0 +1,5 @@
+{
+  "description": "A query that doesn't transpile reports its error.",
+  "mode": "product",
+  "error": "insights: parsing query: 4:6: unexpected trailing input"
+}

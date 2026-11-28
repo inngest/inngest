@@ -1,0 +1,13 @@
+{
+  "description": "IN over terminal statuses only is pushed.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status IN ('Completed', 'Failed', 'Cancelled')",
+        "physical": "runs.status IN ('Completed', 'Failed', 'Cancelled')",
+        "pushed": true
+      }
+    ]
+  }
+}

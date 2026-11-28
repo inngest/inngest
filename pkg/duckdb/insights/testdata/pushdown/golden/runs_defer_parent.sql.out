@@ -1,0 +1,13 @@
+{
+  "description": "defer_parent_function_id maps to the physical defer_parent_fn_slug.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "defer_parent_function_id = 'parent-fn'",
+        "physical": "runs.defer_parent_fn_slug = 'parent-fn'",
+        "pushed": true
+      }
+    ]
+  }
+}

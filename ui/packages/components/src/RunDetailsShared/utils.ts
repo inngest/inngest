@@ -128,6 +128,7 @@ export const useStepSelection = ({ runID }: { runID?: string }) => {
   const [selectedStep, setSelectedStep] = useState<StepInfoType | undefined>(undefined);
 
   useEffect(() => {
+    setSelectedStep(undefined);
     const cleanup = stepSelectionEmitter.subscribe(setSelectedStep, runID);
     return () => {
       cleanup();
@@ -138,7 +139,10 @@ export const useStepSelection = ({ runID }: { runID?: string }) => {
     stepSelectionEmitter.emit(step);
   }, []);
 
-  return { selectedStep, selectStep };
+  return {
+    selectedStep: !runID || selectedStep?.runID === runID ? selectedStep : undefined,
+    selectStep,
+  };
 };
 
 export const formatDuration = (ms: number): string => {
@@ -203,6 +207,7 @@ export const useDynamicRunData = ({ runID }: { runID?: string }) => {
   const [dynamicRunData, setDynamicRunData] = useState<DynamicRunData | undefined>(undefined);
 
   useEffect(() => {
+    setDynamicRunData(undefined);
     const cleanup = dynamicRunDataEmitter.subscribe(setDynamicRunData, runID);
     return () => {
       cleanup();
@@ -213,5 +218,8 @@ export const useDynamicRunData = ({ runID }: { runID?: string }) => {
     dynamicRunDataEmitter.emit(data);
   }, []);
 
-  return { dynamicRunData, updateDynamicRunData };
+  return {
+    dynamicRunData: !runID || dynamicRunData?.runID === runID ? dynamicRunData : undefined,
+    updateDynamicRunData,
+  };
 };

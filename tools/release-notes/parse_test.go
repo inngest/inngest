@@ -187,3 +187,26 @@ Set the new flag before rollout.
 		t.Fatalf("migration note = %q", got)
 	}
 }
+
+func TestParsePRBodyKeepsHowToRevertOutOfReleaseNote(t *testing.T) {
+	body := `## Release note
+
+None.
+
+## How to revert
+
+turn off flag foo first.
+
+## Migration note
+
+None.
+`
+
+	sections := ParsePRBody(body)
+	if got := NormalizeNote(sections["release note"]); got != "" {
+		t.Fatalf("release note = %q", got)
+	}
+	if got := sections["how to revert"]; got != "turn off flag foo first." {
+		t.Fatalf("how to revert = %q", got)
+	}
+}

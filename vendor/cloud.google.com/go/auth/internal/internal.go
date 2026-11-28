@@ -16,7 +16,7 @@ package internal
 
 import (
 	"context"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -38,12 +38,18 @@ const (
 	// QuotaProjectEnvVar is the environment variable for setting the quota
 	// project.
 	QuotaProjectEnvVar = "GOOGLE_CLOUD_QUOTA_PROJECT"
-	projectEnvVar      = "GOOGLE_CLOUD_PROJECT"
-	maxBodySize        = 1 << 20
+	// UniverseDomainEnvVar is the environment variable for setting the default
+	// service domain for a given Cloud universe.
+	UniverseDomainEnvVar = "GOOGLE_CLOUD_UNIVERSE_DOMAIN"
+	projectEnvVar        = "GOOGLE_CLOUD_PROJECT"
+	maxBodySize          = 1 << 20
 
 	// DefaultUniverseDomain is the default value for universe domain.
 	// Universe domain is the default service domain for a given Cloud universe.
 	DefaultUniverseDomain = "googleapis.com"
+
+	// RegionalAccessBoundaryDataKey is the key used to store regional access boundary data in a token's metadata.
+	RegionalAccessBoundaryDataKey = "google.auth.regional_access_boundary_data"
 )
 
 type clonableTransport interface {
@@ -69,25 +75,28 @@ func DefaultClient() *http.Client {
 }
 
 // ParseKey converts the binary contents of a private key file
-// to an *rsa.PrivateKey. It detects whether the private key is in a
+// to an crypto.Signer. It detects whether the private key is in a
 // PEM container or not. If so, it extracts the the private key
 // from PEM container before conversion. It only supports PEM
 // containers with no passphrase.
-func ParseKey(key []byte) (*rsa.PrivateKey, error) {
+func ParseKey(key []byte) (crypto.Signer, error) {
 	block, _ := pem.Decode(key)
 	if block != nil {
 		key = block.Bytes
 	}
-	parsedKey, err := x509.ParsePKCS8PrivateKey(key)
-	if err != nil {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(key)
-		if err != nil {
-			return nil, fmt.Errorf("private key should be a PEM or plain PKCS1 or PKCS8: %w", err)
+	var parsedKey crypto.PrivateKey
+
+	var errPKCS8, errPKCS1, errEC error
+	if parsedKey, errPKCS8 = x509.ParsePKCS8PrivateKey(key); errPKCS8 != nil {
+		if parsedKey, errPKCS1 = x509.ParsePKCS1PrivateKey(key); errPKCS1 != nil {
+			if parsedKey, errEC = x509.ParseECPrivateKey(key); errEC != nil {
+				return nil, fmt.Errorf("failed to parse private key. Tried PKCS8, PKCS1, and EC formats. Errors: [PKCS8: %v], [PKCS1: %v], [EC: %v]", errPKCS8, errPKCS1, errEC)
+			}
 		}
 	}
-	parsed, ok := parsedKey.(*rsa.PrivateKey)
+	parsed, ok := parsedKey.(crypto.Signer)
 	if !ok {
-		return nil, errors.New("private key is invalid")
+		return nil, errors.New("private key is not a signer")
 	}
 	return parsed, nil
 }
@@ -176,6 +185,7 @@ func (p StaticProperty) GetProperty(context.Context) (string, error) {
 // ComputeUniverseDomainProvider fetches the credentials universe domain from
 // the google cloud metadata service.
 type ComputeUniverseDomainProvider struct {
+	MetadataClient     *metadata.Client
 	universeDomainOnce sync.Once
 	universeDomain     string
 	universeDomainErr  error
@@ -185,7 +195,7 @@ type ComputeUniverseDomainProvider struct {
 // metadata service.
 func (c *ComputeUniverseDomainProvider) GetProperty(ctx context.Context) (string, error) {
 	c.universeDomainOnce.Do(func() {
-		c.universeDomain, c.universeDomainErr = getMetadataUniverseDomain(ctx)
+		c.universeDomain, c.universeDomainErr = getMetadataUniverseDomain(ctx, c.MetadataClient)
 	})
 	if c.universeDomainErr != nil {
 		return "", c.universeDomainErr
@@ -194,14 +204,14 @@ func (c *ComputeUniverseDomainProvider) GetProperty(ctx context.Context) (string
 }
 
 // httpGetMetadataUniverseDomain is a package var for unit test substitution.
-var httpGetMetadataUniverseDomain = func(ctx context.Context) (string, error) {
+var httpGetMetadataUniverseDomain = func(ctx context.Context, client *metadata.Client) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
-	return metadata.GetWithContext(ctx, "universe/universe_domain")
+	return client.GetWithContext(ctx, "universe/universe-domain")
 }
 
-func getMetadataUniverseDomain(ctx context.Context) (string, error) {
-	universeDomain, err := httpGetMetadataUniverseDomain(ctx)
+func getMetadataUniverseDomain(ctx context.Context, client *metadata.Client) (string, error) {
+	universeDomain, err := httpGetMetadataUniverseDomain(ctx, client)
 	if err == nil {
 		return universeDomain, nil
 	}
@@ -210,4 +220,43 @@ func getMetadataUniverseDomain(ctx context.Context) (string, error) {
 		return DefaultUniverseDomain, nil
 	}
 	return "", err
+}
+
+// FormatIAMServiceAccountResource sets a service account name in an IAM resource
+// name.
+func FormatIAMServiceAccountResource(name string) string {
+	return fmt.Sprintf("projects/-/serviceAccounts/%s", name)
+}
+
+// RegionalAccessBoundaryData represents the regional access boundary data associated with a token.
+// It contains information about the regions or environments where the token is valid.
+type RegionalAccessBoundaryData struct {
+	// Locations is the list of locations that the token is allowed to be used in.
+	Locations []string
+	// EncodedLocations represents the locations in an encoded format.
+	EncodedLocations string
+}
+
+// NewRegionalAccessBoundaryData returns a new RegionalAccessBoundaryData with the specified locations and encoded locations.
+func NewRegionalAccessBoundaryData(locations []string, encodedLocations string) *RegionalAccessBoundaryData {
+	// Ensure consistency by treating a nil slice as an empty slice.
+	if locations == nil {
+		locations = []string{}
+	}
+	locationsCopy := make([]string, len(locations))
+	copy(locationsCopy, locations)
+	return &RegionalAccessBoundaryData{
+		Locations:        locationsCopy,
+		EncodedLocations: encodedLocations,
+	}
+}
+
+// RegionalAccessBoundaryHeader returns the value for the x-allowed-locations header and a bool
+// indicating if the header should be set. If EncodedLocations is empty, the header
+// should not be present. Otherwise, it should be present with the value of EncodedLocations.
+func (t RegionalAccessBoundaryData) RegionalAccessBoundaryHeader() (value string, present bool) {
+	if t.EncodedLocations == "" {
+		return "", false
+	}
+	return t.EncodedLocations, true
 }

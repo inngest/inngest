@@ -34,7 +34,7 @@ type Hook func(*Peer, string, ...string) bool
 // Server is a simple redis server
 type Server struct {
 	l         net.Listener
-	cmds      map[string]Cmd
+	cmds      map[string]*cmdMeta
 	preHook   Hook
 	peers     map[net.Conn]struct{}
 	mu        sync.Mutex
@@ -60,9 +60,18 @@ func NewServerTLS(addr string, cfg *tls.Config) (*Server, error) {
 	return newServer(l), nil
 }
 
+// NewServerConn makes a server without a listener. Connections are added
+// with ServeConn. Close with .Close().
+func NewServerConn() *Server {
+	return &Server{
+		cmds:  map[string]*cmdMeta{},
+		peers: map[net.Conn]struct{}{},
+	}
+}
+
 func newServer(l net.Listener) *Server {
 	s := Server{
-		cmds:  map[string]Cmd{},
+		cmds:  map[string]*cmdMeta{},
 		peers: map[net.Conn]struct{}{},
 		l:     l,
 	}
@@ -136,6 +145,9 @@ func (s *Server) Close() {
 		s.l.Close()
 	}
 	s.l = nil
+	for c := range s.peers {
+		c.Close()
+	}
 	s.mu.Unlock()
 
 	s.wg.Wait()
@@ -143,14 +155,23 @@ func (s *Server) Close() {
 
 // Register a command. It can't have been registered before. Safe to call on a
 // running server.
-func (s *Server) Register(cmd string, f Cmd) error {
+func (s *Server) Register(cmd string, f Cmd, options ...CmdOption) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cmd = strings.ToUpper(cmd)
 	if _, ok := s.cmds[cmd]; ok {
 		return fmt.Errorf("command already registered: %s", cmd)
 	}
-	s.cmds[cmd] = f
+
+	meta := &cmdMeta{
+		handler:  f,
+		readOnly: false,
+	}
+	for _, option := range options {
+		option(meta)
+	}
+	s.cmds[cmd] = meta
+
 	return nil
 }
 
@@ -205,7 +226,7 @@ func (s *Server) Dispatch(c *Peer, args []string) {
 	}
 
 	s.mu.Lock()
-	cb, ok := s.cmds[cmdUp]
+	cmdMeta, ok := s.cmds[cmdUp]
 	s.mu.Unlock()
 	if !ok {
 		c.WriteError(errUnknownCommand(cmd, args))
@@ -215,7 +236,11 @@ func (s *Server) Dispatch(c *Peer, args []string) {
 	s.mu.Lock()
 	s.infoCmds++
 	s.mu.Unlock()
-	cb(c, cmdUp, args)
+	cmdMeta.handler(c, cmdUp, args)
+	if c.SwitchResp3 != nil {
+		c.Resp3 = *c.SwitchResp3
+		c.SwitchResp3 = nil
+	}
 }
 
 // TotalCommands is total (known) commands since this the server started
@@ -223,6 +248,26 @@ func (s *Server) TotalCommands() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.infoCmds
+}
+
+// IsRegisteredCommand checks if a command is registered
+func (s *Server) IsRegisteredCommand(cmd string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cmdUp := strings.ToUpper(cmd)
+	_, ok := s.cmds[cmdUp]
+	return ok
+}
+
+// IsReadOnlyCommand checks if a command is marked as read-only
+func (s *Server) IsReadOnlyCommand(cmd string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cmdUp := strings.ToUpper(cmd)
+	if cmdMeta, ok := s.cmds[cmdUp]; ok {
+		return cmdMeta.readOnly
+	}
+	return false
 }
 
 // ClientsLen gives the number of connected clients right now
@@ -245,6 +290,7 @@ type Peer struct {
 	w            *bufio.Writer
 	closed       bool
 	Resp3        bool
+	SwitchResp3  *bool       // we'll switch to this version _after_ the command
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
 	mu           sync.Mutex  // for Block()
@@ -324,6 +370,13 @@ func (c *Peer) WriteNull() {
 	})
 }
 
+// WriteNullArray writes a redis Null array: "*-1" in RESP2, and a Null in RESP3
+func (c *Peer) WriteNullArray() {
+	c.Block(func(w *Writer) {
+		w.WriteNullArray()
+	})
+}
+
 // WriteLen starts an array with the given length
 func (c *Peer) WriteLen(n int) {
 	c.Block(func(w *Writer) {
@@ -356,6 +409,13 @@ func (c *Peer) WritePushLen(n int) {
 func (c *Peer) WriteInt(n int) {
 	c.Block(func(w *Writer) {
 		w.WriteInt(n)
+	})
+}
+
+// WriteInt64 writes a 64-bit integer
+func (c *Peer) WriteInt64(n int64) {
+	c.Block(func(w *Writer) {
+		w.WriteInt64(n)
 	})
 }
 
@@ -446,6 +506,11 @@ func (w *Writer) WriteInt(n int) {
 	fmt.Fprintf(w.w, ":%d\r\n", n)
 }
 
+// WriteInt64 writes a 64-bit integer
+func (w *Writer) WriteInt64(n int64) {
+	fmt.Fprintf(w.w, ":%d\r\n", n)
+}
+
 // WriteFloat writes a float
 func (w *Writer) WriteFloat(n float64) {
 	if w.resp3 {
@@ -462,6 +527,15 @@ func (w *Writer) WriteNull() {
 		return
 	}
 	fmt.Fprintf(w.w, "$-1\r\n")
+}
+
+// WriteNullArray writes a redis Null array: "*-1" in RESP2, and a Null in RESP3
+func (w *Writer) WriteNullArray() {
+	if w.resp3 {
+		w.WriteNull()
+		return
+	}
+	w.WriteLen(-1)
 }
 
 // WriteInline writes a redis inline string

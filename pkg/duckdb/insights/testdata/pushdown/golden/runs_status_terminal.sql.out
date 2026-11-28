@@ -1,0 +1,13 @@
+{
+  "description": "Status is mutable, but a run that reached a terminal status never leaves it, so terminal values are pushed.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status = 'Completed'",
+        "physical": "runs.status = 'Completed'",
+        "pushed": true
+      }
+    ]
+  }
+}

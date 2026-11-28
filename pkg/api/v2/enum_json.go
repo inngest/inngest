@@ -10,6 +10,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -49,6 +50,13 @@ func (responseEnumMarshaler) StreamContentType(any) string {
 }
 
 func (m responseEnumMarshaler) Marshal(v any) ([]byte, error) {
+	switch v.(type) {
+	case *apiv2.ListEventsResponse, *apiv2.GetEventResponse, *apiv2.ListAppSyncsResponse, *apiv2.GetAppSyncResponse, *apiv2.GetAccountUsageResponse:
+		// preserve user strings, empty lists, and zero counts
+		marshaler := *m.JSONPb
+		marshaler.EmitDefaultValues = true
+		return marshaler.Marshal(v)
+	}
 	data, err := m.JSONPb.Marshal(v)
 	if err != nil {
 		return nil, err

@@ -48,21 +48,35 @@ type constraintCacheItem struct {
 	// capacity manager's idempotency handling to take effect even when the
 	// in-process cache is deployed.
 	addedAt time.Time
+	// requestedAt records when the Acquire that produced this entry was sent.
+	// The entry may reflect any capacity state from then until addedAt, so
+	// releases after requestedAt can make it stale.
+	requestedAt time.Time
 }
 
-type skipCacheLookupKey struct{}
+type limitingConstraintCacheCutoffKey struct{}
 
-// WithoutLimitingConstraintCacheLookup marks ctx so that Acquire is not
-// answered from cached exhaustion. Use it when the caller knows capacity was
-// released after an entry could have been cached, such as a queue pass woken
-// by a capacity release. Exhausted results are still cached.
+// skipAllCachedExhaustion is a cutoff after any cache entry's requestedAt.
+var skipAllCachedExhaustion = time.Unix(1<<62, 0)
+
+// WithoutLimitingConstraintCacheLookup marks ctx so that Acquire is never
+// answered from cached exhaustion. Exhausted results are still cached.
 func WithoutLimitingConstraintCacheLookup(ctx context.Context) context.Context {
-	return context.WithValue(ctx, skipCacheLookupKey{}, true)
+	return WithoutLimitingConstraintCacheBefore(ctx, skipAllCachedExhaustion)
 }
 
-func skipsLimitingConstraintCacheLookup(ctx context.Context) bool {
-	skip, _ := ctx.Value(skipCacheLookupKey{}).(bool)
-	return skip
+// WithoutLimitingConstraintCacheBefore marks ctx so that Acquire is not
+// answered from exhaustion cached before cutoff. Use it when the caller knows
+// capacity was released before cutoff, such as a queue pass woken by a capacity
+// release. Exhaustion cached at or after cutoff is still honored, so a pass
+// that refills a constraint stops calling the manager for it.
+func WithoutLimitingConstraintCacheBefore(ctx context.Context, cutoff time.Time) context.Context {
+	return context.WithValue(ctx, limitingConstraintCacheCutoffKey{}, cutoff)
+}
+
+func limitingConstraintCacheCutoff(ctx context.Context) time.Time {
+	cutoff, _ := ctx.Value(limitingConstraintCacheCutoffKey{}).(time.Time)
+	return cutoff
 }
 
 type ConstraintCacheOption func(c *constraintCache)
@@ -131,24 +145,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	recentlyLimited := make([]ConstraintItem, 0)
 	var retryAfter time.Time
 
-	lookup := req.Constraints
-	if skipsLimitingConstraintCacheLookup(ctx) {
-		// The caller was woken because capacity was just released, which a
-		// cached exhaustion would not reflect. Ask the manager instead; its
-		// result still refreshes the cache below.
-		lookup = nil
-		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"op":              "skipped_release",
-				"source_location": req.Source.Location.String(),
-				"source_service":  req.Source.Service.String(),
-			},
-		})
-	}
+	cutoff := limitingConstraintCacheCutoff(ctx)
 
 	// Return immediately on first cache hit since any exhausted constraint blocks the request
-	for _, ci := range lookup {
+	for _, ci := range req.Constraints {
 		// Skip constraints that don't pass the filter
 		if l.shouldCache != nil && !l.shouldCache(ci) {
 			continue
@@ -187,6 +187,22 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
 				PkgName: pkgName,
 				Tags:    tags,
+			})
+			continue
+		}
+
+		// Capacity was released after the request behind this entry was sent,
+		// so it may no longer be exhausted. The manager's answer refreshes the
+		// entry below.
+		if val.requestedAt.Before(cutoff) {
+			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"op":              "skipped_release",
+					"source_location": req.Source.Location.String(),
+					"source_service":  req.Source.Service.String(),
+					"constraint":      ci.MetricsIdentifier(),
+				},
 			})
 			continue
 		}
@@ -247,6 +263,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		Tags:    tags,
 	})
 
+	requestedAt := l.clock.Now()
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
 		return nil, err
@@ -280,9 +297,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		l.cache.Set(
 			cacheKey,
 			&constraintCacheItem{
-				retryAfter: res.RetryAfter,
-				constraint: ci,
-				addedAt:    l.clock.Now(),
+				retryAfter:  res.RetryAfter,
+				constraint:  ci,
+				addedAt:     l.clock.Now(),
+				requestedAt: requestedAt,
 			},
 			cacheTTL,
 		)

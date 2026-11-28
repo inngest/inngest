@@ -11,7 +11,12 @@ export type ResizableProps = {
   maxSplitPercentage?: number;
   minSplitPercentage?: number;
   orientation: Orientation;
-  second: ReactNode;
+  // null/undefined collapses the second pane (and the drag notch), giving
+  // `first` the full width/height -- lets a caller keep `first` mounted at a
+  // stable position in the tree while toggling a side panel on and off,
+  // instead of conditionally swapping between <Resizable> and `first` alone
+  // (which would remount `first` and any state it owns).
+  second?: ReactNode | null;
   splitKey?: string;
 };
 
@@ -25,10 +30,11 @@ export function Resizable({
   splitKey,
 }: ResizableProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasSecondPane = second != null;
 
   useLayoutEffect(() => {
     const el = containerRef.current;
-    if (el === null) return;
+    if (el === null || !hasSecondPane) return;
 
     initializeSplitFromStorage(el, {
       defaultSplitPercentage,
@@ -36,7 +42,7 @@ export function Resizable({
       minSplitPercentage,
       splitKey,
     });
-  }, [defaultSplitPercentage, minSplitPercentage, maxSplitPercentage, splitKey]);
+  }, [defaultSplitPercentage, minSplitPercentage, maxSplitPercentage, splitKey, hasSecondPane]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
@@ -44,20 +50,24 @@ export function Resizable({
         <div
           className={cn(
             buildPaneMinClass(orientation),
-            'shrink-0 grow-0 basis-[var(--inngest-resizable-split,50%)]'
+            hasSecondPane ? 'shrink-0 grow-0 basis-[var(--inngest-resizable-split,50%)]' : 'flex-1'
           )}
         >
           {first}
         </div>
-        <div className={cn(buildPaneMinClass(orientation), 'flex-1')}>{second}</div>
+        {hasSecondPane && (
+          <div className={cn(buildPaneMinClass(orientation), 'flex-1')}>{second}</div>
+        )}
       </div>
-      <Notch
-        containerRef={containerRef}
-        maxSplitPercentage={maxSplitPercentage}
-        minSplitPercentage={minSplitPercentage}
-        orientation={orientation}
-        splitKey={splitKey}
-      />
+      {hasSecondPane && (
+        <Notch
+          containerRef={containerRef}
+          maxSplitPercentage={maxSplitPercentage}
+          minSplitPercentage={minSplitPercentage}
+          orientation={orientation}
+          splitKey={splitKey}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,205 @@
+package duckdb
+
+import (
+	"testing"
+
+	"github.com/apache/iceberg-go"
+	"github.com/apache/iceberg-go/catalog"
+	_ "github.com/apache/iceberg-go/catalog/rest"
+
+	"github.com/inngest/inngest/pkg/duckdb/schema"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
+
+	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/stretchr/testify/require"
+)
+
+// testLakeOptions returns driver.Options wired with a fresh Iceberg catalog
+// under t.TempDir(), so "inngest" resolves as a catalog name (see
+// driver.LakeAlias) and the migration's "inngest.<table>" DDL succeeds — the
+// same wiring setupDualWrite uses in production.
+func testLakeOptions(t *testing.T, binPath string) driver.Options {
+	return driver.Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+		Iceberg:    icebergtest.Start(t),
+	}
+}
+
+func TestMigrateCreatesStagingTables(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), testLakeOptions(t, binPath))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
+
+	for _, table := range []string{"runs", "run_trace_spans", "events"} {
+		rows, err := db.QueryContext(t.Context(), "SELECT * FROM "+driver.LakeAlias+"."+table+" LIMIT 0;")
+		require.NoErrorf(t, err, "table %s should exist and be queryable", table)
+		require.NoError(t, rows.Close())
+	}
+
+	// insights_* logical tables are parameterized table macros (see
+	// views.sql), invoked as table
+	// functions with (account_id, env_id) arguments rather than queried as
+	// bare tables.
+	for _, macro := range []string{
+		"insights_runs", "insights_events", "insights_metadata",
+		"insights_extended_trace_spans", "insights_step_attempts", "insights_steps",
+	} {
+		rows, err := db.QueryContext(t.Context(), "SELECT * FROM "+schema.MacroSchema+"."+macro+"(?, ?) LIMIT 0;",
+			"00000000-0000-4000-a000-000000000000", "00000000-0000-4000-b000-000000000000")
+		require.NoErrorf(t, err, "macro %s should exist and be queryable", macro)
+		require.NoError(t, rows.Close())
+	}
+}
+
+// TestMigrateInMemoryWithoutLake proves persist=false's whole point: the
+// same migration files run cleanly against a bare in-memory catalog with no
+// lake ATTACH at all, because the ENVSUB-wrapped Iceberg-only clauses
+// (PARTITIONED BY/WITH, which a plain duckdb table rejects) are
+// overridden to nothing, and the "inngest" schema Migrate creates directly
+// stands in for the catalog the lake ATTACH would otherwise have provided.
+func TestMigrateInMemoryWithoutLake(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), driver.Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeMemory))
+
+	for _, table := range []string{"runs", "run_trace_spans", "events", "run_metadata"} {
+		rows, err := db.QueryContext(t.Context(), "SELECT * FROM "+driver.LakeAlias+"."+table+" LIMIT 0;")
+		require.NoErrorf(t, err, "table %s should exist and be queryable", table)
+		require.NoError(t, rows.Close())
+	}
+}
+
+// TestMigrateInMemoryIsIdempotent mirrors TestMigrateIsIdempotent for the
+// persist=false path, guarding against the env-var override or schema
+// creation breaking on a second run.
+func TestMigrateInMemoryIsIdempotent(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), driver.Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeMemory))
+	require.NoError(t, Migrate(t.Context(), db, ModeMemory))
+}
+
+func TestMigrateIsIdempotent(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), testLakeOptions(t, binPath))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake)) // second call must be a no-op, not an error
+}
+
+// TestMigrateRejectsAnotherMode checks re-migrating a catalog in another
+// mode errors rather than silently keeping the first mode's macros.
+func TestMigrateRejectsAnotherMode(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), testLakeOptions(t, binPath))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeFlatLake))
+	require.NoError(t, Migrate(t.Context(), db, ModeFlatLake))
+	require.ErrorContains(t, Migrate(t.Context(), db, ModeRawLake), "migrated in mode flat_lake, not raw_lake")
+}
+
+// TestMigrateModeRawRunsCollapse checks raw_runs collapses a run's rows to
+// its latest in every mode but ModeFlatLake, whose runs are already one row per
+// run, and that insights_runs (which reads through raw_runs) follows.
+func TestMigrateModeRawRunsCollapse(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	cases := []struct {
+		mode Mode
+		want int
+	}{
+		{ModeMemory, 1},
+		{ModeRawLake, 1},
+		{ModeFlatLake, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.mode.String(), func(t *testing.T) {
+			// Every mode migrates concurrently, so each must keep its own env.
+			t.Parallel()
+			opts := testLakeOptions(t, binPath)
+			if tc.mode == ModeMemory {
+				opts = driver.Options{BinaryPath: binPath, DBFile: ":memory:"}
+			}
+			db, err := driver.Open(t.Context(), opts)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = db.Close() })
+			require.NoError(t, Migrate(t.Context(), db, tc.mode))
+
+			account, env := "00000000-0000-4000-a000-000000000000", "00000000-0000-4000-b000-000000000000"
+			for _, status := range []string{"Queued", "Completed"} {
+				_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.runs
+					(account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, bucket_at)
+					VALUES (?::UUID, ?::UUID, 'run-1', now(), now(), CASE WHEN ? = 'Completed' THEN now() END, uuid(), 'app', uuid(), 'fn', ?, '{}', '[]', now())`,
+					account, env, status, status)
+				require.NoError(t, err)
+			}
+
+			for _, q := range []string{
+				"SELECT count(*) FROM inngest_local.raw_runs()",
+				"SELECT count(*) FROM inngest_local.insights_runs('" + account + "', '" + env + "')",
+			} {
+				var n int
+				require.NoError(t, db.QueryRowContext(t.Context(), q).Scan(&n))
+				require.Equal(t, tc.want, n, q)
+			}
+		})
+	}
+}
+
+// TestLakeTableProperties checks the Iceberg table properties the migration
+// sets on the lake tables, read back from the catalog.
+func TestLakeTableProperties(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+	opts := testLakeOptions(t, binPath)
+	db, err := driver.Open(t.Context(), opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
+
+	cat, err := catalog.Load(t.Context(), "test", iceberg.Properties{"type": "rest", "uri": opts.Iceberg.URI, "token": opts.Iceberg.Token})
+	require.NoError(t, err)
+	for _, tbl := range []schema.Table{schema.Runs, schema.Spans, schema.Events, schema.RunMetadata} {
+		t.Run(tbl.Name, func(t *testing.T) {
+			lt, err := cat.LoadTable(t.Context(), catalog.ToIdentifier(driver.LakeNamespace, tbl.Name))
+			require.NoError(t, err)
+			props := lt.Properties()
+			require.Equal(t, "zstd", props["write.parquet.compression-codec"])
+			require.Equal(t, "false", props["commit.manifest-merge.enabled"])
+			// No declared sort order, compaction owns sorting.
+			require.True(t, lt.SortOrder().IsUnsorted(), "sort order %v", lt.SortOrder())
+		})
+	}
+
+	// No bucket_at default on a lake (it'd be frozen at CREATE), so a writer
+	// that forgets it fails instead of writing under every watermark.
+	_, err = db.ExecContext(t.Context(), `INSERT INTO inngest.events
+		(account_id, env_id, internal_id, received_at, source, event_id, event_name, event_v, event_ts)
+		VALUES (uuid(), uuid(), 'i', now(), 's', 'e', 'n', '1', now())`)
+	require.ErrorContains(t, err, "bucket_at")
+}

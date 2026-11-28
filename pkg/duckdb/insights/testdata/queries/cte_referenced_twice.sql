@@ -1,0 +1,1 @@
+WITH x AS (SELECT run_id, app_id FROM runs) SELECT a.run_id FROM x a JOIN x b ON a.app_id = b.app_id

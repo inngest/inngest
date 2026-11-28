@@ -1,0 +1,11 @@
+---
+urn: extension:io.substrait:extension_types
+types:
+  - name: point
+    structure:
+      latitude: i32
+      longitude: i32
+  - name: line
+    structure:
+      start: u!point
+      end: u!point

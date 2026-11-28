@@ -26,6 +26,7 @@ export const methodTypes = {
   Api: 'API',
   Connect: 'CONNECT',
   Serve: 'SERVE',
+  InngestServe: 'INNGEST_SERVE',
 } as const;
 
 export type ConnectionType = (typeof methodTypes)[keyof typeof methodTypes];

@@ -1156,3 +1156,123 @@ func TestQueueRequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
+
+func TestRequeueMatchItemLeaseRejectsStaleScavenger(t *testing.T) {
+	for _, observedLease := range []bool{false, true} {
+		t.Run(fmt.Sprintf("observed_lease=%t", observedLease), func(t *testing.T) {
+			r, rc := initRedis(t)
+			t.Cleanup(rc.Close)
+			clock := clockwork.NewFakeClock()
+			_, shard := newQueue(t, rc, osqueue.WithClock(clock))
+			ctx := t.Context()
+			item := osqueue.QueueItem{ID: "stale-scavenger", FunctionID: uuid.New(), WorkspaceID: uuid.New(), Data: osqueue.Item{Kind: osqueue.KindSleep}}
+			item.Data.Identifier.AccountID = uuid.New()
+			item.Data.Identifier.WorkflowID, item.Data.Identifier.WorkspaceID = item.FunctionID, item.WorkspaceID
+			item.Data.Identifier.RunID = ulid.Make()
+			item, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Hour), osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.NoError(t, err)
+			if observedLease {
+				_, err := shard.Lease(ctx, item, time.Minute, clock.Now())
+				require.NoError(t, err)
+				clock.Advance(2 * time.Minute)
+			}
+			stale, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			// The scavenger has read its snapshot; another owner now claims it.
+			_, err = shard.Lease(ctx, item, time.Minute, clock.Now())
+			require.NoError(t, err)
+			before := r.Dump()
+			err = shard.Requeue(ctx, *stale, clock.Now(), osqueue.RequeueMatchItemLease())
+			require.ErrorIs(t, err, osqueue.ErrQueueItemLeaseMismatch)
+			require.Equal(t, before, r.Dump(), "a stale scavenger must preserve the new lease and all indexes")
+			current, err := shard.LoadQueueItem(ctx, item.ID)
+			require.NoError(t, err)
+			require.NoError(t, shard.Requeue(ctx, *current, clock.Now().Add(time.Hour), osqueue.RequeueMatchItemLease()))
+		})
+	}
+}
+
+func TestScavengerPreservesFreshLeaseWithExpiredIndex(t *testing.T) {
+	r, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	clock := clockwork.NewFakeClock()
+	_, shard := newQueue(t, rc, osqueue.WithClock(clock))
+	ctx := t.Context()
+	item := osqueue.QueueItem{ID: "fresh-lease-stale-index", FunctionID: uuid.New(), WorkspaceID: uuid.New(), Data: osqueue.Item{Kind: osqueue.KindSleep}}
+	item.Data.Identifier.AccountID, item.Data.Identifier.RunID = uuid.New(), ulid.Make()
+	item.Data.Identifier.WorkflowID, item.Data.Identifier.WorkspaceID = item.FunctionID, item.WorkspaceID
+	item, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Hour), osqueue.EnqueueOpts{PassthroughJobId: true})
+	require.NoError(t, err)
+	_, err = shard.Lease(ctx, item, time.Minute, clock.Now())
+	require.NoError(t, err)
+	kg := shard.Client().KeyGenerator()
+	_, err = r.ZAdd(kg.PartitionScavengerIndex(item.FunctionID.String()), float64(clock.Now().Add(-time.Minute).UnixMilli()), item.ID)
+	require.NoError(t, err)
+	_, err = r.ZAdd(kg.ConcurrencyIndex(), float64(clock.Now().Add(-time.Minute).UnixMilli()), item.FunctionID.String())
+	require.NoError(t, err)
+	before := r.Dump()
+	count, err := shard.Scavenge(ctx, 100)
+	require.NoError(t, err)
+	require.Zero(t, count)
+	require.Equal(t, before, r.Dump(), "expired index membership cannot clear a live lease")
+	clock.Advance(2 * time.Minute)
+	count, err = shard.Scavenge(ctx, 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "the actual lease remains recoverable after expiry")
+}
+
+func TestScavengerMissingThrottleEventChecksObservedLease(t *testing.T) {
+	for _, observedLease := range []bool{false, true} {
+		for _, replaced := range []bool{false, true} {
+			t.Run(fmt.Sprintf("observed_lease=%t/replaced=%t", observedLease, replaced), func(t *testing.T) {
+				r, rc := initRedis(t)
+				t.Cleanup(rc.Close)
+				clock := clockwork.NewFakeClock()
+				var shard RedisQueueShard
+				var beforeCleanup string
+				_, shard = newQueue(t, rc, osqueue.WithClock(clock),
+					osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }),
+					osqueue.WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+						if replaced {
+							current, err := shard.LoadQueueItem(ctx, item.ID)
+							require.NoError(t, err)
+							_, err = shard.Lease(ctx, *current, time.Minute, clock.Now())
+							require.NoError(t, err)
+						}
+						beforeCleanup = r.Dump()
+						return nil, state.ErrEventNotFound
+					}))
+				ctx := t.Context()
+				item := osqueue.QueueItem{ID: "missing-throttle-event", FunctionID: uuid.New(), WorkspaceID: uuid.New(), Data: osqueue.Item{Kind: osqueue.KindStart, Throttle: &osqueue.Throttle{Key: "legacy", Limit: 10, Burst: 1, Period: 60}}}
+				item.Data.Identifier.AccountID, item.Data.Identifier.RunID = uuid.New(), ulid.Make()
+				item.Data.Identifier.WorkflowID, item.Data.Identifier.WorkspaceID = item.FunctionID, item.WorkspaceID
+				item, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Hour), osqueue.EnqueueOpts{PassthroughJobId: true})
+				require.NoError(t, err)
+				if observedLease {
+					_, err := shard.Lease(ctx, item, time.Minute, clock.Now())
+					require.NoError(t, err)
+					clock.Advance(2 * time.Minute)
+				} else {
+					kg := shard.Client().KeyGenerator()
+					_, err = r.ZAdd(kg.PartitionScavengerIndex(item.FunctionID.String()), float64(clock.Now().Add(-time.Minute).UnixMilli()), item.ID)
+					require.NoError(t, err)
+					_, err = r.ZAdd(kg.ConcurrencyIndex(), float64(clock.Now().Add(-time.Minute).UnixMilli()), item.FunctionID.String())
+					require.NoError(t, err)
+				}
+				count, err := shard.Scavenge(ctx, 100)
+				require.NoError(t, err)
+				require.NotEmpty(t, beforeCleanup, "scavenging must take the missing-event cleanup path")
+				current, err := shard.LoadQueueItem(ctx, item.ID)
+				if replaced {
+					require.Zero(t, count)
+					require.NoError(t, err)
+					require.True(t, current.IsLeased(clock.Now()))
+					require.Equal(t, beforeCleanup, r.Dump(), "cleanup must not mutate a newer owner's job, indexes or locks")
+				} else {
+					require.Equal(t, 1, count)
+					require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound, "the unchanged observed lease, including expired or absent, can be cleaned up")
+				}
+			})
+		}
+	}
+}

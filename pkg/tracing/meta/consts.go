@@ -10,13 +10,17 @@ const (
 	// should store any errors under this attribute.
 	InternalError = "internal.error"
 
-	// Top-level span names
+	// Top-level span names. These are the real (v2) production tracing
+	// pipeline's names — pkg/tracing/v3 (the DuckDB dual-write POC's own
+	// TracerProvider) has its own, separate const block for span names that
+	// don't exist here, aliasing the ones below it as needed.
 	SpanNameRun              = "executor.run"
 	SpanNameStepDiscovery    = "executor.step.discovery"
 	SpanNameStep             = "executor.step"
 	SpanNameExecution        = "executor.execution"
 	SpanNameStepFailed       = "executor.failed"
 	SpanNameDefer            = "executor.defer"
+	SpanNameTick             = "executor.tick"
 	SpanNameDynamicExtension = "EXTEND"
 	SpanNameUserland         = "userland"
 	SpanNameMetadata         = "metadata"

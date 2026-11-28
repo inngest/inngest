@@ -1,0 +1,653 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package file
+
+import (
+    "fmt"
+
+    "github.com/apache/arrow-go/v18/arrow/bitutil"
+    "github.com/apache/arrow-go/v18/internal/utils"
+    "github.com/apache/arrow-go/v18/parquet"
+    "github.com/apache/arrow-go/v18/parquet/metadata"
+    "github.com/apache/arrow-go/v18/parquet/internal/encoding"
+    format "github.com/apache/arrow-go/v18/parquet/internal/gen-go/parquet"
+)
+
+{{range .In}}
+// {{.Name}}ColumnChunkWriter is the typed interface for writing columns to a parquet
+// file for {{.Name}} columns.
+type {{.Name}}ColumnChunkWriter struct {
+  columnWriter
+}
+
+// New{{.Name}}ColumnChunkWriter constructs a new column writer using the given metadata chunk builder
+// provided Pager, and desired encoding and properties.
+//
+// This will likely not be often called directly by consumers but rather used internally.
+//
+// ColumnChunkWriters should be acquired by using fileWriter and RowGroupWriter objects
+func New{{.Name}}ColumnChunkWriter(meta *metadata.ColumnChunkMetaDataBuilder, pager PageWriter, useDict bool, enc parquet.Encoding, props *parquet.WriterProperties) *{{.Name}}ColumnChunkWriter {
+{{- if eq .Name "Boolean"}}
+  if useDict {
+    panic("cannot use dictionary for boolean writer")
+  }
+
+{{- end}}
+  ret := &{{.Name}}ColumnChunkWriter{columnWriter: newColumnWriterBase(meta, pager, useDict, enc, props)}
+  ret.currentEncoder = encoding.{{.Name}}EncoderTraits.Encoder(format.Encoding(enc), useDict, meta.Descr(), props.Allocator())
+  if useDict && ret.bloomFilter != nil {
+    ret.currentEncoder.(encoding.DictEncoder).EnableDictionaryReferenceTracking()
+  }
+  return ret
+}
+
+
+// WriteBatch writes a batch of repetition levels, definition levels, and values to the
+// column.
+// `def_levels` (resp. `rep_levels`) can be null if the column's max definition level
+// (resp. max repetition level) is 0.
+// If not null, each of `def_levels` and `rep_levels` must have at least
+// `len(values)`.
+//
+// The number of physical values written (taken from `values`) is returned.
+// It can be smaller than `len(values)` is there are some undefined values.
+//
+// When using DataPageV2 to write a repeated column rows cannot cross data
+// page boundaries. To ensure this the writer ensures that every batch of
+// w.props.BatchSize begins and ends on a row boundary. As a consequence,
+// the first value to WriteBatch must always be the beginning of a row if
+// repLevels is not nil (repLevels[0] should always be 0) and using DataPageV2.
+func (w *{{.Name}}ColumnChunkWriter) WriteBatch(values []{{.name}}, defLevels, repLevels []int16) (valueOffset int64, err error) {
+  defer func() {
+    if r := recover(); r != nil {
+      err = utils.FormatRecoveredError("unknown error type", r)
+    }
+  }()
+  // We check for DataPage limits only after we have inserted the values. If a user
+  // writes a large number of values, the DataPage size can be much above the limit.
+  // The purpose of this chunking is to bound this. Even if a user writes large number
+  // of values, the chunking will ensure the AddDataPage() is called at a reasonable
+  // pagesize limit
+  var n int64
+  switch {
+  case defLevels != nil:
+    n = int64(len(defLevels))
+  case values != nil:
+    n = int64(len(values))
+  }
+{{- if .isByteArray}}
+  // For variable-length types, we use adaptive batch sizing to ensure
+  // each batch's encoded data stays well within int32 range. This prevents
+  // overflow in FlushCurrentPage when computing uncompressed page size.
+  const maxSafeBatchDataSize int64 = 1 << 30 // 1GB
+
+  batchSize := w.props.WriteBatchSize()
+  maxDefLevel := w.descr.MaxDefinitionLevel()
+  requiresRowAlignment := (w.props.DataPageVersion() != parquet.DataPageV1 ||
+    w.props.PageIndexEnabledFor(w.descr.Path())) &&
+    repLevels != nil && w.descr.MaxRepetitionLevel() > 0
+  levelOffset := int64(0)
+
+  // Repeated writes that produce an offset index align batches on row boundaries
+  // below. n comes from defLevels/values, not repLevels, so clamp repLevels to n
+  // to stop an oversized slice from growing a batch past n (spilling extra levels
+  // or reading out of range). Mirrors columnWriter.doBatches.
+  if requiresRowAlignment {
+    if int64(len(repLevels)) < n {
+      panic("columnwriter: not enough repetition levels for batch to write")
+    }
+    if n == 0 {
+      return
+    }
+    repLevels = repLevels[:n]
+    if repLevels[0] != 0 {
+      panic("columnwriter: row-aligned batch writing must start at a row boundary")
+    }
+  }
+
+  for levelOffset < n {
+    remaining := n - levelOffset
+    batch := min(remaining, batchSize)
+
+    // Scan values to find safe batch boundary
+    if values != nil {
+      valScan := valueOffset
+      var cumDataSize int64
+      for li := int64(0); li < batch; li++ {
+        isValue := defLevels == nil || maxDefLevel == 0 ||
+          defLevels[levelOffset+li] == maxDefLevel
+        if isValue && valScan < int64(len(values)) {
+{{- if eq .Name "ByteArray"}}
+          valSize := int64(len(values[valScan])) + 4
+{{- else}}
+          valSize := int64(w.descr.TypeLength()) + 4
+{{- end}}
+          if cumDataSize+valSize > maxSafeBatchDataSize && li > 0 {
+            batch = li
+            break
+          }
+          cumDataSize += valSize
+          valScan++
+        }
+      }
+    }
+
+    // Row-boundary alignment: a repeated row must not span an indexed page boundary,
+    // so snap the batch onto the nearest row boundary (or keep a single wide row
+    // whole). See alignBatchToRowBoundary in column_writer.go.
+    if requiresRowAlignment {
+      batch = alignBatchToRowBoundary(repLevels, levelOffset, batch)
+    }
+    if batch < 1 {
+      batch = 1
+    }
+
+    // Process batch
+    toWrite := w.writeLevels(batch, levelSliceOrNil(defLevels, levelOffset, batch),
+      levelSliceOrNil(repLevels, levelOffset, batch))
+    var vals []{{.name}}
+    if values != nil {
+      vals = values[valueOffset : valueOffset+toWrite]
+    }
+    w.writeValues(vals, batch-toWrite)
+    if err := w.commitWriteAndCheckPageLimit(batch, toWrite); err != nil {
+      panic(err)
+    }
+    valueOffset += toWrite
+    w.checkDictionarySizeLimit()
+    levelOffset += batch
+  }
+{{- else}}
+  w.doBatches(n, repLevels, func(offset, batch int64) {
+    var vals []{{.name}}
+
+    toWrite := w.writeLevels(batch, levelSliceOrNil(defLevels, offset, batch), levelSliceOrNil(repLevels, offset, batch))
+    if values != nil {
+      vals = values[valueOffset:valueOffset+toWrite]
+    }
+
+    w.writeValues(vals, batch - toWrite)
+    if err := w.commitWriteAndCheckPageLimit(batch, toWrite); err != nil {
+        panic(err)
+    }
+
+    valueOffset += toWrite
+    w.checkDictionarySizeLimit()
+  })
+{{- end}}
+  return
+}
+
+// WriteBatchSpaced writes a batch of repetition levels, definition levels, and values to the
+// column.
+//
+// In comparison to WriteBatch the length of repetition and definition levels
+// is the same as of the number of values read for max_definition_level == 1.
+// In the case of max_definition_level > 1, the repetition and definition
+// levels are larger than the values but the values include the null entries
+// with definition_level == (max_definition_level - 1). Thus we have to differentiate
+// in the parameters of this function if the input has the length of num_values or the
+// _number of rows in the lowest nesting level_.
+//
+// In the case that the most inner node in the Parquet is required, the _number of rows
+// in the lowest nesting level_ is equal to the number of non-null values. If the
+// inner-most schema node is optional, the _number of rows in the lowest nesting level_
+// also includes all values with definition_level == (max_definition_level - 1).
+//
+// Deprecated: WriteBatchSpaced reports a write failure by panicking. Use
+// [{{.Name}}ColumnChunkWriter.WriteBatchSpacedWithError] instead, which returns
+// the failure as an error.
+func (w *{{.Name}}ColumnChunkWriter) WriteBatchSpaced(values []{{.name}}, defLevels, repLevels []int16, validBits []byte, validBitsOffset int64) {
+  if _, err := w.WriteBatchSpacedWithError(values, defLevels, repLevels, validBits, validBitsOffset); err != nil {
+    panicCause(err)
+  }
+}
+
+// WriteBatchSpacedWithError behaves like WriteBatchSpaced but reports a write
+// failure as an error instead of panicking or silently discarding it,
+// mirroring the error handling of WriteBatch. Prefer this method on write
+// paths whose sink may fail (for example a network-attached writer).
+func (w *{{.Name}}ColumnChunkWriter) WriteBatchSpacedWithError(values []{{.name}}, defLevels, repLevels []int16, validBits []byte, validBitsOffset int64) (valueOffset int64, err error) {
+  defer func() {
+    if r := recover(); r != nil {
+      err = utils.FormatRecoveredError("unknown error type", r)
+    }
+  }()
+  length := len(defLevels)
+  if defLevels == nil {
+    length = len(values)
+  }
+{{- if .isByteArray}}
+  const maxSafeBatchDataSize int64 = 1 << 30 // 1GB
+
+  batchSize := w.props.WriteBatchSize()
+  requiresRowAlignment := (w.props.DataPageVersion() != parquet.DataPageV1 ||
+    w.props.PageIndexEnabledFor(w.descr.Path())) &&
+    repLevels != nil && w.descr.MaxRepetitionLevel() > 0
+  levelOffset := int64(0)
+  n := int64(length)
+
+  // Clamp repLevels to n; see WriteBatch. Mirrors columnWriter.doBatches.
+  if requiresRowAlignment {
+    if int64(len(repLevels)) < n {
+      panic("columnwriter: not enough repetition levels for batch to write")
+    }
+    if n == 0 {
+      return
+    }
+    repLevels = repLevels[:n]
+    if repLevels[0] != 0 {
+      panic("columnwriter: row-aligned batch writing must start at a row boundary")
+    }
+  }
+
+  for levelOffset < n {
+    remaining := n - levelOffset
+    batch := min(remaining, batchSize)
+
+    if values != nil {
+      var cumDataSize int64
+      for vi := int64(0); vi < batch && valueOffset+vi < int64(len(values)); vi++ {
+{{- if eq .Name "ByteArray"}}
+        valSize := int64(len(values[valueOffset+vi])) + 4
+{{- else}}
+        valSize := int64(w.descr.TypeLength()) + 4
+{{- end}}
+        if cumDataSize+valSize > maxSafeBatchDataSize && vi > 0 {
+          batch = vi
+          break
+        }
+        cumDataSize += valSize
+      }
+    }
+
+    // Row-boundary alignment: a repeated row must not span an indexed page boundary,
+    // so snap the batch onto the nearest row boundary (or keep a single wide row
+    // whole). See alignBatchToRowBoundary in column_writer.go.
+    if requiresRowAlignment {
+      batch = alignBatchToRowBoundary(repLevels, levelOffset, batch)
+    }
+    if batch < 1 {
+      batch = 1
+    }
+
+    info := w.maybeCalculateValidityBits(levelSliceOrNil(defLevels, levelOffset, batch), batch)
+
+    w.writeLevelsSpaced(batch, levelSliceOrNil(defLevels, levelOffset, batch), levelSliceOrNil(repLevels, levelOffset, batch))
+    var vals []{{.name}}
+    if values != nil {
+      vals = values[valueOffset : valueOffset+info.numSpaced()]
+    }
+
+    if w.bitsBuffer != nil {
+      w.writeValuesSpaced(vals, info.batchNum, batch, w.bitsBuffer.Bytes(), 0)
+    } else {
+      w.writeValuesSpaced(vals, info.batchNum, batch, validBits, validBitsOffset+valueOffset)
+    }
+    if err := w.commitWriteAndCheckPageLimit(batch, info.numSpaced()); err != nil {
+      panic(err)
+    }
+    valueOffset += info.numSpaced()
+
+    w.checkDictionarySizeLimit()
+    levelOffset += batch
+  }
+{{- else}}
+  w.doBatches(int64(length), repLevels, func(offset, batch int64) {
+    var vals []{{.name}}
+    info := w.maybeCalculateValidityBits(levelSliceOrNil(defLevels, offset, batch), batch)
+
+    w.writeLevelsSpaced(batch, levelSliceOrNil(defLevels, offset, batch), levelSliceOrNil(repLevels, offset, batch))
+    if values != nil {
+      vals = values[valueOffset:valueOffset+info.numSpaced()]
+    }
+
+    if w.bitsBuffer != nil {
+      w.writeValuesSpaced(vals, info.batchNum, batch, w.bitsBuffer.Bytes(), 0)
+    } else {
+      w.writeValuesSpaced(vals, info.batchNum, batch, validBits, validBitsOffset+valueOffset)
+    }
+    if err := w.commitWriteAndCheckPageLimit(batch, info.numSpaced()); err != nil {
+      panic(err)
+    }
+    valueOffset += info.numSpaced()
+
+    w.checkDictionarySizeLimit()
+  })
+{{- end}}
+  return
+}
+
+{{if eq .Name "Boolean"}}
+// WriteBitmapBatch writes boolean values directly from a bitmap without converting to []bool.
+// This avoids the 8x memory overhead and provides significant performance improvements.
+// numValues specifies the number of boolean values to write from the bitmap.
+func (w *{{.Name}}ColumnChunkWriter) WriteBitmapBatch(bitmap []byte, bitmapOffset int64, numValues int, defLevels, repLevels []int16) (valueOffset int64, err error) {
+  defer func() {
+    if r := recover(); r != nil {
+      err = utils.FormatRecoveredError("unknown error type", r)
+    }
+  }()
+
+  var n int64
+  switch {
+  case defLevels != nil:
+    n = int64(len(defLevels))
+  default:
+    n = int64(numValues)
+  }
+
+  w.doBatches(n, repLevels, func(offset, batch int64) {
+    toWrite := w.writeLevels(batch, levelSliceOrNil(defLevels, offset, batch), levelSliceOrNil(repLevels, offset, batch))
+
+    w.writeBitmapValues(bitmap, bitmapOffset+valueOffset, toWrite, batch-toWrite)
+    if err := w.commitWriteAndCheckPageLimit(batch, toWrite); err != nil {
+      panic(err)
+    }
+
+    valueOffset += toWrite
+    w.checkDictionarySizeLimit()
+  })
+  return
+}
+
+// WriteBitmapBatchSpaced writes boolean values from a bitmap with validity information.
+// numValues specifies the total number of values (including nulls) to process.
+//
+// Deprecated: WriteBitmapBatchSpaced reports a write failure by panicking. Use
+// [{{.Name}}ColumnChunkWriter.WriteBitmapBatchSpacedWithError] instead, which
+// returns the failure as an error.
+func (w *{{.Name}}ColumnChunkWriter) WriteBitmapBatchSpaced(bitmap []byte, bitmapOffset int64, numValues int, defLevels, repLevels []int16, validBits []byte, validBitsOffset int64) {
+  if _, err := w.WriteBitmapBatchSpacedWithError(bitmap, bitmapOffset, numValues, defLevels, repLevels, validBits, validBitsOffset); err != nil {
+    panicCause(err)
+  }
+}
+
+// WriteBitmapBatchSpacedWithError behaves like WriteBitmapBatchSpaced but
+// reports a write failure as an error instead of panicking or silently
+// discarding it, mirroring the error handling of WriteBatch. Prefer this
+// method on write paths whose sink may fail.
+func (w *{{.Name}}ColumnChunkWriter) WriteBitmapBatchSpacedWithError(bitmap []byte, bitmapOffset int64, numValues int, defLevels, repLevels []int16, validBits []byte, validBitsOffset int64) (valueOffset int64, err error) {
+  defer func() {
+    if r := recover(); r != nil {
+      err = utils.FormatRecoveredError("unknown error type", r)
+    }
+  }()
+  length := len(defLevels)
+  if defLevels == nil {
+    length = numValues
+  }
+
+  w.doBatches(int64(length), repLevels, func(offset, batch int64) {
+    info := w.maybeCalculateValidityBits(levelSliceOrNil(defLevels, offset, batch), batch)
+
+    w.writeLevelsSpaced(batch, levelSliceOrNil(defLevels, offset, batch), levelSliceOrNil(repLevels, offset, batch))
+
+    if w.bitsBuffer != nil {
+      w.writeBitmapValuesSpaced(bitmap, bitmapOffset+valueOffset, info.batchNum, batch, w.bitsBuffer.Bytes(), 0)
+    } else {
+      w.writeBitmapValuesSpaced(bitmap, bitmapOffset+valueOffset, info.batchNum, batch, validBits, validBitsOffset+valueOffset)
+    }
+
+    if err := w.commitWriteAndCheckPageLimit(batch, info.numSpaced()); err != nil {
+      panic(err)
+    }
+    valueOffset += info.numSpaced()
+
+    w.checkDictionarySizeLimit()
+  })
+  return
+}
+
+{{end}}
+func (w *{{.Name}}ColumnChunkWriter) WriteDictIndices(indices arrow.Array, defLevels, repLevels []int16) (err error) {
+  defer func() {
+    if r := recover(); r != nil {
+      err = utils.FormatRecoveredError("unknown error type", r)
+    }
+  }()
+
+  valueOffset := int64(0)
+  length := len(defLevels)
+  if defLevels == nil {
+    length = indices.Len()
+  }
+
+  dictEncoder := w.currentEncoder.(encoding.DictEncoder)
+
+  w.doBatches(int64(length), repLevels, func(offset, batch int64) {
+    info := w.maybeCalculateValidityBits(levelSliceOrNil(defLevels, offset, batch), batch)
+
+    writeableIndices := array.NewSlice(indices, valueOffset, valueOffset+info.numSpaced())
+    defer writeableIndices.Release()
+    writeableIndices = w.maybeReplaceValidity(writeableIndices, info.nullCount)
+    defer writeableIndices.Release()
+
+    if err := dictEncoder.PutIndices(writeableIndices); err != nil {
+      panic(err) // caught above
+    }
+
+    w.writeLevelsSpaced(batch, levelSliceOrNil(defLevels, offset, batch), levelSliceOrNil(repLevels, offset, batch))
+
+    if err := w.commitWriteAndCheckPageLimit(batch, info.batchNum); err != nil {
+      panic(err)
+    }
+
+    valueOffset += info.numSpaced()
+  })
+
+  return
+}
+
+func (w *{{.Name}}ColumnChunkWriter) writeValues(values []{{.name}}, numNulls int64) {
+  w.currentEncoder.(encoding.{{.Name}}Encoder).Put(values)
+  if w.pageStatistics != nil {
+{{- if ne .Name "FixedLenByteArray"}}
+    w.pageStatistics.(*metadata.{{.Name}}Statistics).Update(values, numNulls)
+{{- else}}
+    if w.Descr().LogicalType().Equals(schema.Float16LogicalType{}) {
+      w.pageStatistics.(*metadata.Float16Statistics).Update(values, numNulls)
+    } else {
+      w.pageStatistics.(*metadata.{{.Name}}Statistics).Update(values, numNulls)
+    }
+{{- end}}
+  }
+  if w.bloomFilter != nil && w.currentEncoder.Encoding() != parquet.Encodings.PlainDict {
+    metadata.InsertHashes(w.bloomFilter, values)
+  }
+}
+
+func (w *{{.Name}}ColumnChunkWriter) writeValuesSpaced(spacedValues []{{.name}}, numRead, numValues int64, validBits []byte, validBitsOffset int64) {
+  if len(spacedValues) != int(numRead) {
+    w.currentEncoder.(encoding.{{.Name}}Encoder).PutSpaced(spacedValues, validBits, validBitsOffset)
+  } else {
+    w.currentEncoder.(encoding.{{.Name}}Encoder).Put(spacedValues)
+  }
+  if w.pageStatistics != nil {
+    nulls := numValues - numRead
+{{- if ne .Name "FixedLenByteArray"}}
+    w.pageStatistics.(*metadata.{{.Name}}Statistics).UpdateSpaced(spacedValues, validBits, validBitsOffset, nulls)
+{{- else}}
+    if w.Descr().LogicalType().Equals(schema.Float16LogicalType{}) {
+      w.pageStatistics.(*metadata.Float16Statistics).UpdateSpaced(spacedValues, validBits, validBitsOffset, nulls)
+    } else {
+      w.pageStatistics.(*metadata.{{.Name}}Statistics).UpdateSpaced(spacedValues, validBits, validBitsOffset, nulls)
+    }
+{{- end}}
+  }
+  if w.bloomFilter != nil && w.currentEncoder.Encoding() != parquet.Encodings.PlainDict {
+    metadata.InsertSpacedHashes(w.bloomFilter, numRead, spacedValues, validBits, validBitsOffset)
+  }
+}
+
+{{if eq .Name "Boolean"}}
+// writeBitmapValues writes boolean values directly from a bitmap
+func (w *{{.Name}}ColumnChunkWriter) writeBitmapValues(bitmap []byte, bitmapOffset int64, numValues, numNulls int64) {
+  // Check if encoder supports bitmap interface
+  type bitmapEncoder interface {
+    PutBitmap(bitmap []byte, offset int64, length int64)
+  }
+
+  if enc, ok := w.currentEncoder.(bitmapEncoder); ok {
+    enc.PutBitmap(bitmap, bitmapOffset, numValues)
+  } else {
+    // Fallback: convert to []bool (slower but compatible)
+    values := make([]bool, numValues)
+    for i := int64(0); i < numValues; i++ {
+      values[i] = bitutil.BitIsSet(bitmap, int(bitmapOffset+i))
+    }
+    w.currentEncoder.(encoding.BooleanEncoder).Put(values)
+  }
+
+  // Update statistics and bloom filter using bitmap-aware methods
+  if w.pageStatistics != nil {
+    w.pageStatistics.(*metadata.BooleanStatistics).UpdateFromBitmap(bitmap, bitmapOffset, numValues, numNulls)
+  }
+  if w.bloomFilter != nil {
+    metadata.InsertHashesFromBitmap(w.bloomFilter, bitmap, bitmapOffset, numValues)
+  }
+}
+
+// writeBitmapValuesSpaced writes boolean values from a bitmap with validity information
+func (w *{{.Name}}ColumnChunkWriter) writeBitmapValuesSpaced(bitmap []byte, bitmapOffset int64, numRead, numValues int64, validBits []byte, validBitsOffset int64) {
+  // Try to use bitmap-aware encoder interface if available
+  type bitmapSpacedEncoder interface {
+    PutSpacedBitmap(bitmap []byte, bitmapOffset int64, numValues int64, validBits []byte, validBitsOffset int64) int64
+  }
+
+  if enc, ok := w.currentEncoder.(bitmapSpacedEncoder); ok {
+    // Direct bitmap path - no []bool conversion!
+    enc.PutSpacedBitmap(bitmap, bitmapOffset, numValues, validBits, validBitsOffset)
+  } else {
+    // Fallback: convert to []bool for encoders that don't support bitmap interface
+    spacedValues := make([]bool, numValues)
+    for i := int64(0); i < numValues; i++ {
+      spacedValues[i] = bitutil.BitIsSet(bitmap, int(bitmapOffset+i))
+    }
+
+    if len(spacedValues) != int(numRead) {
+      w.currentEncoder.(encoding.BooleanEncoder).PutSpaced(spacedValues, validBits, validBitsOffset)
+    } else {
+      w.currentEncoder.(encoding.BooleanEncoder).Put(spacedValues)
+    }
+  }
+
+  // Use bitmap-aware statistics update
+  if w.pageStatistics != nil {
+    nulls := numValues - numRead
+    w.pageStatistics.(*metadata.BooleanStatistics).UpdateFromBitmapSpaced(bitmap, bitmapOffset, numValues, validBits, validBitsOffset, nulls)
+  }
+
+  // Use bitmap-aware bloom filter hashing
+  if w.bloomFilter != nil {
+    metadata.InsertSpacedHashesFromBitmap(w.bloomFilter, numRead, bitmap, bitmapOffset, numValues, validBits, validBitsOffset)
+  }
+}
+
+{{end}}
+func (w *{{.Name}}ColumnChunkWriter) checkDictionarySizeLimit() {
+  if !w.hasDict || w.fallbackToNonDict {
+    return
+  }
+
+  dictEnc := w.currentEncoder.(encoding.DictEncoder)
+  if dictEnc.DictEncodedSize() >= int(w.props.DictionaryPageSizeLimit()) {
+    w.FallbackToPlain()
+    return
+  }
+
+  // Before any dict-encoded data page has been cut, check whether the
+  // dictionary is actually saving space against a PLAIN baseline. Mirrors
+  // parquet-mr's FallbackValuesWriter.shouldFallBack: if the dictionary
+  // plus the encoded indices meet or exceed the raw input bytes, fall back
+  // to PLAIN now and discard the dictionary — avoiding the mid-cardinality
+  // case where a dict page stays in the file alongside PLAIN pages without
+  // any net compression win. The comparison uses uncompressed sizes, which
+  // is only meaningful when pages are stored uncompressed: with a codec
+  // configured, the near-incompressible dict indices routinely beat PLAIN
+  // pages that compress well. The check therefore runs only for columns
+  // written without page compression, unless overridden per column with
+  // WithDictionaryCostFallbackFor.
+  if !w.dictPageWritten && len(w.pages) == 0 && w.props.DictionaryCostFallbackEnabledFor(w.descr.Path()) {
+    rawSize := dictEnc.ObservedRawSize()
+    encodedSize := dictEnc.EstimatedDataEncodedSize()
+    dictSize := int64(dictEnc.DictEncodedSize())
+    // For an all-nulls batch rawSize, dictSize, and encodedSize are all 0,
+    // so this 0 >= 0 path triggers. Harmless: nothing is encoded yet, so
+    // PLAIN vs dict doesn't matter and we avoid an empty dictionary.
+    if dictSize+encodedSize >= rawSize {
+      w.FallbackToPlain()
+    }
+  }
+}
+
+// FallbackToPlain switches this column from dictionary to PLAIN encoding when
+// the dictionary outgrows the configured page size limit. It mirrors
+// parquet-mr's FallbackValuesWriter: unflushed buffered values are re-encoded
+// as PLAIN (so the next data page is PLAIN, not dict-indexed), and the
+// dictionary page is emitted only if a dict-encoded data page had already
+// been cut before the overflow — otherwise the dictionary is discarded.
+func (w *{{.Name}}ColumnChunkWriter) FallbackToPlain() {
+  if w.currentEncoder.Encoding() != parquet.Encodings.PlainDict {
+    return
+  }
+
+  dictEnc := w.currentEncoder.(encoding.DictEncoder)
+  plainEnc := encoding.{{.Name}}EncoderTraits.Encoder(format.Encoding(parquet.Encodings.Plain), false, w.descr, w.mem).(encoding.{{.Name}}Encoder)
+
+  if len(w.pages) > 0 {
+    if err := w.WriteDictionaryPage(); err != nil {
+      panic(err)
+    }
+    if err := w.drainBufferedDataPages(); err != nil {
+      panic(err)
+    }
+  } else if err := w.populateBloomFilterFromEncoder(dictEnc); err != nil {
+    panic(err)
+  }
+
+  if err := dictEnc.FallBackTo(plainEnc); err != nil {
+    panic(err)
+  }
+
+  dictEnc.Release()
+  w.currentEncoder = plainEnc
+  w.encoding = parquet.Encodings.Plain
+  w.fallbackToNonDict = true
+}
+{{end}}
+
+// NewColumnChunkWriter constructs a column writer of the appropriate type by using the metadata builder
+// and writer properties to determine the correct type of column writer to construct and whether
+// or not to use dictionary encoding.
+func NewColumnChunkWriter(meta *metadata.ColumnChunkMetaDataBuilder, pager PageWriter, props *parquet.WriterProperties) ColumnChunkWriter {
+  descr := meta.Descr()
+  useDict := props.DictionaryEnabledFor(descr.Path()) && descr.PhysicalType() != parquet.Types.Boolean && descr.PhysicalType() != parquet.Types.Int96
+  enc := props.EncodingFor(descr.Path())
+  if useDict {
+    enc = props.DictionaryIndexEncoding()
+  }
+
+  switch descr.PhysicalType() {
+{{- range .In}}
+  case parquet.Types.{{if .physical}}{{.physical}}{{else}}{{.Name}}{{end}}:
+    return New{{.Name}}ColumnChunkWriter(meta, pager, useDict, enc, props)
+{{- end}}
+  default:
+    panic("unimplemented")
+  }
+}

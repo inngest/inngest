@@ -25,6 +25,7 @@ const GetFunctionsUsageDocument = graphql(`
           name
           isPaused
           isArchived
+          isDraining
           triggers {
             type
             value
@@ -87,6 +88,7 @@ const GetFunctionsDocument = graphql(`
           name
           isPaused
           isArchived
+          isDraining
           triggers {
             type
             value
@@ -220,6 +222,7 @@ const GetFunctionDocument = graphql(`
           }
         }
         keyQueuesEnabled
+        isDraining
       }
     }
   }

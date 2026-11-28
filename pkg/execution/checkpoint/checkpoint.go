@@ -94,9 +94,6 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
-	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
-	// The default is to always enforce the limits.
-	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
 	// SyncLifecycleListeners are notified synchronously (see
@@ -122,9 +119,6 @@ func New(o Opts) Checkpointer {
 	}
 	if o.BackoffFunc == nil {
 		o.BackoffFunc = backoff.GetLinearBackoffFunc(5 * time.Second)
-	}
-	if o.EnforceStepSizeLimits == nil {
-		o.EnforceStepSizeLimits = func(ctx context.Context, accountID uuid.UUID) bool { return true }
 	}
 
 	return checkpointer{o}
@@ -197,7 +191,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			RequestVersion: input.Metadata.Config.RequestVersion,
 			StartedAt:      input.Metadata.Config.StartedAt,
 			HasAI:          input.Metadata.Config.HasAI,
-		}); err != nil {
+		}); err != nil && !state.IsRunNotFound(err) {
 			return fmt.Errorf("updating metadata to force step plan: %w", err)
 		}
 		// Update the local metadata so subsequent operations see the change
@@ -226,10 +220,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 		}
 	}
 
-	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
-
 	if !complete {
-		if enforceStepSizeLimits && input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
+		if input.Metadata.Metrics.StateSize+stepOutputSize(ordered) > consts.DefaultMaxStateSizeLimit {
 			return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 		}
 	}
@@ -248,7 +240,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+			if len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
@@ -432,6 +424,13 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				)
 			}
 
+		case enums.OpcodeSubscribeRead:
+			// A lazy op that only draws a read of an inbox. It never moves the
+			// run to async, and a failure to draw it never fails the run.
+			if err := tracing.InboxRead(ctx, c.TracerProvider, input.Metadata, op, time.Now()); err != nil {
+				l.Warn("error drawing an inbox read in checkpoint", "error", err, "step_id", sanitizeLogValue(op.ID))
+			}
+
 		case enums.OpcodeDeferAbort:
 			// Sync listeners: see the OpcodeDeferAdd case above.
 			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, input.Metadata, op); err != nil {
@@ -546,9 +545,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 		}
 	}
 
-	enforceStepSizeLimits := c.EnforceStepSizeLimits(ctx, input.AccountID)
-
-	if enforceStepSizeLimits && md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
+	if md.Metrics.StateSize+stepOutputSize(input.Steps) > consts.DefaultMaxStateSizeLimit {
 		return fmt.Errorf("run state size limit exceeded: %w", sv1.ErrStateOverflowed)
 	}
 
@@ -565,7 +562,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			if enforceStepSizeLimits && len(output) > consts.MaxStepOutputSize {
+			if len(output) > consts.MaxStepOutputSize {
 				return fmt.Errorf("step %s output too large: %w", op.ID, sv1.ErrStepOutputTooLarge)
 			}
 
@@ -660,6 +657,11 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 					"step_id", sanitizeLogValue(op.ID),
 					"run_id", md.ID.RunID.String(),
 				)
+			}
+
+		case enums.OpcodeSubscribeRead:
+			if err := tracing.InboxRead(ctx, c.TracerProvider, &md, op, time.Now()); err != nil {
+				l.Warn("error drawing an inbox read in checkpoint", "error", err, "step_id", sanitizeLogValue(op.ID))
 			}
 
 		case enums.OpcodeDeferAbort:

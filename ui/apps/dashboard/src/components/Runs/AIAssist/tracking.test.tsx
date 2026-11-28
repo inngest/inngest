@@ -4,14 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useRunAITracking } from './tracking';
 
-const { trackEvent } = vi.hoisted(() => ({ trackEvent: vi.fn() }));
-vi.mock('@/utils/tracking', () => ({
-  useTrackingUser: () => ({
-    external_id: 'person-1',
-    account_id: 'account-1',
-    name: null,
+const { track } = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock('@/utils/segment', () => ({ analytics: { track } }));
+vi.mock('@clerk/tanstack-react-start', () => ({
+  useOrganization: () => ({
+    organization: { publicMetadata: { accountID: 'account-1' } },
   }),
-  trackEvent,
 }));
 afterEach(() => {
   cleanup();
@@ -24,41 +22,66 @@ describe('Runs AI tracking', () => {
     (view) => {
       const { result } = renderHook(() => useRunAITracking('debug', view));
       result.current({ action: 'prompt_copied' });
-      expect(trackEvent.mock.lastCall?.[0].data).toEqual({
+      expect(track.mock.lastCall?.[1]).toEqual({
+        feature: 'runs-ai-assist',
+        account_id: 'account-1',
         action: 'prompt_copied',
         surface: 'run_details',
         template_version: 'run_debug_v1',
         detail_view: view,
       });
-    }
+    },
   );
 
-  it('uses the existing identity and emits only categorical feature data', () => {
+  it('routes discovery through Segment with an explicit account ID', () => {
     const { result, rerender } = renderHook(() => useRunAITracking('fn'));
     result.current({ action: 'opened' });
     rerender();
     result.current({ action: 'prompt_copied' });
-    expect(trackEvent).toHaveBeenLastCalledWith({
-      name: 'app/runs.ai_assist.action',
-      v: '1',
-      user: { external_id: 'person-1', account_id: 'account-1', name: null },
-      data: {
-        action: 'prompt_copied',
-        surface: 'function_runs',
-        template_version: 'basic_v1',
-      },
+    expect(track).toHaveBeenLastCalledWith('Assistant Action Performed', {
+      feature: 'runs-ai-assist',
+      account_id: 'account-1',
+      action: 'prompt_copied',
+      surface: 'function_runs',
+      template_version: 'basic_v1',
     });
-    expect(JSON.stringify(trackEvent.mock.calls)).not.toContain('private');
-    expect(JSON.stringify(trackEvent.mock.calls)).not.toContain('secret');
+  });
+
+  it('tracks opening the ChatGPT listing as a setup handoff', () => {
+    const { result } = renderHook(() => useRunAITracking('debug', 'inline'));
+    result.current({ action: 'setup_opened', client: 'chatgpt' });
+    expect(track).toHaveBeenCalledWith('Assistant Action Performed', {
+      feature: 'runs-ai-assist',
+      account_id: 'account-1',
+      action: 'setup_opened',
+      client: 'chatgpt',
+      surface: 'run_details',
+      template_version: 'run_debug_v1',
+      detail_view: 'inline',
+    });
+  });
+
+  it('handles asynchronous transport failures', async () => {
+    const { result } = renderHook(() => useRunAITracking('env'));
+    track.mockRejectedValueOnce(new Error('offline'));
+    result.current({ action: 'opened' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(track).toHaveBeenCalledWith('Assistant Action Performed', {
+      feature: 'runs-ai-assist',
+      account_id: 'account-1',
+      action: 'opened',
+      surface: 'environment_runs',
+      template_version: 'basic_v1',
+    });
   });
 
   it('does not interrupt actions on tracking failure', () => {
     const { result } = renderHook(() => useRunAITracking('env'));
-    trackEvent.mockImplementationOnce(() => {
+    track.mockImplementationOnce(() => {
       throw new Error('offline');
     });
     expect(() =>
-      result.current({ action: 'setup_clicked', client: 'codex_cli' })
+      result.current({ action: 'setup_clicked', client: 'codex_cli' }),
     ).not.toThrow();
   });
 });

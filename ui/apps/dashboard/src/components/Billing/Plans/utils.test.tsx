@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   displayPlanName,
+  executionUsageDescription,
   isActive,
   pickSelfServePlans,
   processPlan,
@@ -303,5 +304,54 @@ describe('Business plan display', () => {
   it('matches a Growth current plan to the Business card', () => {
     expect(isActive({ name: 'Growth' }, { name: 'Business' })).toBe(true);
     expect(isActive({ name: 'Pro' }, { name: 'Business' })).toBe(false);
+  });
+});
+
+describe('execution usage description', () => {
+  it.each([
+    ['Pro', 1_000_000, 50, '1,000,000'],
+    ['Business', 10_000_000, 25, '10,000,000'],
+    ['Growth', 1_000_000, 50, '1,000,000'],
+    ['Pro', 4_999_999, 50, '4,999,999'],
+    ['Pro', 5_000_000, 25, '5,000,000'],
+    ['Pro', 14_999_999, 25, '14,999,999'],
+    ['Pro', 15_000_000, 20, '15,000,000'],
+    ['Pro', 49_999_999, 20, '49,999,999'],
+    ['Pro', 50_000_000, 15, '50,000,000'],
+  ])(
+    'uses the allowance for %s with %i included',
+    (name, limit, price, formattedLimit) => {
+      expect(
+        executionUsageDescription({ name }, { limit, overageAllowed: true }),
+      ).toBe(
+        `Usage beyond ${formattedLimit} is billed at $${price} per 1,000,000 at the start of the next billing cycle.`,
+      );
+    },
+  );
+
+  it.each([
+    ['Enterprise', 1_000_000, false],
+    ['Enterprise - Annual', 10_000_000, true],
+    ['enterprise custom', 50_000_000, false],
+    ['Enterprise', null, false],
+    ['Pro', null, true],
+  ])(
+    'keeps the existing copy for %s with limit %s',
+    (name, limit, overageAllowed) => {
+      expect(
+        executionUsageDescription({ name }, { limit, overageAllowed }),
+      ).toBe('Additional usage billed at the start of the next billing cycle.');
+    },
+  );
+
+  it.each([
+    ['Hobby', 50_000],
+    // Legacy "free-tier" plan: its slug is not a Hobby slug.
+    ['Free Tier', 50_000],
+    ['Pro', 1_000_000],
+  ])('shows the execution limit copy for %s without overage', (name, limit) => {
+    expect(
+      executionUsageDescription({ name }, { limit, overageAllowed: false }),
+    ).toBe('The maximum number of executions per month');
   });
 });

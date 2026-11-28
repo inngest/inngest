@@ -1,0 +1,33 @@
+{
+  "description": "metadata rolls emissions up per span, so only its group key (run_id, span_id) and run_queued_at are pushed.",
+  "mode": "product",
+  "tables": {
+    "metadata": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "metadata.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      },
+      {
+        "logical": "scope = 'step'",
+        "pushed": false,
+        "kept": "computed column"
+      },
+      {
+        "logical": "step_index \u003e= 1",
+        "pushed": false,
+        "kept": "computed column"
+      },
+      {
+        "logical": "step_index \u003c= 3",
+        "pushed": false,
+        "kept": "computed column"
+      },
+      {
+        "logical": "step_attempt \u003e -1",
+        "pushed": false,
+        "kept": "computed column"
+      }
+    ]
+  }
+}

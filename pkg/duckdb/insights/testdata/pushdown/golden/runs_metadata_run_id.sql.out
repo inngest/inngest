@@ -1,0 +1,21 @@
+{
+  "description": "runs' run_id filter also goes to the metadata rollup's source, which nothing else reads.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "runs.run_id = '01J0000000000000000000000A'",
+        "pushed": true,
+        "joined": [
+          "metadata.run_id = '01J0000000000000000000000A'"
+        ]
+      },
+      {
+        "logical": "status = 'Completed'",
+        "physical": "runs.status = 'Completed'",
+        "pushed": true
+      }
+    ]
+  }
+}

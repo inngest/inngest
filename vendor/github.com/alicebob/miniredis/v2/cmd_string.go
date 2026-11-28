@@ -3,7 +3,9 @@
 package miniredis
 
 import (
+	"math"
 	"math/big"
+	"math/bits"
 	"strconv"
 	"strings"
 	"time"
@@ -11,24 +13,29 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
+// maxStringLength is the size limit of a string in Redis, the default of the
+// proto-max-bulk-len config.
+const maxStringLength = 512 * 1024 * 1024
+
 // commandsString handles all string value operations.
 func commandsString(m *Miniredis) {
 	m.srv.Register("APPEND", m.cmdAppend)
-	m.srv.Register("BITCOUNT", m.cmdBitcount)
+	m.srv.Register("BITCOUNT", m.cmdBitcount, server.ReadOnlyOption())
 	m.srv.Register("BITOP", m.cmdBitop)
-	m.srv.Register("BITPOS", m.cmdBitpos)
+	m.srv.Register("BITPOS", m.cmdBitpos, server.ReadOnlyOption())
 	m.srv.Register("DECRBY", m.cmdDecrby)
 	m.srv.Register("DECR", m.cmdDecr)
-	m.srv.Register("GETBIT", m.cmdGetbit)
-	m.srv.Register("GET", m.cmdGet)
-	m.srv.Register("GETEX", m.cmdGetex)
-	m.srv.Register("GETRANGE", m.cmdGetrange)
-	m.srv.Register("GETSET", m.cmdGetset)
+	m.srv.Register("DELEX", m.cmdDelex)
+	m.srv.Register("GETBIT", m.cmdGetbit, server.ReadOnlyOption())
 	m.srv.Register("GETDEL", m.cmdGetdel)
+	m.srv.Register("GETEX", m.cmdGetex)
+	m.srv.Register("GET", m.cmdGet, server.ReadOnlyOption())
+	m.srv.Register("GETRANGE", m.cmdGetrange, server.ReadOnlyOption())
+	m.srv.Register("GETSET", m.cmdGetset)
 	m.srv.Register("INCRBYFLOAT", m.cmdIncrbyfloat)
 	m.srv.Register("INCRBY", m.cmdIncrby)
 	m.srv.Register("INCR", m.cmdIncr)
-	m.srv.Register("MGET", m.cmdMget)
+	m.srv.Register("MGET", m.cmdMget, server.ReadOnlyOption())
 	m.srv.Register("MSET", m.cmdMset)
 	m.srv.Register("MSETNX", m.cmdMsetnx)
 	m.srv.Register("PSETEX", m.cmdPsetex)
@@ -37,20 +44,12 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("SET", m.cmdSet)
 	m.srv.Register("SETNX", m.cmdSetnx)
 	m.srv.Register("SETRANGE", m.cmdSetrange)
-	m.srv.Register("STRLEN", m.cmdStrlen)
+	m.srv.Register("STRLEN", m.cmdStrlen, server.ReadOnlyOption())
 }
 
 // SET
 func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -96,7 +95,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			expire, err := strconv.Atoi(args[1])
+			expire, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
@@ -129,6 +128,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if (opts.nx && opts.xx) || (opts.keepttl && opts.ttlSet) {
+			c.WriteError(msgSyntaxError)
+			return
+		}
 		db := m.db(ctx.selectedDB)
 
 		readonly := false
@@ -160,7 +163,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 			}
 		}
 		if opts.get {
-			if t, ok := db.keys[opts.key]; ok && t != "string" {
+			if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 				c.WriteError(msgWrongType)
 				return
 			}
@@ -191,15 +194,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 
 // SETEX
 func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -229,15 +224,7 @@ func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
 
 // PSETEX
 func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -270,15 +257,7 @@ func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
 
 // SETNX
 func (m *Miniredis) cmdSetnx(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -299,15 +278,7 @@ func (m *Miniredis) cmdSetnx(c *server.Peer, cmd string, args []string) {
 
 // MSET
 func (m *Miniredis) cmdMset(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -334,15 +305,7 @@ func (m *Miniredis) cmdMset(c *server.Peer, cmd string, args []string) {
 
 // MSETNX
 func (m *Miniredis) cmdMsetnx(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -382,15 +345,7 @@ func (m *Miniredis) cmdMsetnx(c *server.Peer, cmd string, args []string) {
 
 // GET
 func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -403,7 +358,7 @@ func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		if db.t(key) != "string" {
+		if db.t(key) != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -414,15 +369,7 @@ func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
 
 // GETEX
 func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -452,7 +399,7 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			expire, err := strconv.Atoi(args[1])
+			expire, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
@@ -483,16 +430,20 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		switch {
-		case opts.persist:
-			delete(db.ttl, opts.key)
-		case opts.ttl != 0:
-			db.ttl[opts.key] = opts.ttl
-		}
-
-		if db.t(opts.key) != "string" {
+		if db.t(opts.key) != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
+		}
+
+		switch {
+		case opts.persist:
+			if _, ok := db.ttl[opts.key]; ok {
+				delete(db.ttl, opts.key)
+				db.incr(opts.key)
+			}
+		case opts.ttl != 0:
+			db.ttl[opts.key] = opts.ttl
+			db.incr(opts.key)
 		}
 
 		c.WriteBulk(db.stringGet(opts.key))
@@ -501,15 +452,7 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 
 // GETSET
 func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -518,7 +461,7 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -538,15 +481,7 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 
 // GETDEL
 func (m *Miniredis) cmdGetdel(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -560,7 +495,7 @@ func (m *Miniredis) cmdGetdel(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		if db.t(key) != "string" {
+		if db.t(key) != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -573,15 +508,7 @@ func (m *Miniredis) cmdGetdel(c *server.Peer, cmd string, args []string) {
 
 // MGET
 func (m *Miniredis) cmdMget(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -590,7 +517,7 @@ func (m *Miniredis) cmdMget(c *server.Peer, cmd string, args []string) {
 
 		c.WriteLen(len(args))
 		for _, k := range args {
-			if t, ok := db.keys[k]; !ok || t != "string" {
+			if t, ok := db.keys[k]; !ok || t != keyTypeString {
 				c.WriteNull()
 				continue
 			}
@@ -607,15 +534,7 @@ func (m *Miniredis) cmdMget(c *server.Peer, cmd string, args []string) {
 
 // INCR
 func (m *Miniredis) cmdIncr(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -623,72 +542,56 @@ func (m *Miniredis) cmdIncr(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		key := args[0]
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
-		v, err := db.stringIncr(key, +1)
+		v, err := db.stringIncr64(key, +1)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
 // INCRBY
 func (m *Miniredis) cmdIncrby(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
 	var opts struct {
 		key   string
-		delta int
+		delta int64
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.delta); !ok {
+	if ok := optInt64(c, args[1], &opts.delta); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
 
-		v, err := db.stringIncr(opts.key, opts.delta)
+		v, err := db.stringIncr64(opts.key, opts.delta)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
 // INCRBYFLOAT
 func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -703,7 +606,7 @@ func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -720,15 +623,7 @@ func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
 
 // DECR
 func (m *Miniredis) cmdDecr(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -736,72 +631,61 @@ func (m *Miniredis) cmdDecr(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		key := args[0]
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
-		v, err := db.stringIncr(key, -1)
+		v, err := db.stringIncr64(key, -1)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
 // DECRBY
 func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
 	var opts struct {
 		key   string
-		delta int
+		delta int64
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.delta); !ok {
+	if ok := optInt64(c, args[1], &opts.delta); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if opts.delta == math.MinInt64 {
+			c.WriteError("ERR decrement would overflow")
+			return
+		}
+
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
 
-		v, err := db.stringIncr(opts.key, -opts.delta)
+		v, err := db.stringIncr64(opts.key, -opts.delta)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
 // STRLEN
 func (m *Miniredis) cmdStrlen(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -810,7 +694,7 @@ func (m *Miniredis) cmdStrlen(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -821,15 +705,7 @@ func (m *Miniredis) cmdStrlen(c *server.Peer, cmd string, args []string) {
 
 // APPEND
 func (m *Miniredis) cmdAppend(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -838,7 +714,7 @@ func (m *Miniredis) cmdAppend(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -852,15 +728,7 @@ func (m *Miniredis) cmdAppend(c *server.Peer, cmd string, args []string) {
 
 // GETRANGE
 func (m *Miniredis) cmdGetrange(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -880,7 +748,7 @@ func (m *Miniredis) cmdGetrange(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -892,25 +760,17 @@ func (m *Miniredis) cmdGetrange(c *server.Peer, cmd string, args []string) {
 
 // SETRANGE
 func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
 	var opts struct {
 		key   string
-		pos   int
+		pos   int64
 		subst string
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.pos); !ok {
+	if ok := optInt64(c, args[1], &opts.pos); !ok {
 		return
 	}
 	if opts.pos < 0 {
@@ -923,19 +783,30 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
 
+		if opts.subst == "" {
+			// Like Redis: nothing changes, and a missing key isn't created.
+			c.WriteInt(len(db.stringKeys[opts.key]))
+			return
+		}
+		if opts.pos > int64(maxStringLength)-int64(len(opts.subst)) {
+			c.WriteError(msgStringTooLong)
+			return
+		}
+
 		v := []byte(db.stringKeys[opts.key])
-		end := opts.pos + len(opts.subst)
+		pos := int(opts.pos)
+		end := pos + len(opts.subst)
 		if len(v) < end {
 			newV := make([]byte, end)
 			copy(newV, v)
 			v = newV
 		}
-		copy(v[opts.pos:end], opts.subst)
+		copy(v[pos:end], opts.subst)
 		db.stringSet(opts.key, string(v))
 		c.WriteInt(len(v))
 	})
@@ -943,15 +814,7 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 
 // BITCOUNT
 func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -972,6 +835,10 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 		}
 		args = args[2:]
 	}
+	if len(args) != 0 {
+		c.WriteError(msgSyntaxError)
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -980,7 +847,7 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		if db.t(opts.key) != "string" {
+		if db.t(opts.key) != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -1002,15 +869,7 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 
 // BITOP
 func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 		return
 	}
 
@@ -1030,13 +889,13 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 		switch opts.op {
 		case "AND", "OR", "XOR":
 			first := opts.input[0]
-			if t, ok := db.keys[first]; ok && t != "string" {
+			if t, ok := db.keys[first]; ok && t != keyTypeString {
 				c.WriteError(msgWrongType)
 				return
 			}
 			res := []byte(db.stringKeys[first])
 			for _, vk := range opts.input[1:] {
-				if t, ok := db.keys[vk]; ok && t != "string" {
+				if t, ok := db.keys[vk]; ok && t != keyTypeString {
 					c.WriteError(msgWrongType)
 					return
 				}
@@ -1048,7 +907,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 				}[opts.op]
 				res = sliceBinOp(cb, res, []byte(v))
 			}
-			db.del(opts.target, false) // Keep TTL
+			db.del(opts.target, true)
 			if len(res) == 0 {
 				db.del(opts.target, true)
 			} else {
@@ -1062,7 +921,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 				return
 			}
 			key := opts.input[0]
-			if t, ok := db.keys[key]; ok && t != "string" {
+			if t, ok := db.keys[key]; ok && t != keyTypeString {
 				c.WriteError(msgWrongType)
 				return
 			}
@@ -1070,7 +929,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 			for i := range value {
 				value[i] = ^value[i]
 			}
-			db.del(opts.target, false) // Keep TTL
+			db.del(opts.target, true)
 			if len(value) == 0 {
 				db.del(opts.target, true)
 			} else {
@@ -1085,15 +944,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 
 // BITPOS
 func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 || len(args) > 4 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, between(2, 4)) {
 		return
 	}
 
@@ -1122,9 +973,14 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if opts.Bit != 0 && opts.Bit != 1 {
+			c.WriteError("ERR The bit argument must be 1 or 0.")
+			return
+		}
+
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.Key]; ok && t != "string" {
+		if t, ok := db.keys[opts.Key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		} else if !ok {
@@ -1186,15 +1042,7 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 
 // GETBIT
 func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -1206,7 +1054,7 @@ func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
 	if ok := optIntErr(c, args[1], &opts.bit, "ERR bit offset is not an integer or out of range"); !ok {
 		return
 	}
-	if opts.bit < 0 {
+	if opts.bit < 0 || opts.bit/8 >= maxStringLength {
 		setDirty(c)
 		c.WriteError("ERR bit offset is not an integer or out of range")
 		return
@@ -1215,7 +1063,7 @@ func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -1238,15 +1086,7 @@ func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
 
 // SETBIT
 func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -1259,7 +1099,7 @@ func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
 	if ok := optIntErr(c, args[1], &opts.bit, "ERR bit offset is not an integer or out of range"); !ok {
 		return
 	}
-	if opts.bit < 0 {
+	if opts.bit < 0 || opts.bit/8 >= maxStringLength {
 		setDirty(c)
 		c.WriteError("ERR bit offset is not an integer or out of range")
 		return
@@ -1276,7 +1116,7 @@ func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[opts.key]; ok && t != "string" {
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -1305,6 +1145,82 @@ func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+// DELEX
+func (m *Miniredis) cmdDelex(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, between(1, 4)) {
+		return
+	}
+
+	var opts struct {
+		key        string
+		opEQ       bool
+		matchValue string
+	}
+
+	// Parse arguments
+	if len(args) != 1 && len(args) != 3 {
+		c.WriteError(errWrongNumber("delex"))
+		return
+	}
+
+	if len(args) == 3 {
+		opts.key = args[0]
+		condition := strings.ToUpper(args[1])
+		opts.matchValue = args[2]
+
+		switch condition {
+		case "IFEQ":
+			opts.opEQ = true
+		case "IFNE":
+			opts.opEQ = false // well doh
+		case "IFDEQ", "IFDNE":
+			c.WriteError("ERR unsupported condition for DELEX: " + condition)
+			return
+		default:
+			c.WriteError("Invalid condition. Use IFEQ, IFNE, IFDEQ, or IFDNE")
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		// If no condition is specified, behave like DEL
+		if opts.key == "" {
+			key := args[0]
+			if db.exists(key) {
+				db.del(key, true) // delete expire
+				c.WriteInt(1)
+			} else {
+				c.WriteInt(0)
+			}
+			return
+		}
+
+		if !db.exists(opts.key) {
+			c.WriteInt(0)
+			return
+		}
+
+		if db.t(opts.key) != keyTypeString {
+			c.WriteError("ERR Key should be of string type if conditions are specified")
+			return
+		}
+		currentValue := db.stringKeys[opts.key]
+
+		shouldDelete := (currentValue == opts.matchValue)
+		if !opts.opEQ {
+			shouldDelete = !shouldDelete
+		}
+		if shouldDelete {
+			db.del(opts.key, true) // delete expire
+			c.WriteInt(1)
+		} else {
+			c.WriteInt(0)
+		}
+	})
+}
+
 // Redis range. both start and end can be negative.
 func withRange(v string, start, end int) string {
 	s, e := redisRange(len(v), start, end, true /* string getrange symantics */)
@@ -1314,10 +1230,7 @@ func withRange(v string, start, end int) string {
 func countBits(v []byte) int {
 	count := 0
 	for _, b := range []byte(v) {
-		for b > 0 {
-			count += int((b % uint8(2)))
-			b = b >> 1
-		}
+		count += bits.OnesCount8(uint8(b))
 	}
 	return count
 }

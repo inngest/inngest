@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+tan(0.0::fp32) = 0.0::fp32
+tan(0.5::fp64) = 0.5463024898437905::fp64
+tan(7.01::fp64) = 0.8891974677731088::fp64
+tan(-7.01::fp64) = -0.8891974677731088::fp64
+tan(null::fp64?) = null::fp64?

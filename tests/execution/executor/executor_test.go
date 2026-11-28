@@ -26,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -1812,7 +1813,7 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	require.Equal(t, int64(0), bufLen)
 }
 
-func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
+func TestCancelOnEventAfterRunStateDeletion(t *testing.T) {
 	ctx := context.Background()
 	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
@@ -1870,7 +1871,7 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	require.NoError(t, err)
 
 	exec, err := executor.NewExecutor(
-		executor.WithStateManager(smv2),
+		executor.WithStateManager(requireExistingRunForConsume{smv2}),
 		executor.WithPauseManager(pauseMgr),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
@@ -1879,6 +1880,7 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 		executor.WithShardRegistry(shardRegistry),
 		executor.WithTraceReader(dbcqrs),
 		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(adapter.Q())),
+		executor.WithExpressionAggregator(expragg.NewAggregator(ctx, 100, 1, nil, nil, nil, nil)),
 	)
 	require.NoError(t, err)
 
@@ -1896,6 +1898,15 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 			If:    &expr,
 		}},
 	}
+
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+	_, err = dbcqrs.UpsertApp(ctx, cqrs.UpsertAppParams{ID: appID, Name: "test-app"})
+	require.NoError(t, err)
+	_, err = dbcqrs.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+		ID: fnID, AppID: appID, Name: fn.Name, Config: string(config),
+	})
+	require.NoError(t, err)
 
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
@@ -1915,8 +1926,7 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Drain the lifecycle hook
-	<-work
+	run := <-work
 
 	// Verify the cancel pause was created for the "cancel/event" event,
 	// because the expression evaluated to true.
@@ -1926,4 +1936,38 @@ func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), bufLen)
+
+	result, err := exec.HandlePauses(ctx, event.BaseTrackedEvent{
+		ID:          ulid.MustNew(ulid.Timestamp(now.Add(time.Second)), rand.Reader),
+		AccountID:   accountID,
+		WorkspaceID: wsID,
+		Event:       event.Event{Name: "cancel/event"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int32(1), result.Handled())
+	exists, err := smv2.Exists(ctx, statev2.ID{
+		RunID: run.runID, FunctionID: fnID,
+		Tenant: statev2.Tenant{AccountID: accountID, EnvID: wsID, AppID: appID},
+	})
+	require.NoError(t, err)
+	require.False(t, exists)
+	bufLen, err = pauseMgr.BufferLen(ctx, pauses.Index{WorkspaceID: wsID, EventName: "cancel/event"})
+	require.NoError(t, err)
+	require.Zero(t, bufLen)
+}
+
+// Model run-state routing that cannot dispatch a consume after the run is deleted.
+type requireExistingRunForConsume struct {
+	statev2.RunService
+}
+
+func (s requireExistingRunForConsume) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+	exists, err := s.Exists(ctx, statev2.IDFromPause(p))
+	if err != nil {
+		return state.ConsumePauseResult{}, err
+	}
+	if !exists {
+		return state.ConsumePauseResult{}, state.ErrRunNotFound
+	}
+	return s.RunService.ConsumePause(ctx, p, opts)
 }

@@ -58,6 +58,10 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
 
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
+    if (!isValidUrl(inputUrl)) {
+      setUrlInvalid(true);
+      return;
+    }
     createApp();
   }
 
@@ -69,7 +73,7 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="min-w-[500px]">
+    <Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[500px]">
       <Modal.Header
         description={`Sync your Inngest application to the ${
           isDevServer ? 'Dev Server' : 'Server'

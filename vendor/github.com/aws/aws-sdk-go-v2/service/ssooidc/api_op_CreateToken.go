@@ -4,15 +4,12 @@ package ssooidc
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates and returns access and refresh tokens for clients that are
 // authenticated using client secrets. The access token can be used to fetch
-// short-term credentials for the assigned AWS accounts or to access application
+// short-lived credentials for the assigned AWS accounts or to access application
 // APIs using bearer authentication.
 func (c *Client) CreateToken(ctx context.Context, params *CreateTokenInput, optFns ...func(*Options)) (*CreateTokenOutput, error) {
 	if params == nil {
@@ -43,22 +40,21 @@ type CreateTokenInput struct {
 	// This member is required.
 	ClientSecret *string
 
-	// Supports the following OAuth grant types: Device Code and Refresh Token.
-	// Specify either of the following values, depending on the grant type that you
-	// want:
+	// Supports the following OAuth grant types: Authorization Code, Device Code, and
+	// Refresh Token. Specify one of the following values, depending on the grant type
+	// that you want:
+	//
+	// * Authorization Code - authorization_code
 	//
 	// * Device Code - urn:ietf:params:oauth:grant-type:device_code
 	//
 	// * Refresh Token - refresh_token
 	//
-	// For information about how to obtain the device code, see the StartDeviceAuthorization topic.
-	//
 	// This member is required.
 	GrantType *string
 
 	// Used only when calling this API for the Authorization Code grant type. The
-	// short-term code is used to identify this authorization request. This grant type
-	// is currently unsupported for the CreateTokenAPI.
+	// short-lived code is used to identify this authorization request.
 	Code *string
 
 	// Used only when calling this API for the Authorization Code grant type. This
@@ -66,9 +62,9 @@ type CreateTokenInput struct {
 	// challenge value the client passed at authorization time.
 	CodeVerifier *string
 
-	// Used only when calling this API for the Device Code grant type. This short-term
-	// code is used to identify this authorization request. This comes from the result
-	// of the StartDeviceAuthorizationAPI.
+	// Used only when calling this API for the Device Code grant type. This
+	// short-lived code is used to identify this authorization request. This comes from
+	// the result of the StartDeviceAuthorizationAPI.
 	DeviceCode *string
 
 	// Used only when calling this API for the Authorization Code grant type. This
@@ -77,7 +73,7 @@ type CreateTokenInput struct {
 	RedirectUri *string
 
 	// Used only when calling this API for the Refresh Token grant type. This token is
-	// used to refresh short-term tokens, such as the access token, that might expire.
+	// used to refresh short-lived tokens, such as the access token, that might expire.
 	//
 	// For more information about the features and limitations of the current IAM
 	// Identity Center OIDC implementation, see Considerations for Using this Guide in
@@ -86,10 +82,9 @@ type CreateTokenInput struct {
 	// [IAM Identity Center OIDC API Reference]: https://docs.aws.amazon.com/singlesignon/latest/OIDCAPIReference/Welcome.html
 	RefreshToken *string
 
-	// The list of scopes for which authorization is requested. The access token that
-	// is issued is limited to the scopes that are granted. If this value is not
-	// specified, IAM Identity Center authorizes all scopes that are configured for the
-	// client during the call to RegisterClient.
+	// The list of scopes for which authorization is requested. This parameter has no
+	// effect; the access token will always include all scopes configured during client
+	// registration.
 	Scope []string
 
 	noSmithyDocumentSerde
@@ -135,9 +130,6 @@ type CreateTokenOutput struct {
 }
 
 func (c *Client) addOperationCreateTokenMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsRestjson1_serializeOpCreateToken{}, middleware.After)
 	if err != nil {
 		return err
@@ -146,59 +138,17 @@ func (c *Client) addOperationCreateTokenMiddlewares(stack *middleware.Stack, opt
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "CreateToken"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateTokenValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opCreateToken(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -213,13 +163,8 @@ func (c *Client) addOperationCreateTokenMiddlewares(stack *middleware.Stack, opt
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opCreateToken(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "CreateToken",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

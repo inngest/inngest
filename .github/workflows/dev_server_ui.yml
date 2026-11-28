@@ -6,10 +6,12 @@ on:
     paths:
       - "ui/**"
       - "pkg/coreapi/**/*.graphql"
+      - ".github/workflows/dev_server_ui.yml"
   pull_request:
     paths:
       - "ui/**"
       - "pkg/coreapi/**/*.graphql"
+      - ".github/workflows/dev_server_ui.yml"
 
 jobs:
   build:
@@ -24,6 +26,9 @@ jobs:
           node-version-file: ".tool-versions"
       - name: Install
         run: pnpm install --frozen-lockfile
+        working-directory: ui/apps/dev-server-ui
+      - name: Test
+        run: pnpm test --run
         working-directory: ui/apps/dev-server-ui
       - name: Build
         run: pnpm build

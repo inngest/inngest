@@ -91,7 +91,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		err := d.batch.DeleteKeys(ctx, payload.FunctionID, payload.BatchID)
+		_, err := d.batch.DeleteKeys(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 		if err != nil {
 			return fmt.Errorf("could not delete batch: %w", err)
 		}

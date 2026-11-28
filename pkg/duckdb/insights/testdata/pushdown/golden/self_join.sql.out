@@ -1,0 +1,4 @@
+{
+  "description": "A table read twice could be filtered for only one of its reads: nothing is pushed for it.",
+  "mode": "product"
+}

@@ -45,12 +45,6 @@ local idemKeyFmt = "%s:batch_idem:%s"
 local batchKey = string.format(keyfmt, prefix, batchID)
 local batchMetadataKey = string.format("%s:metadata", batchKey)
 
--- set the batch status if it doesn't exist but don't overwrite
--- this is necessary for functions that never enabled batch before
-if is_status_empty(batchMetadataKey) then
-  set_batch_status(batchMetadataKey, batchStatusAppending)
-end
-
 -- Dedup: per-event SET key (O(1))
 local idemKey = string.format(idemKeyFmt, prefix, eventID)
 local newEvent = redis.call("SET", idemKey, "1", "NX", "EX", idempotenceSetTTL)
@@ -65,6 +59,12 @@ if not newEvent then
   return cjson.encode(resp)
 end
 
+-- set the batch status if it doesn't exist but don't overwrite
+-- this is necessary for functions that never enabled batch before
+if is_status_empty(batchMetadataKey) then
+  set_batch_status(batchMetadataKey, batchStatusAppending)
+end
+
 -- append event to batch
 local len = redis.call("RPUSH", batchKey, event)
 resp.committed = 1
@@ -75,7 +75,7 @@ if len == 1 then
     resp.status = "new"
 end
 
-local size = redis.call("MEMORY", "USAGE", batchKey)
+local size = update_batch_bytes(batchKey, batchMetadataKey, len - 1, len, resp.committedBytes)
 -- if batch is full
 if len >= batchLimit or size >= batchSizeLimit then
   if not is_status_empty(batchMetadataKey) then

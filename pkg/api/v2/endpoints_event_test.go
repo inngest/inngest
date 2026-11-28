@@ -350,6 +350,8 @@ func TestHTTPGateway_RequestBodyLimitsNormalizePaths(t *testing.T) {
 	}{
 		{"/api/v2/events/", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
 		{"/v2/events", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
+		{"/v2/apps/my-app/functions/pause", `{"functionIds":["echo"]}`, 256 << 10},
+		{"/api/v2/apps/my-app/functions/resume/", `{"functionIds":["echo"]}`, 256 << 10},
 		{"/v2/apps/my-app/functions/orders-created/replays", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
 		{"/api/v2/apps/my-app/functions/orders-created/replays/", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
 	} {
@@ -374,7 +376,7 @@ func TestHTTPGateway_RequestBodyLimitsNormalizePaths(t *testing.T) {
 	}
 }
 
-func TestHTTPGateway_TrailingSlashRemainsNotFound(t *testing.T) {
+func TestHTTPGateway_TrailingSlashMethodNotAllowed(t *testing.T) {
 	sender := &testEventSender{}
 	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
 	require.NoError(t, err)
@@ -382,6 +384,7 @@ func TestHTTPGateway_TrailingSlashRemainsNotFound(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
-	require.Equal(t, http.StatusNotFound, recorder.Code)
+	require.Equal(t, http.StatusNotImplemented, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "Method Not Allowed")
 	require.Nil(t, sender.event)
 }

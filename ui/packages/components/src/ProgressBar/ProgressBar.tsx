@@ -8,7 +8,7 @@ export type ProgressBarProps = {
   overageAllowed?: boolean;
   className?: string;
   indicatorClassName?: string;
-  kind?: 'default' | 'error' | 'warning' | 'caution';
+  kind?: 'default' | 'error' | 'warning' | 'caution' | 'boost';
   size?: 'default' | 'small';
 };
 
@@ -36,6 +36,7 @@ const ProgressBar = ({
         size === 'small' && kind === 'error' && 'bg-tertiary-xSubtle',
         size === 'small' && kind === 'warning' && 'bg-accent-xSubtle',
         size === 'small' && kind === 'caution' && 'bg-accent-3xSubtle',
+        size === 'small' && kind === 'boost' && 'bg-[rgb(var(--color-foreground-subtle))]',
         className
       )}
       value={progress}
@@ -48,6 +49,7 @@ const ProgressBar = ({
           kind === 'error' && 'bg-tertiary-intense',
           kind === 'warning' && 'bg-accent-moderate',
           kind === 'caution' && 'bg-accent-xSubtle',
+          kind === 'boost' && 'from-secondary-moderate to-secondary-xSubtle bg-gradient-to-r',
           indicatorClassName
         )}
         style={{ width: `${includedWidth}%` }}
@@ -59,6 +61,7 @@ const ProgressBar = ({
           kind === 'error' && 'bg-tertiary-intense',
           kind === 'warning' && 'bg-accent-moderate',
           kind === 'caution' && 'bg-accent-xSubtle',
+          kind === 'boost' && 'from-secondary-moderate to-secondary-xSubtle bg-gradient-to-r',
           indicatorClassName
         )}
         style={{ width: `${additionalWidth}%` }}

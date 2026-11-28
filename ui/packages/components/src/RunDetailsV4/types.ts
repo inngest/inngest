@@ -1,6 +1,8 @@
 import { isScoreKind } from '../RunDetails/ScoresAttrs';
+import { canonicalMetadataKind, hasMetadataKind } from '../RunDetailsShared/metadataKind';
 import {
   KindInngestAISummary,
+  KindInngestExperiment,
   KindInngestSandbox,
   KindInngestWarnings,
   KindPrefixInngestWarning,
@@ -40,7 +42,21 @@ export type Trace = {
   debugRunID?: string | null;
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
+  /** Small events on this span's row, such as messages arriving at an inbox */
+  ticks?: SpanTick[] | null;
   response?: ResponseInfo;
+};
+
+/** One small event on a span's row. It is drawn as a marker on the bar. */
+export type SpanTick = {
+  /** What ticked, such as a message's id */
+  id: string;
+  /** What it came through */
+  sources: string[];
+  /** When it happened */
+  at: string;
+  /** When something took it, if anything has */
+  readAt?: string | null;
 };
 
 export type ResponseInfo = {
@@ -75,6 +91,8 @@ export type SpanMetadata =
 export type SpanMetadataInngestAI = {
   scope: 'step_attempt' | 'extended_trace';
   kind: 'inngest.ai';
+  // See canonicalMetadataKind: absent from APIs that only return full kinds.
+  isUser?: boolean | null;
   updatedAt: string;
   values: AIMetadata;
 };
@@ -84,6 +102,7 @@ export type SpanMetadataInngestAI = {
 export type SpanMetadataInngestAISummary = {
   scope: 'run';
   kind: typeof KindInngestAISummary;
+  isUser?: boolean | null;
   updatedAt: string;
   values: AISummaryMetadata;
 };
@@ -91,6 +110,7 @@ export type SpanMetadataInngestAISummary = {
 export type SpanMetadataInngestExperiment = {
   scope: SpanMetadataScope;
   kind: 'inngest.experiment';
+  isUser?: boolean | null;
   updatedAt: string;
   values: {
     name: string;
@@ -105,6 +125,7 @@ export type SpanMetadataInngestExperiment = {
 export type SpanMetadataInngestHTTP = {
   scope: 'extended_trace';
   kind: 'inngest.http';
+  isUser?: boolean | null;
   updatedAt: string;
   values: {
     method: string;
@@ -121,6 +142,7 @@ export type SpanMetadataInngestHTTP = {
 export type SpanMetadataInngestHTTPTiming = {
   scope: 'step_attempt';
   kind: 'inngest.http.timing';
+  isUser?: boolean | null;
   updatedAt: string;
   values: {
     dns_lookup_ms: number;
@@ -135,6 +157,7 @@ export type SpanMetadataInngestHTTPTiming = {
 export type SpanMetadataInngestTiming = {
   scope: 'step_attempt';
   kind: 'inngest.timing';
+  isUser?: boolean | null;
   updatedAt: string;
   values: {
     queue_delay_ms?: number;
@@ -147,6 +170,7 @@ export type SpanMetadataInngestTiming = {
 export type SpanMetadataInngestResponseHeaders = {
   scope: 'extended_trace' | 'step_attempt';
   kind: 'inngest.response_headers';
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, string>;
 };
@@ -154,6 +178,7 @@ export type SpanMetadataInngestResponseHeaders = {
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindInngestWarnings;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Warnings;
 };
@@ -161,6 +186,7 @@ export type SpanMetadataInngestWarnings = {
 export type SpanMetadataInngestSandbox = {
   scope: SpanMetadataScope;
   kind: typeof KindInngestSandbox;
+  isUser?: boolean | null;
   updatedAt: string;
   values: SandboxMetadata;
 };
@@ -168,6 +194,7 @@ export type SpanMetadataInngestSandbox = {
 export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindInngestScore;
+  isUser?: boolean | null;
   updatedAt: string;
   // `inngest.score.<name>` holds the score's `{value}`, the legacy
   // `inngest.score` maps each score name to its `{value}`. Read these through
@@ -178,6 +205,7 @@ export type SpanMetadataInngestScore = {
 export type SpanMetadataUserland = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindUserland;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, unknown>;
 };
@@ -185,6 +213,7 @@ export type SpanMetadataUserland = {
 export type SpanMetadataUnknown = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKind;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, unknown>;
 };
@@ -270,30 +299,32 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
   return 'signal' in stepInfo;
 }
 
+// These match on canonicalMetadataKind, so they accept full and
+// prefix-stripped (+ isUser) kinds alike.
 export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInngestExperiment {
-  return md.kind === 'inngest.experiment';
+  return hasMetadataKind(md, KindInngestExperiment);
 }
 
 export function isSandboxMetadata(md: SpanMetadata): md is SpanMetadataInngestSandbox {
-  return md.kind === KindInngestSandbox;
+  return hasMetadataKind(md, KindInngestSandbox);
 }
 
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
-  return isScoreKind(md.kind);
+  return isScoreKind(canonicalMetadataKind(md));
 }
 
 // Matches the legacy `inngest.warnings` kind (a map of code to message) and per
 // code `inngest.warning.<code>` kinds.
 export function isWarningMetadata(md: SpanMetadata): md is SpanMetadataInngestWarnings {
+  const kind = canonicalMetadataKind(md);
   return (
-    md.kind === KindInngestWarnings ||
-    (md.kind.startsWith(KindPrefixInngestWarning) &&
-      md.kind.length > KindPrefixInngestWarning.length)
+    kind === KindInngestWarnings ||
+    (kind.startsWith(KindPrefixInngestWarning) && kind.length > KindPrefixInngestWarning.length)
   );
 }
 
 export function isAISummaryMetadata(md: SpanMetadata): md is SpanMetadataInngestAISummary {
-  return md.kind === KindInngestAISummary;
+  return hasMetadataKind(md, KindInngestAISummary);
 }
 
 /**

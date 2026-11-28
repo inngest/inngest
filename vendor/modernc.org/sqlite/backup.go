@@ -49,6 +49,28 @@ func (b *Backup) Finish() error {
 	}
 }
 
+// Remaining returns the number of source-database pages still to be backed
+// up at the conclusion of the most recent [Backup.Step] call. The value is
+// useful for driving progress UIs that need to estimate how much work is
+// left.
+//
+// If Step has not yet been called on this Backup, or if the most recent
+// Step returned false (SQLITE_DONE), Remaining returns 0.
+//
+// See https://www.sqlite.org/c3ref/backup_finish.html.
+func (b *Backup) Remaining() int {
+	return int(sqlite3.Xsqlite3_backup_remaining(b.srcConn.tls, b.pBackup))
+}
+
+// PageCount returns the total number of pages in the source database at the
+// conclusion of the most recent [Backup.Step] call. Pair with [Backup.Remaining]
+// to compute progress as a fraction (PageCount - Remaining) / PageCount.
+//
+// See https://www.sqlite.org/c3ref/backup_finish.html.
+func (b *Backup) PageCount() int {
+	return int(sqlite3.Xsqlite3_backup_pagecount(b.srcConn.tls, b.pBackup))
+}
+
 // Commit releases all resources associated with the Backup object but does not
 // close the destination database connection.
 //
@@ -60,6 +82,7 @@ func (b *Backup) Commit() (driver.Conn, error) {
 	if rc == sqlite3.SQLITE_OK {
 		return b.dstConn, nil
 	} else {
+		b.dstConn.Close()
 		return nil, b.srcConn.errstr(rc)
 	}
 }

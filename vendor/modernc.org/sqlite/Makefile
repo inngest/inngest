@@ -4,6 +4,11 @@
 
 .PHONY:	all build_all_targets clean edit editor test vendor work
 
+# Pinned deduplicator. undup folds byte-identical declarations shared across the
+# per-target generated files in lib/ and vec/ into build-tagged shared files,
+# keeping each tag's module download under Go's 500MB cap. Bump deliberately.
+UNDUP = modernc.org/undup@v0.0.5
+
 all: editor
 	golint 2>&1
 	staticcheck 2>&1
@@ -15,10 +20,10 @@ build_all_targets:
 	GOOS=darwin GOARCH=arm64 go build -v ./...
 	GOOS=freebsd GOARCH=amd64 go test -c -o /dev/null
 	GOOS=freebsd GOARCH=amd64 go build -v ./...
-	# GOOS=freebsd GOARCH=386 go test -c -o /dev/null
-	# GOOS=freebsd GOARCH=386 go build -v ./...
-	# GOOS=freebsd GOARCH=arm go test -c -o /dev/null
-	# GOOS=freebsd GOARCH=arm go build -v ./...
+	GOOS=freebsd GOARCH=386 go test -c -o /dev/null
+	GOOS=freebsd GOARCH=386 go build -v ./...
+	GOOS=freebsd GOARCH=arm go test -c -o /dev/null
+	GOOS=freebsd GOARCH=arm go build -v ./...
 	GOOS=freebsd GOARCH=arm64 go test -c -o /dev/null
 	GOOS=freebsd GOARCH=arm64 go build -v ./...
 	GOOS=linux GOARCH=386 go test -c -o /dev/null
@@ -37,8 +42,8 @@ build_all_targets:
 	GOOS=linux GOARCH=riscv64 go build -v ./...
 	GOOS=linux GOARCH=s390x go test -c -o /dev/null
 	GOOS=linux GOARCH=s390x go build -v ./...
-	# GOOS=netbsd GOARCH=amd64 go test -c -o /dev/null
-	# GOOS=netbsd GOARCH=amd64 go build -v ./...
+	GOOS=netbsd GOARCH=amd64 go test -c -o /dev/null
+	GOOS=netbsd GOARCH=amd64 go build -v ./...
 	GOOS=openbsd GOARCH=amd64 go test -c -o /dev/null
 	GOOS=openbsd GOARCH=amd64 go build -v ./...
 	GOOS=openbsd GOARCH=arm64 go test -c -o /dev/null
@@ -61,16 +66,30 @@ edit:
 editor:
 	go test -c -o /dev/null
 	go build -v  -o /dev/null ./...
-	cd vendor_libsqlite3 && go build -o /dev/null main.go
+	cd vendor_libs && go build -o /dev/null main.go
 
 test:
 	go test -v -timeout 24h
 	
 vendor:
-	cd vendor_libsqlite3 && go build -o ../vendor main.go
-	./vendor
+	# Reconstruct full per-target files (a no-op the first time), so the freshly
+	# vendored transpiles overwrite a clean tree with no stale shared files.
+	go run $(UNDUP) -expand -dir lib
+	go run $(UNDUP) -expand -dir vec
+	cd vendor_libs && go build -o ../vendor main.go
+	# ../libsqlite3 and ../libsqlite_vec are read one full per-target file at a
+	# time. They ship expanded today, but either may adopt the deduplicated
+	# layout (modernc.org/builder's NW autogen); the tool detects that and
+	# expands a temporary copy, leaving those checkouts untouched. Hence the pin:
+	# one version of record for this repo, wherever undup is invoked.
+	./vendor -undup=$(UNDUP)
 	rm -f vendor
-	make build_all_targets
+	# Fold byte-identical declarations back into build-tagged shared files. undup
+	# only touches files carrying the generated-code marker, never hand-written
+	# platform files (libsqlite3_*.go, hooks_*.go, ...).
+	go run $(UNDUP) -dir lib
+	go run $(UNDUP) -dir vec
+	gofmt -s -w lib/sqlite*.go vec/vec*.go
 	make build_all_targets
 
 work:

@@ -1,0 +1,1 @@
+SELECT attributes ->> '_inngest.defer.event_id' FROM extended_trace_spans

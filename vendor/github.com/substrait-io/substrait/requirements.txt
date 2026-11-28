@@ -1,0 +1,6 @@
+antlr4-python3-runtime==4.13.2
+black==24.8.0
+flake8==7.0.0
+protobuf==6.33.1
+pytest==8.3.4
+pyyaml==6.0.2
