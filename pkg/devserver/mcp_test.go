@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2operations"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 )
@@ -248,6 +249,117 @@ func TestMCPNotImplementedIsToolError(t *testing.T) {
 			"message": "Sessions not implemented in OSS",
 		}},
 	}, result.StructuredContent)
+}
+
+func TestMCPExecuteV2ForwardsAuthHeader(t *testing.T) {
+	var receivedAuthHeader string
+
+	handler := &MCPHandler{
+		v2: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedAuthHeader = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"status":"ok"}}`))
+		}),
+	}
+
+	ctx := context.WithValue(context.Background(), mcpAuthHeaderContextKey{}, "Bearer signkey-test-secret")
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+	result, err := handler.executeV2(ctx, apiv2endpoint.Endpoint{ToolName: "health"}, req)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer signkey-test-secret", receivedAuthHeader)
+
+	// If the request already has an Authorization header, it should be preserved
+	reqWithAuth := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+	reqWithAuth.Header.Set("Authorization", "Bearer client-custom-token")
+	result, err = handler.executeV2(ctx, apiv2endpoint.Endpoint{ToolName: "health"}, reqWithAuth)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer client-custom-token", receivedAuthHeader)
+}
+
+type authRoundTripper struct {
+	authHeader string
+	base       http.RoundTripper
+}
+
+func (rt *authRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	clone := r.Clone(r.Context())
+	if rt.authHeader != "" {
+		clone.Header.Set("Authorization", rt.authHeader)
+	}
+	base := rt.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(clone)
+}
+
+func TestMCPRouteSigningKeyAuth(t *testing.T) {
+	signingKey := "signkey-test-0123456789abcdef0123456789abcdef"
+	hashedKey, err := authn.HashedSigningKey(signingKey)
+	require.NoError(t, err)
+
+	authMiddleware := authn.SigningKeyMiddleware(&signingKey)
+	v2Handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"status":"ok"}}`))
+	}))
+
+	router := chi.NewRouter()
+	addMCPRoute(router, newMCPHandler(nil, nil, 0, v2Handler), authMiddleware)
+
+	initBody := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}`
+
+	for _, tc := range []struct {
+		name       string
+		authHeader string
+		wantStatus int
+	}{
+		{name: "missing authorization", authHeader: "", wantStatus: http.StatusUnauthorized},
+		{name: "invalid authorization", authHeader: "Bearer signkey-test-wrong", wantStatus: http.StatusUnauthorized},
+		{name: "valid plaintext signing key", authHeader: "Bearer " + signingKey, wantStatus: http.StatusOK},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(initBody))
+			req.Header.Set("Accept", "application/json, text/event-stream")
+			req.Header.Set("Content-Type", "application/json")
+			if tc.authHeader != "" {
+				req.Header.Set("Authorization", tc.authHeader)
+			}
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+			require.Equal(t, tc.wantStatus, recorder.Code)
+		})
+	}
+
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	for _, tc := range []struct {
+		name  string
+		token string
+	}{
+		{name: "plaintext signing key", token: signingKey},
+		{name: "hashed signing key", token: hashedKey},
+	} {
+		t.Run("end-to-end tool call with "+tc.name, func(t *testing.T) {
+			httpClient := &http.Client{
+				Transport: &authRoundTripper{authHeader: "Bearer " + tc.token},
+			}
+			client := mcp.NewClient(&mcp.Implementation{Name: "auth-test", Version: "1"}, nil)
+			session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{
+				Endpoint:   srv.URL + "/mcp",
+				HTTPClient: httpClient,
+			}, nil)
+			require.NoError(t, err)
+			defer session.Close()
+
+			result, err := session.CallTool(t.Context(), &mcp.CallToolParams{Name: "health"})
+			require.NoError(t, err)
+			require.False(t, result.IsError)
+		})
+	}
 }
 
 type listedMCPTool struct {

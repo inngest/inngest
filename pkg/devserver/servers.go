@@ -152,7 +152,7 @@ func newAPITask(p apiParams) (servicefx.Task, error) {
 	}
 
 	mcpHandler := newMCPHandler(p.Devserver.HandleEvent, p.CQRS, p.Opts.Tick, apiv2Handler)
-	addMCPRoute(devAPI, mcpHandler)
+	addMCPRoute(devAPI, mcpHandler, authMiddleware)
 
 	mounts := []api.Mount{
 		{At: "/", Router: devAPI},
