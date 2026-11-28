@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.54.1] - 2026-11-28
+
+### 🐛 Bug Fixes
+
+- *(duckdb)* Fix the Iceberg catalog's read-only check, commit cleanup and cached creds scope (#5300)
+- *(duckdb)* Always read unnest select items in federated lineage (#5301)
+- *(batch)* Don't create or schedule empty batches on duplicate events (#5309)
+- *(queue)* Support pausing key queue refills (#5315)
+- *(executor)* Skip consuming cancellation pauses (#5305)
+- *(duckdb)* Fix quack appender sessions after failed and cancelled flushes (#5303)
+- *(duckdb)* Key the metadata rollup by scope and drop id-less spans from insights_steps (#5302)
+- *(queue)* Reject stale backlog normalization writes (#5328)
+- *(realtime)* Recover interrupted Redis subscriptions (#5331)
+- *(queue)* Recover expired refill reservations without starving dispatch (#5146)
+- *(state)* Handle past pause deadlines (#5332)
+
 ## [v1.54.0] - 2026-11-20
 
 ### 🚀 Features
@@ -42,6 +58,7 @@ All notable changes to this project will be documented in this file.
 
 - *(execution)* Change return type of schedule with routing errors (#5251)
 - Refactor to use fx (#5252)
+- *(release)* V1.54.0 (#5250)
 
 ## [v1.53.0] - 2026-11-12
 
